@@ -1,0 +1,55 @@
+name: Sitio web (www.nucleoerp.cl)
+
+# Publica apps/web en GitHub Pages con dominio propio. Si existe una versión publicada
+# (GitHub Release) con NucleoERPSetup.exe, lo incluye en /descargas/ con su SHA-256.
+on:
+  push:
+    branches: [main]
+    paths: ["apps/web/**", "tools/build_web.py", ".github/workflows/web.yml"]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Descargar el instalador de la última versión (si existe)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p installer
+          if gh release download --repo "${{ github.repository }}" --pattern NucleoERPSetup.exe --dir installer; then
+            echo "INSTALLER=installer/NucleoERPSetup.exe" >> "$GITHUB_ENV"
+          else
+            echo "Aún no hay versiones publicadas: el sitio mostrará 'muy pronto'."
+          fi
+      - name: Construir sitio
+        run: |
+          if [ -n "${INSTALLER:-}" ]; then
+            python3 tools/build_web.py --out dist-web --installer "$INSTALLER"
+          else
+            python3 tools/build_web.py --out dist-web
+          fi
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist-web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

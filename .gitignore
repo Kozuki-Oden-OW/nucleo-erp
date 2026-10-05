@@ -1,0 +1,14 @@
+target/
+node_modules/
+dist/
+*.log
+.DS_Store
+apps/desktop/src-tauri/gen/
+# Datos locales de prueba: nunca versionar bases ni respaldos
+*.db
+*.db-wal
+*.db-shm
+*.erpbackup
+dist-web/
+*.privkey
+nucleo-bench.db*

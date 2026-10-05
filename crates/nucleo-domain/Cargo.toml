@@ -1,0 +1,15 @@
+[package]
+name = "nucleo-domain"
+description = "Entidades, validaciones y cálculos puros de NÚCLEO ERP (sin IO)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+rust_decimal.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+rust_decimal_macros.workspace = true

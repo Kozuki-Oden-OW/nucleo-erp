@@ -1,0 +1,54 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/nucleo-domain",
+    "crates/nucleo-rules",
+    "crates/nucleo-db",
+    "crates/nucleo-io",
+    "crates/nucleo-app",
+    "apps/desktop/src-tauri",
+    "tools/nucleo-tools",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+license = "AGPL-3.0-or-later"
+authors = ["NÚCLEO ERP"]
+repository = "https://github.com/Kozuki-Oden-OW/nucleo-erp"
+
+[workspace.dependencies]
+# Internos
+nucleo-domain = { path = "crates/nucleo-domain" }
+nucleo-rules = { path = "crates/nucleo-rules" }
+nucleo-db = { path = "crates/nucleo-db" }
+nucleo-io = { path = "crates/nucleo-io" }
+nucleo-app = { path = "crates/nucleo-app" }
+
+# Externos (cada uno justificado en docs/DECISIONS.md)
+rusqlite = { version = "0.40", features = ["bundled-sqlcipher-vendored-openssl", "backup"] }
+rust_decimal = { version = "1", features = ["serde-with-str"] }
+rust_decimal_macros = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+time = { version = "0.3", features = ["serde", "formatting", "parsing", "macros"] }
+uuid = { version = "1", features = ["v7", "serde"] }
+sha2 = "0.10"
+hex = "0.4"
+aes-gcm = "0.10"
+argon2 = "0.5"
+getrandom = "0.3"
+tar = "0.4"
+tempfile = "3"
+data-encoding = "2"
+keyring = "3"
+ed25519-dalek = "2.2"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "unwind"
+strip = true

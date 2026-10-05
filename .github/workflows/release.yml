@@ -1,0 +1,69 @@
+name: Publicar versión
+
+# Al crear una etiqueta vX.Y.Z: compila el instalador en Windows, crea la versión (GitHub
+# Release) con NucleoERPSetup.exe y su SHA-256, y actualiza www.nucleoerp.cl/descargar/.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+      - name: Instalar y compilar frontend
+        working-directory: apps/desktop
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+      - uses: Swatinem/rust-cache@v2
+      - name: Pruebas
+        run: cargo test --workspace
+      - name: Construir instalador
+        working-directory: apps/desktop
+        run: pnpm tauri build --bundles nsis
+      - name: Preparar archivos
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem target/release/bundle/nsis/*.exe | Select-Object -First 1
+          New-Item -ItemType Directory -Force out | Out-Null
+          Copy-Item $exe.FullName out/NucleoERPSetup.exe
+          $h = (Get-FileHash out/NucleoERPSetup.exe -Algorithm SHA256).Hash.ToLower()
+          "$h  NucleoERPSetup.exe" | Out-File -Encoding ascii out/NucleoERPSetup.exe.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: instalador
+          path: out/
+
+  release:
+    needs: installer
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: instalador
+          path: out
+      - name: Crear versión en GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" out/NucleoERPSetup.exe out/NucleoERPSetup.exe.sha256 \
+            --repo "${{ github.repository }}" --title "NÚCLEO ERP ${{ github.ref_name }}" \
+            --notes "Instalador para Windows 10/11 x64. Descarga oficial: https://www.nucleoerp.cl/descargar/"
+
+  web:
+    needs: release
+    uses: ./.github/workflows/web.yml

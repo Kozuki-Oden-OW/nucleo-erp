@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Descargar NÚCLEO ERP para Windows — gratis</title>
+  <meta name="description" content="Descarga gratis NÚCLEO ERP para Windows 10 y 11. Instalador oficial, verificación SHA-256 e instrucciones de instalación.">
+  <link rel="canonical" href="{{SITE_URL}}/descargar/">
+  <meta name="theme-color" content="#2f5bea">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+  <meta property="og:title" content="Descargar NÚCLEO ERP">
+  <meta property="og:description" content="Gratis para Windows 10 y 11. Local, privado y de código abierto.">
+  <meta property="og:image" content="{{SITE_URL}}/assets/og-image.png">
+  <link rel="stylesheet" href="/assets/site.css">
+</head>
+<body>
+  <a class="skip" href="#contenido">Saltar al contenido</a>
+  <header class="top">
+    <div class="wrap">
+      <a class="brand" href="/"><img src="/assets/favicon-32.png" alt="" width="30" height="30">NÚCLEO ERP</a>
+      <nav class="nav" aria-label="Principal">
+        <a href="/#que-hace">Qué hace</a>
+        <a href="/#privacidad">Privacidad</a>
+        <a href="/#preguntas">Preguntas</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="contenido">
+    <section>
+      <div class="wrap">
+        <p class="eyebrow">Descarga oficial</p>
+        <h1>Descargar NÚCLEO ERP</h1>
+        <p class="lead">Gratis para Windows 10 y 11 de 64 bits. Descarga siempre desde este sitio: es la única fuente oficial.</p>
+
+        <div class="download">
+          <article class="card">
+            <span class="status">Versión {{VERSION}} — {{STAGE_LABEL}}</span>
+<!--IF:INSTALLER-->
+            <p style="margin:14px 0 22px">{{STAGE_NOTE}}</p>
+            <a class="btn btn-primary" href="/descargas/NucleoERPSetup.exe" download>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 21h14"/></svg>
+              Descargar NucleoERPSetup.exe
+            </a>
+            <dl class="kv">
+              <dt>Versión</dt><dd>{{VERSION}}</dd>
+              <dt>Publicada</dt><dd>{{RELEASE_DATE}}</dd>
+              <dt>Tamaño</dt><dd>{{SIZE}}</dd>
+              <dt>SHA-256</dt><dd class="mono">{{SHA256}}</dd>
+              <dt>Requisitos</dt><dd>Windows 10 u 11, 64 bits. No requiere permisos de administrador.</dd>
+            </dl>
+<!--ELSE:INSTALLER-->
+            <p style="margin:14px 0 0">{{STAGE_NOTE}}</p>
+            <p style="margin:14px 0 0"><strong>El instalador estará disponible aquí muy pronto.</strong> Estamos terminando la compilación automática para Windows.</p>
+<!--END:INSTALLER-->
+          </article>
+          <aside class="card">
+            <h3>Antes de instalar</h3>
+            <p>NÚCLEO guarda todo en tu computador, cifrado. Al crear tu negocio te entregará una <strong>clave de recuperación</strong>: guárdala impresa o anotada fuera del computador.</p>
+            <p style="margin-top:12px">NÚCLEO no es un sistema tributario: no emite documentos tributarios ni pide tu clave.</p>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section id="instalar" class="alt">
+      <div class="wrap grid grid-2">
+        <article class="card">
+          <h3>Cómo instalar</h3>
+          <ol class="howto">
+            <li>Abre <strong>NucleoERPSetup.exe</strong>.</li>
+            <li>Si Windows muestra <em>"Windows protegió su PC"</em>, haz clic en <strong>Más información</strong> y luego en <strong>Ejecutar de todas formas</strong>. Windows advierte con los programas nuevos hasta que acumulan descargas.</li>
+            <li>Sigue el asistente. Se instala solo para tu usuario.</li>
+            <li>Abre NÚCLEO ERP y crea tu negocio.</li>
+          </ol>
+        </article>
+        <article class="card">
+          <h3>Verifica que el archivo es auténtico</h3>
+          <p>Abre PowerShell en la carpeta de descargas y ejecuta:</p>
+          <div class="doc-sample">Get-FileHash .\NucleoERPSetup.exe -Algorithm SHA256</div>
+          <p style="margin-top:12px">El resultado debe ser idéntico al SHA-256 publicado en esta página. Si no coincide, no lo instales.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="estado">
+      <div class="wrap" style="max-width:820px">
+        <h2>Estado del proyecto</h2>
+        <p class="section-lead">Publicamos cada avance. Estas son las partes disponibles hoy y las que vienen.</p>
+        <dl class="kv">
+          <dt>Disponible</dt><dd>Crear negocios (perfiles Emprendedor, Negocio y Empresa), clientes con validación de RUT y búsqueda, base cifrada, respaldos cifrados y verificados, auditoría de cambios.</dd>
+          <dt>En construcción</dt><dd>Productos e inventario, cotizaciones y ventas, compras, dinero (cobros, pagos, flujo de caja), importaciones y exportaciones, reportes.</dd>
+          <dt>Después</dt><dd>Promociones, planificación de compras, análisis de proveedores, fidelización de clientes, punto de venta.</dd>
+        </dl>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <div>© 2026 NÚCLEO ERP · Software libre bajo licencia AGPL-3.0</div>
+      <nav aria-label="Pie de página">
+        <a href="/">Inicio</a>
+        <a href="/privacidad/">Privacidad</a>
+        {{REPO_FOOTER_LINK}}
+      </nav>
+    </div>
+  </footer>
+</body>
+</html>

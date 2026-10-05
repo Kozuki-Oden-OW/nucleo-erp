@@ -1,0 +1,18 @@
+[package]
+name = "nucleo-tools"
+description = "Herramientas de desarrollo de NÚCLEO ERP: datos masivos, mediciones y firma de normativa."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+nucleo-db.workspace = true
+nucleo-domain.workspace = true
+nucleo-rules.workspace = true
+rusqlite.workspace = true
+serde_json.workspace = true
+hex.workspace = true
+getrandom.workspace = true
+ed25519-dalek.workspace = true

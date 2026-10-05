@@ -1,0 +1,9 @@
+{
+  "site_url": "https://www.nucleoerp.cl",
+  "cname": "www.nucleoerp.cl",
+  "repo_url": "https://github.com/Kozuki-Oden-OW/nucleo-erp",
+  "donation_url": "",
+  "contact_email": "",
+  "stage_label": "vista previa técnica",
+  "stage_note": "Esta versión muestra la base del programa (negocios, clientes, cifrado, respaldos y auditoría). Todavía no incluye ventas ni inventario: úsala para conocer NÚCLEO, no para operar tu negocio."
+}

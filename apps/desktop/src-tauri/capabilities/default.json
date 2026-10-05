@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Permisos mínimos de la ventana principal: núcleo de Tauri y diálogo para elegir archivos de respaldo. Sin shell, sin red, sin acceso libre a archivos.",
+  "windows": ["main"],
+  "permissions": ["core:default", "dialog:allow-open"]
+}
