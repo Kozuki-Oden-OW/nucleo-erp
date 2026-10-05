@@ -17,6 +17,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 - Tabla `fact_sales_day` e índice cubriente: el dashboard bajó de ~14,6 s a ~0,3 s con 1M de movimientos.
 - Sitio web `www.nucleoerp.cl` (`apps/web`) sin rastreadores, con descarga directa y SHA-256, y
   publicación automática (`web.yml`, `release.yml`).
+- Identidad de marca: logo a color en los íconos de la app y del instalador, en la pantalla de inicio,
+  en la barra lateral y en el sitio (encabezado, portada, favicon e imagen para redes sociales).
+- `release.yml` se puede ejecutar a mano desde GitHub Actions indicando la versión.
+
+### Corregido
+- CI: el frontend se compila antes de `cargo`, porque Tauri necesita `dist/` para compilar.
 
 ### Cambiado
 - La tabla mínima de clientes de la Fase 1 se reemplazó por el modelo completo (permitido antes de la

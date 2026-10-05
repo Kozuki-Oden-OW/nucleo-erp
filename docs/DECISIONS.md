@@ -68,6 +68,8 @@ informativo, sin renta guiada · D-11 promociones no acumulables por defecto · 
 | D-F2-10 | Claves públicas de confianza embebidas en la app; la privada nunca en el repositorio | Seguridad de la cadena de normativa |
 | D-F2-11 | Sitio web estático en GitHub Pages; instalador publicado en `/descargas/` del propio dominio | Gratis, HTTPS, descarga directa desde www.nucleoerp.cl |
 | D-F2-12 | Sitio sin cookies, analítica ni recursos de terceros | Coherente con la promesa de privacidad |
+| D-F2-13 | Marca: logo a color del usuario (`docs/marca/`); colores azul marino `#001a3c`, turquesa `#0090aa`, verde `#6f9f00` | Identidad única en app, íconos, instalador y sitio |
+| D-F2-14 | Código en GitHub `Kozuki-Oden-OW/nucleo-erp`; el dueño hace el push; las versiones se publican con `release.yml` (etiqueta o "Run workflow") | Claude no maneja credenciales; publicación reproducible desde CI |
 
 ## Dependencias y su justificación
 

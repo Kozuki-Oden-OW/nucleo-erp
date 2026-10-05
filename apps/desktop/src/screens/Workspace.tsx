@@ -3,6 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { api, errorMessage, type AppInfo, type BackupDone, type Customer, type SessionInfo } from "../lib/api";
 import { PROFILE_LABEL, formatBytes, formatRut } from "../lib/format";
 import { Button, Card, Field, Notice, Stat } from "../ui/primitives";
+import simbolo from "../assets/simbolo.png";
 
 type Section = "inicio" | "clientes" | "respaldos" | "seguridad";
 
@@ -44,7 +45,10 @@ export function Workspace({ info, session, onSwitch, onReload }: {
     <div className="flex h-full">
       <aside className="flex w-60 shrink-0 flex-col border-r border-line bg-surface">
         <div className="border-b border-line p-4">
-          <div className="text-xs font-semibold tracking-widest text-accent">NÚCLEO ERP</div>
+          <div className="flex items-center gap-2">
+            <img src={simbolo} alt="" width={28} height={28} />
+            <span className="text-xs font-semibold tracking-widest text-accent">NÚCLEO ERP</span>
+          </div>
           <select
             aria-label="Negocio activo"
             className="mt-2 w-full rounded-lg border border-line bg-surface-2 px-2 py-1.5 text-sm"

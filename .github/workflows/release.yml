@@ -1,10 +1,20 @@
 name: Publicar versión
 
-# Al crear una etiqueta vX.Y.Z: compila el instalador en Windows, crea la versión (GitHub
-# Release) con NucleoERPSetup.exe y su SHA-256, y actualiza www.nucleoerp.cl/descargar/.
+# Al crear una etiqueta vX.Y.Z (o al ejecutarlo a mano desde Actions → "Publicar versión" →
+# "Run workflow"): compila el instalador en Windows, crea la versión (GitHub Release) con
+# NucleoERPSetup.exe y su SHA-256, y actualiza www.nucleoerp.cl/descargar/.
 on:
   push:
     tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versión a publicar (ej. v0.1.0). Se crea la etiqueta sobre el commit elegido."
+        required: true
+        default: "v0.1.0"
+
+env:
+  VERSION: ${{ inputs.version || github.ref_name }}
 
 permissions:
   contents: write
@@ -15,6 +25,10 @@ jobs:
   installer:
     runs-on: windows-latest
     steps:
+      - name: Validar versión
+        shell: bash
+        run: |
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Versión inválida: $VERSION (formato vX.Y.Z)"; exit 1; }
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
@@ -60,8 +74,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ github.ref_name }}" out/NucleoERPSetup.exe out/NucleoERPSetup.exe.sha256 \
-            --repo "${{ github.repository }}" --title "NÚCLEO ERP ${{ github.ref_name }}" \
+          gh release create "$VERSION" out/NucleoERPSetup.exe out/NucleoERPSetup.exe.sha256 \
+            --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "NÚCLEO ERP $VERSION" \
             --notes "Instalador para Windows 10/11 x64. Descarga oficial: https://www.nucleoerp.cl/descargar/"
 
   web:

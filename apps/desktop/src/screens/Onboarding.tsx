@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api, errorMessage, type BusinessProfile, type CreatedCompany } from "../lib/api";
 import { Button, Field, Notice } from "../ui/primitives";
+import simbolo from "../assets/simbolo.png";
 
 const PROFILES: { id: BusinessProfile; title: string; text: string }[] = [
   { id: "emprendedor", title: "Emprendedor", text: "Estoy comenzando. Productos, precios, cotizaciones, ventas, gastos y caja. Sin datos tributarios obligatorios." },
@@ -30,6 +31,7 @@ export function Onboarding({ onCreated }: { onCreated: (c: CreatedCompany) => vo
   return (
     <main className="mx-auto flex min-h-full max-w-3xl flex-col justify-center gap-8 px-6 py-12">
       <div>
+        <img src={simbolo} alt="" width={72} height={72} className="mb-3" />
         <p className="text-sm font-semibold tracking-widest text-accent">NÚCLEO ERP</p>
         <h1 className="mt-2 text-3xl font-semibold">Crea tu negocio</h1>
         <p className="mt-2 text-muted">
