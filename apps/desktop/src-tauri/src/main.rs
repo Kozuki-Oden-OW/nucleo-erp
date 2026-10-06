@@ -76,6 +76,22 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         commands::void_sale,
         commands::update_product,
         commands::update_customer,
+        commands::search_suppliers,
+        commands::supplier,
+        commands::add_supplier,
+        commands::update_supplier,
+        commands::price_history,
+        commands::list_purchase_orders,
+        commands::purchase_order,
+        commands::save_purchase_order,
+        commands::issue_purchase_order,
+        commands::void_purchase_order,
+        commands::receive_purchase_order,
+        commands::list_purchases,
+        commands::purchase,
+        commands::register_purchase,
+        commands::pay_purchase,
+        commands::void_purchase,
     ])
 }
 

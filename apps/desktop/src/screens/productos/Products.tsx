@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Package, PackagePlus, Pencil, Search } from "lucide-react";
-import { useBackend, errorMessage, type Product } from "../../data";
+import { useBackend, errorMessage, type PriceHistoryRow, type Product } from "../../data";
 import { useSession } from "../../lib/session";
-import { formatMoney, formatQty, parseQty } from "../../lib/format";
+import { formatDate, formatMoney, formatQty, parseQty } from "../../lib/format";
 import { UNITS } from "../../data/catalogs";
 import { navigate, type Route } from "../../lib/router";
 import { MoneyField } from "../../ui/doc";
@@ -85,6 +85,7 @@ export function Products({ route }: { route: Route }) {
                 { label: "Stock mínimo", value: <span className="num">{formatQty(product.min_milli)} {product.unit}</span> },
               ] : []),
             ]} />
+            {can("compras.ver") && <PriceHistory productUid={product.uid} />}
             <Notice tone="info">Stock real y proyectado, kárdex, ajustes, velocidad de venta y punto de reorden llegan en la Fase 7 (Inventario).</Notice>
           </div>
         )}
@@ -177,5 +178,29 @@ function EditProductDrawer({ product, onClose, onSaved }: { product: Product; on
         {err && <Notice tone="danger">{err}</Notice>}
       </div>
     </Drawer>
+  );
+}
+
+function PriceHistory({ productUid }: { productUid: string }) {
+  const backend = useBackend();
+  const [rows, setRows] = useState<PriceHistoryRow[] | null>(null);
+  useEffect(() => { backend.priceHistory(productUid).then(setRows).catch(() => setRows([])); }, [backend, productUid]);
+  if (!rows) return null;
+  return (
+    <div>
+      <h3 className="mb-2 text-sm font-semibold text-ink">Precios de compra</h3>
+      {rows.length === 0 ? <p className="text-sm text-muted">Aún no hay compras de este producto.</p> : (
+        <ul className="divide-y divide-line rounded-lg border border-line text-sm">
+          {rows.slice(0, 8).map((r, i) => (
+            <li key={i} className="flex items-center gap-3 px-3 py-2">
+              <span className="num w-[5.5rem] shrink-0 text-muted">{formatDate(r.date)}</span>
+              <span className="min-w-0 flex-1 truncate text-ink">{r.supplier_name}</span>
+              <span className="font-mono text-[12px] text-muted">{r.document}</span>
+              <span className="num w-20 text-right font-medium">{formatMoney(r.unit_price_minor)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

@@ -40,7 +40,16 @@ export function QuoteStatusBadge({ status }: { status: QuoteStatus }) {
 
 /** Cadena documental navegable: COT-000147 → VEN-000089 → PAG-000340 → Factura Nº 563. */
 export function DocChain({ chain, current }: { chain: DocLink[]; current: string }) {
-  const href = (l: DocLink) => (l.kind === "COT" && l.uid ? `/cotizaciones/${l.uid}` : (l.kind === "VEN" || l.kind === "FV") && l.uid ? `/ventas/${l.uid}` : null);
+  const href = (l: DocLink) => {
+    if (!l.uid) return null;
+    switch (l.kind) {
+      case "COT": return `/cotizaciones/${l.uid}`;
+      case "VEN": case "FV": return `/ventas/${l.uid}`;
+      case "OC": return `/compras/oc/${l.uid}`;
+      case "COM": return `/compras/doc/${l.uid}`;
+      default: return null;
+    }
+  };
   return (
     <nav aria-label="Cadena documental" className="flex flex-wrap items-center gap-1.5 text-sm">
       {chain.map((l, i) => {

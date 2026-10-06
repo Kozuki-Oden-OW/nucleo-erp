@@ -10,7 +10,9 @@ pub mod customers;
 pub mod maintenance;
 pub mod migrations;
 pub mod products;
+pub mod purchases;
 pub mod sales;
+pub mod suppliers;
 pub mod users;
 
 use rusqlite::{Connection, OpenFlags};

@@ -2,6 +2,18 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [Sin publicar] — Fase 6 (Compras)
+
+### Agregado
+- Proveedores: ficha con RUT, contacto y plazo de pago habitual; compras, deuda y documentos adjuntos.
+- Órdenes de compra: borrador, emisión, impresión ("ORDEN DE COMPRA") y anulación con motivo.
+- Recepción de mercadería parcial o total: suma stock y recalcula el costo promedio ponderado.
+- Documentos de compra del proveedor (factura, boleta…): asociados a una orden o directos con ingreso a
+  bodega, vencimiento según el plazo del proveedor, "Ya lo pagué", abonos y pago final.
+- "Dinero que debes" con vencimientos; anulación de documentos (devuelve el stock si ingresó directo).
+- Historial de precios de compra por producto y proveedor; el editor sugiere el último precio pagado.
+- Accesos en Ctrl+K: nueva orden de compra, registrar factura de proveedor, nuevo proveedor.
+
 ## [Sin publicar] — Fase 5 (Ventas)
 
 ### Agregado

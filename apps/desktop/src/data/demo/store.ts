@@ -1,12 +1,13 @@
 // Backend de demostración: implementa el mismo puerto que el escritorio, con datos ficticios en memoria.
 // Sirve para el navegador (prueba de usabilidad de la Fase 3) y para desarrollar pantallas antes de
 // que exista su comando Rust. No persiste nada: al recargar la página vuelve al estado inicial.
-import { AppError, type Backend, type Feature, type FileSource, type SaleFilter } from "../backend";
+import { AppError, type Backend, type Feature, type FileSource, type PurchaseFilter, type SaleFilter } from "../backend";
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
   Customer, CustomerDetail, Dashboard, DocLink, EffectInput, EntityRef, ExternalRef, ExternalRefInput, Line, LineInput,
-  NewCustomer, NewProduct, NewUser, Payment, PermissionRow, Product, ProductPatch, PurchaseOrderDetail, PurchaseOrderSummary, QuoteDetail,
+  NewCustomer, NewProduct, NewUser, Payment, PermissionRow, PriceHistoryRow, Product, ProductPatch, PurchaseOrderDetail, PurchaseOrderSummary,
+  BuyLineInput, NewSupplier, PoLine, PoStatus, PurchaseDetail, PurchaseInput, PurchaseLine, PurchaseOrderInput, PurchaseSummary, ReceiveLine, Supplier, SupplierDetail, QuoteDetail,
   QuoteInput, QuoteStatus, QuoteSummary, RateRow, RoleRow, SaleDetail, SaleDocType, SaleInput, SaleSummary, SearchHit,
   SecuritySettings, SequenceRow, SessionInfo, Totals, UserPatch, UserRow,
 } from "../types";
@@ -29,7 +30,16 @@ interface SaleRec {
   quote_uid: string | null; payments: Payment[]; external_ref: ExternalRef | null; void_reason: string | null;
   timeline: { at: string; text: string }[];
 }
-interface PoRec extends PurchaseOrderDetail {}
+interface PoRec {
+  uid: string; number: string; supplier_uid: string; issue_date: string; expected_date: string | null; status: PoStatus;
+  lines: PoLine[]; totals: Totals; notes: string | null; void_reason: string | null; receipts: { number: string; date: string }[];
+  timeline: { at: string; text: string }[];
+}
+interface PurRec {
+  uid: string; number: string; supplier_uid: string; doc_kind: string | null; doc_number: string | null; issue_date: string;
+  due_date: string | null; status: "registrada" | "anulada"; lines: PurchaseLine[]; totals: Totals; order_uid: string | null;
+  payments: Payment[]; received_stock: boolean; notes: string | null; void_reason: string | null; timeline: { at: string; text: string }[];
+}
 
 let uidSeq = 0;
 const uid = (p: string) => `${p}-${(++uidSeq).toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -50,6 +60,8 @@ export class DemoBackend implements Backend {
   private quotes: QuoteRec[] = [];
   private sales: SaleRec[] = [];
   private pos: PoRec[] = [];
+  private suppliers: Supplier[] = [];
+  private purchases: PurRec[] = [];
   private seq: Record<string, number> = {};
   private history: Record<string, number> = {};
   private cashBase = 3_850_000;
@@ -179,21 +191,29 @@ export class DemoBackend implements Backend {
     q2.status = "enviada";
     this.quotes.push(q2);
 
-    // Órdenes de compra.
-    const supplierLines = (idx: number[]) => idx.map((i) => {
-      const p = this.products[i]!;
-      return { product_uid: p.uid, description: p.name, qty_milli: (10 + Math.floor(r() * 20)) * 1000, received_milli: 0, unit_cost_minor: Math.round(p.cost_e4 / 10_000) };
+    // Proveedores, órdenes de compra y un documento de compra por pagar.
+    SUPPLIER_NAMES.forEach((name, i) => {
+      const body = 76_100_000 + Math.floor(r() * 899_999);
+      this.suppliers.push({ id: i + 1, uid: uid("prv"), rut: `${body}-${rutDv(body)}`, name, email: null, phone: null, payment_terms_days: i % 2 === 0 ? 30 : 0, created_at: "2026-01-05T12:00:00Z" });
     });
-    const poDefs: [string, number[], number, PurchaseOrderSummary["status"]][] = [
-      [SUPPLIER_NAMES[0]!, [10, 11, 18, 19], -6, "emitida"],
-      [SUPPLIER_NAMES[2]!, [13, 14, 17], -2, "emitida"],
-      [SUPPLIER_NAMES[4]!, [23, 24, 25], -20, "recibida"],
-    ];
-    for (const [supplier, idx, days, status] of poDefs) {
+    const supplierLines = (idx: number[]): PoLine[] => idx.map((i, n) => {
+      const p = this.products[i]!;
+      const qty = (10 + Math.floor(r() * 20)) * 1000;
+      const cost = Math.round(p.cost_e4 / 10_000);
+      return { line_no: n + 1, product_uid: p.uid, description: p.name, qty_milli: qty, received_milli: 0, unit_cost_minor: cost, taxable: true, net_minor: Math.round((qty * cost) / 1000) };
+    });
+    const poDefs: [number, number[], number, PoStatus][] = [[0, [10, 11, 18, 19], -6, "emitida"], [2, [13, 14, 17], -2, "emitida"], [4, [23, 24, 25], -20, "recibida"]];
+    for (const [si, idx, days, status] of poDefs) {
       const lines = supplierLines(idx);
       if (status === "recibida") lines.forEach((l) => (l.received_milli = l.qty_milli));
-      const totals = computeTotals(lines.map((l) => ({ product_uid: l.product_uid, description: l.description, qty_milli: l.qty_milli, unit_price_minor: l.unit_cost_minor, discount_ppm: 0, taxable: true })), TAX_PPM);
-      this.pos.push({ uid: uid("oc"), number: this.next("OC"), supplier_name: supplier, issue_date: addDays(this.today, days), expected_date: addDays(this.today, days + 7), status, total_minor: totals.total_minor, lines, totals });
+      const date = addDays(this.today, days);
+      const po: PoRec = { uid: uid("oc"), number: this.next("OC"), supplier_uid: this.suppliers[si]!.uid, issue_date: date, expected_date: addDays(date, 7), status, lines, totals: this.buyTotals(lines), notes: null, void_reason: null, receipts: [], timeline: [{ at: `${date}T13:00:00Z`, text: "Emitida: pendiente de recepción" }] };
+      if (status === "recibida") {
+        po.receipts.push({ number: this.next("REC"), date: addDays(date, 6) });
+        po.timeline.push({ at: `${addDays(date, 6)}T15:00:00Z`, text: "Recibida completa: stock y costo promedio actualizados" });
+        this.purchases.push({ uid: uid("com"), number: this.next("COM"), supplier_uid: po.supplier_uid, doc_kind: "Factura", doc_number: "4471", issue_date: addDays(date, 6), due_date: addDays(this.today, 9), status: "registrada", lines: lines.map(({ received_milli: _r, ...l }) => l), totals: po.totals, order_uid: po.uid, payments: [], received_stock: false, notes: null, void_reason: null, timeline: [{ at: `${addDays(date, 6)}T16:00:00Z`, text: "Registrado Factura Nº 4471" }] });
+      }
+      this.pos.push(po);
     }
     // Usuarios de ejemplo: el dueño opera sin contraseña (modo de un solo usuario).
     const mk = (username: string, display_name: string, roles: string[], i: number) => ({
@@ -536,7 +556,8 @@ export class DemoBackend implements Backend {
     for (const p of this.products) if (norm(`${p.name} ${p.sku}`).includes(q)) hits.push({ kind: "producto", uid: p.uid, title: p.name, subtitle: `${p.sku} · stock ${p.on_hand_milli / 1000} ${p.unit}` });
     for (const s of this.sales) if (norm(`${s.number} ${this.customerName(s.customer_uid)}`).includes(q)) hits.push({ kind: "venta", uid: s.uid, title: `${s.number} · ${this.customerName(s.customer_uid)}`, subtitle: s.issue_date });
     for (const x of this.quotes) if (norm(`${x.number} ${this.customerName(x.customer_uid, x.prospect_name)}`).includes(q)) hits.push({ kind: "cotizacion", uid: x.uid, title: `${x.number} · ${this.customerName(x.customer_uid, x.prospect_name)}`, subtitle: x.issue_date });
-    for (const o of this.pos) if (norm(`${o.number} ${o.supplier_name}`).includes(q)) hits.push({ kind: "orden_compra", uid: o.uid, title: `${o.number} · ${o.supplier_name}`, subtitle: o.issue_date });
+    for (const o of this.pos) if (norm(`${o.number} ${this.supplierName(o.supplier_uid)}`).includes(q)) hits.push({ kind: "orden_compra", uid: o.uid, title: `${o.number} · ${this.supplierName(o.supplier_uid)}`, subtitle: o.issue_date });
+    for (const v of this.suppliers) if (norm(`${v.name} ${v.rut ?? ""}`).includes(q)) hits.push({ kind: "proveedor", uid: v.uid, title: v.name, subtitle: v.rut ?? "Proveedor" });
     for (const f of this.files) if (!f.archived && norm(`${f.file_name} ${f.description ?? ""}`).includes(q)) hits.push({ kind: "documento", uid: f.uid, title: f.file_name, subtitle: f.description ?? "Documento adjunto" });
     return wait(hits.slice(0, 30), 30);
   }
@@ -559,9 +580,9 @@ export class DemoBackend implements Backend {
     const open = live.filter((s) => this.payState(s) !== "pagada");
     const receivable = open.reduce((a, s) => a + s.totals.total_minor - this.paid(s), 0);
     const overdue = open.filter((s) => s.due_date && s.due_date < t).reduce((a, s) => a + s.totals.total_minor - this.paid(s), 0);
-    const payable = this.pos.filter((o) => o.status !== "anulada").reduce((a, o) => a + (o.status === "recibida" ? o.total_minor : 0), 0) + 640_000;
+    const payable = this.purchases.filter((c) => c.status === "registrada").reduce((a, c) => a + c.totals.total_minor - this.paidOf(c.payments), 0) + 640_000;
     const collected = live.reduce((a, s) => a + s.payments.filter((p) => p.date >= addDays(t, -45)).reduce((x, p) => x + p.amount_minor, 0), 0);
-    const purchaseCredit = Math.round(this.pos.filter((o) => o.status === "recibida").reduce((a, o) => a + o.totals.tax_minor, 0));
+    const purchaseCredit = this.purchases.filter((c) => c.status === "registrada").reduce((a, c) => a + c.totals.tax_minor, 0);
     const series: Dashboard["series"] = [];
     for (let m = 11; m >= 0; m--) {
       const d = new Date(`${t}T12:00:00`); d.setDate(1); d.setMonth(d.getMonth() - m);
@@ -571,7 +592,8 @@ export class DemoBackend implements Backend {
     const upcoming: Dashboard["upcoming_payments"] = [
       ...open.filter((s) => s.due_date).sort((a, b) => a.due_date!.localeCompare(b.due_date!)).slice(0, 4).map((s) => ({ label: `${s.number} · ${this.customerName(s.customer_uid)}`, date: s.due_date!, amount_minor: s.totals.total_minor - this.paid(s), kind: "cobro" as const })),
       { label: `Arriendo local`, date: addDays(t, 5), amount_minor: 650_000, kind: "pago" as const },
-      { label: `${this.pos[2]?.number ?? "OC"} · ${SUPPLIER_NAMES[4]}`, date: addDays(t, 9), amount_minor: this.pos[2]?.total_minor ?? 0, kind: "pago" as const },
+      ...this.purchases.filter((c) => c.status === "registrada" && c.due_date && this.paidOf(c.payments) < c.totals.total_minor).slice(0, 3)
+        .map((c) => ({ label: `${c.doc_kind ?? "Compra"} ${c.doc_number ?? c.number} · ${this.supplierName(c.supplier_uid)}`, date: c.due_date!, amount_minor: c.totals.total_minor - this.paidOf(c.payments), kind: "pago" as const })),
     ].sort((a, b) => a.date.localeCompare(b.date));
     return wait({
       today_sales_minor: today.reduce((a, s) => a + s.totals.total_minor, 0), today_sales_count: today.length,
@@ -808,34 +830,237 @@ export class DemoBackend implements Backend {
     return wait(this.detail(s));
   }
 
-  /* ───────────── Compras (prototipo) ───────────── */
+  /* ───────────── Proveedores y compras ───────────── */
 
-  async listPurchaseOrders(): Promise<PurchaseOrderSummary[]> {
-    return wait(this.pos.map(({ lines: _l, totals: _t, ...s }) => s).sort((a, b) => b.number.localeCompare(a.number)));
+  private buyTotals(lines: { product_uid: string | null; description: string; qty_milli: number; unit_cost_minor: number; taxable: boolean }[]): Totals {
+    return computeTotals(lines.map((l) => ({ product_uid: l.product_uid, description: l.description, qty_milli: l.qty_milli, unit_price_minor: l.unit_cost_minor, discount_ppm: 0, taxable: l.taxable })), this.taxPpm());
   }
-  async purchaseOrder(u: string): Promise<PurchaseOrderDetail> {
+  private paidOf(p: Payment[]): number { return p.reduce((a, x) => a + x.amount_minor, 0); }
+  private supplierName(u: string): string { return this.suppliers.find((x) => x.uid === u)?.name ?? "Proveedor"; }
+  private findSupplier(u: string): Supplier {
+    const v = this.suppliers.find((x) => x.uid === u);
+    if (!v) throw new AppError("no_encontrado", "No encontramos ese proveedor.");
+    return v;
+  }
+  private findPo(u: string): PoRec {
     const o = this.pos.find((x) => x.uid === u);
     if (!o) throw new AppError("no_encontrado", "No encontramos esa orden de compra.");
-    return wait(o);
+    return o;
   }
-  async receivePurchaseOrder(u: string): Promise<PurchaseOrderDetail> {
-    const o = this.pos.find((x) => x.uid === u);
-    if (!o) throw new AppError("no_encontrado", "No encontramos esa orden de compra.");
-    if (o.status === "recibida") throw new AppError("estado", "Esta orden ya fue recibida completa.");
-    for (const l of o.lines) {
-      const p = this.products.find((x) => x.uid === l.product_uid);
-      const qty = l.qty_milli - l.received_milli;
-      if (p) {
-        // Costo promedio ponderado (vista previa; el cálculo real vive en nucleo-domain::inventory).
-        const total = p.on_hand_milli + qty;
-        if (total > 0) p.cost_e4 = Math.round((p.cost_e4 * Math.max(0, p.on_hand_milli) + l.unit_cost_minor * 10_000 * qty) / (Math.max(0, p.on_hand_milli) + qty));
-        p.on_hand_milli = total;
-      }
-      l.received_milli = l.qty_milli;
+  private findPur(u: string): PurRec {
+    const c = this.purchases.find((x) => x.uid === u);
+    if (!c) throw new AppError("no_encontrado", "No encontramos ese documento de compra.");
+    return c;
+  }
+  private poSummary(o: PoRec): PurchaseOrderSummary {
+    return { uid: o.uid, number: o.number, supplier_name: this.supplierName(o.supplier_uid), issue_date: o.issue_date, expected_date: o.expected_date, status: o.status, total_minor: o.totals.total_minor };
+  }
+  private poDetail(o: PoRec): PurchaseOrderDetail {
+    const docs = this.purchases.filter((c) => c.order_uid === o.uid && c.status === "registrada").map((c) => ({ number: c.number, kind: "COM" as const, uid: c.uid, label: "Documento de compra" }));
+    return { ...this.poSummary(o), supplier_uid: o.supplier_uid, lines: o.lines, totals: o.totals, notes: o.notes, void_reason: o.void_reason, receipts: o.receipts, purchases: docs, timeline: o.timeline };
+  }
+  private purSummary(c: PurRec): PurchaseSummary {
+    const paid = this.paidOf(c.payments);
+    return {
+      uid: c.uid, number: c.number, supplier_name: this.supplierName(c.supplier_uid), doc_kind: c.doc_kind, doc_number: c.doc_number, issue_date: c.issue_date,
+      due_date: c.due_date, status: c.status, payment_state: paid <= 0 ? "sin_pago" : paid < c.totals.total_minor ? "abonada" : "pagada", total_minor: c.totals.total_minor, paid_minor: paid,
+    };
+  }
+  private purDetail(c: PurRec): PurchaseDetail {
+    const o = c.order_uid ? this.pos.find((x) => x.uid === c.order_uid) : undefined;
+    return { ...this.purSummary(c), supplier_uid: c.supplier_uid, lines: c.lines, totals: c.totals, order_uid: c.order_uid, order_number: o?.number ?? null, payments: c.payments, received_stock: c.received_stock, notes: c.notes, void_reason: c.void_reason, timeline: c.timeline };
+  }
+  private validateBuy(lines: BuyLineInput[]): void {
+    if (lines.length === 0) throw new AppError("sin_lineas", "Agrega al menos un producto o servicio.");
+    const bad = lines.findIndex((l) => !l.description.trim() || l.qty_milli <= 0 || l.unit_cost_minor < 0);
+    if (bad >= 0) throw new AppError("linea_invalida", `Revisa la línea ${bad + 1}: necesita descripción, cantidad mayor que cero y costo.`);
+  }
+  private stockIn(productUid: string | null, qty: number, costMinor: number): void {
+    const p = this.products.find((x) => x.uid === productUid);
+    if (!p || p.kind !== "producto") return;
+    const base = Math.max(0, p.on_hand_milli);
+    p.cost_e4 = base + qty > 0 ? Math.round((p.cost_e4 * base + costMinor * 10_000 * qty) / (base + qty)) : costMinor * 10_000;
+    p.on_hand_milli += qty;
+  }
+
+  async searchSuppliers(query: string): Promise<Supplier[]> {
+    this.require("proveedores.ver");
+    const q = norm(query.trim());
+    const rows = q ? this.suppliers.filter((v) => norm(`${v.name} ${v.rut ?? ""} ${v.email ?? ""}`).includes(q)) : this.suppliers;
+    return wait([...rows].sort((a, b) => a.name.localeCompare(b.name, "es")), 40);
+  }
+  async supplier(u: string): Promise<SupplierDetail> {
+    this.require("proveedores.ver");
+    const v = this.findSupplier(u);
+    const docs = this.purchases.filter((c) => c.supplier_uid === u && c.status === "registrada");
+    return wait({
+      ...v, purchases_count: docs.length, purchased_minor: docs.reduce((a, c) => a + c.totals.total_minor, 0),
+      payable_minor: docs.reduce((a, c) => a + c.totals.total_minor - this.paidOf(c.payments), 0),
+      last_purchase_date: docs.map((c) => c.issue_date).sort().at(-1) ?? null,
+      orders: this.pos.filter((o) => o.supplier_uid === u).map((o) => this.poSummary(o)).slice(0, 8),
+      purchases: docs.map((c) => this.purSummary(c)).slice(0, 8),
+    });
+  }
+  private supplierFields(input: NewSupplier, selfUid?: string): Omit<Supplier, "id" | "uid" | "created_at"> {
+    const c = this.customerFields({ name: input.name, rut: input.rut, email: input.email, phone: input.phone });
+    if (c.rut && this.suppliers.some((v) => v.rut === c.rut && v.uid !== selfUid)) throw new AppError("rut_duplicado", "Ya existe un proveedor con ese RUT.");
+    const terms = input.payment_terms_days ?? 0;
+    if (terms < 0 || terms > 365) throw new AppError("plazo", "El plazo de pago debe estar entre 0 y 365 días.");
+    return { ...c, payment_terms_days: terms };
+  }
+  async addSupplier(input: NewSupplier): Promise<Supplier> {
+    this.require("proveedores.editar");
+    const v: Supplier = { id: this.suppliers.length + 1, uid: uid("prv"), ...this.supplierFields(input), created_at: now() };
+    this.suppliers.push(v);
+    this.log("proveedor.crear", "proveedor", v.uid);
+    return wait(v);
+  }
+  async updateSupplier(u: string, input: NewSupplier): Promise<Supplier> {
+    this.require("proveedores.editar");
+    const v = this.findSupplier(u);
+    Object.assign(v, this.supplierFields(input, u));
+    this.log("proveedor.editar", "proveedor", v.uid);
+    return wait({ ...v });
+  }
+  async priceHistory(productUid: string): Promise<PriceHistoryRow[]> {
+    this.require("compras.ver");
+    const rows: PriceHistoryRow[] = [];
+    for (const c of this.purchases) if (c.status === "registrada") for (const l of c.lines) if (l.product_uid === productUid) rows.push({ supplier_uid: c.supplier_uid, supplier_name: this.supplierName(c.supplier_uid), date: c.issue_date, document: c.number, unit_price_minor: l.unit_cost_minor, qty_milli: l.qty_milli });
+    for (const o of this.pos) if (o.status !== "borrador" && o.status !== "anulada") for (const l of o.lines) if (l.product_uid === productUid) rows.push({ supplier_uid: o.supplier_uid, supplier_name: this.supplierName(o.supplier_uid), date: o.issue_date, document: o.number, unit_price_minor: l.unit_cost_minor, qty_milli: l.qty_milli });
+    return wait(rows.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 20));
+  }
+  async listPurchaseOrders(query = ""): Promise<PurchaseOrderSummary[]> {
+    this.require("compras.ver");
+    const q = norm(query.trim());
+    return wait(this.pos.map((o) => this.poSummary(o)).filter((o) => !q || norm(`${o.number} ${o.supplier_name}`).includes(q)).sort((a, b) => b.issue_date.localeCompare(a.issue_date) || b.number.localeCompare(a.number)));
+  }
+  async purchaseOrder(u: string): Promise<PurchaseOrderDetail> { this.require("compras.ver"); return wait(this.poDetail(this.findPo(u))); }
+  async savePurchaseOrder(input: PurchaseOrderInput, u?: string): Promise<PurchaseOrderDetail> {
+    this.require("compras.crear");
+    this.findSupplier(input.supplier_uid);
+    this.validateBuy(input.lines);
+    const lines: PoLine[] = input.lines.map((l, i) => ({ ...l, line_no: i + 1, received_milli: 0, net_minor: Math.round((l.qty_milli * l.unit_cost_minor) / 1000) }));
+    if (u) {
+      const o = this.findPo(u);
+      if (o.status !== "borrador") throw new AppError("bloqueada", "Una orden emitida no se modifica: anúlala con motivo y crea otra.");
+      Object.assign(o, { supplier_uid: input.supplier_uid, issue_date: input.issue_date, expected_date: input.expected_date, lines, totals: this.buyTotals(lines), notes: input.notes ?? null });
+      o.timeline.push({ at: now(), text: "Borrador modificado" });
+      this.log("oc.editar", "orden_compra", o.number);
+      return wait(this.poDetail(o));
     }
-    o.status = "recibida";
+    const o: PoRec = { uid: uid("oc"), number: this.next("OC"), supplier_uid: input.supplier_uid, issue_date: input.issue_date, expected_date: input.expected_date, status: "borrador", lines, totals: this.buyTotals(lines), notes: input.notes ?? null, void_reason: null, receipts: [], timeline: [] };
+    o.timeline.push({ at: now(), text: `Orden ${o.number} creada como borrador` });
+    this.pos.push(o);
+    this.log("oc.crear", "orden_compra", o.number);
+    return wait(this.poDetail(o));
+  }
+  async issuePurchaseOrder(u: string): Promise<PurchaseOrderDetail> {
+    this.require("compras.crear");
+    const o = this.findPo(u);
+    if (o.status !== "borrador") throw new AppError("estado", "Solo se emite una orden en borrador.");
+    o.status = "emitida";
+    o.timeline.push({ at: now(), text: "Emitida: pendiente de recepción" });
+    this.log("oc.emitir", "orden_compra", o.number);
+    return wait(this.poDetail(o));
+  }
+  async voidPurchaseOrder(u: string, reason: string): Promise<PurchaseOrderDetail> {
+    this.require("compras.crear");
+    const o = this.findPo(u);
+    if (!reason.trim()) throw new AppError("motivo", "Escribe el motivo de la anulación.");
+    if (o.status !== "borrador" && o.status !== "emitida") throw new AppError("estado", "Una orden con mercadería recibida no se anula: registra el documento de compra de lo recibido.");
+    o.status = "anulada"; o.void_reason = reason.trim();
+    o.timeline.push({ at: now(), text: `Anulada: ${reason.trim()}` });
+    this.log("oc.anular", "orden_compra", o.number, reason.trim());
+    return wait(this.poDetail(o));
+  }
+  async receivePurchaseOrder(u: string, lines: ReceiveLine[], date: string): Promise<PurchaseOrderDetail> {
+    this.require("compras.recibir");
+    const o = this.findPo(u);
+    if (o.status === "borrador") throw new AppError("estado", "Emite la orden antes de recibir mercadería.");
+    if (o.status !== "emitida" && o.status !== "parcial") throw new AppError("estado", "Esta orden ya fue recibida completa o está anulada.");
+    const plan = lines.length ? lines.filter((r) => r.qty_milli !== 0) : o.lines.map((l) => ({ line_no: l.line_no, qty_milli: l.qty_milli - l.received_milli })).filter((r) => r.qty_milli > 0);
+    if (!plan.length) throw new AppError("cantidades", "Indica qué cantidades llegaron.");
+    for (const r of plan) {
+      const l = o.lines.find((x) => x.line_no === r.line_no);
+      if (!l || r.qty_milli < 0 || r.qty_milli > l.qty_milli - l.received_milli) throw new AppError("cantidades", `Línea ${r.line_no}: puedes recibir hasta lo pendiente de la orden.`);
+    }
+    for (const r of plan) {
+      const l = o.lines.find((x) => x.line_no === r.line_no)!;
+      l.received_milli += r.qty_milli;
+      this.stockIn(l.product_uid, r.qty_milli, l.unit_cost_minor);
+    }
+    const rec = this.next("REC");
+    o.receipts.push({ number: rec, date });
+    o.status = o.lines.every((l) => l.received_milli >= l.qty_milli) ? "recibida" : "parcial";
+    o.timeline.push({ at: now(), text: `${o.status === "recibida" ? "Recibida completa" : "Recepción parcial"} (${rec}): stock y costo promedio actualizados` });
     this.log("oc.recibir", "orden_compra", o.number);
-    return wait(o);
+    return wait(this.poDetail(o));
+  }
+  async listPurchases(filter: PurchaseFilter): Promise<PurchaseSummary[]> {
+    this.require("compras.ver");
+    const q = norm(filter.query ?? "");
+    let rows = this.purchases.map((c) => this.purSummary(c));
+    if (q) rows = rows.filter((c) => norm(`${c.number} ${c.supplier_name} ${c.doc_number ?? ""}`).includes(q));
+    rows = filter.view === "anuladas" ? rows.filter((c) => c.status === "anulada") : rows.filter((c) => c.status === "registrada" && (filter.view !== "por_pagar" || c.payment_state !== "pagada"));
+    return wait(rows.sort((a, b) => b.issue_date.localeCompare(a.issue_date) || b.number.localeCompare(a.number)));
+  }
+  async purchase(u: string): Promise<PurchaseDetail> { this.require("compras.ver"); return wait(this.purDetail(this.findPur(u))); }
+  async registerPurchase(input: PurchaseInput): Promise<PurchaseDetail> {
+    this.require("compras.crear");
+    const v = this.findSupplier(input.supplier_uid);
+    this.validateBuy(input.lines);
+    const o = input.order_uid ? this.findPo(input.order_uid) : undefined;
+    if (o && o.supplier_uid !== v.uid) throw new AppError("orden", "La orden de compra es de otro proveedor.");
+    if (o && (o.status === "borrador" || o.status === "anulada")) throw new AppError("orden", "La orden de compra no está emitida.");
+    if (o && input.receive_stock) throw new AppError("orden", "La mercadería de una orden de compra se recibe desde la orden.");
+    const docNum = input.doc_number?.trim() || null;
+    const kind = input.doc_kind?.trim() || null;
+    if (docNum && this.purchases.some((c) => c.supplier_uid === v.uid && c.doc_kind === kind && c.doc_number === docNum)) throw new AppError("duplicado", "Ya registraste ese documento de este proveedor.");
+    const due = input.due_date || addDays(input.issue_date, v.payment_terms_days);
+    if (due < input.issue_date) throw new AppError("vencimiento", "El vencimiento no puede ser anterior al documento.");
+    const lines: PurchaseLine[] = input.lines.map((l, i) => ({ ...l, line_no: i + 1, net_minor: Math.round((l.qty_milli * l.unit_cost_minor) / 1000) }));
+    const c: PurRec = { uid: uid("com"), number: this.next("COM"), supplier_uid: v.uid, doc_kind: kind, doc_number: docNum, issue_date: input.issue_date, due_date: due, status: "registrada", lines, totals: this.buyTotals(lines), order_uid: o?.uid ?? null, payments: [], received_stock: false, notes: input.notes?.trim() || null, void_reason: null, timeline: [] };
+    c.timeline.push({ at: now(), text: `Registrado ${[kind, docNum && `Nº ${docNum}`].filter(Boolean).join(" ")}`.trim() });
+    if (o) { c.timeline.push({ at: now(), text: `Asociado a la orden ${o.number}` }); o.timeline.push({ at: now(), text: `Documento de compra ${c.number} registrado` }); }
+    if (input.receive_stock) {
+      const any = lines.some((l) => this.products.find((p) => p.uid === l.product_uid)?.kind === "producto");
+      for (const l of lines) this.stockIn(l.product_uid, l.qty_milli, l.unit_cost_minor);
+      if (any) { c.received_stock = true; c.timeline.push({ at: now(), text: `Mercadería ingresada a bodega (${this.next("REC")}): stock y costo promedio actualizados` }); }
+    }
+    if (input.paid_method) {
+      const pnum = this.next("EGR");
+      c.payments.push({ number: pnum, date: input.issue_date, amount_minor: c.totals.total_minor, method: input.paid_method });
+      c.timeline.push({ at: now(), text: `Pagado al contado (${input.paid_method}) · ${pnum}` });
+    } else c.timeline.push({ at: now(), text: `Queda en Dinero que debes (vence ${due})` });
+    this.purchases.push(c);
+    this.log("compra.registrar", "compra", c.number);
+    return wait(this.purDetail(c));
+  }
+  async payPurchase(u: string, amount: number, method: string, date: string): Promise<PurchaseDetail> {
+    this.require("dinero.registrar");
+    const c = this.findPur(u);
+    if (c.status !== "registrada") throw new AppError("estado", "Solo se pagan documentos registrados.");
+    const due = c.totals.total_minor - this.paidOf(c.payments);
+    if (amount <= 0) throw new AppError("monto", "El monto debe ser mayor que cero.");
+    if (amount > due) throw new AppError("monto", "El pago supera el saldo pendiente.");
+    const pnum = this.next("EGR");
+    c.payments.push({ number: pnum, date, amount_minor: amount, method });
+    c.timeline.push({ at: now(), text: `${amount === due ? "Pago final" : "Abono"} al proveedor (${method}) · ${pnum}` });
+    this.log("compra.pagar", "compra", c.number);
+    return wait(this.purDetail(c));
+  }
+  async voidPurchase(u: string, reason: string): Promise<PurchaseDetail> {
+    this.require("compras.crear");
+    const c = this.findPur(u);
+    if (!reason.trim()) throw new AppError("motivo", "Escribe el motivo de la anulación.");
+    if (c.status === "anulada") throw new AppError("estado", "El documento ya está anulado.");
+    if (c.received_stock) for (const l of c.lines) { const p = this.products.find((x) => x.uid === l.product_uid); if (p && p.kind === "producto") p.on_hand_milli -= l.qty_milli; }
+    c.status = "anulada"; c.void_reason = reason.trim();
+    if (c.doc_number) c.doc_number = `${c.doc_number} (anulado ${c.number})`;
+    c.timeline.push({ at: now(), text: `Anulado: ${reason.trim()}` });
+    if (c.payments.length) { c.payments = []; c.timeline.push({ at: now(), text: "Pagos anulados: si pagaste, pide la devolución al proveedor" }); }
+    this.log("compra.anular", "compra", c.number, reason.trim());
+    return wait(this.purDetail(c));
   }
 }
 

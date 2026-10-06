@@ -2,11 +2,12 @@
 // Lo que aún no tiene comando responde con un error claro y la interfaz lo marca "próximamente".
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { AppError, type Backend, type Feature, type FileSource, type SaleFilter } from "./backend";
+import { AppError, type Backend, type Feature, type FileSource, type PurchaseFilter, type SaleFilter } from "./backend";
 import type {
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
   Customer, CustomerDetail, Dashboard, EffectInput, EntityRef, ExternalRefInput, NewCustomer, NewProduct, NewUser, PermissionRow,
-  Product, ProductPatch, PurchaseOrderDetail, PurchaseOrderSummary, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow, SaleDetail, SaleInput,
+  PriceHistoryRow, Product, ProductPatch, PurchaseDetail, PurchaseInput, PurchaseOrderDetail, PurchaseOrderInput, PurchaseOrderSummary,
+  PurchaseSummary, ReceiveLine, NewSupplier, Supplier, SupplierDetail, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow, SaleDetail, SaleInput,
   SaleSummary, SearchHit,
   SecuritySettings, SequenceRow, SessionInfo, UserPatch, UserRow,
 } from "./types";
@@ -41,7 +42,7 @@ export class TauriBackend implements Backend {
   readonly kind = "tauri" as const;
   readonly features: ReadonlySet<Feature> = new Set<Feature>([
     "clientes", "respaldos", "negocio", "busqueda", "usuarios", "documentos", "numeracion", "monedas", "auditoria",
-    "productos", "ventas",
+    "productos", "ventas", "compras",
   ]);
 
   async appInfo(): Promise<AppInfo> {
@@ -116,9 +117,22 @@ export class TauriBackend implements Backend {
   markDocumented(uid: string, ref: ExternalRefInput) { return call<SaleDetail>("mark_documented", { uid, reference: ref }); }
   setDocumentationNotApplicable(uid: string) { return call<SaleDetail>("set_documentation_not_applicable", { uid }); }
   voidSale(uid: string, reason: string) { return call<SaleDetail>("void_sale", { uid, reason }); }
-  async listPurchaseOrders(): Promise<PurchaseOrderSummary[]> { return soon(6); }
-  async purchaseOrder(): Promise<PurchaseOrderDetail> { return soon(6); }
-  async receivePurchaseOrder(): Promise<PurchaseOrderDetail> { return soon(6); }
+  searchSuppliers(query: string) { return call<Supplier[]>("search_suppliers", { query }); }
+  supplier(uid: string) { return call<SupplierDetail>("supplier", { uid }); }
+  addSupplier(input: NewSupplier) { return call<Supplier>("add_supplier", { input }); }
+  updateSupplier(uid: string, input: NewSupplier) { return call<Supplier>("update_supplier", { uid, input }); }
+  priceHistory(productUid: string) { return call<PriceHistoryRow[]>("price_history", { productUid }); }
+  listPurchaseOrders(query?: string) { return call<PurchaseOrderSummary[]>("list_purchase_orders", { query: query ?? null }); }
+  purchaseOrder(uid: string) { return call<PurchaseOrderDetail>("purchase_order", { uid }); }
+  savePurchaseOrder(input: PurchaseOrderInput, uid?: string) { return call<PurchaseOrderDetail>("save_purchase_order", { input, uid: uid ?? null }); }
+  issuePurchaseOrder(uid: string) { return call<PurchaseOrderDetail>("issue_purchase_order", { uid }); }
+  voidPurchaseOrder(uid: string, reason: string) { return call<PurchaseOrderDetail>("void_purchase_order", { uid, reason }); }
+  receivePurchaseOrder(uid: string, lines: ReceiveLine[], date: string) { return call<PurchaseOrderDetail>("receive_purchase_order", { uid, lines, date }); }
+  listPurchases(filter: PurchaseFilter) { return call<PurchaseSummary[]>("list_purchases", { filter: { query: filter.query ?? null, view: filter.view ?? null } }); }
+  purchase(uid: string) { return call<PurchaseDetail>("purchase", { uid }); }
+  registerPurchase(input: PurchaseInput) { return call<PurchaseDetail>("register_purchase", { input }); }
+  payPurchase(uid: string, amount_minor: number, method: string, date: string) { return call<PurchaseDetail>("pay_purchase", { uid, amountMinor: amount_minor, method, date }); }
+  voidPurchase(uid: string, reason: string) { return call<PurchaseDetail>("void_purchase", { uid, reason }); }
 }
 
 /** Selector de archivo del escritorio para adjuntar documentos. */

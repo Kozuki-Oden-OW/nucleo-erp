@@ -9,7 +9,13 @@ use nucleo_app::nucleo_db::audit::{AuditRow, ChainReport};
 use nucleo_app::nucleo_db::core::{AttachmentRow, CurrencyRow, RateRow, SearchHit, SequenceRow};
 use nucleo_app::nucleo_db::customers::CustomerRow;
 use nucleo_app::nucleo_db::products::ProductRow;
+use nucleo_app::nucleo_db::purchases::PriceHistoryRow;
+use nucleo_app::nucleo_db::suppliers::SupplierRow;
 use nucleo_app::nucleo_db::users::{PermissionRow, RoleRow, UserRow};
+use nucleo_app::purchase_ops::{
+    NewSupplier, PoDetail, PoInput, PoSummary, PurchaseDetail, PurchaseFilter, PurchaseInput,
+    PurchaseSummary, ReceiveLine, SupplierDetail,
+};
 use nucleo_app::sales_ops::{
     CustomerDetail, EffectInput, ExternalRefInput, NewProduct, ProductPatch, QuoteDetail,
     QuoteInput, QuoteSummary, SaleDetail, SaleFilter, SaleInput, SaleSummary,
@@ -570,4 +576,133 @@ pub fn update_customer(
     input: NewCustomer,
 ) -> CmdResult<CustomerRow> {
     with_session(&state, |s| Ok(s.update_customer(&uid, &input)?))
+}
+
+/* ───────────────────────────── Compras (Fase 6) ───────────────────────────── */
+
+#[tauri::command]
+pub fn search_suppliers(state: State<'_, AppState>, query: String) -> CmdResult<Vec<SupplierRow>> {
+    with_session(&state, |s| Ok(s.search_suppliers(&query, 300)?))
+}
+
+#[tauri::command]
+pub fn supplier(state: State<'_, AppState>, uid: String) -> CmdResult<SupplierDetail> {
+    with_session(&state, |s| Ok(s.supplier_detail(&uid)?))
+}
+
+#[tauri::command]
+pub fn add_supplier(state: State<'_, AppState>, input: NewSupplier) -> CmdResult<SupplierRow> {
+    with_session(&state, |s| Ok(s.add_supplier(&input)?))
+}
+
+#[tauri::command]
+pub fn update_supplier(
+    state: State<'_, AppState>,
+    uid: String,
+    input: NewSupplier,
+) -> CmdResult<SupplierRow> {
+    with_session(&state, |s| Ok(s.update_supplier(&uid, &input)?))
+}
+
+#[tauri::command]
+pub fn price_history(
+    state: State<'_, AppState>,
+    product_uid: String,
+) -> CmdResult<Vec<PriceHistoryRow>> {
+    with_session(&state, |s| Ok(s.price_history(&product_uid)?))
+}
+
+#[tauri::command]
+pub fn list_purchase_orders(
+    state: State<'_, AppState>,
+    query: Option<String>,
+) -> CmdResult<Vec<PoSummary>> {
+    with_session(&state, |s| {
+        Ok(s.list_purchase_orders(query.as_deref().unwrap_or(""))?)
+    })
+}
+
+#[tauri::command]
+pub fn purchase_order(state: State<'_, AppState>, uid: String) -> CmdResult<PoDetail> {
+    with_session(&state, |s| Ok(s.purchase_order(&uid)?))
+}
+
+#[tauri::command]
+pub fn save_purchase_order(
+    state: State<'_, AppState>,
+    input: PoInput,
+    uid: Option<String>,
+) -> CmdResult<PoDetail> {
+    with_session(&state, |s| {
+        Ok(s.save_purchase_order(&input, uid.as_deref())?)
+    })
+}
+
+#[tauri::command]
+pub fn issue_purchase_order(state: State<'_, AppState>, uid: String) -> CmdResult<PoDetail> {
+    with_session(&state, |s| Ok(s.issue_purchase_order(&uid)?))
+}
+
+#[tauri::command]
+pub fn void_purchase_order(
+    state: State<'_, AppState>,
+    uid: String,
+    reason: String,
+) -> CmdResult<PoDetail> {
+    with_session(&state, |s| Ok(s.void_purchase_order(&uid, &reason)?))
+}
+
+#[tauri::command]
+pub fn receive_purchase_order(
+    state: State<'_, AppState>,
+    uid: String,
+    lines: Vec<ReceiveLine>,
+    date: String,
+) -> CmdResult<PoDetail> {
+    with_session(&state, |s| {
+        Ok(s.receive_purchase_order(&uid, &lines, &date)?)
+    })
+}
+
+#[tauri::command]
+pub fn list_purchases(
+    state: State<'_, AppState>,
+    filter: PurchaseFilter,
+) -> CmdResult<Vec<PurchaseSummary>> {
+    with_session(&state, |s| Ok(s.list_purchases(&filter)?))
+}
+
+#[tauri::command]
+pub fn purchase(state: State<'_, AppState>, uid: String) -> CmdResult<PurchaseDetail> {
+    with_session(&state, |s| Ok(s.purchase(&uid)?))
+}
+
+#[tauri::command]
+pub fn register_purchase(
+    state: State<'_, AppState>,
+    input: PurchaseInput,
+) -> CmdResult<PurchaseDetail> {
+    with_session(&state, |s| Ok(s.register_purchase(&input)?))
+}
+
+#[tauri::command]
+pub fn pay_purchase(
+    state: State<'_, AppState>,
+    uid: String,
+    amount_minor: i64,
+    method: String,
+    date: String,
+) -> CmdResult<PurchaseDetail> {
+    with_session(&state, |s| {
+        Ok(s.pay_purchase(&uid, amount_minor, &method, &date)?)
+    })
+}
+
+#[tauri::command]
+pub fn void_purchase(
+    state: State<'_, AppState>,
+    uid: String,
+    reason: String,
+) -> CmdResult<PurchaseDetail> {
+    with_session(&state, |s| Ok(s.void_purchase(&uid, &reason)?))
 }

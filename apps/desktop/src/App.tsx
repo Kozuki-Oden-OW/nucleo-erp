@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   BackendProvider, createDemoBackend, defaultBackend, errorMessage, useBackend, type AppInfo, type Backend, type CreatedCompany,
-  type QuoteDetail, type SaleDetail, type SessionInfo,
+  type PurchaseOrderDetail, type QuoteDetail, type SaleDetail, type SessionInfo,
 } from "./data";
 import { PrefsProvider } from "./lib/prefs";
 import { SessionProvider, useSession } from "./lib/session";
@@ -18,6 +18,9 @@ import { RecoveryKey } from "./screens/RecoveryKey";
 import { Customers } from "./screens/clientes/Customers";
 import { ImportCalculator } from "./screens/comex/ImportCalculator";
 import { Purchases } from "./screens/compras/Purchases";
+import { BuyEditor } from "./screens/compras/BuyEditor";
+import { PoView } from "./screens/compras/PoView";
+import { PurchaseView } from "./screens/compras/PurchaseView";
 import { Config } from "./screens/config/Config";
 import { Products } from "./screens/productos/Products";
 import { DocEditor } from "./screens/ventas/DocEditor";
@@ -131,7 +134,16 @@ function Screen({ route, info, session, reload }: { route: Route; info: AppInfo;
     case "productos":
       return has.has("productos") ? <Products route={route} /> : <Proximamente id="productos" />;
     case "compras":
-      return has.has("compras") ? <Purchases route={route} /> : <Proximamente id="comprar" />;
+      if (!has.has("compras")) return <Proximamente id="comprar" />;
+      if (a === "oc" && b === "nueva") return <BuyEditor key={route.raw} mode="oc" supplierUid={route.query.get("proveedor")} />;
+      if (a === "oc" && b && route.path[3] === "editar") return <PoEditLoader uid={b} />;
+      if (a === "oc" && b) return <PoView key={b} uid={b} />;
+      if (a === "doc" && b === "nueva") return <BuyEditor key={route.raw} mode="doc" supplierUid={route.query.get("proveedor")} orderUid={route.query.get("oc")} />;
+      if (a === "doc" && b) return <PurchaseView key={b} uid={b} />;
+      return <Purchases route={route} />;
+    case "proveedores":
+      navigate(a ? `/compras?tab=proveedores&ver=${a}` : "/compras?tab=proveedores", { replace: true });
+      return null;
     case "comex":
       return has.has("comex") ? <ImportCalculator /> : <Proximamente id="comex" />;
     case "config":
@@ -143,6 +155,16 @@ function Screen({ route, info, session, reload }: { route: Route; info: AppInfo;
     default:
       return <Proximamente id={section} />;
   }
+}
+
+function PoEditLoader({ uid }: { uid: string }) {
+  const backend = useBackend();
+  const [o, setO] = useState<PurchaseOrderDetail | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => { backend.purchaseOrder(uid).then(setO).catch((e) => setErr(errorMessage(e))); }, [backend, uid]);
+  if (err) return <Notice tone="danger">{err}</Notice>;
+  if (!o) return <Spinner />;
+  return <BuyEditor mode="oc" existing={o} />;
 }
 
 function EditLoader({ kind, uid }: { kind: "sale" | "quote"; uid: string }) {
@@ -163,13 +185,19 @@ function DesktopHome({ session }: { session: SessionInfo }) {
   const backend = useBackend();
   const { can } = useSession();
   const [stats, setStats] = useState<{ receivable: number; receivableCount: number; pendingDoc: number } | null>(null);
+  const [payable, setPayable] = useState<{ total: number; count: number } | null>(null);
   const canSee = can("ventas.ver");
+  const canBuy = can("compras.ver");
   useEffect(() => {
     if (!canSee) return;
     Promise.all([backend.listSales({ view: "por_cobrar" }), backend.listSales({ view: "pendientes_doc" })])
       .then(([r, d]) => setStats({ receivable: r.reduce((a, x) => a + x.total_minor - x.paid_minor, 0), receivableCount: r.length, pendingDoc: d.length }))
       .catch(() => setStats(null));
   }, [backend, canSee]);
+  useEffect(() => {
+    if (!canBuy || !backend.features.has("compras")) return;
+    backend.listPurchases({ view: "por_pagar" }).then((r) => setPayable({ total: r.reduce((a, x) => a + x.total_minor - x.paid_minor, 0), count: r.length })).catch(() => setPayable(null));
+  }, [backend, canBuy]);
   const card = "rounded-xl border border-line bg-surface p-4 text-left shadow-card";
   const label = "text-xs font-semibold uppercase tracking-wide text-muted";
   return (
@@ -184,13 +212,20 @@ function DesktopHome({ session }: { session: SessionInfo }) {
         {can("clientes.editar") && <Button variant="secondary" icon={UserPlus} onClick={() => navigate("/clientes?nuevo=1")}>Nuevo cliente</Button>}
         {can("productos.editar") && <Button variant="secondary" icon={PackagePlus} onClick={() => navigate("/productos?nuevo=1")}>Nuevo producto</Button>}
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <button className={card} onClick={() => navigate("/clientes")}><div className={label}>Clientes</div><div className="num mt-2 text-[22px] font-semibold">{session.customers}</div></button>
         {stats && (
           <button className={card} onClick={() => navigate("/ventas?tab=por_cobrar")}>
             <div className={label}>Dinero que te deben</div>
             <div className="num mt-2 text-[22px] font-semibold">{formatMoney(stats.receivable)}</div>
             <div className="mt-1 text-xs text-muted">{stats.receivableCount} ventas por cobrar</div>
+          </button>
+        )}
+        {payable && (
+          <button className={card} onClick={() => navigate("/compras?tab=por_pagar")}>
+            <div className={label}>Dinero que debes</div>
+            <div className="num mt-2 text-[22px] font-semibold">{formatMoney(payable.total)}</div>
+            <div className="mt-1 text-xs text-muted">{payable.count} documentos de proveedores por pagar</div>
           </button>
         )}
         {stats && (

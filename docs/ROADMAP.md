@@ -10,8 +10,8 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | 3 | Diseño UX | 🟡 Sistema de diseño y prototipos listos; falta la prueba con 3-5 usuarios — ver abajo |
 | 4 | Core (usuarios, roles, configuración, numeración, documentos, búsqueda) | ✅ Hito A cumplido (2026-10-06) — ver abajo |
 | 5 | Ventas | ✅ Completo (2026-10-06) — ver abajo |
-| 6 | Compras | 🟡 En curso |
-| 7 | Inventario (incluye stock real y futuro) | ⏳ |
+| 6 | Compras | ✅ Completo (2026-10-06) — ver abajo |
+| 7 | Inventario (incluye stock real y futuro) | 🟡 En curso |
 | 8 | Finanzas | ⏳ |
 | 9 | COMEX (requiere contador colaborador, D-07) | ⏳ |
 | 10 | Contabilidad (motor de asientos) | ⏳ |
@@ -81,6 +81,19 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | Documentos adjuntos cifrados, vinculados, exportables y archivables; incluidos en respaldos | ✅ |
 | Búsqueda global filtrada por permisos; visor de auditoría | ✅ |
 | Pruebas: `hito_a` (flujo completo + respaldo/restauración con adjuntos) | ✅ |
+
+## Fase 6 — criterio de salida
+
+> Ciclo de compra completo.
+
+| Entregable | Estado |
+|---|---|
+| Proveedores (crear, editar, ficha con compras y deuda) | ✅ |
+| Orden de compra → emitir → recibir (parcial/total) con stock y costo promedio | ✅ prueba `compras.rs` y `ipc_tests.rs` |
+| Documento de compra (asociado a orden o directo con ingreso a bodega), cuenta por pagar, abonos y pago | ✅ |
+| Anulación de órdenes y documentos con motivo | ✅ |
+| Historial de precios por producto y proveedor | ✅ |
+| Solicitudes de compra y comparador formal de cotizaciones de proveedores | ⏳ postergado (D-F6-01) |
 
 ## Fase 5 — criterio de salida
 

@@ -34,7 +34,7 @@ function hitHref(h: SearchHit): string {
     case "producto": return `/productos?ver=${h.uid}`;
     case "venta": return `/ventas/${h.uid}`;
     case "cotizacion": return `/cotizaciones/${h.uid}`;
-    case "orden_compra": return `/compras/${h.uid}`;
+    case "orden_compra": return `/compras/oc/${h.uid}`;
     case "documento": return `/documentos?ver=${h.uid}`;
     case "proveedor": return `/proveedores/${h.uid}`;
   }
@@ -68,6 +68,9 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       { id: "a-cot", group: "Acciones", title: "Nueva cotización", icon: Plus, keywords: "nueva cotizacion presupuesto cot", run: go("/cotizaciones/nueva") },
       { id: "a-cli", group: "Acciones", title: "Nuevo cliente", icon: Users, keywords: "nuevo cliente agregar", run: go("/clientes?nuevo=1") },
       { id: "a-pro", group: "Acciones", title: "Nuevo producto o servicio", icon: Package, keywords: "nuevo producto servicio", run: go("/productos?nuevo=1") },
+      { id: "a-oc", group: "Acciones", title: "Nueva orden de compra", icon: ShoppingCart, keywords: "orden de compra oc pedir proveedor comprar", run: go("/compras/oc/nueva") },
+      { id: "a-com", group: "Acciones", title: "Registrar factura de proveedor", icon: FileText, keywords: "factura proveedor documento compra registrar boleta", run: go("/compras/doc/nueva") },
+      { id: "a-prv", group: "Acciones", title: "Nuevo proveedor", icon: Truck, keywords: "nuevo proveedor agregar", run: go("/compras?tab=proveedores&nuevo_proveedor=1") },
       { id: "a-imp", group: "Acciones", title: "Calcular costo de importación", icon: Calculator, keywords: "comex importacion calculadora landed cif fob", run: go("/comex") },
       { id: "a-tema", group: "Preferencias", title: prefs.theme === "oscuro" ? "Usar tema claro" : "Usar tema oscuro", icon: prefs.theme === "oscuro" ? Sun : Moon, keywords: "tema oscuro claro modo noche", run: () => { set({ theme: prefs.theme === "oscuro" ? "claro" : "oscuro" }); onClose(); } },
       { id: "a-vista", group: "Preferencias", title: prefs.view === "simple" ? "Cambiar a vista Contador" : "Cambiar a vista Simple", icon: FileText, keywords: "vista contador simple contable", run: () => { set({ view: prefs.view === "simple" ? "contador" : "simple" }); onClose(); } },

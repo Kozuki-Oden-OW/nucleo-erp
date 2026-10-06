@@ -214,7 +214,7 @@ export interface Totals {
 
 export interface DocLink {
   number: string;
-  kind: "COT" | "VEN" | "FV" | "PAG" | "REF";
+  kind: "COT" | "VEN" | "FV" | "PAG" | "REF" | "COM" | "OC";
   uid: string | null;
   label: string;
 }
@@ -305,21 +305,105 @@ export interface ExternalRefInput {
   observation?: string;
 }
 
-/* ───── Compras (prototipo Fase 3; módulo real en Fase 6) ───── */
+/* ───── Compras ───── */
 
+export interface Supplier {
+  id: number;
+  uid: string;
+  rut: string | null;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  /** Días de plazo de pago habituales (0 = contado). */
+  payment_terms_days: number;
+  created_at: string;
+}
+export interface NewSupplier { name: string; rut?: string; email?: string; phone?: string; payment_terms_days?: number }
+export interface SupplierDetail extends Supplier {
+  purchases_count: number;
+  purchased_minor: number;
+  payable_minor: number;
+  last_purchase_date: string | null;
+  orders: PurchaseOrderSummary[];
+  purchases: PurchaseSummary[];
+}
+
+export type PoStatus = "borrador" | "emitida" | "parcial" | "recibida" | "anulada";
+export interface BuyLineInput {
+  product_uid: string | null;
+  description: string;
+  qty_milli: number;
+  unit_cost_minor: number;
+  taxable: boolean;
+}
 export interface PurchaseOrderSummary {
   uid: string;
   number: string;
   supplier_name: string;
   issue_date: string;
   expected_date: string | null;
-  status: "borrador" | "emitida" | "parcial" | "recibida" | "anulada";
+  status: PoStatus;
   total_minor: number;
 }
+export interface PoLine extends BuyLineInput { line_no: number; received_milli: number; net_minor: number }
 export interface PurchaseOrderDetail extends PurchaseOrderSummary {
-  lines: { product_uid: string | null; description: string; qty_milli: number; received_milli: number; unit_cost_minor: number }[];
+  supplier_uid: string;
+  lines: PoLine[];
   totals: Totals;
+  notes: string | null;
+  void_reason: string | null;
+  receipts: { number: string; date: string }[];
+  purchases: DocLink[];
+  timeline: { at: string; text: string }[];
 }
+export interface PurchaseOrderInput {
+  supplier_uid: string;
+  issue_date: string;
+  expected_date: string | null;
+  lines: BuyLineInput[];
+  notes?: string;
+}
+export interface ReceiveLine { line_no: number; qty_milli: number }
+
+export interface PurchaseSummary {
+  uid: string;
+  number: string;
+  supplier_name: string;
+  doc_kind: string | null;
+  doc_number: string | null;
+  issue_date: string;
+  due_date: string | null;
+  status: "registrada" | "anulada";
+  payment_state: PaymentState;
+  total_minor: number;
+  paid_minor: number;
+}
+export interface PurchaseLine extends BuyLineInput { line_no: number; net_minor: number }
+export interface PurchaseDetail extends PurchaseSummary {
+  supplier_uid: string;
+  lines: PurchaseLine[];
+  totals: Totals;
+  order_uid: string | null;
+  order_number: string | null;
+  payments: Payment[];
+  received_stock: boolean;
+  notes: string | null;
+  void_reason: string | null;
+  timeline: { at: string; text: string }[];
+}
+export interface PurchaseInput {
+  supplier_uid: string;
+  doc_kind?: string;
+  doc_number?: string;
+  issue_date: string;
+  due_date: string | null;
+  order_uid: string | null;
+  receive_stock: boolean;
+  lines: BuyLineInput[];
+  notes?: string;
+  paid_method: string | null;
+}
+export interface PriceHistoryRow { supplier_uid: string; supplier_name: string; date: string; document: string; unit_price_minor: number; qty_milli: number }
 
 /* ───── Dashboard ───── */
 

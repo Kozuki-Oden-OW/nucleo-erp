@@ -6,12 +6,18 @@
 import type {
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
   Customer, CustomerDetail, Dashboard, EffectInput, EntityRef, ExternalRefInput, NewCustomer, NewProduct, NewUser,
-  PermissionRow, Product, ProductPatch, PurchaseOrderDetail, PurchaseOrderSummary, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow,
+  PermissionRow, PriceHistoryRow, Product, ProductPatch, PurchaseDetail, PurchaseInput, PurchaseOrderDetail, PurchaseOrderInput,
+  PurchaseOrderSummary, PurchaseSummary, ReceiveLine, NewSupplier, Supplier, SupplierDetail, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow,
   SaleDetail, SaleInput, SaleSummary, SearchHit, SecuritySettings, SequenceRow, SessionInfo, UserPatch, UserRow,
 } from "./types";
 
 /** Archivo elegido para adjuntar: ruta en el escritorio o archivo del navegador en la demostración. */
 export type FileSource = { path: string } | { file: File };
+
+export interface PurchaseFilter {
+  query?: string;
+  view?: "todas" | "por_pagar" | "anuladas";
+}
 
 export interface SaleFilter {
   query?: string;
@@ -98,10 +104,24 @@ export interface Backend {
   setDocumentationNotApplicable(uid: string): Promise<SaleDetail>;
   voidSale(uid: string, reason: string): Promise<SaleDetail>;
 
-  // Compras (prototipo)
-  listPurchaseOrders(): Promise<PurchaseOrderSummary[]>;
+  // Proveedores y compras
+  searchSuppliers(query: string): Promise<Supplier[]>;
+  supplier(uid: string): Promise<SupplierDetail>;
+  addSupplier(input: NewSupplier): Promise<Supplier>;
+  updateSupplier(uid: string, input: NewSupplier): Promise<Supplier>;
+  priceHistory(productUid: string): Promise<PriceHistoryRow[]>;
+  listPurchaseOrders(query?: string): Promise<PurchaseOrderSummary[]>;
   purchaseOrder(uid: string): Promise<PurchaseOrderDetail>;
-  receivePurchaseOrder(uid: string): Promise<PurchaseOrderDetail>;
+  savePurchaseOrder(input: PurchaseOrderInput, uid?: string): Promise<PurchaseOrderDetail>;
+  issuePurchaseOrder(uid: string): Promise<PurchaseOrderDetail>;
+  voidPurchaseOrder(uid: string, reason: string): Promise<PurchaseOrderDetail>;
+  /** `lines` vacío = recibir todo lo pendiente. */
+  receivePurchaseOrder(uid: string, lines: ReceiveLine[], date: string): Promise<PurchaseOrderDetail>;
+  listPurchases(filter: PurchaseFilter): Promise<PurchaseSummary[]>;
+  purchase(uid: string): Promise<PurchaseDetail>;
+  registerPurchase(input: PurchaseInput): Promise<PurchaseDetail>;
+  payPurchase(uid: string, amount_minor: number, method: string, date: string): Promise<PurchaseDetail>;
+  voidPurchase(uid: string, reason: string): Promise<PurchaseDetail>;
 }
 
 /** Error con mensaje en lenguaje claro, listo para mostrar. */

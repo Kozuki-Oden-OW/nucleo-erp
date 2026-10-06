@@ -23,9 +23,9 @@ use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use serde::{Deserialize, Serialize};
 
-const MAX_LINES: usize = 500;
-const MAX_QTY_MILLI: i64 = 1_000_000_000_000;
-const MAX_PRICE_MINOR: i64 = 10_000_000_000_000;
+pub(crate) const MAX_LINES: usize = 500;
+pub(crate) const MAX_QTY_MILLI: i64 = 1_000_000_000_000;
+pub(crate) const MAX_PRICE_MINOR: i64 = 10_000_000_000_000;
 
 /* ───────────────────────────── Tipos de la interfaz ───────────────────────────── */
 
@@ -289,14 +289,14 @@ pub fn line_cost_minor(unit_cost_e4: i64, qty_milli: i64) -> i64 {
         .unwrap_or(i64::MAX)
 }
 
-fn parse_date(label: &str, s: &str) -> AppResult<String> {
+pub(crate) fn parse_date(label: &str, s: &str) -> AppResult<String> {
     let fmt = time::macros::format_description!("[year]-[month]-[day]");
     time::Date::parse(s.trim(), &fmt)
         .map(|_| s.trim().to_string())
         .map_err(|_| AppError::Validation(format!("{label} no es una fecha válida")))
 }
 
-fn opt_text(v: &Option<String>, max: usize, label: &str) -> AppResult<Option<String>> {
+pub(crate) fn opt_text(v: &Option<String>, max: usize, label: &str) -> AppResult<Option<String>> {
     match v.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         None => Ok(None),
         Some(s) if s.chars().count() > max => Err(AppError::Validation(format!(
@@ -306,7 +306,7 @@ fn opt_text(v: &Option<String>, max: usize, label: &str) -> AppResult<Option<Str
     }
 }
 
-fn local_today(conn: &Connection) -> AppResult<String> {
+pub(crate) fn local_today(conn: &Connection) -> AppResult<String> {
     Ok(conn.query_row("SELECT date('now', 'localtime')", [], |r| r.get(0))?)
 }
 
@@ -364,12 +364,12 @@ struct Prepared {
 }
 
 impl CompanySession {
-    fn user_id(&self) -> Option<i64> {
+    pub(crate) fn user_id(&self) -> Option<i64> {
         self.actor.as_ref().map(|a| a.user_id)
     }
 
     /// Tasa de impuesto aplicable (ppm) o `None` si el negocio no calcula impuesto.
-    fn tax_ppm(&self) -> AppResult<Option<i64>> {
+    pub(crate) fn tax_ppm(&self) -> AppResult<Option<i64>> {
         let b = self.business()?;
         Ok(if b.tax_enabled { b.tax_rate_ppm } else { None })
     }
@@ -1506,7 +1506,7 @@ impl CompanySession {
     }
 }
 
-fn log(
+pub(crate) fn log(
     conn: &Connection,
     user: &str,
     action: &str,

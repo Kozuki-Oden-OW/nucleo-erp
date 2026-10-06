@@ -199,3 +199,88 @@ fn ciclo_de_venta_por_ipc() {
             .starts_with(char::is_uppercase)
     );
 }
+
+#[test]
+fn ciclo_de_compra_por_ipc() {
+    let ipc = Ipc::new();
+    let created = ipc.ok(
+        "create_company",
+        json!({ "name": "Ferretería Compras", "profile": "negocio" }),
+    );
+    ipc.ok("open_company", json!({ "uid": created["company"]["uid"] }));
+    let p = ipc.ok("add_product", json!({ "input": { "name": "Cemento", "unit": "un", "kind": "producto", "price_minor": 6000, "cost_minor": 4000 } }));
+    let prod = p["uid"].as_str().unwrap().to_string();
+    let s = ipc.ok(
+        "add_supplier",
+        json!({ "input": { "name": "Cementos del Sur", "payment_terms_days": 15 } }),
+    );
+    let sup = s["uid"].as_str().unwrap().to_string();
+    ipc.ok("update_supplier", json!({ "uid": sup, "input": { "name": "Cementos del Sur SpA", "payment_terms_days": 30 } }));
+    assert_eq!(
+        ipc.ok("search_suppliers", json!({ "query": "cementos" }))
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+
+    let line = json!({ "product_uid": prod, "description": "Cemento", "qty_milli": 10000, "unit_cost_minor": 4200, "taxable": true });
+    let o = ipc.ok("save_purchase_order", json!({ "input": { "supplier_uid": sup, "issue_date": HOY, "expected_date": null, "lines": [line] }, "uid": null }));
+    let ouid = o["uid"].as_str().unwrap().to_string();
+    ipc.ok("issue_purchase_order", json!({ "uid": ouid }));
+    let o = ipc.ok(
+        "receive_purchase_order",
+        json!({ "uid": ouid, "lines": [{ "line_no": 1, "qty_milli": 10000 }], "date": HOY }),
+    );
+    assert_eq!(o["status"], "recibida");
+    assert_eq!(
+        ipc.ok("list_purchase_orders", json!({ "query": null }))
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+
+    let c = ipc.ok("register_purchase", json!({ "input": {
+        "supplier_uid": sup, "doc_kind": "Factura", "doc_number": "77", "issue_date": HOY, "due_date": null,
+        "order_uid": ouid, "receive_stock": false, "lines": [line], "paid_method": null
+    } }));
+    assert_eq!(c["due_date"], "2026-11-05");
+    let cuid = c["uid"].as_str().unwrap().to_string();
+    let c = ipc.ok(
+        "pay_purchase",
+        json!({ "uid": cuid, "amountMinor": 42000, "method": "Transferencia", "date": HOY }),
+    );
+    assert_eq!(c["payment_state"], "pagada");
+    assert_eq!(
+        ipc.ok(
+            "list_purchases",
+            json!({ "filter": { "query": null, "view": "todas" } })
+        )
+        .as_array()
+        .unwrap()
+        .len(),
+        1
+    );
+    assert_eq!(
+        ipc.ok("price_history", json!({ "productUid": prod }))
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(
+        ipc.ok("supplier", json!({ "uid": sup }))["purchases_count"],
+        1
+    );
+    ipc.ok("purchase", json!({ "uid": cuid }));
+    let c = ipc.ok("void_purchase", json!({ "uid": cuid, "reason": "Prueba" }));
+    assert_eq!(c["status"], "anulada");
+    let o2 = ipc.ok("save_purchase_order", json!({ "input": { "supplier_uid": sup, "issue_date": HOY, "expected_date": "2026-10-20", "lines": [line], "notes": "x" }, "uid": null }));
+    let o2 = ipc.ok(
+        "void_purchase_order",
+        json!({ "uid": o2["uid"], "reason": "No va" }),
+    );
+    assert_eq!(o2["status"], "anulada");
+    ipc.ok("purchase_order", json!({ "uid": ouid }));
+}

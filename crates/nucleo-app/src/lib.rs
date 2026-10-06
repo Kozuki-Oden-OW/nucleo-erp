@@ -8,6 +8,7 @@ pub mod company;
 pub mod core_ops;
 pub mod error;
 pub mod keys;
+pub mod purchase_ops;
 pub mod registry;
 pub mod sales_ops;
 

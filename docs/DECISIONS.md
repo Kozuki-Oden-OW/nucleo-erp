@@ -116,6 +116,18 @@ informativo, sin renta guiada · D-11 promociones no acumulables por defecto · 
 | D-F5-08 | "Hoy" se toma de la hora local del computador (`date('now','localtime')` de SQLite) | Una venta de las 22:00 en Chile no debe quedar con la fecha de mañana (UTC) |
 | D-F5-09 | El contrato IPC se prueba de punta a punta con el runtime simulado de Tauri (`ipc_tests.rs`) usando los mismos argumentos que `tauri.ts` | Detecta nombres de argumentos o campos que no calzan sin abrir la aplicación |
 
+## Decisiones de la Fase 6
+
+| ID | Decisión | Motivo |
+|---|---|---|
+| D-F6-01 | Las solicitudes de compra y el comparador formal de cotizaciones de proveedores se postergan; el historial de precios por producto y proveedor cubre la comparación al comprar | Para una pyme, "¿cuánto pagué la última vez y a quién?" resuelve la mayoría de los casos; las tablas ya existen para retomarlo |
+| D-F6-02 | La recepción se confirma al registrarla (sin estado "en recepción"); el stock entra al costo neto de la orden con costo promedio ponderado | Flujo simple y explicable; el control de calidad (rechazos) se agrega si hace falta |
+| D-F6-03 | Se reciben entregas parciales; una orden con mercadería recibida ya no se anula | Lo recibido debe quedar respaldado por un documento de compra |
+| D-F6-04 | El documento del proveedor se registra directo (sin borrador) y crea la cuenta por pagar; si no se indica, vence según el plazo habitual del proveedor | Es la copia de un documento que ya existe |
+| D-F6-05 | Una compra sin orden puede ingresar mercadería; con orden, el stock entra solo desde la orden | Evita ingresar dos veces la misma mercadería |
+| D-F6-06 | Anular un documento anula la deuda y los pagos y, si ingresó mercadería directa, la saca del stock recalculando el costo; el número del proveedor queda marcado "(anulado …)" | Corrección sin borrar y sin chocar con la regla de no repetir documentos |
+| D-F6-07 | El costo de compra es el neto; el IVA de compras se muestra como crédito estimado informativo | Coherente con la contabilidad de costos y con el carácter no tributario de NÚCLEO |
+
 ## Dependencias y su justificación
 
 | Dependencia | Dónde | Por qué |

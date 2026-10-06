@@ -1,7 +1,7 @@
 // Buscadores con teclado para elegir cliente y producto mientras se digita un documento.
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { Package, Search, User, UserPlus, X } from "lucide-react";
-import { useBackend, type Customer, type Product } from "../../data";
+import { Package, Search, Truck, User, UserPlus, X } from "lucide-react";
+import { useBackend, type Customer, type Product, type Supplier } from "../../data";
 import { formatMoney, formatQty, formatRut } from "../../lib/format";
 import { cx } from "../../ui/kit";
 
@@ -213,3 +213,76 @@ export const ProductPicker = forwardRef<ProductPickerHandle, { onPick: (p: Produ
     </div>
   );
 });
+
+/** Buscador de proveedor (compras). Permite crear uno nuevo sin salir del documento. */
+export function SupplierPicker({ value, onChange, onCreate }: { value: Supplier | null; onChange: (s: Supplier | null) => void; onCreate: (name: string) => void }) {
+  const backend = useBackend();
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const { rows, forQuery } = useDebounced((x) => backend.searchSuppliers(x).then((r) => r.slice(0, 8)), q, open);
+  const pendingEnter = useRef(false);
+  type Opt = { kind: "s"; s: Supplier } | { kind: "new" };
+  const opts: Opt[] = [...rows.map((s) => ({ kind: "s" as const, s })), ...(q.trim() ? [{ kind: "new" as const }] : [])];
+  function pick(o: Opt) {
+    if (o.kind === "s") onChange(o.s); else onCreate(q.trim());
+    setOpen(false); setQ("");
+  }
+  useEffect(() => setActive(0), [q]);
+  useEffect(() => {
+    if (pendingEnter.current && forQuery === q && opts[0]) { pendingEnter.current = false; pick(opts[0]); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forQuery, q]);
+  if (value) {
+    return (
+      <div className="flex h-ctl items-center gap-3 rounded-lg border border-line-strong bg-surface px-3">
+        <Truck size={16} className="text-accent" aria-hidden />
+        <div className="min-w-0 flex-1 truncate text-sm">
+          <span className="font-medium text-ink">{value.name}</span>
+          {value.rut && <span className="ml-2 text-muted">{formatRut(value.rut)}</span>}
+          {value.payment_terms_days > 0 && <span className="ml-2 text-muted">· paga a {value.payment_terms_days} días</span>}
+        </div>
+        <button className="text-muted hover:text-ink" aria-label="Cambiar proveedor" onClick={() => onChange(null)}><X size={16} /></button>
+      </div>
+    );
+  }
+  return (
+    <div className="relative">
+      <div className="relative flex items-center">
+        <Search size={15} className="pointer-events-none absolute left-3 text-muted" aria-hidden />
+        <input
+          role="combobox"
+          aria-expanded={open}
+          aria-controls="supp-list"
+          aria-label="Proveedor"
+          placeholder="Buscar proveedor por nombre o RUT…"
+          className="h-ctl w-full rounded-lg border border-line-strong bg-surface pl-9 pr-3 text-sm text-ink placeholder:text-faint focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25"
+          value={q}
+          onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 120)}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown") { e.preventDefault(); setActive((a) => Math.min(opts.length - 1, a + 1)); }
+            else if (e.key === "ArrowUp") { e.preventDefault(); setActive((a) => Math.max(0, a - 1)); }
+            else if (e.key === "Enter" && q.trim() && forQuery !== q) { e.preventDefault(); pendingEnter.current = true; }
+            else if (e.key === "Enter" && opts[active]) { e.preventDefault(); pick(opts[active]!); }
+            else if (e.key === "Escape") setOpen(false);
+          }}
+        />
+      </div>
+      {open && opts.length > 0 && (forQuery === q || !q) && (
+        <Listbox
+          id="supp-list"
+          items={opts}
+          active={active}
+          onPick={pick}
+          render={(o) => o.kind === "s" ? (
+            <div className="flex items-center justify-between gap-3"><span className="truncate text-ink">{o.s.name}</span><span className="shrink-0 text-xs text-muted">{formatRut(o.s.rut)}</span></div>
+          ) : (
+            <div className="flex items-center gap-2 text-accent"><UserPlus size={15} aria-hidden /> Crear proveedor “{q.trim()}”</div>
+          )}
+        />
+      )}
+    </div>
+  );
+}
