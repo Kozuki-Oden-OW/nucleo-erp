@@ -12,3 +12,4 @@ apps/desktop/src-tauri/gen/
 dist-web/
 *.privkey
 nucleo-bench.db*
+dist-demo/

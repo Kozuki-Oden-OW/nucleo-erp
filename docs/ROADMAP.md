@@ -5,9 +5,9 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | Fase | Nombre | Estado |
 |---|---|---|
 | 0 | Análisis — Blueprint Maestro | ✅ Aprobado (2026-10-05) |
-| 1 | Arquitectura | 🟡 Código y pruebas listos; falta validar la compilación e instalador en Windows (CI) |
+| 1 | Arquitectura | ✅ Completo (2026-10-05): CI en Windows verde e instalador compilado |
 | 2 | Modelo de datos | ✅ Completo (2026-10-05) — ver abajo |
-| 3 | Diseño UX | ⏳ |
+| 3 | Diseño UX | 🟡 Sistema de diseño y prototipos listos; falta la prueba con 3-5 usuarios — ver abajo |
 | 4 | Core (usuarios, roles, configuración, numeración, documentos, búsqueda) | ⏳ |
 | 5 | Ventas | ⏳ |
 | 6 | Compras | ⏳ |
@@ -36,7 +36,7 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | Flujo crear → escribir → respaldar → restaurar | ✅ prueba automática + prueba manual en la app |
 | Auditoría encadenada con detección de manipulación | ✅ |
 | Clave de recuperación | ✅ |
-| CI en Windows + `NucleoERPSetup.exe` | ⏳ requiere publicar el repositorio en GitHub |
+| CI en Windows + `NucleoERPSetup.exe` | ✅ CI verde en GitHub Actions (Linux y Windows) |
 | Spike PDF (Typst vs. WebView2) | ⏳ movido a la Fase 5 (primer documento imprimible: cotización) |
 | Instalador firmado | ⏳ requiere certificado de firma de código (costo anual) |
 
@@ -53,13 +53,28 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | Generador `seed` (100.000 clientes, 100.000 productos, 1.000.000 de movimientos) | ✅ 7,8 min, 436 MB |
 | Mediciones `bench` contra las metas del MVP | ✅ 12/12 consultas dentro de meta (p95) |
 
+## Fase 3 — criterio de salida
+
+> Prueba de usabilidad con 3-5 usuarios no contadores (Blueprint §17).
+
+| Entregable | Estado |
+|---|---|
+| Sistema de diseño: tokens claro/oscuro, densidad, componentes (`ui/`), accesibilidad | ✅ `docs/UX.md` |
+| Layout: menú por perfil, barra superior, alertas, vista Simple/Contador, glosario dual | ✅ |
+| Paleta de comandos Ctrl+K (registros + acciones) y atajos de teclado | ✅ |
+| Prototipos navegables: dashboard, ciclo de venta completo, compra (OC → recepción), COMEX (escenarios) | ✅ demo en el navegador (backend de demostración) |
+| Puerto `Backend` único: el prototipo se vuelve pantalla real al existir el comando Rust | ✅ `src/data/backend.ts` |
+| Demo pública en `www.nucleoerp.cl/demo/` | ✅ automatizada en `web.yml` |
+| Guion de prueba de usabilidad (8 tareas, métricas, criterio) | ✅ `docs/UX.md` §8 |
+| **Prueba con 3-5 usuarios** | ⏳ la realiza el dueño del proyecto con el guion; resultados en `docs/usabilidad/` |
+
 ## Sitio web
 
 | Entregable | Estado |
 |---|---|
 | Sitio `www.nucleoerp.cl` (inicio, descarga, privacidad, 404), sin rastreadores | ✅ listo en `apps/web` |
 | Descarga directa desde el dominio con SHA-256 publicado | ✅ automatizado (`release.yml` + `web.yml`) |
-| Publicación | ⏳ requiere repositorio en GitHub y DNS (ver `docs/WEB.md`) |
+| Publicación | ✅ GitHub Pages con dominio www.nucleoerp.cl (HTTPS al emitirse el certificado) |
 
 ## Movido a fases posteriores (con motivo)
 

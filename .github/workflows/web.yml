@@ -5,7 +5,7 @@ name: Sitio web (www.nucleoerp.cl)
 on:
   push:
     branches: [main]
-    paths: ["apps/web/**", "tools/build_web.py", ".github/workflows/web.yml"]
+    paths: ["apps/web/**", "apps/desktop/src/**", "apps/desktop/package.json", "tools/build_web.py", ".github/workflows/web.yml"]
   workflow_dispatch:
   workflow_call:
 
@@ -33,12 +33,25 @@ jobs:
           else
             echo "Aún no hay versiones publicadas: el sitio mostrará 'muy pronto'."
           fi
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+      - name: Construir la demostración navegable (/demo/)
+        working-directory: apps/desktop
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build:demo
       - name: Construir sitio
         run: |
           if [ -n "${INSTALLER:-}" ]; then
-            python3 tools/build_web.py --out dist-web --installer "$INSTALLER"
+            python3 tools/build_web.py --out dist-web --demo apps/desktop/dist-demo --installer "$INSTALLER"
           else
-            python3 tools/build_web.py --out dist-web
+            python3 tools/build_web.py --out dist-web --demo apps/desktop/dist-demo
           fi
       - uses: actions/upload-pages-artifact@v3
         with:

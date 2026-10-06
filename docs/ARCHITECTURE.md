@@ -9,7 +9,9 @@ quedó implementada en la Fase 1.
 
 ```
 UI (React + TypeScript, WebView2)
-   │  IPC de Tauri (comandos)            apps/desktop/src/lib/api.ts  ⇄  src-tauri/src/commands.rs
+   │  Puerto Backend                     apps/desktop/src/data/backend.ts
+   │    ├─ TauriBackend → IPC            apps/desktop/src/data/tauri.ts  ⇄  src-tauri/src/commands.rs
+   │    └─ DemoBackend (en memoria)      apps/desktop/src/data/demo (navegador y prototipos)
    ▼
 Capa Tauri (delgada)                     apps/desktop/src-tauri
    ▼
@@ -65,7 +67,12 @@ por negocio).
 ## 6. Frontend
 
 - React 19 + TypeScript estricto + Vite + Tailwind CSS 4 (tokens claro/oscuro en `src/styles.css`).
-- Contrato IPC en `src/lib/api.ts` (tipos espejados a mano en Fase 1; ver DECISIONS D-F1-03).
+- Las pantallas solo hablan con el puerto `Backend` (`src/data/backend.ts`). En el escritorio lo implementa
+  `TauriBackend` (comandos Rust); en el navegador, `DemoBackend` (datos ficticios en memoria). Cada backend
+  declara qué módulos implementa (`features`); lo demás aparece como "próximamente" (D-F3-01).
+- Tipos del contrato en `src/data/types.ts` (espejados a mano; `tauri-specta` en evaluación, D-F1-03).
+- Sistema de diseño en `src/ui` y estructura de pantalla en `src/shell` (ver `UX.md`).
+- Enrutador propio por hash (`src/lib/router.ts`) y preferencias locales (`src/lib/prefs.tsx`).
 - Sin recursos externos: la CSP solo permite `self` e IPC.
 
 ## 7. Seguridad de la aplicación

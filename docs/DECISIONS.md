@@ -71,6 +71,20 @@ informativo, sin renta guiada · D-11 promociones no acumulables por defecto · 
 | D-F2-13 | Marca: logo a color del usuario (`docs/marca/`); colores azul marino `#001a3c`, turquesa `#0090aa`, verde `#6f9f00` | Identidad única en app, íconos, instalador y sitio |
 | D-F2-14 | Código en GitHub `Kozuki-Oden-OW/nucleo-erp`; el dueño hace el push; las versiones se publican con `release.yml` (etiqueta o "Run workflow") | Claude no maneja credenciales; publicación reproducible desde CI |
 
+## Decisiones de la Fase 3
+
+| ID | Decisión | Motivo |
+|---|---|---|
+| D-F3-01 | Puerto `Backend` único en la interfaz, con dos implementaciones (Tauri y demostración) | Los prototipos se convierten en pantallas reales sin rehacerlos; la demo del sitio usa el mismo código |
+| D-F3-02 | Demo en el navegador con datos ficticios en memoria, sin persistencia | Prueba de usabilidad sin instalar nada; ningún dato real sale del computador |
+| D-F3-03 | Íconos `lucide-react` (ISC), empaquetados localmente | Conjunto amplio y coherente sin recursos externos |
+| D-F3-04 | Tipografía del sistema (Segoe UI Variable) sin fuentes descargadas | Funciona sin Internet y respeta la CSP |
+| D-F3-05 | Enrutador por hash propio | Sin dependencias; funciona igual en Tauri y en `/demo/` |
+| D-F3-06 | La vista previa de totales se calcula en TypeScript con la misma regla que Rust; el valor guardado lo calcula Rust | Respuesta instantánea al digitar sin duplicar la autoridad del cálculo |
+| D-F3-07 | Valores normativos de la demo en `reglas-demo.json`, rotulados como ilustrativos | La CI sigue rechazando valores normativos en el código; el escritorio solo usa paquetes con fuente |
+| D-F3-08 | La leyenda "DOCUMENTO INTERNO — NO TRIBUTARIO" se imprime en todos los documentos de venta, incluida la cotización | Más simple y más seguro que distinguir por tipo |
+| D-F3-09 | Perfil de la demo: Empresa | Muestra todos los módulos, incluido COMEX, en la prueba de usabilidad |
+
 ## Dependencias y su justificación
 
 | Dependencia | Dónde | Por qué |
@@ -90,4 +104,5 @@ informativo, sin renta guiada · D-11 promociones no acumulables por defecto · 
 | `ed25519-dalek` | rules, tools | Firma y verificación de paquetes normativos |
 | `tauri`, `tauri-plugin-dialog` | desktop | Aplicación de escritorio y selector de archivos |
 | React, `@tauri-apps/api`, `@tauri-apps/plugin-dialog` | frontend | Interfaz e IPC |
+| `lucide-react` | frontend | Íconos (ISC), empaquetados en la aplicación |
 | Vite, TypeScript, Tailwind CSS, Vitest | frontend (desarrollo) | Compilación, tipos, estilos, pruebas |

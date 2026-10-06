@@ -2,6 +2,23 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [Sin publicar] — Fase 3 (Diseño UX)
+
+### Agregado
+- Sistema de diseño: tokens claro/oscuro con colores de marca, densidad cómoda/compacta, componentes
+  accesibles (botones, campos, montos, tablas con teclado y virtualización, paneles laterales, diálogos,
+  avisos, gráfico de ventas con vista de tabla). Documentado en `docs/UX.md`.
+- Nueva estructura de pantalla: menú lateral según el perfil (Emprendedor, Negocio, Empresa) con
+  "Más módulos", barra superior con búsqueda, "Nueva venta", vista Simple/Contador, tema y alertas.
+- Paleta de comandos `Ctrl+K` que busca clientes, productos, ventas, cotizaciones y órdenes de compra y
+  ejecuta acciones. Atajos `Alt+N`, `Ctrl+Enter`, `Ctrl+B`.
+- Prototipos navegables: dashboard del dueño, cotización → venta → efectuada → pagos → documentada,
+  factura interna, impresión con leyenda "DOCUMENTO INTERNO — NO TRIBUTARIO", clientes con ficha,
+  productos con margen, órdenes de compra con recepción y calculadora de importación con escenarios.
+- Demostración en el navegador con una ferretería ficticia (`www.nucleoerp.cl/demo/`) y botón
+  "Explorar con datos de ejemplo" en el escritorio.
+- Guion de prueba de usabilidad para 3-5 personas (`docs/UX.md` §8).
+
 ## [Sin publicar] — Fase 2 (Modelo de datos) y sitio web
 
 ### Agregado

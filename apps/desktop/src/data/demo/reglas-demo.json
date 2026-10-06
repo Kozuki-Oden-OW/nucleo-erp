@@ -1,0 +1,17 @@
+{
+  "code": "DEMO-2026",
+  "publisher": "NÚCLEO ERP — solo demostración",
+  "note": "Paquete de DEMOSTRACIÓN para prototipos y pruebas de usabilidad. No se usa en el escritorio: allí la tasa viene de un paquete normativo firmado con fuente oficial verificada (TAX_RULES.md).",
+  "values": [
+    {
+      "code": "IVA_TASA_GENERAL_PPM",
+      "value": 190000,
+      "source": "Valor ilustrativo para la demostración (DL 825, art. 14). Pendiente de verificación con el contador colaborador."
+    },
+    {
+      "code": "ARANCEL_GENERAL_PPM",
+      "value": 60000,
+      "source": "Valor ilustrativo para la demostración (arancel ad valorem general). En la operación real lo ingresa el usuario según su clasificación arancelaria."
+    }
+  ]
+}

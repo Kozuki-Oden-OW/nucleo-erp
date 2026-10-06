@@ -2,11 +2,13 @@
 """Construye el sitio www.nucleoerp.cl (apps/web) en una carpeta lista para publicar.
 
 Uso:
-    python3 tools/build_web.py --out dist-web [--installer ruta/NucleoERPSetup.exe]
+    python3 tools/build_web.py --out dist-web [--installer ruta/NucleoERPSetup.exe] [--demo apps/desktop/dist-demo]
 
 - Reemplaza los marcadores {{...}} con site.config.json y los datos de la versión.
 - Con --installer copia el instalador a /descargas/NucleoERPSetup.exe y publica su
   tamaño y SHA-256. Sin --installer, la página de descarga muestra "muy pronto".
+- Con --demo copia la demostración navegable (la interfaz del escritorio con datos ficticios,
+  construida con `pnpm build:demo`) en /demo/.
 - Falla si queda algún marcador sin reemplazar.
 """
 import argparse
@@ -39,6 +41,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
     ap.add_argument("--installer")
+    ap.add_argument("--demo")
     args = ap.parse_args()
 
     cfg = json.loads((WEB / "site.config.json").read_text(encoding="utf-8"))
@@ -70,6 +73,13 @@ def main() -> int:
         shutil.copy2(installer, dest / "NucleoERPSetup.exe")
         (dest / "NucleoERPSetup.exe.sha256").write_text(f"{values['SHA256']}  NucleoERPSetup.exe\n")
 
+    if args.demo:
+        demo = pathlib.Path(args.demo)
+        if not (demo / "index.html").is_file():
+            print(f"No se encontró la demostración construida en {demo}")
+            return 1
+        shutil.copytree(demo, out / "demo")
+
     repo = cfg.get("repo_url", "").strip()
     values["REPO_TEXT"] = (f'<a href="{html.escape(repo)}">Ver el código fuente</a>.' if repo
                            else "El código se publicará junto con la primera versión.")
@@ -83,7 +93,7 @@ def main() -> int:
 
     leftovers = []
     for f in out.rglob("*"):
-        if f.suffix not in TEXT_EXT or not f.is_file():
+        if f.suffix not in TEXT_EXT or not f.is_file() or "demo" in f.relative_to(out).parts[:1]:
             continue
         text = f.read_text(encoding="utf-8")
         text = conditional(text, "INSTALLER", installer is not None)
@@ -96,7 +106,7 @@ def main() -> int:
     if leftovers:
         print("Marcadores sin reemplazar:\n" + "\n".join(leftovers))
         return 1
-    print(f"Sitio construido en {out} (instalador: {'sí' if installer else 'no'})")
+    print(f"Sitio construido en {out} (instalador: {'sí' if installer else 'no'}, demo: {'sí' if args.demo else 'no'})")
     return 0
 
 
