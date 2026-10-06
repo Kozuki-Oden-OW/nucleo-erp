@@ -141,6 +141,20 @@ informativo, sin renta guiada · D-11 promociones no acumulables por defecto · 
 | D-F7-07 | Recálculo retroactivo del costo (entradas con fecha pasada) y reservas por notas de venta se postergan | Requieren rehacer costos de ventas ya efectuadas; se diseñan con la contabilidad (Fase 10) |
 | D-F7-08 | El análisis se calcula al abrir la pantalla; la foto diaria (`stock_daily_snapshot`) y el cálculo en segundo plano llegan con el dashboard (Fase 12) | Medido en segundos para catálogos grandes; suficiente para el MVP |
 
+## Decisiones de la Fase 8
+
+| ID | Decisión | Motivo |
+|---|---|---|
+| D-F8-01 | El saldo de cada cuenta se calcula (saldo inicial + cobros − pagos ± traspasos vigentes); no se guarda un saldo editable | Una sola fuente de verdad; si no cuadra con la cartola, falta registrar algo |
+| D-F8-02 | Sin cuenta elegida, el efectivo va a la caja y los demás medios al banco; si no existe una caja se crea | Cero fricción al cobrar; quien quiera precisión elige la cuenta |
+| D-F8-03 | Las cuentas guardan solo una referencia corta (se rechazan más de 8 dígitos) | Nunca almacenar números de cuenta o tarjeta (seguridad y privacidad) |
+| D-F8-04 | Una cuenta solo se archiva con saldo cero y debe quedar al menos una activa | No perder dinero de vista |
+| D-F8-05 | El gasto crea su cuenta por pagar (GAS) y se paga con egresos (EGR); "ya lo pagué" registra ambos en una transacción | Mismo modelo que las compras: un solo "Dinero que debes" |
+| D-F8-06 | El IVA de un gasto con "monto incluye IVA" se separa con la tasa vigente del negocio y es informativo | Coherente con D-F6-07 y con el carácter no tributario |
+| D-F8-07 | Los recurrentes no generan registros solos: proyectan hasta que se registra un gasto vinculado cerca de la fecha (±15 días; ±3 si es semanal) | Nada se contabiliza sin acción del usuario |
+| D-F8-08 | La proyección de caja usa solo compromisos conocidos (los atrasados cuentan en la semana actual) y no estima ventas futuras | Explicable y sin supuestos ocultos; la estimación de ventas se evaluará con reportes (Fase 12) |
+| D-F8-09 | La conciliación bancaria con cartola importada y los flujos a 7/60/90 días como reportes se postergan | El MVP entrega saldo calculado, calendario y proyección semanal; la importación de cartolas llega con la Fase 11 |
+
 ## Dependencias y su justificación
 
 | Dependencia | Dónde | Por qué |

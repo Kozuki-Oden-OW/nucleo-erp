@@ -12,7 +12,7 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | 5 | Ventas | ✅ Completo (2026-10-06) — ver abajo |
 | 6 | Compras | ✅ Completo (2026-10-06) — ver abajo |
 | 7 | Inventario (incluye stock real y futuro) | ✅ Hito B cumplido (2026-10-06) — ver abajo |
-| 8 | Finanzas | 🟡 En curso |
+| 8 | Finanzas | ✅ Hito C cumplido (2026-10-06) — ver abajo |
 | 9 | COMEX (requiere contador colaborador, D-07) | ⏳ |
 | 10 | Contabilidad (motor de asientos) | ⏳ |
 | 11 | Documentación externa e indicadores | ⏳ |
@@ -81,6 +81,20 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | Documentos adjuntos cifrados, vinculados, exportables y archivables; incluidos en respaldos | ✅ |
 | Búsqueda global filtrada por permisos; visor de auditoría | ✅ |
 | Pruebas: `hito_a` (flujo completo + respaldo/restauración con adjuntos) | ✅ |
+
+## Fase 8 — criterio de salida
+
+> Hito C: "sé cuánto dinero tengo, cuánto me deben, cuánto debo y cómo viene la caja".
+
+| Entregable | Estado |
+|---|---|
+| Cuentas (caja, banco, billetera), saldo calculado, movimientos y traspasos | ✅ prueba `hito_c.rs` e `ipc_tests.rs` |
+| Cuentas por cobrar y por pagar con antigüedad | ✅ |
+| Gastos con categorías, pago total o parcial y anulación | ✅ |
+| Recurrentes, calendario de vencimientos y proyección de caja a 13 semanas | ✅ |
+| Cuenta elegible en cobros y pagos | ✅ |
+| Dashboard del dueño con cifras reales | ✅ (versión completa en la Fase 12) |
+| Conciliación bancaria con cartola importada | ⏳ postergado (D-F8-09) |
 
 ## Fase 7 — criterio de salida
 

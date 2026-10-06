@@ -38,7 +38,7 @@ export const NAV: NavItem[] = [
   { id: "productos", label: "Productos y servicios", icon: Package, href: "/productos", profiles: ALL, feature: "productos", phase: 5, perm: "productos.ver" },
   { id: "comprar", label: "Comprar", icon: ShoppingCart, href: "/compras", profiles: ["negocio", "empresa"], feature: "compras", phase: 6, perm: "compras.ver" },
   { id: "inventario", label: "Inventario", icon: Boxes, href: "/inventario", profiles: ALL, feature: "inventario", phase: 7, perm: "inventario.ver" },
-  { id: "dinero", label: "Dinero", icon: Banknote, href: "/dinero", profiles: ALL, phase: 8, perm: "dinero.ver" },
+  { id: "dinero", label: "Dinero", icon: Banknote, href: "/dinero", profiles: ALL, feature: "dinero", phase: 8, perm: "dinero.ver" },
   { id: "comex", label: "COMEX", icon: Ship, href: "/comex", profiles: ["empresa"], feature: "comex", phase: 9, perm: "comex.ver" },
   { id: "contabilidad", label: "Contabilidad", icon: Landmark, href: "/contabilidad", profiles: ["empresa"], phase: 10, perm: "contabilidad.ver" },
   { id: "analisis", label: "Análisis y reportes", icon: BarChart3, href: "/analisis", profiles: ["negocio", "empresa"], phase: 12, perm: "reportes.ver" },

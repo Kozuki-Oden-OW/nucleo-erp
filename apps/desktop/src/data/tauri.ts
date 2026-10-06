@@ -4,6 +4,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { AppError, type Backend, type Feature, type FileSource, type PurchaseFilter, type SaleFilter } from "./backend";
 import type {
+  AccountInput, CalendarItem, ExpenseCategory, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow, MoneyAccount,
+  MoneyOverview, MoneyTransferInput, Recurring, RecurringInput,
   AdjustmentInput, InventoryOverview, InventorySettings, ProductInventory, ReorderInput, StockDocDone, StockDocRow, TransferInput, Warehouse,
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
   Customer, CustomerDetail, Dashboard, EffectInput, EntityRef, ExternalRefInput, NewCustomer, NewProduct, NewUser, PermissionRow,
@@ -24,10 +26,6 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> 
   }
 }
 
-function soon(phase: number): never {
-  throw new AppError("proximamente", `Esta función llega en la Fase ${phase}. Puedes probarla en la demostración.`);
-}
-
 /** Texto vacío para los campos que se borran (contrato de `BusinessPatch` en Rust). */
 function businessPatch(p: Partial<BusinessSettings>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -43,7 +41,7 @@ export class TauriBackend implements Backend {
   readonly kind = "tauri" as const;
   readonly features: ReadonlySet<Feature> = new Set<Feature>([
     "clientes", "respaldos", "negocio", "busqueda", "usuarios", "documentos", "numeracion", "monedas", "auditoria",
-    "productos", "ventas", "compras", "inventario",
+    "productos", "ventas", "compras", "inventario", "dinero", "dashboard",
   ]);
 
   async appInfo(): Promise<AppInfo> {
@@ -97,7 +95,7 @@ export class TauriBackend implements Backend {
   archiveAttachment(uid: string, reason: string) { return call<void>("archive_attachment", { uid, reason }); }
 
   async ruleValue(): Promise<{ value: number; source: string } | null> { return null; }
-  async dashboard(): Promise<Dashboard> { return soon(12); }
+  dashboard() { return call<Dashboard>("dashboard"); }
   customer(uid: string) { return call<CustomerDetail>("customer", { uid }); }
   searchProducts(query: string) { return call<Product[]>("search_products", { query }); }
   addProduct(input: NewProduct) { return call<Product>("add_product", { input }); }
@@ -112,8 +110,8 @@ export class TauriBackend implements Backend {
   sale(uid: string) { return call<SaleDetail>("sale", { uid }); }
   saveSale(input: SaleInput, uid?: string) { return call<SaleDetail>("save_sale", { input, uid: uid ?? null }); }
   effectSale(uid: string, input: EffectInput) { return call<SaleDetail>("effect_sale", { uid, input }); }
-  registerPayment(uid: string, amount_minor: number, method: string, date: string) {
-    return call<SaleDetail>("register_payment", { uid, amountMinor: amount_minor, method, date });
+  registerPayment(uid: string, amount_minor: number, method: string, date: string, accountUid?: string) {
+    return call<SaleDetail>("register_payment", { uid, amountMinor: amount_minor, method, date, accountUid: accountUid ?? null });
   }
   markDocumented(uid: string, ref: ExternalRefInput) { return call<SaleDetail>("mark_documented", { uid, reference: ref }); }
   setDocumentationNotApplicable(uid: string) { return call<SaleDetail>("set_documentation_not_applicable", { uid }); }
@@ -132,7 +130,9 @@ export class TauriBackend implements Backend {
   listPurchases(filter: PurchaseFilter) { return call<PurchaseSummary[]>("list_purchases", { filter: { query: filter.query ?? null, view: filter.view ?? null } }); }
   purchase(uid: string) { return call<PurchaseDetail>("purchase", { uid }); }
   registerPurchase(input: PurchaseInput) { return call<PurchaseDetail>("register_purchase", { input }); }
-  payPurchase(uid: string, amount_minor: number, method: string, date: string) { return call<PurchaseDetail>("pay_purchase", { uid, amountMinor: amount_minor, method, date }); }
+  payPurchase(uid: string, amount_minor: number, method: string, date: string, accountUid?: string) {
+    return call<PurchaseDetail>("pay_purchase", { uid, amountMinor: amount_minor, method, date, accountUid: accountUid ?? null });
+  }
   voidPurchase(uid: string, reason: string) { return call<PurchaseDetail>("void_purchase", { uid, reason }); }
   inventorySettings() { return call<InventorySettings>("inventory_settings"); }
   updateInventorySettings(settings: InventorySettings) { return call<InventorySettings>("update_inventory_settings", { settings }); }
@@ -147,6 +147,25 @@ export class TauriBackend implements Backend {
   inventoryOverview() { return call<InventoryOverview>("inventory_overview"); }
   productInventory(uid: string, warehouseUid?: string) { return call<ProductInventory>("product_inventory", { uid, warehouseUid: warehouseUid ?? null }); }
   updateReorderSettings(uid: string, input: ReorderInput) { return call<ProductInventory>("update_reorder_settings", { uid, input }); }
+  moneyAccounts() { return call<MoneyAccount[]>("money_accounts"); }
+  createMoneyAccount(input: AccountInput) { return call<MoneyAccount[]>("create_money_account", { input }); }
+  updateMoneyAccount(uid: string, input: AccountInput) { return call<MoneyAccount[]>("update_money_account", { uid, input }); }
+  archiveMoneyAccount(uid: string) { return call<MoneyAccount[]>("archive_money_account", { uid }); }
+  accountLedger(uid: string) { return call<LedgerRow[]>("account_ledger", { uid }); }
+  transferMoney(input: MoneyTransferInput) { return call<MoneyAccount[]>("transfer_money", { input: { ...input, notes: input.notes ?? null } }); }
+  expenseCategories() { return call<ExpenseCategory[]>("expense_categories"); }
+  addExpenseCategory(name: string, fixed: boolean) { return call<ExpenseCategory[]>("add_expense_category", { name, fixed }); }
+  listExpenses(filter: ExpenseFilter) { return call<ExpenseSummary[]>("list_expenses", { filter }); }
+  expense(uid: string) { return call<ExpenseDetail>("expense", { uid }); }
+  registerExpense(input: ExpenseInput) { return call<ExpenseDetail>("register_expense", { input }); }
+  payExpense(uid: string, amount_minor: number, method: string, date: string, accountUid?: string) {
+    return call<ExpenseDetail>("pay_expense", { uid, amountMinor: amount_minor, method, date, accountUid: accountUid ?? null });
+  }
+  voidExpense(uid: string, reason: string) { return call<ExpenseDetail>("void_expense", { uid, reason }); }
+  recurring() { return call<Recurring[]>("recurring"); }
+  saveRecurring(input: RecurringInput) { return call<Recurring[]>("save_recurring", { input }); }
+  moneyOverview() { return call<MoneyOverview>("money_overview"); }
+  moneyCalendar(days: number) { return call<CalendarItem[]>("money_calendar", { days }); }
 }
 
 /** Selector de archivo del escritorio para adjuntar documentos. */

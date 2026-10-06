@@ -168,6 +168,9 @@ pub struct PurchaseInput {
     pub notes: Option<String>,
     /// Si se pagó al momento, el medio de pago.
     pub paid_method: Option<String>,
+    /// Cuenta de donde salió el dinero (si no se indica, se sugiere según el medio).
+    #[serde(default)]
+    pub paid_account_uid: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -1074,9 +1077,14 @@ impl CompanySession {
         if total > 0 {
             let pay = db::insert_payable(&tx, cid, supplier.id, &due, total)?;
             if let Some(m) = &input.paid_method {
-                let acc = sdb::default_cash_account(&tx, &now)?;
-                let pnum = dbcore::take_number(&tx, "EGR")?;
                 let code = method_code(m);
+                let acc = crate::finance_ops::account_for(
+                    &tx,
+                    input.paid_account_uid.as_deref(),
+                    code,
+                    &now,
+                )?;
+                let pnum = dbcore::take_number(&tx, "EGR")?;
                 db::insert_supplier_payment(
                     &tx,
                     &uuid::Uuid::now_v7().to_string(),
@@ -1114,6 +1122,7 @@ impl CompanySession {
         amount_minor: i64,
         method: &str,
         date: &str,
+        account_uid: Option<&str>,
     ) -> AppResult<PurchaseDetail> {
         self.require("dinero.registrar")?;
         let c = self.purchase_row(uid)?;
@@ -1140,9 +1149,9 @@ impl CompanySession {
         let tx = self.db.conn_mut().transaction()?;
         let pay = db::open_payable(&tx, c.id)?
             .ok_or_else(|| AppError::Validation("el documento no tiene saldo por pagar".into()))?;
-        let acc = sdb::default_cash_account(&tx, &now)?;
-        let pnum = dbcore::take_number(&tx, "EGR")?;
         let code = method_code(method);
+        let acc = crate::finance_ops::account_for(&tx, account_uid, code, &now)?;
+        let pnum = dbcore::take_number(&tx, "EGR")?;
         db::insert_supplier_payment(
             &tx,
             &uuid::Uuid::now_v7().to_string(),

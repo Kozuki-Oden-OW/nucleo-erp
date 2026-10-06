@@ -5,6 +5,10 @@ use nucleo_app::company::BackupDone;
 use nucleo_app::core_ops::{
     BusinessPatch, BusinessSettings, CurrentUser, EntityRef, NewUser, SecuritySettings, UserPatch,
 };
+use nucleo_app::finance_ops::{
+    AccountInput, CalendarItem, DashboardData, ExpenseDetail, ExpenseFilter, ExpenseInput,
+    ExpenseSummary, MoneyOverview, MoneyTransferInput, RecurringInput,
+};
 use nucleo_app::inventory_ops::{
     AdjustmentInput, InventoryOverview, InventorySettings, ProductInventory, ReorderInput,
     StockDocDone, TransferInput,
@@ -12,6 +16,7 @@ use nucleo_app::inventory_ops::{
 use nucleo_app::nucleo_db::audit::{AuditRow, ChainReport};
 use nucleo_app::nucleo_db::core::{AttachmentRow, CurrencyRow, RateRow, SearchHit, SequenceRow};
 use nucleo_app::nucleo_db::customers::CustomerRow;
+use nucleo_app::nucleo_db::finance::{AccountRow, CategoryRow, LedgerRow, RecurringRow};
 use nucleo_app::nucleo_db::inventory::{StockDocRow, WarehouseRow};
 use nucleo_app::nucleo_db::products::ProductRow;
 use nucleo_app::nucleo_db::purchases::PriceHistoryRow;
@@ -537,9 +542,10 @@ pub fn register_payment(
     amount_minor: i64,
     method: String,
     date: String,
+    account_uid: Option<String>,
 ) -> CmdResult<SaleDetail> {
     with_session(&state, |s| {
-        Ok(s.register_payment(&uid, amount_minor, &method, &date)?)
+        Ok(s.register_payment(&uid, amount_minor, &method, &date, account_uid.as_deref())?)
     })
 }
 
@@ -697,9 +703,10 @@ pub fn pay_purchase(
     amount_minor: i64,
     method: String,
     date: String,
+    account_uid: Option<String>,
 ) -> CmdResult<PurchaseDetail> {
     with_session(&state, |s| {
-        Ok(s.pay_purchase(&uid, amount_minor, &method, &date)?)
+        Ok(s.pay_purchase(&uid, amount_minor, &method, &date, account_uid.as_deref())?)
     })
 }
 
@@ -797,4 +804,135 @@ pub fn update_reorder_settings(
     input: ReorderInput,
 ) -> CmdResult<ProductInventory> {
     with_session(&state, |s| Ok(s.update_reorder_settings(&uid, &input)?))
+}
+
+/* ───────────────────────────── Finanzas (Fase 8) ───────────────────────────── */
+
+#[tauri::command]
+pub fn money_accounts(state: State<'_, AppState>) -> CmdResult<Vec<AccountRow>> {
+    with_session(&state, |s| Ok(s.money_accounts()?))
+}
+
+#[tauri::command]
+pub fn create_money_account(
+    state: State<'_, AppState>,
+    input: AccountInput,
+) -> CmdResult<Vec<AccountRow>> {
+    with_session(&state, |s| Ok(s.create_money_account(&input)?))
+}
+
+#[tauri::command]
+pub fn update_money_account(
+    state: State<'_, AppState>,
+    uid: String,
+    input: AccountInput,
+) -> CmdResult<Vec<AccountRow>> {
+    with_session(&state, |s| Ok(s.update_money_account(&uid, &input)?))
+}
+
+#[tauri::command]
+pub fn archive_money_account(
+    state: State<'_, AppState>,
+    uid: String,
+) -> CmdResult<Vec<AccountRow>> {
+    with_session(&state, |s| Ok(s.archive_money_account(&uid)?))
+}
+
+#[tauri::command]
+pub fn account_ledger(state: State<'_, AppState>, uid: String) -> CmdResult<Vec<LedgerRow>> {
+    with_session(&state, |s| Ok(s.account_ledger(&uid)?))
+}
+
+#[tauri::command]
+pub fn transfer_money(
+    state: State<'_, AppState>,
+    input: MoneyTransferInput,
+) -> CmdResult<Vec<AccountRow>> {
+    with_session(&state, |s| Ok(s.transfer_money(&input)?))
+}
+
+#[tauri::command]
+pub fn expense_categories(state: State<'_, AppState>) -> CmdResult<Vec<CategoryRow>> {
+    with_session(&state, |s| Ok(s.expense_categories()?))
+}
+
+#[tauri::command]
+pub fn add_expense_category(
+    state: State<'_, AppState>,
+    name: String,
+    fixed: bool,
+) -> CmdResult<Vec<CategoryRow>> {
+    with_session(&state, |s| Ok(s.add_expense_category(&name, fixed)?))
+}
+
+#[tauri::command]
+pub fn list_expenses(
+    state: State<'_, AppState>,
+    filter: ExpenseFilter,
+) -> CmdResult<Vec<ExpenseSummary>> {
+    with_session(&state, |s| Ok(s.list_expenses(&filter)?))
+}
+
+#[tauri::command]
+pub fn expense(state: State<'_, AppState>, uid: String) -> CmdResult<ExpenseDetail> {
+    with_session(&state, |s| Ok(s.expense(&uid)?))
+}
+
+#[tauri::command]
+pub fn register_expense(
+    state: State<'_, AppState>,
+    input: ExpenseInput,
+) -> CmdResult<ExpenseDetail> {
+    with_session(&state, |s| Ok(s.register_expense(&input)?))
+}
+
+#[tauri::command]
+pub fn pay_expense(
+    state: State<'_, AppState>,
+    uid: String,
+    amount_minor: i64,
+    method: String,
+    date: String,
+    account_uid: Option<String>,
+) -> CmdResult<ExpenseDetail> {
+    with_session(&state, |s| {
+        Ok(s.pay_expense(&uid, amount_minor, &method, &date, account_uid.as_deref())?)
+    })
+}
+
+#[tauri::command]
+pub fn void_expense(
+    state: State<'_, AppState>,
+    uid: String,
+    reason: String,
+) -> CmdResult<ExpenseDetail> {
+    with_session(&state, |s| Ok(s.void_expense(&uid, &reason)?))
+}
+
+#[tauri::command]
+pub fn recurring(state: State<'_, AppState>) -> CmdResult<Vec<RecurringRow>> {
+    with_session(&state, |s| Ok(s.recurring()?))
+}
+
+#[tauri::command]
+pub fn save_recurring(
+    state: State<'_, AppState>,
+    input: RecurringInput,
+) -> CmdResult<Vec<RecurringRow>> {
+    with_session(&state, |s| Ok(s.save_recurring(&input)?))
+}
+
+#[tauri::command]
+pub fn money_overview(state: State<'_, AppState>) -> CmdResult<MoneyOverview> {
+    with_session(&state, |s| Ok(s.money_overview()?))
+}
+
+#[tauri::command]
+pub fn money_calendar(state: State<'_, AppState>, days: i64) -> CmdResult<Vec<CalendarItem>> {
+    with_session(&state, |s| Ok(s.money_calendar(days)?))
+}
+
+#[tauri::command]
+pub fn dashboard(state: State<'_, AppState>) -> CmdResult<DashboardData> {
+    with_session(&state, |s| Ok(s.dashboard()?))
 }

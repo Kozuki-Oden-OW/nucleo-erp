@@ -59,6 +59,7 @@ fn sell(
             mode: "contado".into(),
             method: "Efectivo".into(),
             due_date: None,
+            account_uid: None,
         },
     )?;
     Ok(())

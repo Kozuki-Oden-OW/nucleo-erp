@@ -7,6 +7,7 @@ import { addDays, formatMoney, todayIso } from "../../lib/format";
 import { MoneyField } from "../../ui/doc";
 import { Button, Field, Notice, Segmented, Select, TextArea } from "../../ui/kit";
 import { Dialog, useToast } from "../../ui/overlay";
+import { AccountSelect } from "../dinero/common";
 
 type Done = (s: SaleDetail) => void;
 
@@ -15,13 +16,14 @@ export function EffectDialog({ sale, open, onClose, onDone }: { sale: SaleDetail
   const toast = useToast();
   const [mode, setMode] = useState<"contado" | "credito">("contado");
   const [method, setMethod] = useState(PAYMENT_METHODS[0]!);
+  const [account, setAccount] = useState("");
   const [due, setDue] = useState(addDays(todayIso(), 30));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   async function go() {
     setBusy(true); setErr(null);
     try {
-      const s = await backend.effectSale(sale.uid, { mode, method, due_date: mode === "credito" ? due : null });
+      const s = await backend.effectSale(sale.uid, { mode, method, due_date: mode === "credito" ? due : null, account_uid: mode === "contado" && account ? account : null });
       toast("success", `${s.number} efectuada.${s.documentation_state === "pendiente" ? " Quedó pendiente de documentación tributaria." : ""}`);
       onDone(s); onClose();
     } catch (e) { setErr(errorMessage(e)); } finally { setBusy(false); }
@@ -46,7 +48,10 @@ export function EffectDialog({ sale, open, onClose, onDone }: { sale: SaleDetail
           <Segmented label="Forma de pago" value={mode} onChange={setMode} options={[{ value: "contado", label: "Al contado", icon: HandCoins }, { value: "credito", label: "A crédito", icon: CreditCard }]} />
         </div>
         {mode === "contado" ? (
-          <Select label="Medio de pago" value={method} onChange={(e) => setMethod(e.target.value)} options={PAYMENT_METHODS.map((m) => ({ value: m, label: m }))} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Select label="Medio de pago" value={method} onChange={(e) => setMethod(e.target.value)} options={PAYMENT_METHODS.map((m) => ({ value: m, label: m }))} />
+            <AccountSelect value={account} onChange={setAccount} method={method} label="Entra a la cuenta" />
+          </div>
         ) : (
           <Field label="Fecha en que te pagará" type="date" value={due} onChange={(e) => setDue(e.target.value)} hint="Aparecerá en “Dinero que te deben” y en el calendario de cobros." />
         )}
@@ -62,6 +67,7 @@ export function PaymentDialog({ sale, open, onClose, onDone }: { sale: SaleDetai
   const due = sale.total_minor - sale.paid_minor;
   const [amount, setAmount] = useState<number | null>(due);
   const [method, setMethod] = useState(PAYMENT_METHODS[1]!);
+  const [account, setAccount] = useState("");
   const [date, setDate] = useState(todayIso());
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -69,7 +75,7 @@ export function PaymentDialog({ sale, open, onClose, onDone }: { sale: SaleDetai
     if (!amount) return;
     setBusy(true); setErr(null);
     try {
-      const s = await backend.registerPayment(sale.uid, amount, method, date);
+      const s = await backend.registerPayment(sale.uid, amount, method, date, account || undefined);
       toast("success", amount === due ? "Pago registrado: la venta quedó pagada." : `Abono de ${formatMoney(amount)} registrado.`);
       onDone(s); onClose();
     } catch (e) { setErr(errorMessage(e)); } finally { setBusy(false); }
@@ -83,6 +89,7 @@ export function PaymentDialog({ sale, open, onClose, onDone }: { sale: SaleDetai
           <Select label="Medio de pago" value={method} onChange={(e) => setMethod(e.target.value)} options={PAYMENT_METHODS.map((m) => ({ value: m, label: m }))} />
           <Field label="Fecha" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
+        <AccountSelect value={account} onChange={setAccount} method={method} label="Entra a la cuenta" />
         {err && <Notice tone="danger">{err}</Notice>}
       </div>
     </Dialog>

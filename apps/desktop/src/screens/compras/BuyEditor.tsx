@@ -13,6 +13,7 @@ import { MoneyField } from "../../ui/doc";
 import { Button, Card, Checkbox, Field, IconButton, Label, Notice, PageHeader, Select, TextArea } from "../../ui/kit";
 import { useToast } from "../../ui/overlay";
 import { ProductPicker, SupplierPicker, type ProductPickerHandle } from "../ventas/pickers";
+import { AccountSelect } from "../dinero/common";
 import { SupplierFormDrawer } from "./common";
 
 type Mode = "oc" | "doc";
@@ -37,6 +38,7 @@ export function BuyEditor({ mode, existing, supplierUid, orderUid }: { mode: Mod
   const [receive, setReceive] = useState(true);
   const [paid, setPaid] = useState(false);
   const [method, setMethod] = useState(PAYMENT_METHODS[1]!);
+  const [account, setAccount] = useState("");
   const [rows, setRows] = useState<Row[]>(() => (existing?.lines ?? []).map((l) => toRow(l)));
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [newSupplier, setNewSupplier] = useState<string | null>(null);
@@ -109,7 +111,7 @@ export function BuyEditor({ mode, existing, supplierUid, orderUid }: { mode: Mod
       } else {
         const c = await backend.registerPurchase({
           supplier_uid: supplier.uid, doc_kind: docKind, doc_number: docNumber || undefined, issue_date: date, due_date: due || null,
-          order_uid: order?.uid ?? null, receive_stock: !order && receive, lines, notes: notes || undefined, paid_method: paid ? method : null,
+          order_uid: order?.uid ?? null, receive_stock: !order && receive, lines, notes: notes || undefined, paid_method: paid ? method : null, paid_account_uid: paid && account ? account : null,
         });
         toast("success", `${c.number} registrado.${c.received_stock ? " La mercadería ya está en bodega." : ""}`);
         navigate(`/compras/doc/${c.uid}`, { replace: true });
@@ -234,6 +236,7 @@ export function BuyEditor({ mode, existing, supplierUid, orderUid }: { mode: Mod
                 )}
                 {can("dinero.registrar") && <Checkbox label="Ya lo pagué" hint="Registra el pago completo con este documento." checked={paid} onChange={setPaid} />}
                 {paid && <Select label="Medio de pago" value={method} onChange={(e) => setMethod(e.target.value)} options={PAYMENT_METHODS.map((m) => ({ value: m, label: m }))} />}
+                {paid && <AccountSelect value={account} onChange={setAccount} method={method} label="Sale de la cuenta" />}
               </div>
             </Card>
           )}

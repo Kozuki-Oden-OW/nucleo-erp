@@ -297,6 +297,8 @@ export interface EffectInput {
   mode: "contado" | "credito";
   method: string;
   due_date: string | null;
+  /** Cuenta donde entra el dinero; vacío = según el medio (efectivo → caja, otros → banco). */
+  account_uid?: string | null;
 }
 export interface ExternalRefInput {
   doc_kind?: string;
@@ -402,6 +404,7 @@ export interface PurchaseInput {
   lines: BuyLineInput[];
   notes?: string;
   paid_method: string | null;
+  paid_account_uid?: string | null;
 }
 export interface PriceHistoryRow { supplier_uid: string; supplier_name: string; date: string; document: string; unit_price_minor: number; qty_milli: number }
 
@@ -463,6 +466,115 @@ export interface TransferInput { from_uid: string; to_uid: string; date: string;
 export interface StockDocDone { number: string; moved_lines: number }
 export interface StockDocRow { uid: string; number: string; kind: "ajuste" | "conteo" | "transferencia"; date: string; description: string; lines: number; created_by: string | null }
 export interface ReorderInput extends ReorderSettings { min_milli: number }
+
+/* ───── Dinero ───── */
+
+export type AccountKind = "caja" | "banco" | "billetera";
+export interface MoneyAccount {
+  uid: string;
+  kind: AccountKind;
+  name: string;
+  bank_name: string | null;
+  account_label: string | null;
+  opening_minor: number;
+  opening_date: string | null;
+  archived: boolean;
+  balance_minor: number;
+}
+export interface AccountInput { kind: AccountKind; name: string; bank_name?: string; account_label?: string; opening_minor: number; opening_date?: string }
+export interface LedgerRow {
+  date: string;
+  kind: "cobro" | "pago" | "traspaso_entrada" | "traspaso_salida";
+  document: string;
+  detail: string;
+  amount_minor: number;
+  link: string | null;
+  status: "vigente" | "anulado";
+}
+export interface MoneyTransferInput { from_uid: string; to_uid: string; date: string; amount_minor: number; notes?: string }
+export interface ExpenseCategory { id: number; name: string; behavior: "fijo" | "variable" }
+export interface ExpenseInput {
+  category_id: number;
+  supplier_uid: string | null;
+  date: string;
+  description: string;
+  total_minor: number;
+  tax_included: boolean;
+  due_date: string | null;
+  paid_method: string | null;
+  paid_account_uid: string | null;
+  notes?: string;
+  recurring_id: number | null;
+}
+export interface ExpenseSummary {
+  uid: string;
+  number: string;
+  date: string;
+  due_date: string | null;
+  category: string;
+  supplier_name: string | null;
+  description: string;
+  total_minor: number;
+  paid_minor: number;
+  status: "registrado" | "anulado";
+  payment_state: "pagado" | "abonado" | "por_pagar" | "anulado";
+}
+export interface ExpenseDetail extends ExpenseSummary {
+  supplier_uid: string | null;
+  net_minor: number;
+  tax_minor: number;
+  payments: Payment[];
+  void_reason: string | null;
+  notes: string | null;
+  timeline: { at: string; text: string }[];
+}
+export interface ExpenseFilter { query?: string; from?: string; to?: string; include_void?: boolean }
+export type Frequency = "semanal" | "mensual" | "bimestral" | "trimestral" | "anual";
+export interface Recurring {
+  id: number;
+  direction: "ingreso" | "egreso";
+  description: string;
+  category_id: number | null;
+  category: string | null;
+  amount_minor: number;
+  frequency: Frequency;
+  day_of_period: number | null;
+  starts_on: string;
+  ends_on: string | null;
+  active: boolean;
+}
+export interface RecurringInput extends Omit<Recurring, "id" | "category"> { id: number | null }
+export interface Aging { current_minor: number; d1_30_minor: number; d31_60_minor: number; d61_90_minor: number; d90_plus_minor: number }
+export interface WeekFlow { start: string; end: string; opening_minor: number; inflow_minor: number; outflow_minor: number; closing_minor: number }
+export interface DueRow { kind: "cobro" | "pago"; due_date: string; party: string; document: string; link: string; amount_minor: number; pending_minor: number }
+export interface CalendarItem {
+  date: string;
+  kind: "cobro" | "pago" | "ingreso_recurrente" | "egreso_recurrente";
+  label: string;
+  party: string;
+  amount_minor: number;
+  link: string | null;
+  overdue: boolean;
+}
+export interface MoneyOverview {
+  today: string;
+  accounts: MoneyAccount[];
+  cash_minor: number;
+  receivable_minor: number;
+  receivable_overdue_minor: number;
+  receivable_aging: Aging;
+  payable_minor: number;
+  payable_overdue_minor: number;
+  payable_aging: Aging;
+  next30_in_minor: number;
+  next30_out_minor: number;
+  in30_minor: number;
+  projection: WeekFlow[];
+  shortfall_week: string | null;
+  lowest_minor: number;
+  receivables: DueRow[];
+  payables: DueRow[];
+}
 
 /* ───── Dashboard ───── */
 

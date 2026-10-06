@@ -4,6 +4,8 @@
 // Las pantallas solo conocen esta interfaz; así un prototipo de la Fase 3 se convierte en pantalla
 // real cuando el comando Rust correspondiente existe.
 import type {
+  AccountInput, CalendarItem, ExpenseCategory, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow, MoneyAccount,
+  MoneyOverview, MoneyTransferInput, Recurring, RecurringInput,
   AdjustmentInput, InventoryOverview, InventorySettings, ProductInventory, ReorderInput, StockDocDone, StockDocRow, TransferInput, Warehouse,
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
   Customer, CustomerDetail, Dashboard, EffectInput, EntityRef, ExternalRefInput, NewCustomer, NewProduct, NewUser,
@@ -28,7 +30,7 @@ export interface SaleFilter {
 /** Módulos que el backend ya implementa. La interfaz oculta o marca "próximamente" lo que falte. */
 export type Feature =
   | "dashboard" | "clientes" | "productos" | "ventas" | "compras" | "comex" | "negocio" | "respaldos" | "busqueda"
-  | "usuarios" | "documentos" | "numeracion" | "monedas" | "auditoria" | "inventario";
+  | "usuarios" | "documentos" | "numeracion" | "monedas" | "auditoria" | "inventario" | "dinero";
 
 export interface Backend {
   readonly kind: "tauri" | "demo";
@@ -100,7 +102,7 @@ export interface Backend {
   sale(uid: string): Promise<SaleDetail>;
   saveSale(input: SaleInput, uid?: string): Promise<SaleDetail>;
   effectSale(uid: string, input: EffectInput): Promise<SaleDetail>;
-  registerPayment(uid: string, amount_minor: number, method: string, date: string): Promise<SaleDetail>;
+  registerPayment(uid: string, amount_minor: number, method: string, date: string, accountUid?: string): Promise<SaleDetail>;
   markDocumented(uid: string, ref: ExternalRefInput): Promise<SaleDetail>;
   setDocumentationNotApplicable(uid: string): Promise<SaleDetail>;
   voidSale(uid: string, reason: string): Promise<SaleDetail>;
@@ -121,7 +123,7 @@ export interface Backend {
   listPurchases(filter: PurchaseFilter): Promise<PurchaseSummary[]>;
   purchase(uid: string): Promise<PurchaseDetail>;
   registerPurchase(input: PurchaseInput): Promise<PurchaseDetail>;
-  payPurchase(uid: string, amount_minor: number, method: string, date: string): Promise<PurchaseDetail>;
+  payPurchase(uid: string, amount_minor: number, method: string, date: string, accountUid?: string): Promise<PurchaseDetail>;
   voidPurchase(uid: string, reason: string): Promise<PurchaseDetail>;
 
   // Inventario
@@ -138,6 +140,25 @@ export interface Backend {
   inventoryOverview(): Promise<InventoryOverview>;
   productInventory(uid: string, warehouseUid?: string): Promise<ProductInventory>;
   updateReorderSettings(uid: string, input: ReorderInput): Promise<ProductInventory>;
+
+  // Dinero
+  moneyAccounts(): Promise<MoneyAccount[]>;
+  createMoneyAccount(input: AccountInput): Promise<MoneyAccount[]>;
+  updateMoneyAccount(uid: string, input: AccountInput): Promise<MoneyAccount[]>;
+  archiveMoneyAccount(uid: string): Promise<MoneyAccount[]>;
+  accountLedger(uid: string): Promise<LedgerRow[]>;
+  transferMoney(input: MoneyTransferInput): Promise<MoneyAccount[]>;
+  expenseCategories(): Promise<ExpenseCategory[]>;
+  addExpenseCategory(name: string, fixed: boolean): Promise<ExpenseCategory[]>;
+  listExpenses(filter: ExpenseFilter): Promise<ExpenseSummary[]>;
+  expense(uid: string): Promise<ExpenseDetail>;
+  registerExpense(input: ExpenseInput): Promise<ExpenseDetail>;
+  payExpense(uid: string, amount_minor: number, method: string, date: string, accountUid?: string): Promise<ExpenseDetail>;
+  voidExpense(uid: string, reason: string): Promise<ExpenseDetail>;
+  recurring(): Promise<Recurring[]>;
+  saveRecurring(input: RecurringInput): Promise<Recurring[]>;
+  moneyOverview(): Promise<MoneyOverview>;
+  moneyCalendar(days: number): Promise<CalendarItem[]>;
 }
 
 /** Error con mensaje en lenguaje claro, listo para mostrar. */

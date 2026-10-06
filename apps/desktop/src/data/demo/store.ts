@@ -11,7 +11,10 @@ import type {
   BuyLineInput, NewSupplier, PoLine, PoStatus, PurchaseDetail, PurchaseInput, PurchaseLine, PurchaseOrderInput, PurchaseSummary, ReceiveLine, Supplier, SupplierDetail, QuoteDetail,
   QuoteInput, QuoteStatus, QuoteSummary, RateRow, RoleRow, SaleDetail, SaleDocType, SaleInput, SaleSummary, SearchHit,
   SecuritySettings, SequenceRow, SessionInfo, Totals, UserPatch, UserRow,
+  AccountInput, AccountKind, CalendarItem, DueRow, ExpenseCategory, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow,
+  MoneyAccount, MoneyOverview, MoneyTransferInput, Recurring, RecurringInput,
 } from "../types";
+import { DEMO_CATEGORIES, PROJECTION_WEEKS, agingAdd, emptyAging, methodCode, occurrences } from "./money";
 import { DEMO_PERMISSIONS, DEMO_ROLES } from "./roles";
 import { addDays, daysBetween, todayIso } from "../../lib/format";
 import { CUSTOMER_NAMES, DEMO_COMPANY, PAYMENT_METHODS, PRODUCT_ROWS, SUPPLIER_NAMES, rng, rutDv } from "./seed";
@@ -46,6 +49,13 @@ interface PurRec {
   due_date: string | null; status: "registrada" | "anulada"; lines: PurchaseLine[]; totals: Totals; order_uid: string | null;
   payments: Payment[]; received_stock: boolean; notes: string | null; void_reason: string | null; timeline: { at: string; text: string }[];
 }
+interface AccRec { uid: string; kind: AccountKind; name: string; bank_name: string | null; account_label: string | null; opening_minor: number; opening_date: string | null; archived: boolean }
+interface TransferRec { uid: string; from: string; to: string; date: string; amount: number; notes: string | null }
+interface GasRec {
+  uid: string; number: string; category_id: number; supplier_uid: string | null; date: string; due_date: string | null; description: string;
+  net: number; tax: number; total: number; status: "registrado" | "anulado"; payments: Payment[]; void_reason: string | null; notes: string | null;
+  recurring_id: number | null; timeline: { at: string; text: string }[];
+}
 
 let uidSeq = 0;
 const uid = (p: string) => `${p}-${(++uidSeq).toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -57,7 +67,7 @@ export class DemoBackend implements Backend {
   readonly kind = "demo" as const;
   readonly features: ReadonlySet<Feature> = new Set<Feature>([
     "dashboard", "clientes", "productos", "ventas", "compras", "comex", "negocio", "busqueda",
-    "usuarios", "documentos", "numeracion", "monedas", "auditoria", "inventario",
+    "usuarios", "documentos", "numeracion", "monedas", "auditoria", "inventario", "dinero",
   ]);
   private company = { uid: "demo-company", name: DEMO_COMPANY, profile: "empresa" as BusinessProfile, created_at: "2026-01-02T12:00:00Z" };
   private biz: BusinessSettings;
@@ -75,7 +85,12 @@ export class DemoBackend implements Backend {
   private purchases: PurRec[] = [];
   private seq: Record<string, number> = {};
   private history: Record<string, number> = {};
-  private cashBase = 3_850_000;
+  private accs: AccRec[] = [];
+  private payAcc: Record<string, string> = {};
+  private transfers: TransferRec[] = [];
+  private cats: ExpenseCategory[] = structuredClone(DEMO_CATEGORIES);
+  private gastos: GasRec[] = [];
+  private recs: Recurring[] = [];
   private auditRows: AuditRow[] = [];
   private today = todayIso();
   private users: (UserRow & { password: string | null })[] = [];
@@ -98,6 +113,7 @@ export class DemoBackend implements Backend {
     };
     this.seed();
     this.seedInventory();
+    this.seedMoney();
   }
 
   private next(docType: string): string {
@@ -178,7 +194,7 @@ export class DemoBackend implements Backend {
         s.external_ref = { doc_kind: cust?.rut && cust.rut.startsWith("7") ? "Factura" : "Boleta", external_number: String(4000 + i), issue_date: date, observation: null, marked_at: `${date}T18:00:00Z` };
       }
       if (!credit) s.payments.push({ number: this.next("PAG"), date, amount_minor: s.totals.total_minor, method: s.payment_method });
-      else if (r() < 0.4) s.payments.push({ number: this.next("PAG"), date: addDays(date, 10), amount_minor: Math.round(s.totals.total_minor / 2), method: "Transferencia" });
+      else if (r() < 0.4) s.payments.push({ number: this.next("PAG"), date: addDays(date, 10) < this.today ? addDays(date, 10) : this.today, amount_minor: Math.round(s.totals.total_minor / 2), method: "Transferencia" });
       s.timeline.push({ at: `${date}T12:00:00Z`, text: "Venta efectuada" });
       this.autoClose(s);
       this.sales.push(s);
@@ -587,31 +603,30 @@ export class DemoBackend implements Backend {
     const monthNet = sumBy((s) => s.issue_date.startsWith(ym), (s) => s.totals.net_minor + s.totals.exempt_minor);
     const monthCost = sumBy((s) => s.issue_date.startsWith(ym), (s) => s.cost_minor);
     const monthTax = sumBy((s) => s.issue_date.startsWith(ym), (s) => s.totals.tax_minor);
-    const expenses = Math.round((1_240_000 * Number(t.slice(8, 10))) / 30 / 1000) * 1000; // gastos fijos proporcionales al día del mes
+    const ms = `${ym}-01`;
+    const gastosMes = this.gastos.filter((g) => g.status === "registrado" && g.date >= ms);
+    const expenses = gastosMes.reduce((x, g) => x + g.net, 0);
     const prevMonth = (this.history[prev] ?? 0) + sumBy((s) => s.issue_date.startsWith(prev), (s) => s.totals.total_minor);
-    const open = live.filter((s) => this.payState(s) !== "pagada");
-    const receivable = open.reduce((a, s) => a + s.totals.total_minor - this.paid(s), 0);
-    const overdue = open.filter((s) => s.due_date && s.due_date < t).reduce((a, s) => a + s.totals.total_minor - this.paid(s), 0);
-    const payable = this.purchases.filter((c) => c.status === "registrada").reduce((a, c) => a + c.totals.total_minor - this.paidOf(c.payments), 0) + 640_000;
-    const collected = live.reduce((a, s) => a + s.payments.filter((p) => p.date >= addDays(t, -45)).reduce((x, p) => x + p.amount_minor, 0), 0);
-    const purchaseCredit = this.purchases.filter((c) => c.status === "registrada").reduce((a, c) => a + c.totals.tax_minor, 0);
+    const { rec, pay } = this.dues();
+    const receivable = rec.reduce((x, d) => x + d.pending_minor, 0);
+    const overdue = rec.filter((d) => d.due_date < t).reduce((x, d) => x + d.pending_minor, 0);
+    const payable = pay.reduce((x, d) => x + d.pending_minor, 0);
+    const cash = this.accountRows().filter((a) => !a.archived).reduce((x, a) => x + a.balance_minor, 0);
+    const purchaseCredit = this.purchases.filter((c) => c.status === "registrada" && c.issue_date >= ms).reduce((a, c) => a + c.totals.tax_minor, 0)
+      + gastosMes.reduce((x, g) => x + g.tax, 0);
     const series: Dashboard["series"] = [];
     for (let m = 11; m >= 0; m--) {
       const d = new Date(`${t}T12:00:00`); d.setDate(1); d.setMonth(d.getMonth() - m);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       series.push({ month: key, sales_minor: (this.history[key] ?? 0) + sumBy((s) => s.issue_date.startsWith(key), (s) => s.totals.total_minor) });
     }
-    const upcoming: Dashboard["upcoming_payments"] = [
-      ...open.filter((s) => s.due_date).sort((a, b) => a.due_date!.localeCompare(b.due_date!)).slice(0, 4).map((s) => ({ label: `${s.number} · ${this.customerName(s.customer_uid)}`, date: s.due_date!, amount_minor: s.totals.total_minor - this.paid(s), kind: "cobro" as const })),
-      { label: `Arriendo local`, date: addDays(t, 5), amount_minor: 650_000, kind: "pago" as const },
-      ...this.purchases.filter((c) => c.status === "registrada" && c.due_date && this.paidOf(c.payments) < c.totals.total_minor).slice(0, 3)
-        .map((c) => ({ label: `${c.doc_kind ?? "Compra"} ${c.doc_number ?? c.number} · ${this.supplierName(c.supplier_uid)}`, date: c.due_date!, amount_minor: c.totals.total_minor - this.paidOf(c.payments), kind: "pago" as const })),
-    ].sort((a, b) => a.date.localeCompare(b.date));
+    const upcoming: Dashboard["upcoming_payments"] = [...rec, ...pay].filter((d) => d.due_date >= t).sort((x, y) => x.due_date.localeCompare(y.due_date))
+      .map((d) => ({ label: `${d.document} · ${d.party}`, date: d.due_date, amount_minor: d.pending_minor, kind: d.kind }));
     return wait({
       today_sales_minor: today.reduce((a, s) => a + s.totals.total_minor, 0), today_sales_count: today.length,
       month_sales_minor: month, month_prev_sales_minor: prevMonth, month_expenses_minor: expenses,
       month_profit_minor: monthNet - monthCost - expenses, receivable_minor: receivable, receivable_overdue_minor: overdue,
-      payable_minor: payable, cash_minor: this.cashBase + collected - payable / 3,
+      payable_minor: payable, cash_minor: cash,
       tax_estimate_minor: this.biz.tax_enabled ? Math.max(0, monthTax - purchaseCredit) : null,
       low_stock: this.products.filter((p) => p.kind === "producto" && p.on_hand_milli <= p.min_milli).map((p) => ({ uid: p.uid, name: p.name, on_hand_milli: p.on_hand_milli, min_milli: p.min_milli })),
       pending_documentation: live.filter((s) => s.documentation_state === "pendiente").length,
@@ -790,7 +805,10 @@ export class DemoBackend implements Backend {
     s.documentation_state = this.biz.documentation_reminder ? "pendiente" : "no_aplica";
     s.timeline.push({ at: now(), text: "Venta efectuada: se descontó stock y se fijaron costo y margen" });
     if (input.mode === "contado") {
-      s.payments.push({ number: this.next("PAG"), date: this.today, amount_minor: s.totals.total_minor, method: input.method });
+      const acc = this.accountFor(input.account_uid, input.method);
+      const pnum = this.next("PAG");
+      this.payAcc[pnum] = acc;
+      s.payments.push({ number: pnum, date: this.today, amount_minor: s.totals.total_minor, method: input.method });
       s.timeline.push({ at: now(), text: `Pago registrado (${input.method})` });
     } else {
       s.timeline.push({ at: now(), text: "Queda en Dinero que te deben" });
@@ -800,13 +818,16 @@ export class DemoBackend implements Backend {
     this.log("venta.efectuar", "venta", s.number);
     return wait(this.detail(s), 150);
   }
-  async registerPayment(u: string, amount: number, method: string, date: string): Promise<SaleDetail> {
+  async registerPayment(u: string, amount: number, method: string, date: string, accountUid?: string): Promise<SaleDetail> {
     const s = this.findSale(u);
     if (s.commercial_state !== "efectuada") throw new AppError("estado", "Solo se registran pagos de ventas efectuadas.");
     const due = s.totals.total_minor - this.paid(s);
     if (amount <= 0) throw new AppError("monto", "El monto debe ser mayor que cero.");
     if (amount > due) throw new AppError("monto", `El pago supera el saldo pendiente.`);
-    s.payments.push({ number: this.next("PAG"), date, amount_minor: amount, method });
+    const acc = this.accountFor(accountUid, method);
+    const pnum = this.next("PAG");
+    this.payAcc[pnum] = acc;
+    s.payments.push({ number: pnum, date, amount_minor: amount, method });
     s.timeline.push({ at: now(), text: amount === due ? `Pago final registrado (${method})` : `Abono registrado (${method})` });
     this.autoClose(s);
     this.log("pago.registrar", "venta", s.number);
@@ -1269,7 +1290,9 @@ export class DemoBackend implements Backend {
       if (any) { c.received_stock = true; c.timeline.push({ at: now(), text: `Mercadería ingresada a bodega (${this.next("REC")}): stock y costo promedio actualizados` }); }
     }
     if (input.paid_method) {
+      const acc = this.accountFor(input.paid_account_uid, input.paid_method);
       const pnum = this.next("EGR");
+      this.payAcc[pnum] = acc;
       c.payments.push({ number: pnum, date: input.issue_date, amount_minor: c.totals.total_minor, method: input.paid_method });
       c.timeline.push({ at: now(), text: `Pagado al contado (${input.paid_method}) · ${pnum}` });
     } else c.timeline.push({ at: now(), text: `Queda en Dinero que debes (vence ${due})` });
@@ -1277,14 +1300,16 @@ export class DemoBackend implements Backend {
     this.log("compra.registrar", "compra", c.number);
     return wait(this.purDetail(c));
   }
-  async payPurchase(u: string, amount: number, method: string, date: string): Promise<PurchaseDetail> {
+  async payPurchase(u: string, amount: number, method: string, date: string, accountUid?: string): Promise<PurchaseDetail> {
     this.require("dinero.registrar");
     const c = this.findPur(u);
     if (c.status !== "registrada") throw new AppError("estado", "Solo se pagan documentos registrados.");
     const due = c.totals.total_minor - this.paidOf(c.payments);
     if (amount <= 0) throw new AppError("monto", "El monto debe ser mayor que cero.");
     if (amount > due) throw new AppError("monto", "El pago supera el saldo pendiente.");
+    const acc = this.accountFor(accountUid, method);
     const pnum = this.next("EGR");
+    this.payAcc[pnum] = acc;
     c.payments.push({ number: pnum, date, amount_minor: amount, method });
     c.timeline.push({ at: now(), text: `${amount === due ? "Pago final" : "Abono"} al proveedor (${method}) · ${pnum}` });
     this.log("compra.pagar", "compra", c.number);
@@ -1302,6 +1327,308 @@ export class DemoBackend implements Backend {
     if (c.payments.length) { c.payments = []; c.timeline.push({ at: now(), text: "Pagos anulados: si pagaste, pide la devolución al proveedor" }); }
     this.log("compra.anular", "compra", c.number, reason.trim());
     return wait(this.purDetail(c));
+  }
+
+  /* ───────────── Dinero ───────────── */
+
+  private accountFor(accountUid: string | null | undefined, method: string): string {
+    if (accountUid) {
+      const a = this.accs.find((x) => x.uid === accountUid);
+      if (!a || a.archived) throw new AppError("cuenta", "Elige una cuenta activa.");
+      return a.uid;
+    }
+    const active = this.accs.filter((a) => !a.archived);
+    const order: AccountKind[] = methodCode(method) === "efectivo" ? ["caja", "banco", "billetera"] : ["banco", "billetera", "caja"];
+    for (const k of order) { const a = active.find((x) => x.kind === k); if (a) return a.uid; }
+    const caja: AccRec = { uid: uid("cta"), kind: "caja", name: "Caja", bank_name: null, account_label: null, opening_minor: 0, opening_date: null, archived: false };
+    this.accs.push(caja);
+    return caja.uid;
+  }
+  private accName(u: string): string { return this.accs.find((a) => a.uid === u)?.name ?? "Cuenta"; }
+  /** Libro de dinero: cada cobro, pago y traspaso con su cuenta. */
+  private cashMoves(): (LedgerRow & { acc: string; seq: number })[] {
+    const out: (LedgerRow & { acc: string; seq: number })[] = [];
+    let seq = 0;
+    const acc = (number: string, method: string) => this.payAcc[number] ?? this.accountFor(null, method);
+    for (const s of this.sales) for (const p of s.payments) out.push({ acc: acc(p.number, p.method), seq: ++seq, date: p.date, kind: "cobro", document: p.number, detail: `Cobro ${s.number} · ${this.customerName(s.customer_uid)}`, amount_minor: p.amount_minor, link: `/ventas/${s.uid}`, status: s.commercial_state === "anulada" ? "anulado" : "vigente" });
+    for (const c of this.purchases) for (const p of c.payments) out.push({ acc: acc(p.number, p.method), seq: ++seq, date: p.date, kind: "pago", document: p.number, detail: `Pago ${c.doc_kind && c.doc_number ? `${c.doc_kind} ${c.doc_number}` : c.number} · ${this.supplierName(c.supplier_uid)}`, amount_minor: -p.amount_minor, link: `/compras/doc/${c.uid}`, status: "vigente" });
+    for (const g of this.gastos) for (const p of g.payments) out.push({ acc: acc(p.number, p.method), seq: ++seq, date: p.date, kind: "pago", document: p.number, detail: `Gasto ${g.number} · ${g.description}`, amount_minor: -p.amount_minor, link: `/dinero/gasto/${g.uid}`, status: g.status === "anulado" ? "anulado" : "vigente" });
+    for (const t of this.transfers) {
+      const n = t.notes ? ` · ${t.notes}` : "";
+      out.push({ acc: t.to, seq: ++seq, date: t.date, kind: "traspaso_entrada", document: "Traspaso", detail: `Desde ${this.accName(t.from)}${n}`, amount_minor: t.amount, link: null, status: "vigente" });
+      out.push({ acc: t.from, seq: ++seq, date: t.date, kind: "traspaso_salida", document: "Traspaso", detail: `A ${this.accName(t.to)}${n}`, amount_minor: -t.amount, link: null, status: "vigente" });
+    }
+    return out;
+  }
+  private accountRows(): MoneyAccount[] {
+    const moves = this.cashMoves();
+    return this.accs.map((a) => ({ ...a, balance_minor: a.opening_minor + moves.filter((m) => m.acc === a.uid && m.status === "vigente").reduce((x, m) => x + m.amount_minor, 0) }))
+      .sort((a, b) => Number(a.archived) - Number(b.archived) || a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name));
+  }
+  private seedMoney(): void {
+    const t = this.today;
+    const start = addDays(t, -150);
+    this.accs = [
+      { uid: "cta-caja", kind: "caja", name: "Caja del local", bank_name: null, account_label: null, opening_minor: 350_000, opening_date: start, archived: false },
+      { uid: "cta-banco", kind: "banco", name: "Cuenta corriente", bank_name: "Banco Ejemplo", account_label: "CC ···· 4821", opening_minor: 2_900_000, opening_date: start, archived: false },
+      { uid: "cta-mp", kind: "billetera", name: "Billetera digital", bank_name: null, account_label: null, opening_minor: 0, opening_date: start, archived: false },
+    ];
+    for (const s of this.sales) for (const p of s.payments) this.payAcc[p.number] = this.accountFor(null, p.method);
+    for (const c of this.purchases) for (const p of c.payments) this.payAcc[p.number] = this.accountFor(null, p.method);
+    const cat = (n: string) => DEMO_CATEGORIES.find((c) => c.name === n)!.id;
+    const monthDay = (offsetMonths: number, day: number) => { const d = new Date(`${t}T12:00:00`); d.setDate(1); d.setMonth(d.getMonth() + offsetMonths); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`; };
+    const begin = monthDay(-2, 1);
+    this.recs = [
+      { id: 1, direction: "egreso", description: "Arriendo del local", category_id: cat("Arriendo"), category: "Arriendo", amount_minor: 650_000, frequency: "mensual", day_of_period: 5, starts_on: begin, ends_on: null, active: true },
+      { id: 2, direction: "egreso", description: "Internet y teléfono", category_id: cat("Internet y telefonía"), category: "Internet y telefonía", amount_minor: 39_990, frequency: "mensual", day_of_period: 12, starts_on: begin, ends_on: null, active: true },
+      { id: 3, direction: "egreso", description: "Sueldos", category_id: cat("Remuneraciones"), category: "Remuneraciones", amount_minor: 1_850_000, frequency: "mensual", day_of_period: 30, starts_on: begin, ends_on: null, active: true },
+      { id: 4, direction: "ingreso", description: "Mantención mensual · Constructora (contrato)", category_id: null, category: null, amount_minor: 180_000, frequency: "mensual", day_of_period: 15, starts_on: begin, ends_on: null, active: true },
+    ];
+    // Gastos de los dos meses anteriores y del actual (los recurrentes ya pagados no se repiten en el calendario).
+    const add = (date: string, category: string, description: string, total: number, paid: string | null, due = date, recurring_id: number | null = null, supplier_uid: string | null = null) => {
+      if (date > t) return;
+      const ppm = this.taxPpm();
+      const affected = !["Arriendo", "Remuneraciones", "Impuestos y contribuciones", "Honorarios"].includes(category);
+      const net = affected && ppm ? Math.round((total * 1_000_000) / (1_000_000 + ppm)) : total;
+      const g: GasRec = { uid: uid("gas"), number: this.next("GAS"), category_id: cat(category), supplier_uid, date, due_date: due, description, net, tax: total - net, total, status: "registrado", payments: [], void_reason: null, notes: null, recurring_id, timeline: [{ at: `${date}T15:00:00Z`, text: `Registrado · ${category} · ${description}` }] };
+      if (paid) {
+        const pnum = this.next("EGR");
+        g.payments.push({ number: pnum, date, amount_minor: total, method: paid });
+        this.payAcc[pnum] = this.accountFor(null, paid);
+        g.timeline.push({ at: `${date}T15:00:00Z`, text: `Pagado (${paid}) · ${pnum}` });
+      } else g.timeline.push({ at: `${date}T15:00:00Z`, text: `Queda en Dinero que debes (vence ${due})` });
+      this.gastos.push(g);
+    };
+    for (const m of [-2, -1, 0]) {
+      add(monthDay(m, 5), "Arriendo", "Arriendo del local", 650_000, "Transferencia", monthDay(m, 5), 1);
+      add(monthDay(m, 12), "Internet y telefonía", "Internet y teléfono", 39_990, "Transferencia", monthDay(m, 12), 2);
+      if (m < 0) add(monthDay(m, 28), "Remuneraciones", "Sueldos", 1_850_000, "Transferencia", monthDay(m, 28), 3);
+      add(monthDay(m, 8), "Transporte", "Fletes y combustible", 68_400 + (m + 2) * 4_150, "Efectivo");
+    }
+    add(addDays(t, -4), "Electricidad", "Cuenta de luz", 84_350, null, addDays(t, 8));
+    add(addDays(t, -9), "Marketing", "Avisos en redes sociales", 45_000, "Tarjeta de crédito");
+    add(addDays(t, -20), "Honorarios", "Contador (honorarios del mes)", 180_000, null, addDays(t, -3));
+    this.transfers = [{ uid: uid("trs"), from: "cta-caja", to: "cta-banco", date: addDays(t, -14), amount: 400_000, notes: "Depósito de efectivo" }];
+  }
+  private findGasto(u: string): GasRec {
+    const g = this.gastos.find((x) => x.uid === u);
+    if (!g) throw new AppError("no_encontrado", "No encontramos ese gasto.");
+    return g;
+  }
+  private gastoSummary(g: GasRec): ExpenseSummary {
+    const paid = this.paidOf(g.payments);
+    return {
+      uid: g.uid, number: g.number, date: g.date, due_date: g.due_date, category: this.cats.find((c) => c.id === g.category_id)?.name ?? "Otros",
+      supplier_name: g.supplier_uid ? this.supplierName(g.supplier_uid) : null, description: g.description, total_minor: g.total, paid_minor: g.status === "anulado" ? 0 : paid,
+      status: g.status, payment_state: g.status === "anulado" ? "anulado" : paid >= g.total ? "pagado" : paid > 0 ? "abonado" : "por_pagar",
+    };
+  }
+  private gastoDetail(g: GasRec): ExpenseDetail {
+    return { ...this.gastoSummary(g), supplier_uid: g.supplier_uid, net_minor: g.net, tax_minor: g.tax, payments: g.payments, void_reason: g.void_reason, notes: g.notes, timeline: g.timeline };
+  }
+  private dues(): { rec: DueRow[]; pay: DueRow[] } {
+    const rec: DueRow[] = this.sales.filter((s) => s.commercial_state === "efectuada" || s.commercial_state === "cerrada")
+      .map((s) => ({ kind: "cobro" as const, due_date: s.due_date ?? s.issue_date, party: this.customerName(s.customer_uid), document: s.number, link: `/ventas/${s.uid}`, amount_minor: s.totals.total_minor, pending_minor: s.totals.total_minor - this.paid(s) }))
+      .filter((d) => d.pending_minor > 0);
+    const pay: DueRow[] = [
+      ...this.purchases.filter((c) => c.status === "registrada").map((c) => ({ kind: "pago" as const, due_date: c.due_date ?? c.issue_date, party: this.supplierName(c.supplier_uid), document: c.doc_kind && c.doc_number ? `${c.doc_kind} ${c.doc_number}` : c.number, link: `/compras/doc/${c.uid}`, amount_minor: c.totals.total_minor, pending_minor: c.totals.total_minor - this.paidOf(c.payments) })),
+      ...this.gastos.filter((g) => g.status === "registrado").map((g) => ({ kind: "pago" as const, due_date: g.due_date ?? g.date, party: g.supplier_uid ? this.supplierName(g.supplier_uid) : this.gastoSummary(g).category, document: `${g.number} · ${g.description}`, link: `/dinero/gasto/${g.uid}`, amount_minor: g.total, pending_minor: g.total - this.paidOf(g.payments) })),
+    ].filter((d) => d.pending_minor > 0);
+    const by = (a: DueRow, b: DueRow) => a.due_date.localeCompare(b.due_date);
+    return { rec: rec.sort(by), pay: pay.sort(by) };
+  }
+  private calendarItems(from: string, to: string): CalendarItem[] {
+    const t = this.today;
+    const { rec, pay } = this.dues();
+    const out: CalendarItem[] = [...rec, ...pay].filter((d) => d.due_date <= to)
+      .map((d) => ({ date: d.due_date, kind: d.kind, label: d.document, party: d.party, amount_minor: d.pending_minor, link: d.link, overdue: d.due_date < t }));
+    for (const r of this.recs.filter((x) => x.active)) {
+      for (const d of occurrences(r, from, to)) {
+        const half = r.frequency === "semanal" ? 3 : 15;
+        if (r.direction === "egreso" && this.gastos.some((g) => g.recurring_id === r.id && g.status === "registrado" && g.date >= addDays(d, -half) && g.date <= addDays(d, half))) continue;
+        out.push({ date: d, kind: r.direction === "ingreso" ? "ingreso_recurrente" : "egreso_recurrente", label: r.description, party: r.category ?? "Recurrente", amount_minor: r.amount_minor, link: null, overdue: false });
+      }
+    }
+    return out.sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  async moneyAccounts(): Promise<MoneyAccount[]> { this.require("dinero.ver"); return wait(this.accountRows()); }
+  private accountInput(input: AccountInput): Omit<AccRec, "uid" | "archived"> {
+    const name = input.name.trim();
+    if (!name || name.length > 80) throw new AppError("validacion", "Ponle un nombre a la cuenta (hasta 80 caracteres).");
+    if (!["caja", "banco", "billetera"].includes(input.kind)) throw new AppError("validacion", "Elige el tipo de cuenta.");
+    const label = input.account_label?.trim() || null;
+    if (label && (label.match(/\d/g)?.length ?? 0) > 8) throw new AppError("validacion", "Para la referencia de la cuenta anota solo los últimos 4 dígitos: NÚCLEO no guarda números de cuenta completos.");
+    if (!Number.isFinite(input.opening_minor)) throw new AppError("validacion", "Revisa el saldo inicial.");
+    return { kind: input.kind, name, bank_name: input.bank_name?.trim() || null, account_label: label, opening_minor: Math.round(input.opening_minor), opening_date: input.opening_date || this.today };
+  }
+  async createMoneyAccount(input: AccountInput): Promise<MoneyAccount[]> {
+    this.require("dinero.registrar");
+    const f = this.accountInput(input);
+    if (this.accs.some((a) => !a.archived && norm(a.name) === norm(f.name))) throw new AppError("duplicado", "Ya tienes una cuenta con ese nombre.");
+    this.accs.push({ uid: uid("cta"), archived: false, ...f });
+    this.log("cuenta.crear", "cuenta", f.name);
+    return wait(this.accountRows());
+  }
+  async updateMoneyAccount(u: string, input: AccountInput): Promise<MoneyAccount[]> {
+    this.require("dinero.registrar");
+    const a = this.accs.find((x) => x.uid === u);
+    if (!a) throw new AppError("no_encontrado", "No encontramos esa cuenta.");
+    Object.assign(a, this.accountInput(input));
+    this.log("cuenta.editar", "cuenta", a.name);
+    return wait(this.accountRows());
+  }
+  async archiveMoneyAccount(u: string): Promise<MoneyAccount[]> {
+    this.require("dinero.registrar");
+    const row = this.accountRows().find((x) => x.uid === u);
+    if (!row) throw new AppError("no_encontrado", "No encontramos esa cuenta.");
+    if (row.balance_minor !== 0) throw new AppError("saldo", "Solo se archivan cuentas con saldo cero: traspasa primero el dinero a otra cuenta.");
+    if (this.accs.filter((a) => !a.archived).length <= 1) throw new AppError("ultima", "Necesitas al menos una cuenta activa.");
+    this.accs.find((x) => x.uid === u)!.archived = true;
+    this.log("cuenta.archivar", "cuenta", row.name);
+    return wait(this.accountRows());
+  }
+  async accountLedger(u: string): Promise<LedgerRow[]> {
+    this.require("dinero.ver");
+    return wait(this.cashMoves().filter((m) => m.acc === u).sort((a, b) => b.date.localeCompare(a.date) || b.seq - a.seq).slice(0, 500)
+      .map(({ acc: _a, seq: _s, ...r }) => r));
+  }
+  async transferMoney(input: MoneyTransferInput): Promise<MoneyAccount[]> {
+    this.require("dinero.registrar");
+    if (input.from_uid === input.to_uid) throw new AppError("validacion", "Elige dos cuentas distintas.");
+    const rows = this.accountRows();
+    const from = rows.find((a) => a.uid === input.from_uid && !a.archived);
+    const to = rows.find((a) => a.uid === input.to_uid && !a.archived);
+    if (!from || !to) throw new AppError("cuenta", "Elige cuentas activas.");
+    if (!(input.amount_minor > 0)) throw new AppError("monto", "El monto debe ser mayor que cero.");
+    this.transfers.push({ uid: uid("trs"), from: from.uid, to: to.uid, date: input.date, amount: input.amount_minor, notes: input.notes?.trim() || null });
+    this.log("dinero.traspasar", "cuenta", `${from.name} → ${to.name}`);
+    return wait(this.accountRows());
+  }
+  async expenseCategories(): Promise<ExpenseCategory[]> { return wait([...this.cats].sort((a, b) => a.name.localeCompare(b.name))); }
+  async addExpenseCategory(name: string, fixed: boolean): Promise<ExpenseCategory[]> {
+    this.require("dinero.registrar");
+    const n = name.trim();
+    if (!n || n.length > 60) throw new AppError("validacion", "Escribe el nombre de la categoría (hasta 60 caracteres).");
+    if (this.cats.some((c) => norm(c.name) === norm(n))) throw new AppError("duplicado", "Esa categoría ya existe.");
+    this.cats.push({ id: this.cats.length + 1, name: n, behavior: fixed ? "fijo" : "variable" });
+    return this.expenseCategories();
+  }
+  async listExpenses(filter: ExpenseFilter): Promise<ExpenseSummary[]> {
+    this.require("dinero.ver");
+    const q = norm(filter.query?.trim() ?? "");
+    const rows = this.gastos.map((g) => this.gastoSummary(g)).filter((g) =>
+      (filter.include_void || g.status !== "anulado") && (!filter.from || g.date >= filter.from) && (!filter.to || g.date <= filter.to)
+      && (!q || norm(`${g.number} ${g.description} ${g.category} ${g.supplier_name ?? ""}`).includes(q)));
+    return wait(rows.sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number)));
+  }
+  async expense(u: string): Promise<ExpenseDetail> { this.require("dinero.ver"); return wait(this.gastoDetail(this.findGasto(u))); }
+  async registerExpense(input: ExpenseInput): Promise<ExpenseDetail> {
+    this.require("dinero.registrar");
+    const cat = this.cats.find((c) => c.id === input.category_id);
+    if (!cat) throw new AppError("no_encontrado", "Elige una categoría.");
+    if (input.supplier_uid) this.findSupplier(input.supplier_uid);
+    const description = input.description.trim();
+    if (!description || description.length > 200) throw new AppError("validacion", "Describe el gasto (hasta 200 caracteres).");
+    if (!(input.total_minor > 0)) throw new AppError("monto", "El monto debe ser mayor que cero.");
+    const due = input.due_date || input.date;
+    if (due < input.date) throw new AppError("vencimiento", "El vencimiento no puede ser anterior al gasto.");
+    const ppm = this.taxPpm();
+    const net = input.tax_included && ppm ? Math.round((input.total_minor * 1_000_000) / (1_000_000 + ppm)) : input.total_minor;
+    const g: GasRec = { uid: uid("gas"), number: this.next("GAS"), category_id: cat.id, supplier_uid: input.supplier_uid || null, date: input.date, due_date: due, description, net, tax: input.total_minor - net, total: input.total_minor, status: "registrado", payments: [], void_reason: null, notes: input.notes?.trim() || null, recurring_id: input.recurring_id, timeline: [] };
+    g.timeline.push({ at: now(), text: `${g.number} registrado · ${cat.name} · ${description}` });
+    if (input.paid_method) {
+      const acc = this.accountFor(input.paid_account_uid, input.paid_method);
+      const pnum = this.next("EGR");
+      g.payments.push({ number: pnum, date: input.date, amount_minor: input.total_minor, method: input.paid_method });
+      this.payAcc[pnum] = acc;
+      g.timeline.push({ at: now(), text: `Pagado (${input.paid_method}) · ${pnum}` });
+    } else g.timeline.push({ at: now(), text: `Queda en Dinero que debes (vence ${due})` });
+    this.gastos.push(g);
+    this.log("gasto.registrar", "gasto", g.number);
+    return wait(this.gastoDetail(g));
+  }
+  async payExpense(u: string, amount: number, method: string, date: string, accountUid?: string): Promise<ExpenseDetail> {
+    this.require("dinero.registrar");
+    const g = this.findGasto(u);
+    if (g.status !== "registrado") throw new AppError("estado", "El gasto está anulado.");
+    const due = g.total - this.paidOf(g.payments);
+    if (amount <= 0 || amount > due) throw new AppError("monto", "El monto debe ser mayor que cero y no superar el saldo.");
+    const acc = this.accountFor(accountUid, method);
+    const pnum = this.next("EGR");
+    g.payments.push({ number: pnum, date, amount_minor: amount, method });
+    this.payAcc[pnum] = acc;
+    g.timeline.push({ at: now(), text: `${amount === due ? "Pago final" : "Abono"} (${method}) · ${pnum}` });
+    this.log("gasto.pagar", "gasto", g.number);
+    return wait(this.gastoDetail(g));
+  }
+  async voidExpense(u: string, reason: string): Promise<ExpenseDetail> {
+    this.require("dinero.registrar");
+    const g = this.findGasto(u);
+    if (!reason.trim()) throw new AppError("motivo", "Escribe el motivo de la anulación.");
+    if (g.status === "anulado") throw new AppError("estado", "El gasto ya está anulado.");
+    g.status = "anulado"; g.void_reason = reason.trim();
+    g.timeline.push({ at: now(), text: `Anulado: ${reason.trim()}` });
+    if (g.payments.length) g.timeline.push({ at: now(), text: "Pagos anulados: el dinero vuelve a la cuenta" });
+    this.log("gasto.anular", "gasto", g.number, reason.trim());
+    return wait(this.gastoDetail(g));
+  }
+  async recurring(): Promise<Recurring[]> { this.require("dinero.ver"); return wait(this.recs); }
+  async saveRecurring(input: RecurringInput): Promise<Recurring[]> {
+    this.require("dinero.registrar");
+    const description = input.description.trim();
+    if (!description || description.length > 120) throw new AppError("validacion", "Describe el movimiento (hasta 120 caracteres).");
+    if (!(input.amount_minor > 0)) throw new AppError("monto", "El monto debe ser mayor que cero.");
+    if (input.day_of_period !== null && (input.day_of_period < 1 || input.day_of_period > 31)) throw new AppError("validacion", "El día debe estar entre 1 y 31.");
+    if (input.ends_on && input.ends_on < input.starts_on) throw new AppError("validacion", "La fecha de término es anterior al inicio.");
+    const category = input.category_id ? this.cats.find((c) => c.id === input.category_id)?.name ?? null : null;
+    const row: Recurring = { ...input, description, ends_on: input.ends_on || null, category, id: input.id ?? Math.max(0, ...this.recs.map((r) => r.id)) + 1 };
+    const i = this.recs.findIndex((r) => r.id === row.id);
+    if (i >= 0) this.recs[i] = row; else this.recs.push(row);
+    this.log("recurrente.guardar", "recurrente", description);
+    return wait(this.recs);
+  }
+  async moneyOverview(): Promise<MoneyOverview> {
+    this.require("dinero.ver");
+    const t = this.today;
+    const accounts = this.accountRows();
+    const cash = accounts.filter((a) => !a.archived).reduce((x, a) => x + a.balance_minor, 0);
+    const { rec, pay } = this.dues();
+    const rAging = emptyAging(), pAging = emptyAging();
+    const late = (d: string) => daysBetween(d, t);
+    for (const r of rec) agingAdd(rAging, late(r.due_date), r.pending_minor);
+    for (const p of pay) agingAdd(pAging, late(p.due_date), p.pending_minor);
+    const end = addDays(t, PROJECTION_WEEKS * 7 - 1);
+    const items = this.calendarItems(t, end).map((c) => ({ d: c.date < t ? t : c.date, v: (c.kind === "cobro" || c.kind === "ingreso_recurrente" ? 1 : -1) * c.amount_minor }));
+    const projection: MoneyOverview["projection"] = [];
+    let balance = cash, lowest = cash;
+    let lowestWeek: string | null = null;
+    for (let w = 0; w < PROJECTION_WEEKS; w++) {
+      const a = addDays(t, w * 7), b = addDays(t, w * 7 + 6);
+      const inW = items.filter((i) => i.d >= a && i.d <= b);
+      const inflow = inW.filter((i) => i.v > 0).reduce((x, i) => x + i.v, 0);
+      const outflow = -inW.filter((i) => i.v < 0).reduce((x, i) => x + i.v, 0);
+      const opening = balance;
+      balance += inflow - outflow;
+      if (balance < lowest) { lowest = balance; lowestWeek = a; }
+      projection.push({ start: a, end: b, opening_minor: opening, inflow_minor: inflow, outflow_minor: outflow, closing_minor: balance });
+    }
+    const d30 = addDays(t, 29);
+    const in30 = items.filter((i) => i.d <= d30 && i.v > 0).reduce((x, i) => x + i.v, 0);
+    const out30 = -items.filter((i) => i.d <= d30 && i.v < 0).reduce((x, i) => x + i.v, 0);
+    const sum = (rows: DueRow[], overdue = false) => rows.filter((r) => !overdue || r.due_date < t).reduce((x, r) => x + r.pending_minor, 0);
+    return wait({
+      today: t, accounts, cash_minor: cash,
+      receivable_minor: sum(rec), receivable_overdue_minor: sum(rec, true), receivable_aging: rAging,
+      payable_minor: sum(pay), payable_overdue_minor: sum(pay, true), payable_aging: pAging,
+      next30_in_minor: in30, next30_out_minor: out30, in30_minor: cash + in30 - out30,
+      projection, shortfall_week: lowest < 0 ? lowestWeek : null, lowest_minor: lowest, receivables: rec, payables: pay,
+    }, 120);
+  }
+  async moneyCalendar(days: number): Promise<CalendarItem[]> {
+    this.require("dinero.ver");
+    const n = Math.min(366, Math.max(1, days));
+    return wait(this.calendarItems(this.today, addDays(this.today, n - 1)));
   }
 }
 

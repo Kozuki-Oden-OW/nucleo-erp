@@ -122,7 +122,8 @@ fn ciclo_completo_cotizacion_a_venta_cerrada() {
             &EffectInput {
                 mode: "credito".into(),
                 method: "".into(),
-                due_date: None
+                due_date: None,
+                account_uid: None,
             }
         )
         .is_err()
@@ -134,6 +135,7 @@ fn ciclo_completo_cotizacion_a_venta_cerrada() {
                 mode: "credito".into(),
                 method: "".into(),
                 due_date: Some("2026-11-05".into()),
+                account_uid: None,
             },
         )
         .unwrap();
@@ -182,16 +184,16 @@ fn ciclo_completo_cotizacion_a_venta_cerrada() {
 
     // Abono y pago final.
     assert!(
-        s.register_payment(&v.summary.uid, 40_000, "Efectivo", HOY)
+        s.register_payment(&v.summary.uid, 40_000, "Efectivo", HOY, None)
             .is_err(),
         "no supera el saldo"
     );
     let v = s
-        .register_payment(&v.summary.uid, 10_000, "Transferencia", HOY)
+        .register_payment(&v.summary.uid, 10_000, "Transferencia", HOY, None)
         .unwrap();
     assert_eq!(v.summary.payment_state, "abonada");
     let v = s
-        .register_payment(&v.summary.uid, 19_700, "Efectivo", "2026-10-10")
+        .register_payment(&v.summary.uid, 19_700, "Efectivo", "2026-10-10", None)
         .unwrap();
     assert_eq!(v.summary.payment_state, "pagada");
     assert_eq!(
@@ -295,7 +297,8 @@ fn factura_interna_al_contado_y_emprendedor_sin_impuesto() {
             &EffectInput {
                 mode: "credito".into(),
                 method: "".into(),
-                due_date: Some(HOY.into())
+                due_date: Some(HOY.into()),
+                account_uid: None,
             }
         )
         .is_err(),
@@ -308,6 +311,7 @@ fn factura_interna_al_contado_y_emprendedor_sin_impuesto() {
                 mode: "contado".into(),
                 method: "Tarjeta de débito".into(),
                 due_date: None,
+                account_uid: None,
             },
         )
         .unwrap();
@@ -349,7 +353,7 @@ fn permisos_de_venta() {
         "bodega ve las ventas"
     );
     assert!(matches!(
-        s.register_payment("x", 1, "Efectivo", HOY),
+        s.register_payment("x", 1, "Efectivo", HOY, None),
         Err(AppError::Forbidden(_))
     ));
     assert!(matches!(

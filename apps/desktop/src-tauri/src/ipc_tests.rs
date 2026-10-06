@@ -358,3 +358,86 @@ fn inventario_por_ipc() {
     );
     assert_eq!(ipc.ok("warehouses", json!({})).as_array().unwrap().len(), 2);
 }
+
+#[test]
+fn dinero_por_ipc() {
+    let ipc = Ipc::new();
+    let created = ipc.ok(
+        "create_company",
+        json!({ "name": "Almacén Caja", "profile": "negocio" }),
+    );
+    ipc.ok("open_company", json!({ "uid": created["company"]["uid"] }));
+    let accs = ipc.ok("create_money_account", json!({ "input": { "kind": "banco", "name": "Cuenta corriente", "bank_name": "Banco Ejemplo", "account_label": "CC ···· 4821", "opening_minor": 500000, "opening_date": HOY } }));
+    let banco = accs
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["kind"] == "banco")
+        .unwrap()["uid"]
+        .clone();
+    assert!(
+        ipc.call("create_money_account", json!({ "input": { "kind": "banco", "name": "Otra", "bank_name": null, "account_label": "1234567890123", "opening_minor": 0, "opening_date": null } }))
+            .is_err(),
+        "no se guardan números de cuenta completos"
+    );
+    let cats = ipc.ok("expense_categories", json!({}));
+    let luz = cats
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "Electricidad")
+        .unwrap()["id"]
+        .clone();
+    let g = ipc.ok("register_expense", json!({ "input": { "category_id": luz, "supplier_uid": null, "date": HOY, "description": "Cuenta de luz", "total_minor": 119000, "tax_included": false, "due_date": "2026-10-20", "paid_method": null, "paid_account_uid": null, "recurring_id": null } }));
+    assert_eq!(g["payment_state"], "por_pagar");
+    let uid = g["uid"].clone();
+    let g = ipc.ok("pay_expense", json!({ "uid": uid, "amountMinor": 119000, "method": "Transferencia", "date": HOY, "accountUid": banco }));
+    assert_eq!(g["payment_state"], "pagado");
+    let ledger = ipc.ok("account_ledger", json!({ "uid": banco }));
+    assert_eq!(ledger[0]["amount_minor"], -119000);
+    assert_eq!(
+        ledger[0]["link"],
+        format!("/dinero/gasto/{}", uid.as_str().unwrap())
+    );
+    let accs = ipc.ok("create_money_account", json!({ "input": { "kind": "caja", "name": "Caja", "bank_name": null, "account_label": null, "opening_minor": 0, "opening_date": null } }));
+    let caja = accs
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["kind"] == "caja")
+        .unwrap()["uid"]
+        .clone();
+    let accs = ipc.ok("transfer_money", json!({ "input": { "from_uid": banco, "to_uid": caja, "date": HOY, "amount_minor": 81000, "notes": null } }));
+    let bal = |kind: &str| {
+        accs.as_array()
+            .unwrap()
+            .iter()
+            .find(|a| a["kind"] == kind)
+            .unwrap()["balance_minor"]
+            .as_i64()
+            .unwrap()
+    };
+    assert_eq!(bal("banco"), 300000);
+    assert_eq!(bal("caja"), 81000);
+    let rec = ipc.ok("save_recurring", json!({ "input": { "id": null, "direction": "egreso", "description": "Arriendo", "category_id": null, "amount_minor": 400000, "frequency": "mensual", "day_of_period": 5, "starts_on": HOY, "ends_on": null, "active": true } }));
+    assert_eq!(rec.as_array().unwrap().len(), 1);
+    let ov = ipc.ok("money_overview", json!({}));
+    assert_eq!(ov["cash_minor"], 381000);
+    assert_eq!(ov["projection"].as_array().unwrap().len(), 13);
+    assert!(
+        !ipc.ok("money_calendar", json!({ "days": 60 }))
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        ipc.ok("list_expenses", json!({ "filter": { "query": "luz" } }))
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    let g = ipc.ok("void_expense", json!({ "uid": uid, "reason": "Duplicado" }));
+    assert_eq!(g["payment_state"], "anulado");
+    assert_eq!(ipc.ok("dashboard", json!({}))["cash_minor"], 500000);
+}

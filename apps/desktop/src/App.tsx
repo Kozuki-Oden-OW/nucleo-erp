@@ -25,6 +25,8 @@ import { Inventory } from "./screens/inventario/Inventory";
 import { ProductStock } from "./screens/inventario/ProductStock";
 import { StockDocEditor } from "./screens/inventario/StockDocEditor";
 import { Config } from "./screens/config/Config";
+import { Money } from "./screens/dinero/Money";
+import { ExpenseView } from "./screens/dinero/Expenses";
 import { Products } from "./screens/productos/Products";
 import { DocEditor } from "./screens/ventas/DocEditor";
 import { QuoteView } from "./screens/ventas/QuoteView";
@@ -153,6 +155,10 @@ function Screen({ route, info, session, reload }: { route: Route; info: AppInfo;
       if (a === "ajuste") return <StockDocEditor key="aju" mode="ajuste" />;
       if (a === "transferencia") return <StockDocEditor key="tra" mode="transferencia" />;
       return <Inventory route={route} />;
+    case "dinero":
+      if (!has.has("dinero")) return <Proximamente id="dinero" />;
+      if (a === "gasto" && b) return <ExpenseView key={b} uid={b} />;
+      return <Money route={route} />;
     case "comex":
       return has.has("comex") ? <ImportCalculator /> : <Proximamente id="comex" />;
     case "config":

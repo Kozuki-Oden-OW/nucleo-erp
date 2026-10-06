@@ -53,16 +53,16 @@ export function Dashboard({ session }: { session: SessionInfo }) {
           hint={`${dayOfMonth} ${dayOfMonth === 1 ? "día" : "días"} · mes anterior completo: ${formatMoneyShort(d.month_prev_sales_minor)}`}
         />
         <Kpi icon={Landmark} label={t("utilidad_mes")} value={formatMoney(d.month_profit_minor)} tone={d.month_profit_minor < 0 ? "danger" : "success"} hint={`Ventas − costo − ${t("gastos_mes").toLowerCase()} (${formatMoneyShort(d.month_expenses_minor)})`} />
-        <Kpi icon={Wallet} label={t("disponible")} value={formatMoney(d.cash_minor)} hint="Caja y bancos" />
+        <Kpi icon={Wallet} label={t("disponible")} value={formatMoney(d.cash_minor)} hint="Caja y bancos" onClick={() => navigate("/dinero")} />
         <Kpi
           icon={HandCoins}
           label={t("por_cobrar")}
           value={formatMoney(d.receivable_minor)}
           tone={d.receivable_overdue_minor > 0 ? "warning" : undefined}
           hint={d.receivable_overdue_minor > 0 ? `${formatMoney(d.receivable_overdue_minor)} ${t("vencido").toLowerCase()}` : "Todo al día"}
-          onClick={() => navigate("/ventas?tab=por_cobrar")}
+          onClick={() => navigate("/dinero?tab=por_cobrar")}
         />
-        <Kpi icon={Banknote} label={t("por_pagar")} value={formatMoney(d.payable_minor)} hint="Proveedores y cuentas" onClick={() => navigate("/compras")} />
+        <Kpi icon={Banknote} label={t("por_pagar")} value={formatMoney(d.payable_minor)} hint="Proveedores y gastos" onClick={() => navigate("/dinero?tab=por_pagar")} />
         {d.tax_estimate_minor !== null && (
           <Kpi icon={Receipt} label={t("iva_estimado")} value={formatMoney(d.tax_estimate_minor)} hint="Solo referencia: NÚCLEO no declara impuestos" />
         )}
@@ -114,8 +114,9 @@ export function Dashboard({ session }: { session: SessionInfo }) {
             </ul>
           </Card>
 
-          <Card title="Próximos cobros y pagos" actions={<CalendarClock size={16} className="text-muted" aria-hidden />}>
+          <Card title="Próximos cobros y pagos" actions={<button className="inline-flex items-center gap-1 text-[13px] font-medium text-accent hover:underline" onClick={() => navigate("/dinero?tab=calendario")}><CalendarClock size={15} aria-hidden /> Calendario</button>}>
             <ul className="flex flex-col divide-y divide-line text-sm">
+              {d.upcoming_payments.length === 0 && <li className="text-muted">Sin cobros ni pagos por vencer.</li>}
               {d.upcoming_payments.map((u, i) => (
                 <li key={i} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
                   <div className="min-w-0 flex-1">

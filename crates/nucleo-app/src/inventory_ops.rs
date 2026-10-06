@@ -125,14 +125,14 @@ pub struct ReorderInput {
 
 /* ───────────────────────────── Cálculos ───────────────────────────── */
 
-fn date_ord(s: &str) -> Option<i64> {
+pub(crate) fn date_ord(s: &str) -> Option<i64> {
     let fmt = time::macros::format_description!("[year]-[month]-[day]");
     time::Date::parse(s, &fmt)
         .ok()
         .map(|d| d.to_julian_day() as i64)
 }
 
-fn date_str(julian: i64) -> String {
+pub(crate) fn date_str(julian: i64) -> String {
     let fmt = time::macros::format_description!("[year]-[month]-[day]");
     time::Date::from_julian_day(julian as i32)
         .ok()

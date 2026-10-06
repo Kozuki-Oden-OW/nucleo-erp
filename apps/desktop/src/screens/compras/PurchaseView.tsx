@@ -11,6 +11,7 @@ import { Badge, Button, Card, DefinitionList, Field, Notice, PageHeader, Select,
 import { Dialog, useToast } from "../../ui/overlay";
 import { AttachmentsPanel } from "../documentos/Documents";
 import { PurchaseStatusBadge } from "./common";
+import { AccountSelect } from "../dinero/common";
 
 export function PurchaseView({ uid }: { uid: string }) {
   const backend = useBackend();
@@ -102,12 +103,13 @@ function PayDialog({ c, due, onClose, onDone }: { c: PurchaseDetail; due: number
   const toast = useToast();
   const [amount, setAmount] = useState<number | null>(due);
   const [method, setMethod] = useState(PAYMENT_METHODS[1]!);
+  const [account, setAccount] = useState("");
   const [date, setDate] = useState(todayIso());
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   async function go() {
     setBusy(true); setErr(null);
-    try { const x = await backend.payPurchase(c.uid, amount ?? 0, method, date); toast("success", x.payment_state === "pagada" ? "Documento pagado completo." : "Abono registrado."); onDone(x); }
+    try { const x = await backend.payPurchase(c.uid, amount ?? 0, method, date, account || undefined); toast("success", x.payment_state === "pagada" ? "Documento pagado completo." : "Abono registrado."); onDone(x); }
     catch (e) { setErr(errorMessage(e)); } finally { setBusy(false); }
   }
   return (
@@ -120,6 +122,7 @@ function PayDialog({ c, due, onClose, onDone }: { c: PurchaseDetail; due: number
           <Select label="Medio de pago" value={method} onChange={(e) => setMethod(e.target.value)} options={PAYMENT_METHODS.map((m) => ({ value: m, label: m }))} />
           <Field label="Fecha" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
+        <AccountSelect value={account} onChange={setAccount} method={method} label="Sale de la cuenta" />
         {err && <Notice tone="danger">{err}</Notice>}
       </div>
     </Dialog>

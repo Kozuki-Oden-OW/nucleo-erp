@@ -140,6 +140,7 @@ fn ciclo_de_compra_completo() {
         lines: input.lines.clone(),
         notes: None,
         paid_method: None,
+        paid_account_uid: None,
     };
     assert!(
         s.register_purchase(&PurchaseInput {
@@ -167,11 +168,11 @@ fn ciclo_de_compra_completo() {
     );
 
     let c = s
-        .pay_purchase(&c.summary.uid, 59_500, "Transferencia", HOY)
+        .pay_purchase(&c.summary.uid, 59_500, "Transferencia", HOY, None)
         .unwrap();
     assert_eq!(c.summary.payment_state, "abonada");
     let c = s
-        .pay_purchase(&c.summary.uid, 100_000, "Transferencia", HOY)
+        .pay_purchase(&c.summary.uid, 100_000, "Transferencia", HOY, None)
         .unwrap();
     assert_eq!(c.summary.payment_state, "pagada");
     assert_eq!(c.payments.len(), 2);
@@ -214,6 +215,7 @@ fn compra_directa_con_ingreso_y_anulacion() {
         lines: vec![buy(Some(&clavo.uid), "Clavo 2\"", 8, 1_500)],
         notes: None,
         paid_method: Some("Efectivo".into()),
+        paid_account_uid: None,
     };
     let c = s.register_purchase(&doc).unwrap();
     assert!(c.received_stock);

@@ -7,6 +7,7 @@ pub mod auth;
 pub mod company;
 pub mod core_ops;
 pub mod error;
+pub mod finance_ops;
 pub mod inventory_ops;
 pub mod keys;
 pub mod purchase_ops;

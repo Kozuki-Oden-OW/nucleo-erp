@@ -2,6 +2,25 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [Sin publicar] — Fase 8 (Finanzas) · Hito C
+
+### Agregado
+- Módulo Dinero con resumen: dinero disponible, lo que te deben y lo que debes (con atraso por tramos:
+  al día, 1–30, 31–60, 61–90 y más de 90 días) y cuánto tendrías en 30 días.
+- Proyección de caja a 13 semanas con lo que ya se sabe (cobros y pagos por vencer y recurrentes),
+  gráfico con tabla equivalente y aviso de la primera semana en negativo.
+- Cuentas de dinero (caja, banco, billetera): saldo inicial, saldo calculado, movimientos con enlace al
+  documento, edición, archivo (solo con saldo cero) y traspasos entre cuentas. Solo se guarda una
+  referencia corta de la cuenta, nunca el número completo.
+- Gastos: registro rápido pagado o por pagar, IVA incluido separado de forma informativa, proveedor
+  opcional, categorías propias, pagos parciales, anulación con motivo y documentos adjuntos.
+- Ingresos y egresos recurrentes que alimentan el calendario y la proyección hasta que se registra el
+  gasto del período.
+- Calendario de cobros y pagos a 30, 60 y 90 días, con lo atrasado primero.
+- Elección de la cuenta en cobros de ventas, pagos de compras y gastos (por defecto: efectivo → caja,
+  otros medios → banco).
+- Inicio con cifras reales de caja, deudas, gastos del mes, IVA estimado y próximos vencimientos.
+
 ## [Sin publicar] — Fase 7 (Inventario) · Hito B
 
 ### Agregado

@@ -4,7 +4,7 @@ Modelo de datos del MVP, diseñado en la **Fase 2** a partir del Blueprint §5 y
 `02_INTELIGENCIA_COMERCIAL.md` §19. Cada negocio tiene su propio archivo `company.db` cifrado con
 SQLCipher (ADR-001, ADR-005).
 
-**Tamaño:** 93 tablas · 31 triggers · 69 índices · 1 vista · 3 índices de búsqueda FTS5 · 14 migraciones.
+**Tamaño:** 94 tablas · 32 triggers · 72 índices · 1 vista · 3 índices de búsqueda FTS5 · 15 migraciones.
 
 ## 1. Convenciones
 
@@ -41,6 +41,7 @@ Todo es entero: las sumas y los reportes se hacen en SQL sin perder exactitud y 
 | 12 | `0012_ventas.sql` | Fase 5: descuento porcentual por línea de venta, anulación de ventas cerradas, índices por número de documento |
 | 13 | `0013_compras.sql` | Fase 6: monto exento y motivo de anulación en órdenes de compra, bloqueo de montos de órdenes emitidas, índices de compras |
 | 14 | `0014_inventario.sql` | Fase 7: encabezados de ajustes y conteos (`stock_adjustments`) y de transferencias (`stock_transfers`), índice del kárdex |
+| 15 | `0015_finanzas.sql` | Fase 8: traspasos entre cuentas (`money_transfers`, inmutables), motivo y notas de gastos, fecha de creación de recurrentes, índices de cuentas por cobrar y por pagar |
 
 Las migraciones son transaccionales y versionadas con `PRAGMA user_version`. **Pre-1.0:** se pueden
 reescribir (en la Fase 2 se reemplazó la tabla mínima de clientes de la Fase 1); desde la primera beta
@@ -57,7 +58,7 @@ INVENTARIO      warehouses · lots · serials · stock_movements → stock_balan
                 stock_daily_snapshot · reorder_settings
 VENTAS          quotes → sales_orders → deliveries → sales (+ sale_items, sale_item_adjustments, external_doc_refs)
 COMPRAS         purchase_requests → supplier_quotes → purchase_orders → receipts → purchases
-DINERO          money_accounts · payments → payment_allocations → receivables / payables · expenses · recurring_schedules
+DINERO          money_accounts · money_transfers · payments → payment_allocations → receivables / payables · expenses · recurring_schedules
 CONTABILIDAD    accounting_accounts · cost_centers · fiscal_periods · journal_entries/lines · posting_rules
 INDICADORES     tax_codes · tax_periods (IVA estimado informativo)
 COMEX           incoterm_definitions · imports (+ items, costs, stage_history, eta_changes) · exports (+ items, costs)

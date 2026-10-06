@@ -182,6 +182,9 @@ pub struct EffectInput {
     pub mode: String,
     pub method: String,
     pub due_date: Option<String>,
+    /// Cuenta donde entra el dinero (si no se indica, se sugiere según el medio de pago).
+    #[serde(default)]
+    pub account_uid: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -1243,7 +1246,12 @@ impl CompanySession {
                 total,
             )?;
             if !credit {
-                let acc = db::default_cash_account(&tx, &now)?;
+                let acc = crate::finance_ops::account_for(
+                    &tx,
+                    input.account_uid.as_deref(),
+                    method_code(&input.method),
+                    &now,
+                )?;
                 let pnum = dbcore::take_number(&tx, "PAG")?;
                 let puid = uuid::Uuid::now_v7().to_string();
                 let pid = db::insert_payment(
@@ -1287,6 +1295,7 @@ impl CompanySession {
         amount_minor: i64,
         method: &str,
         date: &str,
+        account_uid: Option<&str>,
     ) -> AppResult<SaleDetail> {
         self.require("cobros.registrar")?;
         let s = self.sale_row(uid)?;
@@ -1313,10 +1322,10 @@ impl CompanySession {
         let tx = self.db.conn_mut().transaction()?;
         let rec = db::open_receivable(&tx, s.id)?
             .ok_or_else(|| AppError::Validation("la venta no tiene saldo por cobrar".into()))?;
-        let acc = db::default_cash_account(&tx, &now)?;
+        let code = method_code(method);
+        let acc = crate::finance_ops::account_for(&tx, account_uid, code, &now)?;
         let pnum = dbcore::take_number(&tx, "PAG")?;
         let puid = uuid::Uuid::now_v7().to_string();
-        let code = method_code(method);
         let pid = db::insert_payment(
             &tx,
             &PaymentWrite {
