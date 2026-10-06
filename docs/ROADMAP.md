@@ -13,7 +13,7 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | 6 | Compras | ✅ Completo (2026-10-06) — ver abajo |
 | 7 | Inventario (incluye stock real y futuro) | ✅ Hito B cumplido (2026-10-06) — ver abajo |
 | 8 | Finanzas | ✅ Hito C cumplido (2026-10-06) — ver abajo |
-| 9 | COMEX (requiere contador colaborador, D-07) | ⏳ |
+| 9 | COMEX (requiere contador colaborador, D-07) | 🟡 Construido (2026-10-06); falta la firma de los casos golden — ver abajo |
 | 10 | Contabilidad (motor de asientos) | ⏳ |
 | 11 | Documentación externa e indicadores | ⏳ |
 | 12 | Reportes y dashboard del dueño | ⏳ |
@@ -81,6 +81,19 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | Documentos adjuntos cifrados, vinculados, exportables y archivables; incluidos en respaldos | ✅ |
 | Búsqueda global filtrada por permisos; visor de auditoría | ✅ |
 | Pruebas: `hito_a` (flujo completo + respaldo/restauración con adjuntos) | ✅ |
+
+## Fase 9 — criterio de salida
+
+> Casos golden de importación/exportación aprobados.
+
+| Entregable | Estado |
+|---|---|
+| Carpeta de importación con etapas, ETA, historial y timeline | ✅ prueba `comex.rs` e `ipc_tests.rs` |
+| Costo puesto en bodega y prorrateo a stock (recepción parcial/total) | ✅ |
+| Costos estimados vs. reales con cuentas por pagar | ✅ |
+| Calculadora y escenarios (misma fórmula), exportaciones, Incoterms | ✅ |
+| Casos golden en `golden/comex.json` (Rust e interfaz) | ✅ escritos · ⏳ **revisión y firma del contador o agente de aduana** (D-07) |
+| Moneda extranjera en cuentas por pagar y diferencias de cambio | ⏳ Fase 10 (D-F9-06) |
 
 ## Fase 8 — criterio de salida
 

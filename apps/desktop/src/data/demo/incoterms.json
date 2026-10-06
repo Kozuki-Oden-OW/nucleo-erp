@@ -1,0 +1,279 @@
+[
+ {
+  "code": "EXW",
+  "version": "2020",
+  "name": "En fábrica",
+  "content": {
+   "grupo": "E",
+   "transporte": "cualquiera",
+   "entrega": "El vendedor deja la mercadería a disposición en su local, sin cargarla ni despacharla para exportación.",
+   "riesgo": "Pasa al comprador desde que la mercadería está a su disposición en el local del vendedor.",
+   "vendedor": [
+    "Embalaje"
+   ],
+   "comprador": [
+    "Carga en origen",
+    "Despacho de exportación",
+    "Flete internacional",
+    "Seguro",
+    "Despacho de importación, derechos e impuestos",
+    "Transporte hasta su bodega"
+   ],
+   "agregar": [
+    "otros",
+    "flete",
+    "seguro"
+   ],
+   "nota": "Agrega como costo los gastos en origen (carga y despacho de exportación), además del flete y el seguro."
+  },
+  "source": "Resumen propio de Incoterms® 2020 (Cámara de Comercio Internacional). Referencial: revisa tu contrato y consulta a tu agente de aduana."
+ },
+ {
+  "code": "FCA",
+  "version": "2020",
+  "name": "Franco transportista",
+  "content": {
+   "grupo": "F",
+   "transporte": "cualquiera",
+   "entrega": "El vendedor entrega la mercadería, despachada para exportación, al transportista que designa el comprador en el lugar convenido.",
+   "riesgo": "Pasa al comprador al entregarla al transportista.",
+   "vendedor": [
+    "Despacho de exportación",
+    "Entrega al transportista"
+   ],
+   "comprador": [
+    "Flete internacional",
+    "Seguro",
+    "Despacho de importación, derechos e impuestos",
+    "Transporte hasta su bodega"
+   ],
+   "agregar": [
+    "flete",
+    "seguro"
+   ],
+   "nota": "Agrega el flete internacional y el seguro."
+  },
+  "source": "Resumen propio de Incoterms® 2020 (Cámara de Comercio Internacional). Referencial: revisa tu contrato y consulta a tu agente de aduana."
+ },
+ {
+  "code": "FAS",
+  "version": "2020",
+  "name": "Franco al costado del buque",
+  "content": {
+   "grupo": "F",
+   "transporte": "maritimo",
+   "entrega": "El vendedor deja la mercadería al costado del buque en el puerto de embarque, despachada para exportación.",
+   "riesgo": "Pasa al comprador cuando la mercadería está al costado del buque.",
+   "vendedor": [
+    "Despacho de exportación",
+    "Traslado al puerto de embarque"
+   ],
+   "comprador": [
+    "Carga al buque",
+    "Flete marítimo",
+    "Seguro",
+    "Despacho de importación, derechos e impuestos",
+    "Transporte hasta su bodega"
+   ],
+   "agregar": [
+    "flete",
+    "seguro"
+   ],
+   "nota": "Agrega el flete (incluida la carga al buque) y el seguro."
+  },
+  "source": "Resumen propio de Incoterms® 2020 (Cámara de Comercio Internacional). Referencial: revisa tu contrato y consulta a tu agente de aduana."
+ },
+ {
+  "code": "FOB",
+  "version": "2020",
+  "name": "Franco a bordo",
+  "content": {
+   "grupo": "F",
+   "transporte": "maritimo",
+   "entrega": "El vendedor entrega la mercadería a bordo del buque en el puerto de embarque, despachada para exportación.",
+   "riesgo": "Pasa al comprador cuando la mercadería está a bordo.",
+   "vendedor": [
+    "Despacho de exportación",
+    "Carga a bordo"
+   ],
+   "comprador": [
+    "Flete marítimo",
+    "Seguro",
+    "Despacho de importación, derechos e impuestos",
+    "Transporte hasta su bodega"
+   ],
+   "agregar": [
+    "flete",
+    "seguro"
+   ],
+   "nota": "Agrega el flete marítimo y el seguro: el precio no los incluye."
+  },
+  "source": "Resumen propio de Incoterms® 2020 (Cámara de Comercio Internacional). Referencial: revisa tu contrato y consulta a tu agente de aduana."
+ },
+ {
+  "code": "CFR",
+  "version": "2020",
+  "name": "Costo y flete",
+  "content": {
+   "grupo": "C",
+   "transporte": "maritimo",
+   "entrega": "El vendedor entrega a bordo en el puerto de embarque y paga el flete hasta el puerto de destino.",
+   "riesgo": "Pasa al comprador cuando la mercadería está a bordo en origen (aunque el vendedor pague el flete).",
+   "vendedor": [
+    "Despacho de exportación",
+    "Carga a bordo",
+    "Flete marítimo"
+   ],
+   "comprador": [
+    "Seguro",
+    "Descarga si no está en el flete",
+    "Despacho de importación, derechos e impuestos",
+    "Transporte hasta su bodega"
+   ],
+   "agregar": [
+    "seguro"
+   ],
+   "nota": "El precio incluye el flete; agrega el seguro."
+  },
+  "source": "Resumen propio de Incoterms® 2020 (Cámara de Comercio Internacional). Referencial: revisa tu contrato y consulta a tu agente de aduana."
+ },
+ {
+  "code": "CIF",
+  "version": "2020",
+  "name": "Costo, seguro y flete",
+  "content": {
+   "grupo": "C",
+   "transporte": "maritimo",
+   "entrega": "El vendedor entrega a bordo en el puerto de embarque y paga el flete y un seguro de cobertura mínima hasta el puerto de destino.",
+   "riesgo": "Pasa al comprador cuando la mercadería está a bordo en origen.",
+   "vendedor": [
+    "Despacho de exportación",
+    "Carga a bordo",
+    "Flete marítimo",
+    "Seguro de cobertura mínima"
+   ],
+   "comprador": [
+    "Descarga si no está en el flete",
+    "Despacho de importación, derechos e impuestos",
+    "Transporte hasta su bodega"
+   ],
+   "agregar": [],
+   "nota": "El precio ya incluye flete y seguro: no los agregues como costo."
+  },
+  "source": "Resumen propio de Incoterms® 2020 (Cámara de Comercio Internacional). Referencial: revisa tu contrato y consulta a tu agente de aduana."
+ },
+ {
+  "code": "CPT",
+  "version": "2020",
+  "name": "Transporte pagado hasta",
+  "content": {
+   "grupo": "C",
+   "transporte": "cualquiera",
+   "entrega": "El vendedor entrega al primer transportista y paga el transporte hasta el lugar de destino convenido.",
+   "riesgo": "Pasa al comprador al entregar la mercadería al primer transportista.",
+   "vendedor": [
+    "Despacho de exportación",
+    "Transporte hasta el destino convenido"
+   ],
+   "comprador": [
+    "Seguro",
+    "Despacho de importación, derechos e impuestos",
+    "Transporte desde el destino convenido a su bodega"
+   ],
+   "agregar": [
+    "seguro"
+   ],
+   "nota": "El precio incluye el transporte; agrega el seguro."
+  },
+  "source": "Resumen propio de Incoterms® 2020 (Cámara de Comercio Internacional). Referencial: revisa tu contrato y consulta a tu agente de aduana."
+ },
+ {
+  "code": "CIP",
+  "version": "2020",
+  "name": "Transporte y seguro pagados hasta",
+  "content": {
+   "grupo": "C",
+   "transporte": "cualquiera",
+   "entrega": "El vendedor entrega al primer transportista y paga el transporte y un seguro de cobertura amplia hasta el destino convenido.",
+   "riesgo": "Pasa al comprador al entregar la mercadería al primer transportista.",
+   "vendedor": [
+    "Despacho de exportación",
+    "Transporte hasta el destino convenido",
+    "Seguro de cobertura amplia"
+   ],
+   "comprador": [
+    "Despacho de importación, derechos e impuestos",
+    "Transporte desde el destino convenido a su bodega"
+   ],
+   "agregar": [],
+   "nota": "El precio ya incluye transporte y seguro."
+  },
+  "source": "Resumen propio de Incoterms® 2020 (Cámara de Comercio Internacional). Referencial: revisa tu contrato y consulta a tu agente de aduana."
+ },
+ {
+  "code": "DAP",
+  "version": "2020",
+  "name": "Entregada en lugar",
+  "content": {
+   "grupo": "D",
+   "transporte": "cualquiera",
+   "entrega": "El vendedor pone la mercadería en el lugar de destino convenido, lista para descargar.",
+   "riesgo": "El vendedor asume el riesgo hasta el lugar de destino.",
+   "vendedor": [
+    "Despacho de exportación",
+    "Transporte y seguro hasta el destino"
+   ],
+   "comprador": [
+    "Descarga",
+    "Despacho de importación, derechos e impuestos"
+   ],
+   "agregar": [],
+   "nota": "El precio incluye transporte hasta el destino. Pregunta a tu agente cómo separar los gastos posteriores a la llegada para el valor aduanero."
+  },
+  "source": "Resumen propio de Incoterms® 2020 (Cámara de Comercio Internacional). Referencial: revisa tu contrato y consulta a tu agente de aduana."
+ },
+ {
+  "code": "DPU",
+  "version": "2020",
+  "name": "Entregada en lugar descargada",
+  "content": {
+   "grupo": "D",
+   "transporte": "cualquiera",
+   "entrega": "El vendedor entrega la mercadería descargada en el lugar de destino convenido.",
+   "riesgo": "El vendedor asume el riesgo hasta descargar en destino.",
+   "vendedor": [
+    "Despacho de exportación",
+    "Transporte y seguro hasta el destino",
+    "Descarga"
+   ],
+   "comprador": [
+    "Despacho de importación, derechos e impuestos"
+   ],
+   "agregar": [],
+   "nota": "El precio incluye transporte y descarga en destino. Consulta a tu agente por el valor aduanero."
+  },
+  "source": "Resumen propio de Incoterms® 2020 (Cámara de Comercio Internacional). Referencial: revisa tu contrato y consulta a tu agente de aduana."
+ },
+ {
+  "code": "DDP",
+  "version": "2020",
+  "name": "Entregada derechos pagados",
+  "content": {
+   "grupo": "D",
+   "transporte": "cualquiera",
+   "entrega": "El vendedor entrega en el destino convenido con la importación despachada y los derechos e impuestos pagados.",
+   "riesgo": "El vendedor asume el riesgo hasta el destino.",
+   "vendedor": [
+    "Todo el transporte y seguro",
+    "Despacho de exportación e importación",
+    "Derechos e impuestos de importación"
+   ],
+   "comprador": [
+    "Descarga"
+   ],
+   "agregar": [],
+   "nota": "El vendedor paga derechos e impuestos: no los agregues salvo que te los cobren aparte."
+  },
+  "source": "Resumen propio de Incoterms® 2020 (Cámara de Comercio Internacional). Referencial: revisa tu contrato y consulta a tu agente de aduana."
+ }
+]

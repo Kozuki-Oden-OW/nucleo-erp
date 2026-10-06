@@ -123,6 +123,19 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         commands::money_overview,
         commands::money_calendar,
         commands::dashboard,
+        commands::incoterms,
+        commands::list_imports,
+        commands::import,
+        commands::save_import,
+        commands::set_import_stage,
+        commands::change_import_eta,
+        commands::add_import_cost,
+        commands::update_import_cost,
+        commands::remove_import_cost,
+        commands::pay_import_cost,
+        commands::receive_import,
+        commands::close_import,
+        commands::void_import,
     ])
 }
 

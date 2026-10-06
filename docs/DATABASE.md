@@ -4,7 +4,7 @@ Modelo de datos del MVP, diseñado en la **Fase 2** a partir del Blueprint §5 y
 `02_INTELIGENCIA_COMERCIAL.md` §19. Cada negocio tiene su propio archivo `company.db` cifrado con
 SQLCipher (ADR-001, ADR-005).
 
-**Tamaño:** 94 tablas · 32 triggers · 72 índices · 1 vista · 3 índices de búsqueda FTS5 · 15 migraciones.
+**Tamaño:** 94 tablas · 32 triggers · 74 índices · 1 vista · 3 índices de búsqueda FTS5 · 16 migraciones.
 
 ## 1. Convenciones
 
@@ -42,6 +42,7 @@ Todo es entero: las sumas y los reportes se hacen en SQL sin perder exactitud y 
 | 13 | `0013_compras.sql` | Fase 6: monto exento y motivo de anulación en órdenes de compra, bloqueo de montos de órdenes emitidas, índices de compras |
 | 14 | `0014_inventario.sql` | Fase 7: encabezados de ajustes y conteos (`stock_adjustments`) y de transferencias (`stock_transfers`), índice del kárdex |
 | 15 | `0015_finanzas.sql` | Fase 8: traspasos entre cuentas (`money_transfers`, inmutables), motivo y notas de gastos, fecha de creación de recurrentes, índices de cuentas por cobrar y por pagar |
+| 16 | `0016_comex.sql` | Fase 9: tasa de IVA de importación ingresada, foto del costo estimado, costos anulables con documento y fecha, Incoterms® 2020 (resumen propio), permiso de COMEX para el rol Compras |
 
 Las migraciones son transaccionales y versionadas con `PRAGMA user_version`. **Pre-1.0:** se pueden
 reescribir (en la Fase 2 se reemplazó la tabla mínima de clientes de la Fase 1); desde la primera beta

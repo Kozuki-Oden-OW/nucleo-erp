@@ -2,6 +2,26 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [Sin publicar] — Fase 9 (NÚCLEO COMEX) · en validación
+
+### Agregado
+- Carpetas de importación: proveedor, Incoterm, transporte, moneda y tipo de cambio, productos con
+  precio en moneda extranjera, peso, arancel y partida; parten como cotización.
+- 12 etapas (cotización → ordenada → … → recibida → cerrada) con historial, fechas automáticas y
+  ETA con historial de cambios y motivo ("cambió 2 veces, +9 días").
+- Costos estimados y reales (flete, seguro, derechos, IVA de importación, agente, puerto,
+  almacenaje, transporte local, banco, otros), cada uno en su moneda y con su criterio de reparto;
+  los reales pueden quedar por pagar o pagados en Dinero, y se anulan con motivo.
+- Costo puesto en bodega por producto, calculado en Rust (`nucleo-domain::comex`) y con el mismo
+  algoritmo en la interfaz; los montos reales de la declaración reemplazan al cálculo por tasa.
+- Recepción parcial o total a la bodega principal al costo puesto en bodega (costo promedio y
+  kárdex "Importación"); cierre con comparación "estimaste $X, costó $Y".
+- Lo que viene en una importación cuenta como "por llegar" y su ETA como próxima llegada en el
+  análisis de stock.
+- Calculadora de importación con escenarios (misma fórmula) y botón "Crear importación"; calculadora
+  de exportación (utilidad, margen y punto de equilibrio); guía de Incoterms® 2020 (resumen propio).
+- Casos golden compartidos Rust/interfaz en `golden/comex.json`, pendientes de firma (D-07).
+
 ## [Sin publicar] — Fase 8 (Finanzas) · Hito C
 
 ### Agregado

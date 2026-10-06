@@ -4,6 +4,7 @@
 //! transacción** que incluye el cambio y su registro de auditoría (Blueprint §2.3).
 
 pub mod auth;
+pub mod comex_ops;
 pub mod company;
 pub mod core_ops;
 pub mod error;

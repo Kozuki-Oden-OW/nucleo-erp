@@ -209,7 +209,7 @@ fn purchase_summary(c: &PurchaseRow) -> PurchaseSummary {
     }
 }
 
-fn timeline(conn: &Connection, entity: &str, uid: &str) -> AppResult<Vec<TimelineItem>> {
+pub(crate) fn timeline(conn: &Connection, entity: &str, uid: &str) -> AppResult<Vec<TimelineItem>> {
     let mut stmt = conn.prepare(
         "SELECT ts_utc, json_extract(after_json, '$.texto') FROM audit_log WHERE entity = ?1 AND entity_id = ?2 ORDER BY id",
     )?;
@@ -226,7 +226,7 @@ fn timeline(conn: &Connection, entity: &str, uid: &str) -> AppResult<Vec<Timelin
     Ok(rows)
 }
 
-fn add_days(date: &str, days: i64) -> AppResult<String> {
+pub(crate) fn add_days(date: &str, days: i64) -> AppResult<String> {
     let fmt = time::macros::format_description!("[year]-[month]-[day]");
     let d = time::Date::parse(date, &fmt)
         .map_err(|_| AppError::Validation("fecha no válida".into()))?;
@@ -237,7 +237,7 @@ fn add_days(date: &str, days: i64) -> AppResult<String> {
 
 /// Entrada de mercadería: recalcula el costo promedio ponderado y registra el movimiento.
 #[allow(clippy::too_many_arguments)]
-fn stock_in(
+pub(crate) fn stock_in(
     conn: &Connection,
     product_id: i64,
     warehouse_id: i64,

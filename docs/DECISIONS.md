@@ -155,6 +155,19 @@ informativo, sin renta guiada · D-11 promociones no acumulables por defecto · 
 | D-F8-08 | La proyección de caja usa solo compromisos conocidos (los atrasados cuentan en la semana actual) y no estima ventas futuras | Explicable y sin supuestos ocultos; la estimación de ventas se evaluará con reportes (Fase 12) |
 | D-F8-09 | La conciliación bancaria con cartola importada y los flujos a 7/60/90 días como reportes se postergan | El MVP entrega saldo calculado, calendario y proyección semanal; la importación de cartolas llega con la Fase 11 |
 
+## Decisiones de la Fase 9
+
+| ID | Decisión | Motivo |
+|---|---|---|
+| D-F9-01 | El cálculo vive en `nucleo-domain::comex` y tiene un espejo exacto en la interfaz; ambos corren los mismos casos de `golden/comex.json` | "La simulación y la operación usan la misma calculadora" (Blueprint §7.5), con vista previa instantánea |
+| D-F9-02 | Valor aduanero = mercadería (según el Incoterm de la factura) + flete + seguro; derechos e IVA ingresados reemplazan al cálculo por tasa | Lo real manda; sin aranceles ni tasas en el código (COMEX_RULES) |
+| D-F9-03 | Reparto por resto mayor (la suma cuadra al peso); el seguro y el IVA por valor, los derechos ingresados según el arancel de cada producto, el resto según el criterio de la carpeta o del costo; sin peso/volumen cae a valor con aviso | Explicable y sin descuadres |
+| D-F9-04 | Al confirmar (salir de cotización) se guarda la foto del costo estimado total y por producto; al cerrar se compara | "Estimaste $X, costó $Y" |
+| D-F9-05 | La recepción usa el costo calculado ese día; los costos que lleguen después no recalculan el stock ya recibido (llega con el recálculo retroactivo, D-F7-07); el cierre exige reemplazar los estimados | Evita reescribir costos de ventas ya hechas |
+| D-F9-06 | Solo los costos reales llevan cuenta por pagar (en pesos, al tipo de cambio del costo); el pago de la mercadería al proveedor extranjero y las diferencias de cambio llegan con la contabilidad (Fase 10) | Requiere moneda extranjera en CxP y asientos de diferencia de cambio |
+| D-F9-07 | Exportaciones: solo calculadora (V1); el tratamiento del IVA exportador queda pendiente de validación | Alcance V1 del §15 y validación de D-07 |
+| D-F9-08 | Incoterms® 2020 como contenido versionado con resumen propio (no el texto de la ICC) | Actualizable y sin reproducir texto protegido |
+
 ## Dependencias y su justificación
 
 | Dependencia | Dónde | Por qué |

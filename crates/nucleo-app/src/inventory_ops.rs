@@ -650,10 +650,18 @@ impl CompanySession {
             .into_iter()
             .collect();
         let last: HashMap<i64, String> = db::last_movement_dates(conn)?.into_iter().collect();
-        let arrivals: HashMap<i64, (String, i64)> = db::next_arrivals(conn)?
+        // Próxima llegada: la más cercana entre órdenes de compra e importaciones en curso.
+        let mut arrivals: HashMap<i64, (String, i64)> = HashMap::new();
+        for (p, d, q) in db::next_arrivals(conn)?
             .into_iter()
-            .map(|(p, d, q)| (p, (d, q)))
-            .collect();
+            .chain(nucleo_db::comex::import_arrivals(conn)?)
+        {
+            let e = arrivals.entry(p).or_insert((d.clone(), 0));
+            if d < e.0 {
+                e.0 = d;
+            }
+            e.1 += q;
+        }
         let settings: HashMap<i64, ReorderSettingsRow> =
             db::reorder_settings_all(conn)?.into_iter().collect();
 
@@ -782,7 +790,8 @@ impl CompanySession {
                 unit: p.unit.clone(),
                 on_hand_milli: pos.on_hand_milli,
                 reserved_milli: pos.reserved_milli,
-                in_purchase_milli: pos.in_purchase_milli,
+                // "Por llegar": órdenes de compra nacionales e importaciones en curso.
+                in_purchase_milli: pos.in_purchase_milli + pos.in_import_milli,
                 future_milli: milli(position.future_without_sales()),
                 min_milli: min,
                 avg_cost_e4: if costs { p.cost_e4 } else { 0 },

@@ -4,6 +4,7 @@
 // Las pantallas solo conocen esta interfaz; así un prototipo de la Fase 3 se convierte en pantalla
 // real cuando el comando Rust correspondiente existe.
 import type {
+  ImportCostInput, ImportDetail, ImportInput, ImportReceiveLine, ImportStage, ImportSummary, IncotermDef,
   AccountInput, CalendarItem, ExpenseCategory, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow, MoneyAccount,
   MoneyOverview, MoneyTransferInput, Recurring, RecurringInput,
   AdjustmentInput, InventoryOverview, InventorySettings, ProductInventory, ReorderInput, StockDocDone, StockDocRow, TransferInput, Warehouse,
@@ -159,7 +160,25 @@ export interface Backend {
   saveRecurring(input: RecurringInput): Promise<Recurring[]>;
   moneyOverview(): Promise<MoneyOverview>;
   moneyCalendar(days: number): Promise<CalendarItem[]>;
+
+  // COMEX: carpetas de importación
+  incoterms(): Promise<IncotermDef[]>;
+  listImports(view: ImportView, query: string): Promise<ImportSummary[]>;
+  import(uid: string): Promise<ImportDetail>;
+  saveImport(input: ImportInput, uid?: string): Promise<ImportDetail>;
+  setImportStage(uid: string, stage: ImportStage, note?: string): Promise<ImportDetail>;
+  changeImportEta(uid: string, eta: string, reason?: string): Promise<ImportDetail>;
+  addImportCost(uid: string, input: ImportCostInput): Promise<ImportDetail>;
+  updateImportCost(uid: string, costId: number, input: ImportCostInput): Promise<ImportDetail>;
+  removeImportCost(uid: string, costId: number, reason?: string): Promise<ImportDetail>;
+  payImportCost(uid: string, costId: number, amount_minor: number, method: string, date: string, accountUid?: string): Promise<ImportDetail>;
+  /** `lines` vacío = recibir todo lo pendiente. */
+  receiveImport(uid: string, lines: ImportReceiveLine[], date: string): Promise<ImportDetail>;
+  closeImport(uid: string): Promise<ImportDetail>;
+  voidImport(uid: string, reason: string): Promise<ImportDetail>;
 }
+
+export type ImportView = "en_curso" | "cotizaciones" | "cerradas" | "anuladas" | "todas";
 
 /** Error con mensaje en lenguaje claro, listo para mostrar. */
 export class AppError extends Error {

@@ -576,6 +576,172 @@ export interface MoneyOverview {
   payables: DueRow[];
 }
 
+/* ───── COMEX ───── */
+
+export type ImportStage =
+  | "cotizacion" | "ordenada" | "pagada" | "produccion" | "lista_despacho" | "embarcada" | "en_transito"
+  | "arribada" | "internacion" | "transporte_local" | "recibida" | "cerrada" | "anulada";
+export type TransportMode = "maritimo" | "aereo" | "terrestre" | "courier" | "multimodal";
+export interface IncotermDef {
+  code: string;
+  version: string;
+  name: string;
+  content: {
+    grupo: string; transporte: string; entrega: string; riesgo: string;
+    vendedor: string[]; comprador: string[]; agregar: string[]; nota: string;
+  };
+  source: string;
+}
+export interface ImportSummary {
+  uid: string;
+  number: string;
+  supplier_name: string | null;
+  stage: ImportStage;
+  incoterm: string | null;
+  transport_mode: TransportMode | null;
+  currency_code: string;
+  fob_minor: number | null;
+  eta: string | null;
+  eta_changes: number;
+  eta_shift_days: number;
+  landed_total_clp: number | null;
+  estimated_landed_clp: number | null;
+  items: number;
+  created_at: string;
+}
+export interface ImportItemRow {
+  id: number;
+  product_uid: string | null;
+  sku: string | null;
+  description: string;
+  qty_milli: number;
+  received_milli: number;
+  unit_price_minor: number;
+  weight_g: number | null;
+  volume_cm3: number | null;
+  duty_ppm: number | null;
+  hs_code: string | null;
+  landed_unit_cost_e4: number | null;
+  estimated_unit_cost_e4: number | null;
+}
+export interface ImportCost {
+  id: number;
+  kind: import("./comex").CostKind;
+  description: string | null;
+  supplier_uid: string | null;
+  supplier_name: string | null;
+  currency_code: string;
+  currency_decimals: number;
+  amount_minor: number;
+  rate_e6: number | null;
+  is_estimate: boolean;
+  recoverable_tax: boolean;
+  allocation_basis: import("./comex").Basis | null;
+  status: "vigente" | "anulado";
+  document_ref: string | null;
+  cost_date: string | null;
+  created_at: string;
+  payable_due: string | null;
+  payable_amount_minor: number | null;
+  payable_paid_minor: number | null;
+  amount_clp: number;
+  payments: Payment[];
+}
+export interface StageChange { from_stage: ImportStage | null; to_stage: ImportStage; changed_at: string; changed_by: string | null; note: string | null }
+export interface EtaChange { old_eta: string | null; new_eta: string; reason: string | null; changed_at: string; changed_by: string | null }
+export interface ImportDetail {
+  uid: string;
+  number: string;
+  supplier_uid: string | null;
+  supplier_name: string | null;
+  incoterm: string | null;
+  incoterm_version: string | null;
+  transport_mode: TransportMode | null;
+  origin_country: string | null;
+  origin_port: string | null;
+  destination_port: string | null;
+  currency_code: string;
+  currency_decimals: number;
+  rate_e6: number | null;
+  stage: ImportStage;
+  purchase_date: string | null;
+  production_eta: string | null;
+  shipment_date: string | null;
+  eta: string | null;
+  arrival_date: string | null;
+  reception_date: string | null;
+  allocation_basis: import("./comex").Basis;
+  vat_ppm: number | null;
+  vat_recoverable: boolean;
+  fob_minor: number | null;
+  landed_total_clp: number | null;
+  estimated_landed_clp: number | null;
+  estimated_at: string | null;
+  notes: string | null;
+  void_reason: string | null;
+  created_at: string;
+  items: ImportItemRow[];
+  costs: ImportCost[];
+  calc: import("./comex").LandedResult;
+  has_estimates: boolean;
+  editable: boolean;
+  receivable: boolean;
+  stage_history: StageChange[];
+  eta_history: EtaChange[];
+  receipts: { number: string; date: string }[];
+  incoterm_info: IncotermDef | null;
+  timeline: { at: string; text: string }[];
+}
+export interface ImportItemInput {
+  product_uid: string | null;
+  description: string;
+  qty_milli: number;
+  unit_price_minor: number;
+  weight_g: number | null;
+  volume_cm3: number | null;
+  duty_ppm: number | null;
+  hs_code: string | null;
+}
+export interface ImportInput {
+  supplier_uid: string | null;
+  incoterm: string | null;
+  transport_mode: TransportMode | null;
+  origin_country: string | null;
+  origin_port: string | null;
+  destination_port: string | null;
+  currency_code: string;
+  rate_e6: number | null;
+  purchase_date: string | null;
+  production_eta: string | null;
+  shipment_date: string | null;
+  eta: string | null;
+  arrival_date: string | null;
+  allocation_basis: import("./comex").Basis;
+  vat_ppm: number | null;
+  vat_recoverable: boolean;
+  notes: string | null;
+  items: ImportItemInput[];
+}
+export interface ImportCostInput {
+  kind: import("./comex").CostKind;
+  description: string | null;
+  supplier_uid: string | null;
+  currency_code: string;
+  amount_minor: number;
+  rate_e6: number | null;
+  is_estimate: boolean;
+  recoverable_tax: boolean;
+  allocation_basis: import("./comex").Basis | null;
+  document_ref: string | null;
+  cost_date: string | null;
+  /** Solo costos reales. */
+  payment: "por_pagar" | "pagado" | "no_registrar" | null;
+  due_date: string | null;
+  paid_method: string | null;
+  paid_account_uid: string | null;
+}
+export interface ImportReceiveLine { item_id: number; qty_milli: number }
+
 /* ───── Dashboard ───── */
 
 export interface Dashboard {

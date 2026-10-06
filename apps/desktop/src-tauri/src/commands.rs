@@ -1,6 +1,7 @@
 //! Comandos IPC: capa delgada sobre `nucleo-app`. Aquí no hay reglas de negocio ni permisos:
 //! cada caso de uso de `nucleo-app` verifica el permiso de quien opera y audita.
 
+use nucleo_app::comex_ops::{ImportCostInput, ImportDetail, ImportInput, ImportReceiveLine};
 use nucleo_app::company::BackupDone;
 use nucleo_app::core_ops::{
     BusinessPatch, BusinessSettings, CurrentUser, EntityRef, NewUser, SecuritySettings, UserPatch,
@@ -14,6 +15,7 @@ use nucleo_app::inventory_ops::{
     StockDocDone, TransferInput,
 };
 use nucleo_app::nucleo_db::audit::{AuditRow, ChainReport};
+use nucleo_app::nucleo_db::comex::{ImportSummary, IncotermRow};
 use nucleo_app::nucleo_db::core::{AttachmentRow, CurrencyRow, RateRow, SearchHit, SequenceRow};
 use nucleo_app::nucleo_db::customers::CustomerRow;
 use nucleo_app::nucleo_db::finance::{AccountRow, CategoryRow, LedgerRow, RecurringRow};
@@ -935,4 +937,135 @@ pub fn money_calendar(state: State<'_, AppState>, days: i64) -> CmdResult<Vec<Ca
 #[tauri::command]
 pub fn dashboard(state: State<'_, AppState>) -> CmdResult<DashboardData> {
     with_session(&state, |s| Ok(s.dashboard()?))
+}
+
+/* ───────────────────────────── Fase 9: COMEX ───────────────────────────── */
+
+#[tauri::command]
+pub fn incoterms(state: State<'_, AppState>) -> CmdResult<Vec<IncotermRow>> {
+    with_session(&state, |s| Ok(s.incoterms()?))
+}
+
+#[tauri::command]
+pub fn list_imports(
+    state: State<'_, AppState>,
+    view: String,
+    query: String,
+) -> CmdResult<Vec<ImportSummary>> {
+    with_session(&state, |s| Ok(s.list_imports(&view, &query)?))
+}
+
+#[tauri::command]
+pub fn import(state: State<'_, AppState>, uid: String) -> CmdResult<ImportDetail> {
+    with_session(&state, |s| Ok(s.import(&uid)?))
+}
+
+#[tauri::command]
+pub fn save_import(
+    state: State<'_, AppState>,
+    input: ImportInput,
+    uid: Option<String>,
+) -> CmdResult<ImportDetail> {
+    with_session(&state, |s| Ok(s.save_import(&input, uid.as_deref())?))
+}
+
+#[tauri::command]
+pub fn set_import_stage(
+    state: State<'_, AppState>,
+    uid: String,
+    stage: String,
+    note: Option<String>,
+) -> CmdResult<ImportDetail> {
+    with_session(&state, |s| {
+        Ok(s.set_import_stage(&uid, &stage, note.as_deref())?)
+    })
+}
+
+#[tauri::command]
+pub fn change_import_eta(
+    state: State<'_, AppState>,
+    uid: String,
+    eta: String,
+    reason: Option<String>,
+) -> CmdResult<ImportDetail> {
+    with_session(&state, |s| {
+        Ok(s.change_import_eta(&uid, &eta, reason.as_deref())?)
+    })
+}
+
+#[tauri::command]
+pub fn add_import_cost(
+    state: State<'_, AppState>,
+    uid: String,
+    input: ImportCostInput,
+) -> CmdResult<ImportDetail> {
+    with_session(&state, |s| Ok(s.add_import_cost(&uid, &input)?))
+}
+
+#[tauri::command]
+pub fn update_import_cost(
+    state: State<'_, AppState>,
+    uid: String,
+    cost_id: i64,
+    input: ImportCostInput,
+) -> CmdResult<ImportDetail> {
+    with_session(&state, |s| Ok(s.update_import_cost(&uid, cost_id, &input)?))
+}
+
+#[tauri::command]
+pub fn remove_import_cost(
+    state: State<'_, AppState>,
+    uid: String,
+    cost_id: i64,
+    reason: Option<String>,
+) -> CmdResult<ImportDetail> {
+    with_session(&state, |s| {
+        Ok(s.remove_import_cost(&uid, cost_id, reason.as_deref())?)
+    })
+}
+
+#[tauri::command]
+pub fn pay_import_cost(
+    state: State<'_, AppState>,
+    uid: String,
+    cost_id: i64,
+    amount_minor: i64,
+    method: String,
+    date: String,
+    account_uid: Option<String>,
+) -> CmdResult<ImportDetail> {
+    with_session(&state, |s| {
+        Ok(s.pay_import_cost(
+            &uid,
+            cost_id,
+            amount_minor,
+            &method,
+            &date,
+            account_uid.as_deref(),
+        )?)
+    })
+}
+
+#[tauri::command]
+pub fn receive_import(
+    state: State<'_, AppState>,
+    uid: String,
+    lines: Vec<ImportReceiveLine>,
+    date: String,
+) -> CmdResult<ImportDetail> {
+    with_session(&state, |s| Ok(s.receive_import(&uid, &lines, &date)?))
+}
+
+#[tauri::command]
+pub fn close_import(state: State<'_, AppState>, uid: String) -> CmdResult<ImportDetail> {
+    with_session(&state, |s| Ok(s.close_import(&uid)?))
+}
+
+#[tauri::command]
+pub fn void_import(
+    state: State<'_, AppState>,
+    uid: String,
+    reason: String,
+) -> CmdResult<ImportDetail> {
+    with_session(&state, |s| Ok(s.void_import(&uid, &reason)?))
 }

@@ -7,6 +7,7 @@
 //! Regla de oro (Blueprint §5.4): este crate **no contiene valores normativos**
 //! (tasas, topes, tablas). Los recibe como parámetros desde `nucleo-rules`.
 
+pub mod comex;
 pub mod customers;
 pub mod inventory;
 pub mod money;

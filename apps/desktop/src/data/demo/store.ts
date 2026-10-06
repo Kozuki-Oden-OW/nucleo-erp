@@ -1,7 +1,7 @@
 // Backend de demostración: implementa el mismo puerto que el escritorio, con datos ficticios en memoria.
 // Sirve para el navegador (prueba de usabilidad de la Fase 3) y para desarrollar pantallas antes de
 // que exista su comando Rust. No persiste nada: al recargar la página vuelve al estado inicial.
-import { AppError, type Backend, type Feature, type FileSource, type PurchaseFilter, type SaleFilter } from "../backend";
+import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "../backend";
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
@@ -13,7 +13,10 @@ import type {
   SecuritySettings, SequenceRow, SessionInfo, Totals, UserPatch, UserRow,
   AccountInput, AccountKind, CalendarItem, DueRow, ExpenseCategory, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow,
   MoneyAccount, MoneyOverview, MoneyTransferInput, Recurring, RecurringInput,
+  EtaChange, ImportCostInput, ImportDetail, ImportInput, ImportItemRow, ImportReceiveLine, ImportStage, ImportSummary, IncotermDef, StageChange, TransportMode,
 } from "../types";
+import incotermsJson from "./incoterms.json";
+import { COST_LABEL, STAGE_LABEL, landedCost, toClp, type Basis, type CostKind, type LandedResult } from "../comex";
 import { DEMO_CATEGORIES, PROJECTION_WEEKS, agingAdd, emptyAging, methodCode, occurrences } from "./money";
 import { DEMO_PERMISSIONS, DEMO_ROLES } from "./roles";
 import { addDays, daysBetween, todayIso } from "../../lib/format";
@@ -56,6 +59,24 @@ interface GasRec {
   net: number; tax: number; total: number; status: "registrado" | "anulado"; payments: Payment[]; void_reason: string | null; notes: string | null;
   recurring_id: number | null; timeline: { at: string; text: string }[];
 }
+type ImpItemRec = ImportItemRow;
+interface ImpCostRec {
+  id: number; kind: CostKind; description: string | null; supplier_uid: string | null; currency_code: string; currency_decimals: number;
+  amount_minor: number; rate_e6: number | null; is_estimate: boolean; recoverable_tax: boolean; allocation_basis: Basis | null;
+  status: "vigente" | "anulado"; document_ref: string | null; cost_date: string | null; created_at: string;
+  payable: { due: string; amount: number; status: "abierta" | "pagada" | "anulada" } | null;
+  payments: (Payment & { status: "vigente" | "anulado" })[];
+}
+interface ImpRec {
+  uid: string; number: string; supplier_uid: string | null; incoterm: string | null; incoterm_version: string | null; transport_mode: TransportMode | null;
+  origin_country: string | null; origin_port: string | null; destination_port: string | null; currency_code: string; rate_e6: number | null;
+  stage: ImportStage; purchase_date: string | null; production_eta: string | null; shipment_date: string | null; eta: string | null;
+  arrival_date: string | null; reception_date: string | null; allocation_basis: Basis; vat_ppm: number | null; vat_recoverable: boolean;
+  fob_minor: number | null; landed_total_clp: number | null; estimated_landed_clp: number | null; estimated_at: string | null;
+  notes: string | null; void_reason: string | null; created_at: string; items: ImpItemRec[]; costs: ImpCostRec[];
+  stages: StageChange[]; etas: EtaChange[]; receipts: { number: string; date: string }[]; timeline: { at: string; text: string }[];
+}
+const INCOTERMS = incotermsJson as IncotermDef[];
 
 let uidSeq = 0;
 const uid = (p: string) => `${p}-${(++uidSeq).toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -91,6 +112,8 @@ export class DemoBackend implements Backend {
   private cats: ExpenseCategory[] = structuredClone(DEMO_CATEGORIES);
   private gastos: GasRec[] = [];
   private recs: Recurring[] = [];
+  private imps: ImpRec[] = [];
+  private impItemSeq = 0;
   private auditRows: AuditRow[] = [];
   private today = todayIso();
   private users: (UserRow & { password: string | null })[] = [];
@@ -114,6 +137,7 @@ export class DemoBackend implements Backend {
     this.seed();
     this.seedInventory();
     this.seedMoney();
+    this.seedComex();
   }
 
   private next(docType: string): string {
@@ -946,8 +970,13 @@ export class DemoBackend implements Backend {
     sold = Math.max(0, sold);
     const s = this.reorder[p.uid] ?? { safety_days: 7, target_coverage_days: 30, excess_coverage_days: 180, lead_time_days: null };
     const lead = s.lead_time_days ?? 7;
-    const inPurchase = this.pos.filter((o) => o.status === "emitida" || o.status === "parcial").reduce((a, o) => a + o.lines.filter((l) => l.product_uid === p.uid).reduce((x, l) => x + l.qty_milli - l.received_milli, 0), 0);
-    const arrivals = this.pos.filter((o) => (o.status === "emitida" || o.status === "parcial") && o.expected_date && o.lines.some((l) => l.product_uid === p.uid && l.received_milli < l.qty_milli)).map((o) => o.expected_date!).sort();
+    const liveImps = this.imps.filter((h) => !["cotizacion", "recibida", "cerrada", "anulada"].includes(h.stage));
+    const inPurchase = this.pos.filter((o) => o.status === "emitida" || o.status === "parcial").reduce((a, o) => a + o.lines.filter((l) => l.product_uid === p.uid).reduce((x, l) => x + l.qty_milli - l.received_milli, 0), 0)
+      + liveImps.reduce((a, h) => a + h.items.filter((i) => i.product_uid === p.uid).reduce((x, i) => x + i.qty_milli - i.received_milli, 0), 0);
+    const arrivals = [
+      ...this.pos.filter((o) => (o.status === "emitida" || o.status === "parcial") && o.expected_date && o.lines.some((l) => l.product_uid === p.uid && l.received_milli < l.qty_milli)).map((o) => o.expected_date!),
+      ...liveImps.filter((h) => h.eta && h.items.some((i) => i.product_uid === p.uid && i.received_milli < i.qty_milli)).map((h) => h.eta!),
+    ].sort();
     const v = days >= 14 && days > 0 ? sold / 1000 / days : null;
     const onHand = p.on_hand_milli / 1000;
     const position = onHand + inPurchase / 1000;
@@ -1137,11 +1166,14 @@ export class DemoBackend implements Backend {
     if (bad >= 0) throw new AppError("linea_invalida", `Revisa la línea ${bad + 1}: necesita descripción, cantidad mayor que cero y costo.`);
   }
   private stockIn(productUid: string | null, qty: number, costMinor: number, doc = "REC", sourceType = "OC", sourceUid: string | null = null, date = this.today): void {
+    this.stockInE4(productUid, qty, costMinor * 10_000, doc, sourceType, sourceUid, date);
+  }
+  private stockInE4(productUid: string | null, qty: number, costE4: number, doc: string, sourceType: string, sourceUid: string | null, date = this.today): void {
     const p = this.products.find((x) => x.uid === productUid);
     if (!p || p.kind !== "producto") return;
-    this.mv(p.uid, qty, "entrada", doc, sourceType, sourceUid, null, date, costMinor * 10_000);
+    this.mv(p.uid, qty, "entrada", doc, sourceType, sourceUid, null, date, costE4);
     const base = Math.max(0, p.on_hand_milli);
-    p.cost_e4 = base + qty > 0 ? Math.round((p.cost_e4 * base + costMinor * 10_000 * qty) / (base + qty)) : costMinor * 10_000;
+    p.cost_e4 = base + qty > 0 ? Math.round((p.cost_e4 * base + costE4 * qty) / (base + qty)) : costE4;
     p.on_hand_milli += qty;
   }
 
@@ -1329,6 +1361,404 @@ export class DemoBackend implements Backend {
     return wait(this.purDetail(c));
   }
 
+  /* ───────────── COMEX: carpetas de importación ───────────── */
+
+  private impDecimals(code: string): number { return code === "CLP" ? 0 : 2; }
+  private impCostClp(c: ImpCostRec, h: ImpRec): number {
+    const rate = c.rate_e6 ?? (c.currency_code === "CLP" ? 1_000_000 : c.currency_code === h.currency_code ? h.rate_e6 : null);
+    return rate ? toClp(c.amount_minor, this.impDecimals(c.currency_code), rate) : 0;
+  }
+  private impCalc(h: ImpRec): LandedResult {
+    const calc = landedCost({
+      currency_decimals: this.impDecimals(h.currency_code),
+      rate_e6: h.rate_e6 ?? (h.currency_code === "CLP" ? 1_000_000 : 0),
+      basis: h.allocation_basis, vat_ppm: h.vat_ppm, vat_recoverable: h.vat_recoverable,
+      items: h.items.map((i) => ({ qty_milli: i.qty_milli, unit_price_minor: i.unit_price_minor, weight_g: i.weight_g, volume_cm3: i.volume_cm3, duty_ppm: i.duty_ppm })),
+      costs: h.costs.filter((c) => c.status === "vigente").map((c) => ({ kind: c.kind, amount_clp: this.impCostClp(c, h), basis: c.allocation_basis, recoverable: c.recoverable_tax })),
+    });
+    for (const c of h.costs) if (c.status === "vigente" && c.amount_minor > 0 && this.impCostClp(c, h) === 0) calc.notes.push(`${COST_LABEL[c.kind]} en ${c.currency_code} no tiene tipo de cambio: no se sumó.`);
+    return calc;
+  }
+  private findImp(u: string): ImpRec {
+    const h = this.imps.find((x) => x.uid === u);
+    if (!h) throw new AppError("no_encontrado", "No encontramos esa importación.");
+    return h;
+  }
+  private impDetail(h: ImpRec): ImportDetail {
+    const calc = this.impCalc(h);
+    const open = h.stage !== "cerrada" && h.stage !== "anulada";
+    const { items, costs, stages, etas, receipts, timeline, ...head } = h;
+    return {
+      ...head,
+      supplier_name: h.supplier_uid ? this.supplierName(h.supplier_uid) : null,
+      currency_decimals: this.impDecimals(h.currency_code),
+      items,
+      costs: costs.map((c) => ({
+        ...c, supplier_name: c.supplier_uid ? this.supplierName(c.supplier_uid) : null, amount_clp: this.impCostClp(c, h),
+        payable_due: c.payable && c.payable.status !== "anulada" ? c.payable.due : null,
+        payable_amount_minor: c.payable && c.payable.status !== "anulada" ? c.payable.amount : null,
+        payable_paid_minor: c.payable && c.payable.status !== "anulada" ? this.paidOf(c.payments.filter((p) => p.status === "vigente")) : null,
+        payments: c.payments.filter((p) => p.status === "vigente").map(({ status: _s, ...p }) => p),
+      })),
+      calc,
+      has_estimates: costs.some((c) => c.status === "vigente" && c.is_estimate),
+      editable: open && h.stage !== "recibida" && !items.some((i) => i.received_milli > 0),
+      receivable: open && h.stage !== "cotizacion" && items.some((i) => i.product_uid && i.received_milli < i.qty_milli),
+      stage_history: stages, eta_history: etas, receipts,
+      incoterm_info: (INCOTERMS as IncotermDef[]).find((x) => x.code === h.incoterm) ?? null,
+      timeline,
+    };
+  }
+  private impLog(h: ImpRec, text: string, action = "importacion.editar"): void {
+    h.timeline.push({ at: now(), text });
+    this.log(action, "importacion", h.number);
+  }
+  private impStage(h: ImpRec, stage: ImportStage, note: string | null = null): void {
+    h.stages.push({ from_stage: h.stage, to_stage: stage, changed_at: now(), changed_by: this.me().display_name, note });
+    h.stage = stage;
+  }
+  private impItems(input: ImportInput): ImpItemRec[] {
+    if (!input.items.length) throw new AppError("validacion", "Agrega al menos un producto a la importación.");
+    return input.items.map((it, i) => {
+      if (!it.description.trim()) throw new AppError("validacion", `Línea ${i + 1}: escribe la descripción del producto.`);
+      if (!(it.qty_milli > 0)) throw new AppError("validacion", `Línea ${i + 1}: la cantidad debe ser mayor que cero.`);
+      if (it.unit_price_minor < 0) throw new AppError("validacion", `Línea ${i + 1}: el precio no es válido.`);
+      if (it.duty_ppm != null && (it.duty_ppm < 0 || it.duty_ppm > 1_000_000)) throw new AppError("validacion", `Línea ${i + 1}: el arancel debe estar entre 0 % y 100 %.`);
+      const p = it.product_uid ? this.products.find((x) => x.uid === it.product_uid) : null;
+      return { id: ++this.impItemSeq, product_uid: p?.uid ?? null, sku: p?.sku ?? null, description: it.description.trim(), qty_milli: it.qty_milli, received_milli: 0, unit_price_minor: it.unit_price_minor, weight_g: it.weight_g, volume_cm3: it.volume_cm3, duty_ppm: it.duty_ppm, hs_code: it.hs_code?.trim() || null, landed_unit_cost_e4: null, estimated_unit_cost_e4: null };
+    });
+  }
+  private impHeader(input: ImportInput) {
+    if (input.incoterm && !(INCOTERMS as IncotermDef[]).some((x) => x.code === input.incoterm)) throw new AppError("validacion", `El Incoterm ${input.incoterm} no está en la guía.`);
+    if (input.rate_e6 != null && input.rate_e6 <= 0) throw new AppError("validacion", "El tipo de cambio no es válido.");
+    if (input.supplier_uid) this.findSupplier(input.supplier_uid);
+    const t = (v: string | null) => v?.trim() || null;
+    return {
+      supplier_uid: input.supplier_uid || null, incoterm: input.incoterm || null, incoterm_version: input.incoterm ? "2020" : null,
+      transport_mode: input.transport_mode || null, origin_country: t(input.origin_country), origin_port: t(input.origin_port),
+      destination_port: t(input.destination_port), currency_code: input.currency_code, rate_e6: input.rate_e6,
+      purchase_date: input.purchase_date || null, production_eta: input.production_eta || null, shipment_date: input.shipment_date || null,
+      arrival_date: input.arrival_date || null, allocation_basis: input.allocation_basis, vat_ppm: input.vat_ppm,
+      vat_recoverable: input.vat_recoverable, notes: t(input.notes),
+    };
+  }
+  private impSetEta(h: ImpRec, eta: string, reason: string | null): boolean {
+    if (h.eta === eta) return false;
+    h.etas.push({ old_eta: h.eta, new_eta: eta, reason, changed_at: now(), changed_by: this.me().display_name });
+    h.eta = eta;
+    return true;
+  }
+
+  async incoterms(): Promise<IncotermDef[]> { this.require("comex.ver"); return wait(INCOTERMS as IncotermDef[]); }
+  async listImports(view: ImportView, query: string): Promise<ImportSummary[]> {
+    this.require("comex.ver");
+    const q = norm(query.trim());
+    const rows = this.imps.filter((h) => {
+      const okView = view === "en_curso" ? !["cotizacion", "cerrada", "anulada"].includes(h.stage) : view === "cotizaciones" ? h.stage === "cotizacion" : view === "cerradas" ? h.stage === "cerrada" : view === "anuladas" ? h.stage === "anulada" : true;
+      return okView && (!q || norm(`${h.number} ${h.supplier_uid ? this.supplierName(h.supplier_uid) : ""} ${h.notes ?? ""} ${h.items.map((i) => i.description).join(" ")}`).includes(q));
+    }).map((h): ImportSummary => {
+      const first = h.etas[0];
+      const base = first ? first.old_eta ?? first.new_eta : null;
+      return {
+        uid: h.uid, number: h.number, supplier_name: h.supplier_uid ? this.supplierName(h.supplier_uid) : null, stage: h.stage, incoterm: h.incoterm,
+        transport_mode: h.transport_mode, currency_code: h.currency_code, fob_minor: h.fob_minor ?? this.impCalc(h).fob_minor, eta: h.eta,
+        eta_changes: h.etas.filter((e) => e.old_eta).length, eta_shift_days: base && h.eta ? daysBetween(base, h.eta) : 0,
+        landed_total_clp: h.landed_total_clp, estimated_landed_clp: h.estimated_landed_clp, items: h.items.length, created_at: h.created_at,
+      };
+    });
+    const closed = (s: ImportStage) => (s === "cerrada" || s === "anulada" ? 1 : 0);
+    return wait(rows.sort((a, b) => closed(a.stage) - closed(b.stage) || (a.eta ?? "9999").localeCompare(b.eta ?? "9999") || b.number.localeCompare(a.number)));
+  }
+  async import(u: string): Promise<ImportDetail> { this.require("comex.ver"); return wait(this.impDetail(this.findImp(u))); }
+  async saveImport(input: ImportInput, u?: string): Promise<ImportDetail> {
+    this.require("comex.editar");
+    const head = this.impHeader(input);
+    const items = this.impItems(input);
+    if (u) {
+      const h = this.findImp(u);
+      if (!this.impDetail(h).editable) throw new AppError("estado", "Esta importación ya tiene mercadería recibida o está cerrada: solo puedes cambiar costos.");
+      for (const it of items) { const prev = h.items.find((o) => o.product_uid && o.product_uid === it.product_uid); if (prev) it.estimated_unit_cost_e4 = prev.estimated_unit_cost_e4; }
+      Object.assign(h, head, { items });
+      if (input.eta) this.impSetEta(h, input.eta, null);
+      this.impLog(h, "Datos de la importación actualizados");
+      return wait(this.impDetail(h));
+    }
+    const h: ImpRec = {
+      uid: uid("imp"), number: this.next("IMP"), ...head, stage: "cotizacion", eta: input.eta || null, reception_date: null, fob_minor: null,
+      landed_total_clp: null, estimated_landed_clp: null, estimated_at: null, void_reason: null, created_at: now(), items, costs: [], stages: [], etas: [], receipts: [], timeline: [],
+    };
+    this.imps.push(h);
+    this.impLog(h, `${h.number} creada como cotización`, "importacion.crear");
+    return wait(this.impDetail(h));
+  }
+  async setImportStage(u: string, stage: ImportStage, note?: string): Promise<ImportDetail> {
+    this.require("comex.editar");
+    const h = this.findImp(u);
+    if (stage === "recibida") throw new AppError("estado", "Para pasar a Recibida, registra la recepción de la mercadería.");
+    if (stage === "cerrada") throw new AppError("estado", "Usa “Cerrar importación” para fijar el costo final.");
+    if (stage === "anulada") throw new AppError("estado", "Usa “Anular” e indica el motivo.");
+    if (["recibida", "cerrada", "anulada"].includes(h.stage)) throw new AppError("estado", "La importación ya no cambia de etapa.");
+    if (h.items.some((i) => i.received_milli > 0)) throw new AppError("estado", "Ya se recibió mercadería: completa la recepción.");
+    if (h.stage === stage) return wait(this.impDetail(h));
+    const leaving = h.stage === "cotizacion";
+    if (leaving && !h.rate_e6 && h.currency_code !== "CLP") throw new AppError("validacion", "Indica el tipo de cambio antes de confirmar la importación.");
+    const calc = this.impCalc(h);
+    this.impStage(h, stage, note?.trim() || null);
+    if (stage === "ordenada") h.purchase_date ??= this.today;
+    if (stage === "embarcada" || stage === "en_transito") h.shipment_date ??= this.today;
+    if (["arribada", "internacion", "transporte_local"].includes(stage)) h.arrival_date ??= this.today;
+    let text = `Etapa: ${STAGE_LABEL[stage]}${note?.trim() ? ` · ${note.trim()}` : ""}`;
+    if (leaving && h.estimated_landed_clp === null) {
+      h.estimated_landed_clp = calc.landed_clp; h.estimated_at = now();
+      h.items.forEach((it, i) => { it.estimated_unit_cost_e4 = calc.items[i]!.unit_cost_e4; });
+      text += " · se guardó el costo estimado para compararlo al cerrar";
+    }
+    this.impLog(h, text, "importacion.etapa");
+    return wait(this.impDetail(h));
+  }
+  async changeImportEta(u: string, eta: string, reason?: string): Promise<ImportDetail> {
+    this.require("comex.editar");
+    const h = this.findImp(u);
+    if (["recibida", "cerrada", "anulada"].includes(h.stage)) throw new AppError("estado", "La mercadería ya llegó: la ETA no cambia.");
+    if (h.eta && !reason?.trim()) throw new AppError("validacion", "Indica por qué cambió la fecha de llegada (queda en el historial).");
+    const old = h.eta;
+    if (this.impSetEta(h, eta, reason?.trim() || null)) this.impLog(h, old ? `ETA cambió de ${old} a ${eta}: ${reason!.trim()}` : `ETA: ${eta}`, "importacion.eta");
+    return wait(this.impDetail(h));
+  }
+  private impCostRec(h: ImpRec, input: ImportCostInput, id: number): ImpCostRec {
+    if (!(input.amount_minor > 0)) throw new AppError("monto", "El monto debe ser mayor que cero.");
+    if (input.currency_code !== "CLP" && input.currency_code !== h.currency_code && !input.rate_e6) throw new AppError("validacion", `Indica el tipo de cambio de ${input.currency_code} para este costo.`);
+    if (input.supplier_uid) this.findSupplier(input.supplier_uid);
+    return {
+      id, kind: input.kind, description: input.description?.trim() || null, supplier_uid: input.supplier_uid || null, currency_code: input.currency_code,
+      currency_decimals: this.impDecimals(input.currency_code), amount_minor: input.amount_minor, rate_e6: input.rate_e6, is_estimate: input.is_estimate,
+      recoverable_tax: input.recoverable_tax, allocation_basis: input.allocation_basis, status: "vigente", document_ref: input.document_ref?.trim() || null,
+      cost_date: input.cost_date || null, created_at: now(), payable: null, payments: [],
+    };
+  }
+  async addImportCost(u: string, input: ImportCostInput): Promise<ImportDetail> {
+    this.require("comex.editar");
+    const h = this.findImp(u);
+    if (h.stage === "cerrada" || h.stage === "anulada") throw new AppError("estado", "La importación está cerrada.");
+    const c = this.impCostRec(h, input, ++this.impItemSeq);
+    const payment = input.is_estimate ? "no_registrar" : input.payment ?? "no_registrar";
+    if (payment !== "no_registrar") this.require("dinero.registrar");
+    const clp = this.impCostClp(c, h);
+    let text = `${input.is_estimate ? "Costo estimado" : "Costo real"} ${COST_LABEL[c.kind].toLowerCase()}: ${c.description ?? COST_LABEL[c.kind]}`;
+    if (payment !== "no_registrar") {
+      if (clp <= 0) throw new AppError("validacion", "Falta el tipo de cambio para llevar este costo a Dinero.");
+      const date = c.cost_date ?? this.today;
+      c.payable = { due: input.due_date || date, amount: clp, status: "abierta" };
+      if (payment === "pagado") {
+        if (!input.paid_method) throw new AppError("validacion", "Indica el medio de pago.");
+        const acc = this.accountFor(input.paid_account_uid, input.paid_method);
+        const pnum = this.next("EGR");
+        this.payAcc[pnum] = acc;
+        c.payments.push({ number: pnum, date, amount_minor: clp, method: input.paid_method, status: "vigente" });
+        c.payable.status = "pagada";
+        text += ` · pagado (${input.paid_method}) · ${pnum}`;
+      } else text += ` · queda en Dinero que debes (vence ${c.payable.due})`;
+    }
+    h.costs.push(c);
+    this.impLog(h, text, "importacion.costo");
+    return wait(this.impDetail(h));
+  }
+  async updateImportCost(u: string, costId: number, input: ImportCostInput): Promise<ImportDetail> {
+    this.require("comex.editar");
+    const h = this.findImp(u);
+    const i = h.costs.findIndex((c) => c.id === costId);
+    const cur = h.costs[i];
+    if (!cur) throw new AppError("no_encontrado", "No encontramos ese costo.");
+    if (cur.status !== "vigente" || cur.payable) throw new AppError("estado", "Este costo ya está en Dinero: anúlalo y regístralo de nuevo.");
+    h.costs[i] = { ...this.impCostRec(h, input, costId), created_at: cur.created_at };
+    this.impLog(h, `${COST_LABEL[input.kind]} actualizado${cur.is_estimate && !input.is_estimate ? ": ahora es el monto real" : ""}`, "importacion.costo");
+    return wait(this.impDetail(h));
+  }
+  async removeImportCost(u: string, costId: number, reason?: string): Promise<ImportDetail> {
+    this.require("comex.editar");
+    const h = this.findImp(u);
+    const cur = h.costs.find((c) => c.id === costId && c.status === "vigente");
+    if (!cur) throw new AppError("no_encontrado", "No encontramos ese costo.");
+    if (cur.is_estimate) { h.costs = h.costs.filter((c) => c !== cur); this.impLog(h, `Estimado quitado: ${COST_LABEL[cur.kind]}`, "importacion.costo"); }
+    else {
+      if (!reason?.trim()) throw new AppError("motivo", "Escribe el motivo: los costos reales se anulan, no se borran.");
+      cur.status = "anulado";
+      const paid = cur.payments.some((p) => p.status === "vigente");
+      cur.payments.forEach((p) => { p.status = "anulado"; });
+      if (cur.payable) cur.payable.status = "anulada";
+      this.impLog(h, `Costo anulado: ${COST_LABEL[cur.kind]} · ${reason.trim()}${paid ? " · sus pagos se anularon y el dinero vuelve a la cuenta" : ""}`, "importacion.costo");
+    }
+    return wait(this.impDetail(h));
+  }
+  async payImportCost(u: string, costId: number, amount: number, method: string, date: string, accountUid?: string): Promise<ImportDetail> {
+    this.require("dinero.registrar");
+    const h = this.findImp(u);
+    const c = h.costs.find((x) => x.id === costId && x.status === "vigente");
+    if (!c?.payable || c.payable.status !== "abierta") throw new AppError("estado", "Este costo no tiene saldo por pagar.");
+    const due = c.payable.amount - this.paidOf(c.payments.filter((p) => p.status === "vigente"));
+    if (amount <= 0 || amount > due) throw new AppError("monto", "El monto debe ser mayor que cero y no superar el saldo.");
+    const acc = this.accountFor(accountUid, method);
+    const pnum = this.next("EGR");
+    this.payAcc[pnum] = acc;
+    c.payments.push({ number: pnum, date, amount_minor: amount, method, status: "vigente" });
+    if (amount === due) c.payable.status = "pagada";
+    this.impLog(h, `${amount === due ? "Pago final" : "Abono"} de ${COST_LABEL[c.kind].toLowerCase()} (${method}) · ${pnum}`, "importacion.pagar");
+    return wait(this.impDetail(h));
+  }
+  async receiveImport(u: string, lines: ImportReceiveLine[], date: string): Promise<ImportDetail> {
+    this.require("comex.editar");
+    const h = this.findImp(u);
+    const d = this.impDetail(h);
+    if (!d.receivable) throw new AppError("estado", h.stage === "cotizacion" ? "Confirma la importación (pásala a Ordenada) antes de recibir." : "No hay mercadería pendiente de recibir.");
+    if (!h.supplier_uid) throw new AppError("validacion", "Indica el proveedor de la importación antes de recibir.");
+    const plan: [ImpItemRec, number, number][] = [];
+    h.items.forEach((it, i) => {
+      if (!it.product_uid) return;
+      const pending = it.qty_milli - it.received_milli;
+      const l = lines.length ? lines.find((x) => x.item_id === it.id) : { item_id: it.id, qty_milli: pending };
+      if (!l) return;
+      if (l.qty_milli < 0 || l.qty_milli > pending) throw new AppError("validacion", `${it.description}: puedes recibir hasta lo pendiente.`);
+      if (l.qty_milli > 0) plan.push([it, l.qty_milli, d.calc.items[i]!.unit_cost_e4]);
+    });
+    if (!plan.length) throw new AppError("validacion", "Indica qué cantidades llegaron.");
+    const rnum = this.next("REC");
+    for (const [it, qty, cost] of plan) { it.received_milli += qty; this.stockInE4(it.product_uid, qty, cost, rnum, "IMP", h.uid, date); }
+    h.receipts.push({ number: rnum, date });
+    h.fob_minor = d.calc.fob_minor; h.landed_total_clp = d.calc.landed_clp;
+    h.items.forEach((it, i) => { it.landed_unit_cost_e4 = d.calc.items[i]!.unit_cost_e4; });
+    const complete = h.items.filter((i) => i.product_uid).every((i) => i.received_milli >= i.qty_milli);
+    if (complete) { this.impStage(h, "recibida", rnum); h.reception_date = date; }
+    this.impLog(h, `${complete ? "Mercadería recibida completa" : "Recepción parcial"} (${rnum}): stock y costo promedio actualizados al costo puesto en bodega${d.has_estimates ? " · incluye costos estimados" : ""}`, "importacion.recibir");
+    return wait(this.impDetail(h));
+  }
+  async closeImport(u: string): Promise<ImportDetail> {
+    this.require("comex.editar");
+    const h = this.findImp(u);
+    const d = this.impDetail(h);
+    if (h.stage !== "recibida") throw new AppError("estado", "Solo se cierra una importación recibida completa.");
+    if (d.has_estimates) throw new AppError("estado", "Quedan costos estimados: reemplázalos por los montos reales (o quítalos) antes de cerrar.");
+    h.landed_total_clp = d.calc.landed_clp;
+    h.items.forEach((it, i) => { it.landed_unit_cost_e4 = d.calc.items[i]!.unit_cost_e4; });
+    this.impStage(h, "cerrada");
+    const diff = h.estimated_landed_clp === null ? null : d.calc.landed_clp - h.estimated_landed_clp;
+    const fmt = (n: number) => new Intl.NumberFormat("es-CL").format(n);
+    this.impLog(h, `Cerrada: costo final $${fmt(d.calc.landed_clp)}${diff === null ? "" : ` · estimado $${fmt(h.estimated_landed_clp!)} · diferencia ${diff < 0 ? "−" : "+"}$${fmt(Math.abs(diff))}`}`, "importacion.cerrar");
+    return wait(this.impDetail(h));
+  }
+  async voidImport(u: string, reason: string): Promise<ImportDetail> {
+    this.require("comex.editar");
+    const h = this.findImp(u);
+    if (!reason.trim()) throw new AppError("motivo", "Escribe el motivo de la anulación.");
+    if (h.stage === "anulada") throw new AppError("estado", "La importación ya está anulada.");
+    if (h.items.some((i) => i.received_milli > 0)) throw new AppError("estado", "Ya se recibió mercadería: no se puede anular (corrige con un ajuste de inventario).");
+    let paid = false;
+    for (const c of h.costs.filter((x) => x.status === "vigente" && !x.is_estimate)) {
+      c.status = "anulado"; if (c.payable) c.payable.status = "anulada";
+      c.payments.forEach((p) => { if (p.status === "vigente") paid = true; p.status = "anulado"; });
+    }
+    h.void_reason = reason.trim();
+    this.impStage(h, "anulada", reason.trim());
+    this.impLog(h, `Anulada: ${reason.trim()}${paid ? " · los pagos de sus costos se anularon" : ""}`, "importacion.anular");
+    return wait(this.impDetail(h));
+  }
+
+  private seedComex(): void {
+    const t = this.today;
+    const duty = reglas.values.find((v) => v.code === "ARANCEL_GENERAL_PPM")?.value ?? null;
+    const sup: Supplier = { id: this.suppliers.length + 1, uid: "sup-ningbo", rut: null, name: "Ningbo Power Tools Co., Ltd. (ficticio)", email: "sales@ejemplo.cn", phone: null, payment_terms_days: 0, created_at: `${addDays(t, -120)}T12:00:00Z` };
+    const fwd: Supplier = { id: this.suppliers.length + 2, uid: "sup-fwd", rut: "77.111.222-3", name: "Transportes y Aduanas Ejemplo Ltda.", email: null, phone: null, payment_terms_days: 30, created_at: `${addDays(t, -120)}T12:00:00Z` };
+    this.suppliers.push(sup, fwd);
+    const p = (sku: string) => this.products.find((x) => x.sku === sku)!;
+    const item = (sku: string, qty: number, priceCents: number, w: number): ImpItemRec => {
+      const x = p(sku);
+      return { id: ++this.impItemSeq, product_uid: x.uid, sku: x.sku, description: x.name, qty_milli: qty * 1000, received_milli: 0, unit_price_minor: priceCents, weight_g: w, volume_cm3: null, duty_ppm: duty, hs_code: null, landed_unit_cost_e4: null, estimated_unit_cost_e4: null };
+    };
+    const cost = (kind: CostKind, amount: number, currency: string, estimate: boolean, extra: Partial<ImpCostRec> = {}): ImpCostRec => ({
+      id: ++this.impItemSeq, kind, description: null, supplier_uid: null, currency_code: currency, currency_decimals: this.impDecimals(currency), amount_minor: amount,
+      rate_e6: null, is_estimate: estimate, recoverable_tax: false, allocation_basis: null, status: "vigente", document_ref: null, cost_date: null,
+      created_at: now(), payable: null, payments: [], ...extra,
+    });
+    const base = (n: string, stage: ImportStage, extra: Partial<ImpRec>): ImpRec => ({
+      uid: `imp-${n}`, number: this.next("IMP"), supplier_uid: sup.uid, incoterm: "FOB", incoterm_version: "2020", transport_mode: "maritimo", origin_country: "China",
+      origin_port: "Ningbo", destination_port: "San Antonio", currency_code: "USD", rate_e6: 945_000_000, stage, purchase_date: null, production_eta: null,
+      shipment_date: null, eta: null, arrival_date: null, reception_date: null, allocation_basis: "valor", vat_ppm: TAX_PPM, vat_recoverable: true, fob_minor: null,
+      landed_total_clp: null, estimated_landed_clp: null, estimated_at: null, notes: null, void_reason: null, created_at: now(), items: [], costs: [], stages: [], etas: [],
+      receipts: [], timeline: [], ...extra,
+    });
+    const at = (d: number) => `${addDays(t, d)}T15:00:00Z`;
+    const step = (h: ImpRec, to: ImportStage, d: number, note: string | null = null) => { h.stages.push({ from_stage: h.stage, to_stage: to, changed_at: at(d), changed_by: "Dueño", note }); h.stage = to; h.timeline.push({ at: at(d), text: `Etapa: ${STAGE_LABEL[to]}${note ? ` · ${note}` : ""}` }); };
+
+    // 1) Cerrada hace un mes: costos reales, estimado vs. real.
+    const c1 = base("c1", "cotizacion", { rate_e6: 938_500_000, purchase_date: addDays(t, -95), shipment_date: addDays(t, -80), arrival_date: addDays(t, -42), reception_date: addDays(t, -38) });
+    c1.items = [item("CAB-25", 500, 30, 30), item("AMP-LED", 100, 70, 50)];
+    c1.timeline.push({ at: at(-100), text: `${c1.number} creada como cotización` });
+    c1.costs = [cost("flete", 16_000, "USD", true), cost("seguro", 4_000, "CLP", true), cost("agente_aduana", 85_000, "CLP", true), cost("transporte_interno", 30_000, "CLP", true)];
+    c1.eta = addDays(t, -45);
+    let calc = this.impCalc(c1);
+    c1.estimated_landed_clp = calc.landed_clp; c1.estimated_at = at(-96);
+    c1.items.forEach((it, i) => { it.estimated_unit_cost_e4 = calc.items[i]!.unit_cost_e4; });
+    step(c1, "ordenada", -96, "Pedido confirmado · se guardó el costo estimado"); step(c1, "embarcada", -80); step(c1, "arribada", -42);
+    c1.etas.push({ old_eta: addDays(t, -45), new_eta: addDays(t, -42), reason: "Congestión en puerto de destino", changed_at: at(-50), changed_by: "Dueño" });
+    c1.eta = addDays(t, -42);
+    const real = (k: CostKind, amount: number, currency: string, d: number, ref: string | null, supplier: string | null) => {
+      const x = cost(k, amount, currency, false, { supplier_uid: supplier, document_ref: ref, cost_date: addDays(t, d) });
+      const clp = this.impCostClp(x, c1);
+      const pnum = this.next("EGR");
+      x.payable = { due: addDays(t, d), amount: clp, status: "pagada" };
+      x.payments = [{ number: pnum, date: addDays(t, d + 2), amount_minor: clp, method: "Transferencia", status: "vigente" }];
+      this.payAcc[pnum] = "cta-banco";
+      return x;
+    };
+    c1.costs = [
+      real("flete", 17_250, "USD", -82, "BL-88213", fwd.uid), real("seguro", 4_100, "CLP", -82, null, fwd.uid),
+      real("derechos", 23_480, "CLP", -41, "DIN 51234", null), real("iva_importacion", 78_350, "CLP", -41, "DIN 51234", null),
+      real("agente_aduana", 92_000, "CLP", -40, "F-4410", fwd.uid), real("transporte_interno", 28_500, "CLP", -39, null, fwd.uid),
+    ];
+    c1.costs.find((c) => c.kind === "iva_importacion")!.recoverable_tax = true;
+    calc = this.impCalc(c1);
+    const rnum = this.next("REC");
+    c1.items.forEach((it, i) => {
+      it.received_milli = it.qty_milli; it.landed_unit_cost_e4 = calc.items[i]!.unit_cost_e4;
+      // El stock recibido ya está en el stock actual de la demostración: se descuenta del inicial.
+      const init = this.moves.find((m) => m.product_uid === it.product_uid && m.kind === "inicial");
+      if (init) init.qty -= it.qty_milli;
+      this.moves.push({ id: this.moves.length + 1, date: addDays(t, -38), product_uid: it.product_uid!, wh: "wh-principal", kind: "entrada", document: rnum, source_type: "IMP", source_uid: c1.uid, qty: it.qty_milli, cost_e4: calc.items[i]!.unit_cost_e4, reason: null });
+    });
+    this.moves.sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id);
+    c1.receipts = [{ number: rnum, date: addDays(t, -38) }];
+    c1.fob_minor = calc.fob_minor; c1.landed_total_clp = calc.landed_clp;
+    step(c1, "recibida", -38, rnum); step(c1, "cerrada", -30);
+    const fmt = (n: number) => new Intl.NumberFormat("es-CL").format(n);
+    const diff = calc.landed_clp - c1.estimated_landed_clp;
+    c1.timeline.push({ at: at(-30), text: `Cerrada: costo final $${fmt(calc.landed_clp)} · estimado $${fmt(c1.estimated_landed_clp)} · diferencia ${diff < 0 ? "−" : "+"}$${fmt(Math.abs(diff))}` });
+
+    // 2) En tránsito: la ETA cambió dos veces; flete real por pagar y el resto estimado.
+    const c2 = base("c2", "cotizacion", { rate_e6: 951_200_000, purchase_date: addDays(t, -40), shipment_date: addDays(t, -12), notes: "Reposición de temporada alta" });
+    c2.items = [item("TAL-18V", 60, 2_150, 2_300), item("ATO-SET", 150, 310, 650), item("ESC-5", 12, 3_600, 9_500)];
+    c2.timeline.push({ at: at(-45), text: `${c2.number} creada como cotización` });
+    c2.costs = [cost("flete", 85_000, "USD", true), cost("seguro", 24_000, "CLP", true), cost("agente_aduana", 175_000, "CLP", true), cost("gastos_portuarios", 140_000, "CLP", true), cost("transporte_interno", 110_000, "CLP", true)];
+    c2.eta = addDays(t, 9);
+    calc = this.impCalc(c2);
+    c2.estimated_landed_clp = calc.landed_clp; c2.estimated_at = at(-40);
+    c2.items.forEach((it, i) => { it.estimated_unit_cost_e4 = calc.items[i]!.unit_cost_e4; });
+    step(c2, "ordenada", -40, "Pedido confirmado · se guardó el costo estimado"); step(c2, "pagada", -38, "Pago 100 % por transferencia"); step(c2, "produccion", -36); step(c2, "embarcada", -12); step(c2, "en_transito", -11);
+    c2.etas.push({ old_eta: addDays(t, 9), new_eta: addDays(t, 14), reason: "Naviera omitió escala (blank sailing)", changed_at: at(-20), changed_by: "Dueño" });
+    c2.etas.push({ old_eta: addDays(t, 14), new_eta: addDays(t, 18), reason: "Transbordo en Callao", changed_at: at(-6), changed_by: "Dueño" });
+    c2.eta = addDays(t, 18);
+    c2.timeline.push({ at: at(-20), text: `ETA cambió de ${addDays(t, 9)} a ${addDays(t, 14)}: Naviera omitió escala (blank sailing)` }, { at: at(-6), text: `ETA cambió de ${addDays(t, 14)} a ${addDays(t, 18)}: Transbordo en Callao` });
+    const flete = c2.costs[0]!;
+    Object.assign(flete, { is_estimate: false, amount_minor: 92_000, supplier_uid: fwd.uid, document_ref: "BL-90551", cost_date: addDays(t, -12) });
+    flete.payable = { due: addDays(t, 18), amount: this.impCostClp(flete, c2), status: "abierta" };
+    c2.timeline.push({ at: at(-12), text: "Costo real flete internacional · queda en Dinero que debes" });
+
+    // 3) Cotización aérea en evaluación.
+    const c3 = base("c3", "cotizacion", { incoterm: "FCA", transport_mode: "aereo", origin_port: "Shenzhen", destination_port: "Santiago (SCL)", rate_e6: 951_200_000, allocation_basis: "peso", notes: "Comparar contra envío marítimo" });
+    c3.items = [item("FOC-LED", 80, 1_150, 1_400), item("AMP-LED", 400, 95, 60)];
+    c3.costs = [cost("flete", 98_000, "USD", true), cost("agente_aduana", 120_000, "CLP", true), cost("transporte_interno", 45_000, "CLP", true)];
+    c3.timeline.push({ at: at(-3), text: `${c3.number} creada como cotización` });
+    this.imps.push(c1, c2, c3);
+  }
+
   /* ───────────── Dinero ───────────── */
 
   private accountFor(accountUid: string | null | undefined, method: string): string {
@@ -1353,6 +1783,7 @@ export class DemoBackend implements Backend {
     for (const s of this.sales) for (const p of s.payments) out.push({ acc: acc(p.number, p.method), seq: ++seq, date: p.date, kind: "cobro", document: p.number, detail: `Cobro ${s.number} · ${this.customerName(s.customer_uid)}`, amount_minor: p.amount_minor, link: `/ventas/${s.uid}`, status: s.commercial_state === "anulada" ? "anulado" : "vigente" });
     for (const c of this.purchases) for (const p of c.payments) out.push({ acc: acc(p.number, p.method), seq: ++seq, date: p.date, kind: "pago", document: p.number, detail: `Pago ${c.doc_kind && c.doc_number ? `${c.doc_kind} ${c.doc_number}` : c.number} · ${this.supplierName(c.supplier_uid)}`, amount_minor: -p.amount_minor, link: `/compras/doc/${c.uid}`, status: "vigente" });
     for (const g of this.gastos) for (const p of g.payments) out.push({ acc: acc(p.number, p.method), seq: ++seq, date: p.date, kind: "pago", document: p.number, detail: `Gasto ${g.number} · ${g.description}`, amount_minor: -p.amount_minor, link: `/dinero/gasto/${g.uid}`, status: g.status === "anulado" ? "anulado" : "vigente" });
+    for (const h of this.imps) for (const c of h.costs) for (const p of c.payments) out.push({ acc: acc(p.number, p.method), seq: ++seq, date: p.date, kind: "pago", document: p.number, detail: `Importación ${h.number} · ${c.description ?? COST_LABEL[c.kind]}`, amount_minor: -p.amount_minor, link: `/comex/importacion/${h.uid}`, status: p.status });
     for (const t of this.transfers) {
       const n = t.notes ? ` · ${t.notes}` : "";
       out.push({ acc: t.to, seq: ++seq, date: t.date, kind: "traspaso_entrada", document: "Traspaso", detail: `Desde ${this.accName(t.from)}${n}`, amount_minor: t.amount, link: null, status: "vigente" });
@@ -1433,6 +1864,11 @@ export class DemoBackend implements Backend {
     const pay: DueRow[] = [
       ...this.purchases.filter((c) => c.status === "registrada").map((c) => ({ kind: "pago" as const, due_date: c.due_date ?? c.issue_date, party: this.supplierName(c.supplier_uid), document: c.doc_kind && c.doc_number ? `${c.doc_kind} ${c.doc_number}` : c.number, link: `/compras/doc/${c.uid}`, amount_minor: c.totals.total_minor, pending_minor: c.totals.total_minor - this.paidOf(c.payments) })),
       ...this.gastos.filter((g) => g.status === "registrado").map((g) => ({ kind: "pago" as const, due_date: g.due_date ?? g.date, party: g.supplier_uid ? this.supplierName(g.supplier_uid) : this.gastoSummary(g).category, document: `${g.number} · ${g.description}`, link: `/dinero/gasto/${g.uid}`, amount_minor: g.total, pending_minor: g.total - this.paidOf(g.payments) })),
+      ...this.imps.flatMap((h) => h.costs.filter((c) => c.status === "vigente" && c.payable?.status === "abierta").map((c) => ({
+        kind: "pago" as const, due_date: c.payable!.due, party: c.supplier_uid ? this.supplierName(c.supplier_uid) : "Importación",
+        document: `${h.number} · ${c.description ?? COST_LABEL[c.kind].toLowerCase()}`, link: `/comex/importacion/${h.uid}`, amount_minor: c.payable!.amount,
+        pending_minor: c.payable!.amount - this.paidOf(c.payments.filter((p) => p.status === "vigente")),
+      }))),
     ].filter((d) => d.pending_minor > 0);
     const by = (a: DueRow, b: DueRow) => a.due_date.localeCompare(b.due_date);
     return { rec: rec.sort(by), pay: pay.sort(by) };

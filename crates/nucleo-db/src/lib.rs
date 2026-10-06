@@ -5,6 +5,7 @@
 //! la auditoría encadenada, la búsqueda FTS5 y las copias consistentes para respaldos.
 
 pub mod audit;
+pub mod comex;
 pub mod core;
 pub mod customers;
 pub mod finance;

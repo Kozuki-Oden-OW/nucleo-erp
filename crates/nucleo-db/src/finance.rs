@@ -140,12 +140,16 @@ pub fn ledger(conn: &Connection, account_id: i64, limit: u32) -> DbResult<Vec<Le
                        JOIN suppliers v ON v.id = c.supplier_id WHERE a.payment_id = p.id LIMIT 1),
                     (SELECT 'Gasto ' || g.number || ' · ' || g.description FROM payment_allocations a JOIN payables b ON b.id = a.payable_id
                        JOIN expenses g ON b.source_type = 'GAS' AND g.id = b.source_id WHERE a.payment_id = p.id LIMIT 1),
+                    (SELECT 'Importación ' || i.number || ' · ' || coalesce(k.description, replace(k.kind, '_', ' ')) FROM payment_allocations a
+                       JOIN payables b ON b.id = a.payable_id JOIN import_costs k ON b.source_type = 'IMP' AND k.id = b.source_id
+                       JOIN imports i ON i.id = k.import_id WHERE a.payment_id = p.id LIMIT 1),
                     p.number),
                 CASE p.direction WHEN 'entrada' THEN p.amount_minor ELSE -p.amount_minor END,
                 coalesce(
                     (SELECT '/ventas/' || s.uid FROM payment_allocations a JOIN receivables r ON r.id = a.receivable_id JOIN sales s ON s.id = r.sale_id WHERE a.payment_id = p.id LIMIT 1),
                     (SELECT '/compras/doc/' || c.uid FROM payment_allocations a JOIN payables b ON b.id = a.payable_id JOIN purchases c ON b.source_type = 'COM' AND c.id = b.source_id WHERE a.payment_id = p.id LIMIT 1),
-                    (SELECT '/dinero/gasto/' || g.uid FROM payment_allocations a JOIN payables b ON b.id = a.payable_id JOIN expenses g ON b.source_type = 'GAS' AND g.id = b.source_id WHERE a.payment_id = p.id LIMIT 1)),
+                    (SELECT '/dinero/gasto/' || g.uid FROM payment_allocations a JOIN payables b ON b.id = a.payable_id JOIN expenses g ON b.source_type = 'GAS' AND g.id = b.source_id WHERE a.payment_id = p.id LIMIT 1),
+                    (SELECT '/comex/importacion/' || i.uid FROM payment_allocations a JOIN payables b ON b.id = a.payable_id JOIN import_costs k ON b.source_type = 'IMP' AND k.id = b.source_id JOIN imports i ON i.id = k.import_id WHERE a.payment_id = p.id LIMIT 1)),
                 p.status, p.id AS k
             FROM payments p WHERE p.money_account_id = ?1
             UNION ALL
@@ -499,14 +503,17 @@ pub fn open_receivables(conn: &Connection) -> DbResult<Vec<DueRow>> {
 pub fn open_payables(conn: &Connection) -> DbResult<Vec<DueRow>> {
     let mut stmt = conn.prepare(
         "SELECT b.due_date,
-            coalesce(v.name, CASE b.source_type WHEN 'GAS' THEN (SELECT k.name FROM expenses g JOIN expense_categories k ON k.id = g.category_id WHERE g.id = b.source_id) END, 'Proveedor'),
+            coalesce(v.name, CASE b.source_type WHEN 'GAS' THEN (SELECT k.name FROM expenses g JOIN expense_categories k ON k.id = g.category_id WHERE g.id = b.source_id)
+                WHEN 'IMP' THEN 'Importación' END, 'Proveedor'),
             CASE b.source_type
                 WHEN 'COM' THEN (SELECT coalesce(c.supplier_doc_kind || ' ' || c.supplier_doc_number, c.number) FROM purchases c WHERE c.id = b.source_id)
                 WHEN 'GAS' THEN (SELECT g.number || ' · ' || g.description FROM expenses g WHERE g.id = b.source_id)
+                WHEN 'IMP' THEN (SELECT i.number || ' · ' || coalesce(k.description, replace(k.kind, '_', ' ')) FROM import_costs k JOIN imports i ON i.id = k.import_id WHERE k.id = b.source_id)
                 ELSE b.source_type END,
             CASE b.source_type
                 WHEN 'COM' THEN '/compras/doc/' || (SELECT c.uid FROM purchases c WHERE c.id = b.source_id)
                 WHEN 'GAS' THEN '/dinero/gasto/' || (SELECT g.uid FROM expenses g WHERE g.id = b.source_id)
+                WHEN 'IMP' THEN '/comex/importacion/' || (SELECT i.uid FROM import_costs k JOIN imports i ON i.id = k.import_id WHERE k.id = b.source_id)
                 ELSE '/dinero' END,
             b.amount_minor, b.amount_minor - b.paid_minor
          FROM payables b LEFT JOIN suppliers v ON v.id = b.supplier_id

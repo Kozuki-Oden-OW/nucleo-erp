@@ -2,8 +2,9 @@
 // Lo que aún no tiene comando responde con un error claro y la interfaz lo marca "próximamente".
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { AppError, type Backend, type Feature, type FileSource, type PurchaseFilter, type SaleFilter } from "./backend";
+import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "./backend";
 import type {
+  ImportCostInput, ImportDetail, ImportInput, ImportReceiveLine, ImportStage, ImportSummary, IncotermDef,
   AccountInput, CalendarItem, ExpenseCategory, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow, MoneyAccount,
   MoneyOverview, MoneyTransferInput, Recurring, RecurringInput,
   AdjustmentInput, InventoryOverview, InventorySettings, ProductInventory, ReorderInput, StockDocDone, StockDocRow, TransferInput, Warehouse,
@@ -166,6 +167,22 @@ export class TauriBackend implements Backend {
   saveRecurring(input: RecurringInput) { return call<Recurring[]>("save_recurring", { input }); }
   moneyOverview() { return call<MoneyOverview>("money_overview"); }
   moneyCalendar(days: number) { return call<CalendarItem[]>("money_calendar", { days }); }
+
+  incoterms() { return call<IncotermDef[]>("incoterms"); }
+  listImports(view: ImportView, query: string) { return call<ImportSummary[]>("list_imports", { view, query }); }
+  import(uid: string) { return call<ImportDetail>("import", { uid }); }
+  saveImport(input: ImportInput, uid?: string) { return call<ImportDetail>("save_import", { input, uid: uid ?? null }); }
+  setImportStage(uid: string, stage: ImportStage, note?: string) { return call<ImportDetail>("set_import_stage", { uid, stage, note: note ?? null }); }
+  changeImportEta(uid: string, eta: string, reason?: string) { return call<ImportDetail>("change_import_eta", { uid, eta, reason: reason ?? null }); }
+  addImportCost(uid: string, input: ImportCostInput) { return call<ImportDetail>("add_import_cost", { uid, input }); }
+  updateImportCost(uid: string, costId: number, input: ImportCostInput) { return call<ImportDetail>("update_import_cost", { uid, costId, input }); }
+  removeImportCost(uid: string, costId: number, reason?: string) { return call<ImportDetail>("remove_import_cost", { uid, costId, reason: reason ?? null }); }
+  payImportCost(uid: string, costId: number, amount_minor: number, method: string, date: string, accountUid?: string) {
+    return call<ImportDetail>("pay_import_cost", { uid, costId, amountMinor: amount_minor, method, date, accountUid: accountUid ?? null });
+  }
+  receiveImport(uid: string, lines: ImportReceiveLine[], date: string) { return call<ImportDetail>("receive_import", { uid, lines, date }); }
+  closeImport(uid: string) { return call<ImportDetail>("close_import", { uid }); }
+  voidImport(uid: string, reason: string) { return call<ImportDetail>("void_import", { uid, reason }); }
 }
 
 /** Selector de archivo del escritorio para adjuntar documentos. */

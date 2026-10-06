@@ -187,14 +187,15 @@ pub fn kardex(
             CASE m.source_type
                 WHEN 'VEN' THEN (SELECT uid FROM sales WHERE id = m.source_id)
                 WHEN 'FV' THEN (SELECT uid FROM sales WHERE id = m.source_id)
-                WHEN 'REC' THEN (SELECT coalesce(o.uid, c.uid) FROM receipts r
+                WHEN 'REC' THEN (SELECT coalesce(o.uid, c.uid, im.uid) FROM receipts r
                                    LEFT JOIN purchase_orders o ON o.id = r.purchase_order_id
+                                   LEFT JOIN imports im ON im.id = r.import_id
                                    LEFT JOIN document_links l ON l.target_type = 'REC' AND l.target_id = r.id AND l.source_type = 'COM'
                                    LEFT JOIN purchases c ON c.id = l.source_id
                                   WHERE r.id = m.source_id)
             END,
             CASE WHEN m.source_type = 'REC' THEN
-                (SELECT CASE WHEN r.purchase_order_id IS NULL THEN 'COM' ELSE 'OC' END FROM receipts r WHERE r.id = m.source_id)
+                (SELECT CASE WHEN r.import_id IS NOT NULL THEN 'IMP' WHEN r.purchase_order_id IS NULL THEN 'COM' ELSE 'OC' END FROM receipts r WHERE r.id = m.source_id)
             END
          FROM stock_movements m JOIN warehouses w ON w.id = m.warehouse_id
          WHERE m.product_id = ?1 AND (?2 IS NULL OR m.warehouse_id = ?2)

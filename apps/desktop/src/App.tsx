@@ -16,7 +16,9 @@ import { Onboarding } from "./screens/Onboarding";
 import { Proximamente } from "./screens/Proximamente";
 import { RecoveryKey } from "./screens/RecoveryKey";
 import { Customers } from "./screens/clientes/Customers";
-import { ImportCalculator } from "./screens/comex/ImportCalculator";
+import { Comex } from "./screens/comex/Comex";
+import { ImportEditLoader, ImportEditor } from "./screens/comex/ImportEditor";
+import { ImportView } from "./screens/comex/ImportView";
 import { Purchases } from "./screens/compras/Purchases";
 import { BuyEditor } from "./screens/compras/BuyEditor";
 import { PoView } from "./screens/compras/PoView";
@@ -160,7 +162,11 @@ function Screen({ route, info, session, reload }: { route: Route; info: AppInfo;
       if (a === "gasto" && b) return <ExpenseView key={b} uid={b} />;
       return <Money route={route} />;
     case "comex":
-      return has.has("comex") ? <ImportCalculator /> : <Proximamente id="comex" />;
+      if (!has.has("comex")) return <Proximamente id="comex" />;
+      if (a === "importacion" && b === "nueva") return <ImportEditor key={route.raw} />;
+      if (a === "importacion" && b && route.path[3] === "editar") return <ImportEditLoader key={b} uid={b} />;
+      if (a === "importacion" && b) return <ImportView key={b} uid={b} />;
+      return <Comex route={route} />;
     case "config":
       return <Config route={route} info={info} session={session} onChanged={reload} />;
     case "documentos":

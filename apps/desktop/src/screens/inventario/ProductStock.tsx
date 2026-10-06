@@ -31,6 +31,7 @@ export function ProductStock({ uid }: { uid: string }) {
     if (k.source_type === "VEN" || k.source_type === "FV") return `/ventas/${k.source_uid}`;
     if (k.source_type === "OC") return `/compras/oc/${k.source_uid}`;
     if (k.source_type === "COM") return `/compras/doc/${k.source_uid}`;
+    if (k.source_type === "IMP") return `/comex/importacion/${k.source_uid}`;
     return null;
   };
 
@@ -78,7 +79,7 @@ export function ProductStock({ uid }: { uid: string }) {
                       return (
                         <tr key={k.id} className="border-b border-line last:border-0" title={k.reason ?? undefined}>
                           <td className="num whitespace-nowrap px-4 py-2 text-muted">{formatDate(k.date)}</td>
-                          <td className="whitespace-nowrap px-2 text-ink">{KIND[k.kind]}{k.reason && k.kind === "ajuste" && <div className="max-w-[16rem] truncate text-xs text-muted">{k.reason}</div>}</td>
+                          <td className="whitespace-nowrap px-2 text-ink">{k.source_type === "IMP" && k.kind === "entrada" ? "Importación" : KIND[k.kind]}{k.reason && k.kind === "ajuste" && <div className="max-w-[16rem] truncate text-xs text-muted">{k.reason}</div>}</td>
                           <td className="px-2">{href ? <button className="font-mono text-[12.5px] text-accent hover:underline" onClick={() => navigate(href)}>{k.document}</button> : <span className="whitespace-nowrap font-mono text-[12.5px] text-muted">{k.document}</span>}</td>
                           {d.by_warehouse.length > 1 && !wh && <td className="whitespace-nowrap px-2 text-muted">{k.warehouse_name}</td>}
                           <td className={`num px-2 text-right font-medium ${k.qty_milli > 0 ? "text-success" : "text-danger"}`}>{k.qty_milli > 0 ? "+" : "−"}{formatQty(Math.abs(k.qty_milli))}</td>

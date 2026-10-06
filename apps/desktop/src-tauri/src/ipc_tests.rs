@@ -441,3 +441,90 @@ fn dinero_por_ipc() {
     assert_eq!(g["payment_state"], "anulado");
     assert_eq!(ipc.ok("dashboard", json!({}))["cash_minor"], 500000);
 }
+
+#[test]
+fn comex_por_ipc() {
+    let ipc = Ipc::new();
+    let created = ipc.ok(
+        "create_company",
+        json!({ "name": "Importadora", "profile": "empresa" }),
+    );
+    ipc.ok("open_company", json!({ "uid": created["company"]["uid"] }));
+    let sup = ipc.ok(
+        "add_supplier",
+        json!({ "input": { "name": "Shenzhen Co." } }),
+    );
+    let p = ipc.ok("add_product", json!({ "input": { "name": "Sensor", "unit": "un", "kind": "producto", "price_minor": 9000, "cost_minor": 0 } }));
+    assert_eq!(ipc.ok("incoterms", json!({})).as_array().unwrap().len(), 11);
+    let d = ipc.ok("save_import", json!({ "uid": null, "input": {
+        "supplier_uid": sup["uid"], "incoterm": "FOB", "transport_mode": "aereo", "origin_country": "China", "origin_port": null,
+        "destination_port": null, "currency_code": "USD", "rate_e6": 900000000, "purchase_date": null, "production_eta": null,
+        "shipment_date": null, "eta": HOY, "arrival_date": null, "allocation_basis": "valor", "vat_ppm": null, "vat_recoverable": true,
+        "notes": null, "items": [{ "product_uid": p["uid"], "description": "Sensor", "qty_milli": 10000, "unit_price_minor": 1000,
+        "weight_g": null, "volume_cm3": null, "duty_ppm": null, "hs_code": null }] } }));
+    let uid = d["uid"].clone();
+    assert_eq!(d["calc"]["landed_clp"], 90000);
+    let d = ipc.ok("add_import_cost", json!({ "uid": uid, "input": { "kind": "flete", "description": null, "supplier_uid": null,
+        "currency_code": "USD", "amount_minor": 2000, "rate_e6": null, "is_estimate": false, "allocation_basis": null,
+        "document_ref": null, "cost_date": null, "payment": "por_pagar", "due_date": null, "paid_method": null, "paid_account_uid": null } }));
+    assert_eq!(d["costs"][0]["amount_clp"], 18000);
+    let cost_id = d["costs"][0]["id"].clone();
+    ipc.ok("pay_import_cost", json!({ "uid": uid, "costId": cost_id, "amountMinor": 18000, "method": "Transferencia", "date": HOY, "accountUid": null }));
+    ipc.ok(
+        "set_import_stage",
+        json!({ "uid": uid, "stage": "en_transito", "note": null }),
+    );
+    ipc.ok(
+        "change_import_eta",
+        json!({ "uid": uid, "eta": "2026-10-20", "reason": "Retraso" }),
+    );
+    let d = ipc.ok(
+        "receive_import",
+        json!({ "uid": uid, "lines": [], "date": HOY }),
+    );
+    assert_eq!(d["stage"], "recibida");
+    let d = ipc.ok("close_import", json!({ "uid": uid }));
+    assert_eq!(d["landed_total_clp"], 108000);
+    assert_eq!(
+        ipc.ok("list_imports", json!({ "view": "cerradas", "query": "" }))
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert!(
+        ipc.call("void_import", json!({ "uid": uid, "reason": "x" }))
+            .is_err()
+    );
+    let d2 = ipc.ok("save_import", json!({ "uid": null, "input": {
+        "supplier_uid": null, "incoterm": null, "transport_mode": null, "origin_country": null, "origin_port": null,
+        "destination_port": null, "currency_code": "CLP", "rate_e6": null, "purchase_date": null, "production_eta": null,
+        "shipment_date": null, "eta": null, "arrival_date": null, "allocation_basis": "unidades", "vat_ppm": null, "vat_recoverable": true,
+        "notes": null, "items": [{ "product_uid": null, "description": "Muestra", "qty_milli": 1000, "unit_price_minor": 5000,
+        "weight_g": null, "volume_cm3": null, "duty_ppm": null, "hs_code": null }] } }));
+    let d2 = ipc.ok("add_import_cost", json!({ "uid": d2["uid"], "input": { "kind": "otros", "description": "Courier", "supplier_uid": null,
+        "currency_code": "CLP", "amount_minor": 1000, "rate_e6": null, "is_estimate": true, "allocation_basis": null,
+        "document_ref": null, "cost_date": null, "payment": null, "due_date": null, "paid_method": null, "paid_account_uid": null } }));
+    let d2 = ipc.ok("update_import_cost", json!({ "uid": d2["uid"], "costId": d2["costs"][0]["id"], "input": { "kind": "otros", "description": "Courier", "supplier_uid": null,
+        "currency_code": "CLP", "amount_minor": 1500, "rate_e6": null, "is_estimate": true, "allocation_basis": null,
+        "document_ref": null, "cost_date": null, "payment": null, "due_date": null, "paid_method": null, "paid_account_uid": null } }));
+    assert_eq!(d2["calc"]["landed_clp"], 6500);
+    let d2 = ipc.ok(
+        "remove_import_cost",
+        json!({ "uid": d2["uid"], "costId": d2["costs"][0]["id"], "reason": null }),
+    );
+    assert_eq!(
+        ipc.ok(
+            "void_import",
+            json!({ "uid": d2["uid"], "reason": "Prueba" })
+        )["stage"],
+        "anulada"
+    );
+    assert_eq!(
+        ipc.ok("import", json!({ "uid": d2["uid"] }))["costs"]
+            .as_array()
+            .unwrap()
+            .len(),
+        0
+    );
+}

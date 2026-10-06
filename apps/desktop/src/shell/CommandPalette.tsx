@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  ArrowRight, FileText, Moon, Package, Paperclip, Plus, Search, ShoppingBag, ShoppingCart, Sun, Truck, User, Users, Calculator, type LucideIcon,
+  ArrowRight, FileText, Moon, Package, Paperclip, Plus, Search, ShoppingBag, ShoppingCart, Sun, Truck, User, Users, Calculator, Ship, type LucideIcon,
 } from "lucide-react";
 import { useBackend, type SearchHit } from "../data";
 import { navigate } from "../lib/router";
@@ -71,7 +71,9 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       { id: "a-oc", group: "Acciones", title: "Nueva orden de compra", icon: ShoppingCart, keywords: "orden de compra oc pedir proveedor comprar", run: go("/compras/oc/nueva") },
       { id: "a-com", group: "Acciones", title: "Registrar factura de proveedor", icon: FileText, keywords: "factura proveedor documento compra registrar boleta", run: go("/compras/doc/nueva") },
       { id: "a-prv", group: "Acciones", title: "Nuevo proveedor", icon: Truck, keywords: "nuevo proveedor agregar", run: go("/compras?tab=proveedores&nuevo_proveedor=1") },
-      { id: "a-imp", group: "Acciones", title: "Calcular costo de importación", icon: Calculator, keywords: "comex importacion calculadora landed cif fob", run: go("/comex") },
+      { id: "a-imp", group: "Acciones", title: "Calcular costo de importación", icon: Calculator, keywords: "comex importacion calculadora landed cif fob", run: go("/comex?tab=calculadora") },
+      { id: "a-impn", group: "Acciones", title: "Nueva importación", icon: Ship, keywords: "comex importacion carpeta embarque contenedor proveedor extranjero", run: go("/comex/importacion/nueva") },
+      { id: "a-inco", group: "Acciones", title: "Guía de Incoterms", icon: Ship, keywords: "incoterms fob cif exw ddp", run: go("/comex?tab=incoterms") },
       { id: "a-tema", group: "Preferencias", title: prefs.theme === "oscuro" ? "Usar tema claro" : "Usar tema oscuro", icon: prefs.theme === "oscuro" ? Sun : Moon, keywords: "tema oscuro claro modo noche", run: () => { set({ theme: prefs.theme === "oscuro" ? "claro" : "oscuro" }); onClose(); } },
       { id: "a-vista", group: "Preferencias", title: prefs.view === "simple" ? "Cambiar a vista Contador" : "Cambiar a vista Simple", icon: FileText, keywords: "vista contador simple contable", run: () => { set({ view: prefs.view === "simple" ? "contador" : "simple" }); onClose(); } },
     ];
