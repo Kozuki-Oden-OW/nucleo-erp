@@ -25,9 +25,17 @@
    del administrador (aún no hay usuarios). Quien inicie sesión en la cuenta de Windows puede abrir NÚCLEO.
 2. `app.db` (registro de negocios) guarda **nombre y carpeta** de cada negocio sin cifrar.
 3. El respaldo se arma en memoria: para respaldos muy grandes se implementará cifrado por bloques.
-4. Los adjuntos de `documents/` aún no se cifran por archivo (no hay adjuntos hasta la Fase 4).
+4. ~~Los adjuntos de `documents/` aún no se cifran por archivo.~~ Resuelto en la Fase 4 (D-F4-06).
 5. La cadena hexadecimal de la clave usada en `PRAGMA key` vive brevemente en memoria sin borrado garantizado.
 6. El instalador aún no está firmado (requiere certificado de firma de código).
+
+## Usuarios y permisos (Fase 4)
+
+- Contraseñas con Argon2id (19 MiB, 2 pasadas); nunca se guardan ni se registran en claro.
+- 5 intentos fallidos bloquean al usuario 5 minutos; bloqueo de pantalla por inactividad.
+- Cada comando verifica el permiso en Rust; la auditoría registra quién hizo cada cambio.
+- Las contraseñas de usuario controlan **quién usa** NÚCLEO en el computador; la base sigue abriéndose con
+  la clave guardada en Windows (limitación 1). Envolver la clave con la contraseña llega en la Fase 13.
 
 ## Dependencias
 

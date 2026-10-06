@@ -1,5 +1,7 @@
 //! # nucleo-io
 //!
-//! Formatos de entrada y salida. En la Fase 1: el respaldo `.erpbackup` (Blueprint §9).
+//! Formatos de entrada y salida: el respaldo `.erpbackup` (Blueprint §9) y la bóveda cifrada
+//! de documentos adjuntos (§10.1).
 
 pub mod erpbackup;
+pub mod vault;

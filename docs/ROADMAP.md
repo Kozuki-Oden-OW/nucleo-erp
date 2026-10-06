@@ -8,8 +8,8 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | 1 | Arquitectura | ✅ Completo (2026-10-05): CI en Windows verde e instalador compilado |
 | 2 | Modelo de datos | ✅ Completo (2026-10-05) — ver abajo |
 | 3 | Diseño UX | 🟡 Sistema de diseño y prototipos listos; falta la prueba con 3-5 usuarios — ver abajo |
-| 4 | Core (usuarios, roles, configuración, numeración, documentos, búsqueda) | ⏳ |
-| 5 | Ventas | ⏳ |
+| 4 | Core (usuarios, roles, configuración, numeración, documentos, búsqueda) | ✅ Hito A cumplido (2026-10-06) — ver abajo |
+| 5 | Ventas | 🟡 En curso |
 | 6 | Compras | ⏳ |
 | 7 | Inventario (incluye stock real y futuro) | ⏳ |
 | 8 | Finanzas | ⏳ |
@@ -68,6 +68,20 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | Guion de prueba de usabilidad (8 tareas, métricas, criterio) | ✅ `docs/UX.md` §8 |
 | **Prueba con 3-5 usuarios** | ⏳ la realiza el dueño del proyecto con el guion; resultados en `docs/usabilidad/` |
 
+## Fase 4 — criterio de salida
+
+> Hito A: "puedo crear mi empresa, usuarios y adjuntar documentos".
+
+| Entregable | Estado |
+|---|---|
+| Migración 0011: 37 permisos, 8 roles, dueño inicial, monedas, adjuntos archivables | ✅ |
+| Usuarios, contraseñas Argon2id, inicio de sesión con bloqueo, bloqueo por inactividad | ✅ |
+| Roles y permisos editables; permisos verificados en Rust | ✅ |
+| Configuración del negocio, numeración interna, monedas y tipos de cambio | ✅ |
+| Documentos adjuntos cifrados, vinculados, exportables y archivables; incluidos en respaldos | ✅ |
+| Búsqueda global filtrada por permisos; visor de auditoría | ✅ |
+| Pruebas: `hito_a` (flujo completo + respaldo/restauración con adjuntos) | ✅ |
+
 ## Sitio web
 
 | Entregable | Estado |
@@ -80,8 +94,9 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 
 | Ítem | Nueva fase | Motivo |
 |---|---|---|
-| Hilo escritor + lectores | 4 (Core) | Hace falta recién con varias pantallas trabajando en paralelo |
-| `tauri-specta` (tipos TS generados) | 4 (Core) | Sigue en *release candidate*; el contrato IPC crece en la Fase 4 |
+| Hilo escritor + lectores | 12 (Reportes) | Las operaciones del Core miden < 50 ms con un `Mutex` por negocio (D-F4-11) |
+| `tauri-specta` (tipos TS generados) | Al salir su versión estable | Sigue en *release candidate* (D-F4-11) |
+| Clave de datos envuelta con la contraseña del administrador | 13 (Seguridad) | Se diseña junto con la clave de recuperación (D-F4-12) |
 | Spike de PDF | 5 (Ventas) | El primer documento imprimible es la cotización |
 | Clave oficial de firma de normativa | 11 | Se genera cuando exista el primer paquete con fuentes verificadas |
 | Dashboard por bloques y "Atención" precalculada | 12 | Primera carga con caché fría ~1,3 s en el equipo de medición |

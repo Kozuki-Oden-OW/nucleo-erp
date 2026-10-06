@@ -8,9 +8,12 @@ import { SaleStatus } from "../../ui/doc";
 import { Button, DefinitionList, EmptyState, Field, Kpi, Notice, PageHeader, Spinner } from "../../ui/kit";
 import { Drawer, useToast } from "../../ui/overlay";
 import { DataTable, type Column } from "../../ui/table";
+import { AttachmentsPanel } from "../documentos/Documents";
+import { useSession } from "../../lib/session";
 
 export function Customers({ route }: { route: Route }) {
   const backend = useBackend();
+  const { can } = useSession();
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState<Customer[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -36,7 +39,7 @@ export function Customers({ route }: { route: Route }) {
       <PageHeader
         title="Clientes"
         subtitle="Busca sin importar tildes, por nombre, RUT (con o sin puntos) o correo."
-        actions={<Button icon={UserPlus} onClick={() => navigate("/clientes?nuevo=1")}>Nuevo cliente</Button>}
+        actions={can("clientes.editar") && <Button icon={UserPlus} onClick={() => navigate("/clientes?nuevo=1")}>Nuevo cliente</Button>}
       />
       <div className="mb-4">
         <Field aria-label="Buscar clientes" leading={<Search size={15} />} placeholder="Ej. perez, 76.123 o @empresa.cl" value={query} onChange={(e) => setQuery(e.target.value)} className="max-w-md" autoFocus />
@@ -50,8 +53,9 @@ export function Customers({ route }: { route: Route }) {
         onOpen={(c) => navigate(`/clientes/${c.uid}`)}
         empty={<EmptyState icon={Users} title={query ? "Sin coincidencias" : "Aún no tienes clientes"} action={<Button icon={Plus} onClick={() => navigate("/clientes?nuevo=1")}>Agregar cliente</Button>} />}
       />
-      <NewCustomerDrawer open={creating} onClose={() => navigate("/clientes", { replace: true })} onCreated={(c) => { setVersion((v) => v + 1); navigate(backend.features.has("ventas") ? `/clientes/${c.uid}` : "/clientes", { replace: true }); }} />
+      <NewCustomerDrawer open={creating} onClose={() => navigate("/clientes", { replace: true })} onCreated={(c) => { setVersion((v) => v + 1); navigate(`/clientes/${c.uid}`, { replace: true }); }} />
       {openUid && backend.features.has("ventas") && <CustomerDrawer uid={openUid} onClose={() => navigate("/clientes", { replace: true })} />}
+      {openUid && !backend.features.has("ventas") && <BasicCustomerDrawer customer={rows?.find((c) => c.uid === openUid)} onClose={() => navigate("/clientes", { replace: true })} />}
     </div>
   );
 }
@@ -94,6 +98,20 @@ export function NewCustomerDrawer({ open, onClose, onCreated, initialName = "" }
   );
 }
 
+/** Ficha básica (escritorio, antes de la Fase 5): datos y documentos adjuntos. */
+function BasicCustomerDrawer({ customer, onClose }: { customer: Customer | undefined; onClose: () => void }) {
+  if (!customer) return null;
+  return (
+    <Drawer open onClose={onClose} title={customer.name} subtitle={customer.rut ? `RUT ${formatRut(customer.rut)}` : undefined}>
+      <div className="flex flex-col gap-6">
+        <DefinitionList items={[{ label: "Correo", value: customer.email ?? "—" }, { label: "Teléfono", value: customer.phone ?? "—" }, { label: "Desde", value: new Date(customer.created_at).toLocaleDateString("es-CL") }]} />
+        <AttachmentsPanel link={{ entity: "cliente", uid: customer.uid }} />
+        <Notice tone="info">El historial de ventas, la deuda y la ficha inteligente llegan con la Fase 5 (Ventas).</Notice>
+      </div>
+    </Drawer>
+  );
+}
+
 function CustomerDrawer({ uid, onClose }: { uid: string; onClose: () => void }) {
   const backend = useBackend();
   const t = useTerm();
@@ -125,6 +143,7 @@ function CustomerDrawer({ uid, onClose }: { uid: string; onClose: () => void }) 
             <Kpi label="Compra cada" value={c.avg_days_between ? `${c.avg_days_between} días` : "—"} hint="Promedio entre compras" />
           </div>
           <DefinitionList items={[{ label: "Correo", value: c.email ?? "—" }, { label: "Teléfono", value: c.phone ?? "—" }]} />
+          <AttachmentsPanel link={{ entity: "cliente", uid: c.uid }} />
           <div>
             <h3 className="mb-2 text-sm font-semibold text-ink">Últimas ventas</h3>
             {c.recent.length === 0 ? <p className="text-sm text-muted">Sin ventas todavía.</p> : (

@@ -2,6 +2,29 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [Sin publicar] — Fase 4 (Core)
+
+### Agregado
+- Usuarios con contraseña (Argon2id), 8 roles predefinidos (Administrador, Dueño, Contador, Ventas,
+  Bodega, Caja, Compras, Recursos humanos) y 37 permisos editables por rol. Cada acción se valida en
+  Rust, no solo en la pantalla.
+- Modo de un solo usuario: mientras nadie tenga contraseña, NÚCLEO abre directo con el dueño. Al
+  asignar contraseñas aparece la pantalla de inicio de sesión, con bloqueo de 5 minutos tras 5 intentos
+  fallidos y bloqueo automático por inactividad (configurable).
+- Configuración del negocio (nombre, RUT, giro, dirección, recordatorio de documentación tributaria).
+- Numeración interna editable por tipo de documento (prefijo, ancho y próximo número; nunca hacia atrás).
+- Monedas (CLP, USD, EUR, CNY) y tipos de cambio anotados a mano, con historial por fecha.
+- Documentos adjuntos cifrados por archivo (AES-256-GCM) dentro de la carpeta del negocio, con
+  descripción, vínculo a cliente/proveedor/documento, vista previa de imágenes, exportación y archivado
+  con motivo. Se incluyen en los respaldos.
+- Búsqueda global (clientes, proveedores, productos, números de documento y adjuntos) filtrada por los
+  permisos del usuario.
+- Visor del registro de auditoría con filtro y verificación de la cadena.
+
+### Seguridad
+- Los adjuntos usan subclaves derivadas y nombres en disco con huella con clave (no revelan el contenido).
+- No se puede dejar el negocio sin un dueño activo capaz de iniciar sesión.
+
 ## [Sin publicar] — Fase 3 (Diseño UX)
 
 ### Agregado

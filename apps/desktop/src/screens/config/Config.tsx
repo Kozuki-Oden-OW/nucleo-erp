@@ -1,16 +1,22 @@
 import { useEffect, useState } from "react";
 import { open as openFile } from "@tauri-apps/plugin-dialog";
-import { Building2, DatabaseBackup, Palette, ShieldCheck, Lock } from "lucide-react";
+import { Building2, Coins, DatabaseBackup, Hash, Lock, Palette, ShieldCheck, Users } from "lucide-react";
 import { useBackend, errorMessage, type AppInfo, type BackupDone, type BusinessProfile, type BusinessSettings, type SessionInfo } from "../../data";
 import { formatBytes, formatPpm } from "../../lib/format";
 import { navigate, type Route } from "../../lib/router";
 import { usePrefs } from "../../lib/prefs";
 import { Button, Card, Checkbox, Field, Notice, PageHeader, Segmented, Spinner, cx } from "../../ui/kit";
 import { useToast } from "../../ui/overlay";
+import { useSession } from "../../lib/session";
+import { CurrenciesSection, NumberingSection, SecuritySection } from "./Catalogs";
+import { UsersSection } from "./Users";
 
-type Section = "negocio" | "respaldos" | "seguridad" | "apariencia";
-const SECTIONS: { id: Section; label: string; icon: typeof Building2 }[] = [
-  { id: "negocio", label: "Mi negocio", icon: Building2 },
+type Section = "negocio" | "usuarios" | "numeracion" | "monedas" | "respaldos" | "seguridad" | "apariencia";
+const SECTIONS: { id: Section; label: string; icon: typeof Building2; feature?: string }[] = [
+  { id: "negocio", label: "Mi negocio", icon: Building2, feature: "negocio" },
+  { id: "usuarios", label: "Usuarios y roles", icon: Users, feature: "usuarios" },
+  { id: "numeracion", label: "Numeración", icon: Hash, feature: "numeracion" },
+  { id: "monedas", label: "Monedas", icon: Coins, feature: "monedas" },
   { id: "respaldos", label: "Respaldos", icon: DatabaseBackup },
   { id: "seguridad", label: "Seguridad y auditoría", icon: ShieldCheck },
   { id: "apariencia", label: "Apariencia", icon: Palette },
@@ -25,7 +31,7 @@ export function Config({ route, info, session, onChanged }: { route: Route; info
       <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
         <nav className="flex gap-1 overflow-x-auto lg:flex-col" aria-label="Secciones de configuración">
           {SECTIONS.map((s) => {
-            const ready = s.id !== "negocio" || backend.features.has("negocio");
+            const ready = !s.feature || backend.features.has(s.feature as never);
             return (
               <button
                 key={s.id}
@@ -39,6 +45,9 @@ export function Config({ route, info, session, onChanged }: { route: Route; info
         </nav>
         <div className="min-w-0">
           {section === "negocio" && <BusinessSection onChanged={onChanged} />}
+          {section === "usuarios" && <UsersSection />}
+          {section === "numeracion" && <NumberingSection />}
+          {section === "monedas" && <CurrenciesSection />}
           {section === "respaldos" && <BackupsSection info={info} onRestored={onChanged} />}
           {section === "seguridad" && <SecuritySection session={session} />}
           {section === "apariencia" && <AppearanceSection />}
@@ -57,6 +66,8 @@ const PROFILES: { value: BusinessProfile; title: string; text: string }[] = [
 function BusinessSection({ onChanged }: { onChanged: () => void }) {
   const backend = useBackend();
   const toast = useToast();
+  const { can } = useSession();
+  const editable = can("config.editar");
   const [b, setB] = useState<BusinessSettings | null>(null);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => { backend.business().then(setB).catch((e) => setErr(errorMessage(e))); }, [backend]);
@@ -101,13 +112,13 @@ function BusinessSection({ onChanged }: { onChanged: () => void }) {
           />
           <Checkbox
             label="Calcular IVA en mis documentos (informativo)"
-            hint={b.tax_rate_ppm ? `Tasa del paquete normativo vigente: ${formatPpm(b.tax_rate_ppm, 0)} · ${b.tax_rule_source ?? ""}` : "No hay un paquete normativo cargado todavía."}
+            hint={b.tax_rate_ppm ? `Tasa del paquete normativo vigente: ${formatPpm(b.tax_rate_ppm, 0)} · ${b.tax_rule_source ?? ""}` : "No hay un paquete normativo cargado: mientras tanto los documentos no calculan IVA. El paquete con la tasa y su fuente oficial llega con la Fase 5."}
             checked={b.tax_enabled}
             onChange={(v) => set({ tax_enabled: v })}
           />
         </div>
       </Card>
-      <div><Button onClick={save}>Guardar cambios</Button></div>
+      {editable ? <div><Button onClick={save}>Guardar cambios</Button></div> : <Notice tone="info">Solo el dueño o un administrador puede cambiar estos datos.</Notice>}
     </div>
   );
 }
@@ -121,6 +132,7 @@ function BackupsSection({ info, onRestored }: { info: AppInfo; onRestored: () =>
   const [msg, setMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   const [path, setPath] = useState<string | null>(null);
   const [rpw, setRpw] = useState("");
+  const { can } = useSession();
   const demo = backend.kind === "demo";
 
   async function create() {
@@ -149,38 +161,17 @@ function BackupsSection({ info, onRestored }: { info: AppInfo; onRestored: () =>
           <Field label="Contraseña del respaldo" type="password" value={pw} onChange={(e) => setPw(e.target.value)} hint="Mínimo 8 caracteres. Sin ella no se puede restaurar." />
           <Field label="Repetir contraseña" type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} error={pw2 && pw !== pw2 ? "Las contraseñas no coinciden." : null} />
         </div>
-        <div className="mt-4"><Button icon={Lock} onClick={create} disabled={demo || busy || pw.length < 8 || pw !== pw2}>{busy ? "Trabajando…" : "Crear respaldo"}</Button></div>
+        <div className="mt-4"><Button icon={Lock} onClick={create} disabled={demo || !can("respaldos.crear") || busy || pw.length < 8 || pw !== pw2}>{busy ? "Trabajando…" : "Crear respaldo"}</Button></div>
         {done && <div className="mt-4"><Notice tone="success">Respaldo verificado ✓ — {done.file_name} ({formatBytes(done.size_bytes)}), {done.manifest.counts["customers"] ?? 0} clientes.</Notice></div>}
       </Card>
       <Card title="Restaurar respaldo" subtitle="Se restaura como un negocio nuevo: nunca reemplaza al actual.">
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-3"><Button variant="secondary" onClick={pick} disabled={demo}>Elegir archivo .erpbackup</Button><span className="truncate text-sm text-muted">{path ?? "Ningún archivo elegido"}</span></div>
           <Field label="Contraseña del respaldo" type="password" value={rpw} onChange={(e) => setRpw(e.target.value)} />
-          <div><Button onClick={restore} disabled={demo || busy || !path || rpw.length < 8}>Restaurar</Button></div>
+          <div><Button onClick={restore} disabled={demo || !can("respaldos.restaurar") || busy || !path || rpw.length < 8}>Restaurar</Button></div>
         </div>
       </Card>
       {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
-    </div>
-  );
-}
-
-function SecuritySection({ session }: { session: SessionInfo }) {
-  const backend = useBackend();
-  const [report, setReport] = useState(session.audit);
-  const [busy, setBusy] = useState(false);
-  return (
-    <div className="flex flex-col gap-6">
-      <Card title="Cadena de auditoría" actions={<Button variant="secondary" disabled={busy} onClick={async () => { setBusy(true); try { setReport(await backend.verifyAudit()); } finally { setBusy(false); } }}>Verificar ahora</Button>}>
-        {report.ok
-          ? <Notice tone="success">Íntegra: {report.entries} registros encadenados, ninguno alterado.</Notice>
-          : <Notice tone="danger">La cadena se rompe en el registro {report.broken_at}: la base fue modificada fuera de NÚCLEO.</Notice>}
-      </Card>
-      <Card title="Cifrado">
-        <p className="text-sm text-muted">
-          Base cifrada con SQLCipher {session.cipher_version}. La clave se guarda en el almacén seguro de Windows; la clave de recuperación que
-          guardaste al crear el negocio permite recuperarla si reinstalas el sistema.
-        </p>
-      </Card>
     </div>
   );
 }

@@ -175,8 +175,7 @@ fn main() {
 
 fn base(tx: &Transaction) {
     tx.execute_batch(&format!(
-        "INSERT INTO currencies (code, name, decimals, symbol) VALUES ('CLP','Peso chileno',0,'$'), ('USD','Dólar estadounidense',2,'US$');
-         INSERT INTO branches (uid, name, is_default, created_at) VALUES ('b1','Casa matriz',1,'{T}');
+        "INSERT INTO branches (uid, name, is_default, created_at) VALUES ('b1','Casa matriz',1,'{T}');
          INSERT INTO warehouses (uid, branch_id, code, name, is_default, created_at) VALUES ('w1',1,'B1','Bodega principal',1,'{T}'), ('w2',1,'B2','Bodega secundaria',0,'{T}');
          INSERT INTO money_accounts (uid, kind, name, created_at) VALUES ('m1','caja','Caja','{T}'), ('m2','banco','Cuenta corriente','{T}');"
     ))

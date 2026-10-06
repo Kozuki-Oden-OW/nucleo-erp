@@ -2184,6 +2184,7 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 name = "nucleo-app"
 version = "0.1.0"
 dependencies = [
+ "argon2",
  "data-encoding",
  "getrandom 0.3.4",
  "keyring",
@@ -2191,6 +2192,7 @@ dependencies = [
  "nucleo-domain",
  "nucleo-io",
  "rusqlite",
+ "rust_decimal",
  "serde",
  "serde_json",
  "tempfile",
@@ -2218,6 +2220,7 @@ dependencies = [
 name = "nucleo-desktop"
 version = "0.1.0"
 dependencies = [
+ "data-encoding",
  "nucleo-app",
  "serde",
  "serde_json",

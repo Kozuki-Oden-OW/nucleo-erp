@@ -1,5 +1,6 @@
 //! Sesión abierta sobre la base de una empresa y sus casos de uso.
 
+use crate::auth::Actor;
 use crate::registry::{BusinessProfile, validate_name};
 use crate::{APP_VERSION, AppError, AppResult};
 use nucleo_db::customers::{self, CustomerRow, NewCustomerRow};
@@ -10,12 +11,14 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 pub struct CompanySession {
-    uid: String,
-    name: String,
-    profile: BusinessProfile,
-    dir: PathBuf,
-    db: Db,
-    key: DataKey,
+    pub(crate) uid: String,
+    pub(crate) name: String,
+    pub(crate) profile: BusinessProfile,
+    pub(crate) dir: PathBuf,
+    pub(crate) db: Db,
+    pub(crate) key: DataKey,
+    /// Quién opera. `None` = falta iniciar sesión (hay usuarios con contraseña).
+    pub(crate) actor: Option<Actor>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -108,14 +111,17 @@ impl CompanySession {
             .map(|p| BusinessProfile::parse(&p))
             .transpose()?
             .unwrap_or(BusinessProfile::Emprendedor);
-        Ok(Self {
+        let mut s = Self {
             uid: uid.into(),
             name,
             profile,
             dir: dir.into(),
             db,
             key,
-        })
+            actor: None,
+        };
+        s.auto_login()?;
+        Ok(s)
     }
 
     pub fn uid(&self) -> &str {
@@ -132,7 +138,9 @@ impl CompanySession {
     }
 
     /// Agrega un cliente. Valida el RUT (opcional) y audita en la misma transacción.
-    pub fn add_customer(&mut self, input: &NewCustomer, user: &str) -> AppResult<CustomerRow> {
+    pub fn add_customer(&mut self, input: &NewCustomer) -> AppResult<CustomerRow> {
+        let user = self.require("clientes.editar")?.username.clone();
+        let user = user.as_str();
         let name = validate_name(&input.name)?;
         let rut = match none_if_blank(&input.rut) {
             Some(r) => Some(
@@ -181,6 +189,7 @@ impl CompanySession {
     }
 
     pub fn search_customers(&self, query: &str, limit: u32) -> AppResult<Vec<CustomerRow>> {
+        self.require("clientes.ver")?;
         Ok(customers::search(
             self.db.conn(),
             query,
@@ -197,12 +206,9 @@ impl CompanySession {
     }
 
     /// Crea un respaldo `.erpbackup` en `dest_dir`, lo **verifica** reabriéndolo y lo audita.
-    pub fn create_backup(
-        &mut self,
-        dest_dir: &Path,
-        password: &str,
-        user: &str,
-    ) -> AppResult<BackupDone> {
+    pub fn create_backup(&mut self, dest_dir: &Path, password: &str) -> AppResult<BackupDone> {
+        let user = self.require("respaldos.crear")?.username.clone();
+        let user = user.as_str();
         std::fs::create_dir_all(dest_dir)?;
         let tmp = tempfile::tempdir()?;
         let snapshot = tmp.path().join("company.db");

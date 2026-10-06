@@ -85,6 +85,23 @@ informativo, sin renta guiada · D-11 promociones no acumulables por defecto · 
 | D-F3-08 | La leyenda "DOCUMENTO INTERNO — NO TRIBUTARIO" se imprime en todos los documentos de venta, incluida la cotización | Más simple y más seguro que distinguir por tipo |
 | D-F3-09 | Perfil de la demo: Empresa | Muestra todos los módulos, incluido COMEX, en la prueba de usabilidad |
 
+## Decisiones de la Fase 4
+
+| ID | Decisión | Motivo |
+|---|---|---|
+| D-F4-01 | Modo de un solo usuario por defecto: sin contraseñas, NÚCLEO abre con el dueño; el inicio de sesión aparece cuando alguien tiene contraseña | Un emprendedor solo no necesita usuarios; el negocio con personal sí. Mismo modelo para ambos |
+| D-F4-02 | Contraseñas con Argon2id (19 MiB, 2 pasadas, 1 hilo; parámetros OWASP), mínimo 8 caracteres | Estándar actual, rápido en un PC de oficina (< 0,1 s) |
+| D-F4-03 | 5 intentos fallidos bloquean al usuario 5 minutos; bloqueo de pantalla por inactividad configurable (15 min por defecto, 0 = nunca) | Frena adivinanzas sin dejar a nadie afuera por mucho tiempo |
+| D-F4-04 | Permisos verificados en Rust en cada comando (`Actor::require`); la interfaz solo oculta lo que no se puede usar | La pantalla no es una barrera de seguridad |
+| D-F4-05 | Siempre debe existir un dueño activo; si alguien tiene contraseña, el dueño también debe tenerla. Los roles Dueño y Administrador no se editan | Evita quedar fuera del propio negocio |
+| D-F4-06 | Adjuntos cifrados con AES-256-GCM usando subclaves derivadas de la clave de datos; nombre en disco = huella con clave; máximo 50 MB; sin duplicados | Cierra la limitación 4 de SECURITY.md; el respaldo los incluye sin cambios |
+| D-F4-07 | Los adjuntos no se borran: se archivan con motivo (queda en la auditoría) | Coherente con la inmutabilidad del resto del sistema |
+| D-F4-08 | Numeración guardada en `document_sequences` + `app_meta` (último usado); el próximo número solo avanza | Sin huecos ni números repetidos en documentos internos |
+| D-F4-09 | Tipos de cambio anotados por el usuario; NÚCLEO no los descarga | Sin conexión a Internet (privacidad); se usa el más reciente en o antes de la fecha del documento |
+| D-F4-10 | `BusinessPatch` con `Option<String>`: ausente = no cambia, cadena vacía = borrar | Semántica simple y sin ambigüedad sobre `null` en IPC |
+| D-F4-11 | Hilo escritor dedicado y `tauri-specta` se postergan | Con un `Mutex` por negocio las operaciones miden < 50 ms; `tauri-specta` sigue en *release candidate*. Se reevalúan en la Fase 12 (dashboard) y al publicarse su versión estable |
+| D-F4-12 | Envolver la clave de datos con la contraseña del administrador queda para la Fase 13 | Requiere diseñar la recuperación junto con la clave de recuperación existente |
+
 ## Dependencias y su justificación
 
 | Dependencia | Dónde | Por qué |
@@ -96,7 +113,7 @@ informativo, sin renta guiada · D-11 promociones no acumulables por defecto · 
 | `time` | rules, db, app | Fechas y vigencias |
 | `uuid` (v7) | db, app | Identificadores ordenables |
 | `sha2`, `hex` | db, io | Hash de auditoría y checksums |
-| `aes-gcm`, `argon2`, `getrandom` | io, app | Cifrado autenticado de respaldos, derivación de clave, aleatoriedad del SO |
+| `aes-gcm`, `argon2`, `getrandom` | io, app | Cifrado autenticado de respaldos y adjuntos, derivación de clave y hash de contraseñas, aleatoriedad del SO |
 | `tar` | io | Contenedor del respaldo |
 | `tempfile` | io, app | Carpetas temporales y escritura atómica |
 | `data-encoding` | app | Clave de recuperación en base32 |

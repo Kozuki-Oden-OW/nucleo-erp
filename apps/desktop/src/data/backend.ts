@@ -4,10 +4,14 @@
 // Las pantallas solo conocen esta interfaz; así un prototipo de la Fase 3 se convierte en pantalla
 // real cuando el comando Rust correspondiente existe.
 import type {
-  AppInfo, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, Customer, CustomerDetail,
-  Dashboard, EffectInput, ExternalRefInput, NewCustomer, NewProduct, Product, PurchaseOrderDetail,
-  PurchaseOrderSummary, QuoteDetail, QuoteInput, QuoteSummary, SaleDetail, SaleInput, SaleSummary, SearchHit, SessionInfo,
+  AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
+  Customer, CustomerDetail, Dashboard, EffectInput, EntityRef, ExternalRefInput, NewCustomer, NewProduct, NewUser,
+  PermissionRow, Product, PurchaseOrderDetail, PurchaseOrderSummary, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow,
+  SaleDetail, SaleInput, SaleSummary, SearchHit, SecuritySettings, SequenceRow, SessionInfo, UserPatch, UserRow,
 } from "./types";
+
+/** Archivo elegido para adjuntar: ruta en el escritorio o archivo del navegador en la demostración. */
+export type FileSource = { path: string } | { file: File };
 
 export interface SaleFilter {
   query?: string;
@@ -15,7 +19,9 @@ export interface SaleFilter {
 }
 
 /** Módulos que el backend ya implementa. La interfaz oculta o marca "próximamente" lo que falte. */
-export type Feature = "dashboard" | "clientes" | "productos" | "ventas" | "compras" | "comex" | "negocio" | "respaldos" | "busqueda";
+export type Feature =
+  | "dashboard" | "clientes" | "productos" | "ventas" | "compras" | "comex" | "negocio" | "respaldos" | "busqueda"
+  | "usuarios" | "documentos" | "numeracion" | "monedas" | "auditoria";
 
 export interface Backend {
   readonly kind: "tauri" | "demo";
@@ -26,12 +32,42 @@ export interface Backend {
   createCompany(name: string, profile: BusinessProfile): Promise<CreatedCompany>;
   openCompany(uid: string): Promise<SessionInfo>;
   recoverKey(uid: string, recovery: string): Promise<void>;
+  sessionInfo(): Promise<SessionInfo>;
+  login(username: string, password: string): Promise<SessionInfo>;
+  logout(): Promise<SessionInfo>;
   business(): Promise<BusinessSettings>;
+  /** Campos de texto: cadena vacía = borrar el dato. */
   updateBusiness(patch: Partial<BusinessSettings>): Promise<BusinessSettings>;
   globalSearch(query: string): Promise<SearchHit[]>;
   /** Valor normativo vigente (paquete cargado), o null si no hay uno con fuente. */
   ruleValue(code: string): Promise<{ value: number; source: string } | null>;
   verifyAudit(): Promise<ChainReport>;
+  auditLog(query: string, beforeId?: number): Promise<AuditRow[]>;
+  security(): Promise<SecuritySettings>;
+  updateSecurity(s: SecuritySettings): Promise<SecuritySettings>;
+
+  // Usuarios y roles
+  listUsers(): Promise<UserRow[]>;
+  roles(): Promise<{ roles: RoleRow[]; permissions: PermissionRow[] }>;
+  createUser(input: NewUser): Promise<UserRow>;
+  updateUser(uid: string, patch: UserPatch): Promise<UserRow>;
+  setPassword(uid: string, password: string | null): Promise<void>;
+  updateRolePermissions(role: string, permissions: string[]): Promise<RoleRow>;
+
+  // Numeración y monedas
+  sequences(): Promise<SequenceRow[]>;
+  updateSequence(docType: string, prefix: string, nextNumber: number, width: number): Promise<SequenceRow>;
+  currencies(): Promise<CurrencyRow[]>;
+  rates(currency: string): Promise<RateRow[]>;
+  setRate(currency: string, date: string, rateE6: number, note?: string): Promise<void>;
+
+  // Documentos adjuntos (cifrados en el computador)
+  addAttachment(source: FileSource, description: string | null, link: EntityRef | null): Promise<AttachmentRow>;
+  listAttachments(query: string, link: EntityRef | null): Promise<AttachmentRow[]>;
+  /** Guarda una copia descifrada donde la persona elija. Devuelve false si canceló. */
+  exportAttachment(row: AttachmentRow): Promise<boolean>;
+  attachmentPreview(uid: string): Promise<string | null>;
+  archiveAttachment(uid: string, reason: string): Promise<void>;
   createBackup(password: string): Promise<BackupDone>;
   restoreBackup(path: string, password: string): Promise<{ name: string }>;
 

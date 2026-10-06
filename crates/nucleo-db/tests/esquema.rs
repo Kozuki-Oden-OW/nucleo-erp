@@ -17,7 +17,7 @@ fn db() -> (tempfile::TempDir, Db) {
 }
 
 fn seed_basics(c: &Connection) -> (i64, i64, i64) {
-    c.execute("INSERT INTO currencies (code, name, decimals, symbol) VALUES ('CLP','Peso chileno',0,'$'), ('USD','Dólar',2,'US$')", []).unwrap();
+    // Las monedas base (CLP, USD, EUR, CNY) vienen en la migración 0011.
     c.execute("INSERT INTO warehouses (uid, code, name, is_default, created_at) VALUES ('w1','B1','Bodega principal',1,?1)", [T]).unwrap();
     let wh = c.last_insert_rowid();
     c.execute("INSERT INTO products (uid, sku, name, price_minor, created_at) VALUES ('p1','CAF-X','Cafetera X',49990,?1)", [T]).unwrap();

@@ -79,6 +79,52 @@ pub struct ChainReport {
     pub broken_at: Option<i64>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AuditRow {
+    pub id: i64,
+    pub ts_utc: String,
+    pub user_name: String,
+    pub action: String,
+    pub entity: String,
+    pub entity_id: Option<String>,
+    pub before_json: Option<String>,
+    pub after_json: Option<String>,
+    pub reason: Option<String>,
+}
+
+/// Registros más recientes primero, con filtro de texto opcional (usuario, acción o entidad)
+/// y paginación por cursor (`before_id`).
+pub fn recent(
+    conn: &Connection,
+    query: &str,
+    before_id: Option<i64>,
+    limit: u32,
+) -> DbResult<Vec<AuditRow>> {
+    let like = format!("%{}%", query.trim());
+    let mut stmt = conn.prepare(
+        "SELECT id, ts_utc, user_name, action, entity, entity_id, before_json, after_json, reason FROM audit_log
+         WHERE id < ?1 AND (user_name LIKE ?2 OR action LIKE ?2 OR entity LIKE ?2 OR ifnull(entity_id, '') LIKE ?2)
+         ORDER BY id DESC LIMIT ?3",
+    )?;
+    let rows = stmt.query_map(
+        rusqlite::params![before_id.unwrap_or(i64::MAX), like, limit],
+        |r| {
+            Ok(AuditRow {
+                id: r.get(0)?,
+                ts_utc: r.get(1)?,
+                user_name: r.get(2)?,
+                action: r.get(3)?,
+                entity: r.get(4)?,
+                entity_id: r.get(5)?,
+                before_json: r.get(6)?,
+                after_json: r.get(7)?,
+                reason: r.get(8)?,
+            })
+        },
+    )?;
+    Ok(rows.collect::<Result<_, _>>()?)
+}
+
 pub fn verify_chain(conn: &Connection) -> DbResult<ChainReport> {
     let mut stmt = conn.prepare(
         "SELECT id, ts_utc, user_name, action, entity, entity_id, before_json, after_json, reason, prev_hash, hash

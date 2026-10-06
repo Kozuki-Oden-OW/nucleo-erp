@@ -60,6 +60,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "analitica",
         sql: include_str!("../migrations/0010_analitica.sql"),
     },
+    Migration {
+        version: 11,
+        name: "core",
+        sql: include_str!("../migrations/0011_core.sql"),
+    },
 ];
 
 pub fn latest_version() -> i64 {

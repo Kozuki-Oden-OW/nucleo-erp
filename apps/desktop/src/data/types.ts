@@ -27,11 +27,77 @@ export interface ChainReport {
   ok: boolean;
   broken_at: number | null;
 }
+export interface CurrentUser {
+  uid: string;
+  username: string;
+  display_name: string;
+  roles: string[];
+  permissions: string[];
+}
 export interface SessionInfo {
   company: CompanyInfo;
   cipher_version: string;
   customers: number;
   audit: ChainReport;
+  /** Hay usuarios con contraseña y falta iniciar sesión. */
+  login_required: boolean;
+  user: CurrentUser | null;
+  /** [usuario, nombre visible] de quienes pueden iniciar sesión. */
+  login_users: [string, string][];
+  /** Minutos sin actividad antes de bloquear (0 = nunca). */
+  lock_minutes: number;
+}
+
+/* ───── Usuarios y permisos ───── */
+
+export interface UserRow {
+  id: number;
+  uid: string;
+  username: string;
+  display_name: string;
+  has_password: boolean;
+  is_active: boolean;
+  last_login_at: string | null;
+  created_at: string;
+  roles: string[];
+}
+export interface RoleRow { code: string; name: string; is_system: boolean; permissions: string[] }
+export interface PermissionRow { code: string; description: string }
+export interface NewUser { username: string; display_name: string; roles: string[]; password?: string }
+export interface UserPatch { display_name: string; is_active: boolean; roles: string[] }
+export interface SecuritySettings { lock_minutes: number }
+
+/* ───── Numeración y monedas ───── */
+
+export interface SequenceRow { doc_type: string; name: string; prefix: string; next_number: number; width: number; last_used: number }
+export interface CurrencyRow { code: string; name: string; decimals: number; symbol: string; last_rate_e6: number | null; last_rate_date: string | null }
+export interface RateRow { currency_code: string; rate_date: string; rate_e6: number; note: string | null; created_at: string }
+
+/* ───── Documentos y auditoría ───── */
+
+export interface AttachmentRow {
+  id: number;
+  uid: string;
+  sha256: string;
+  file_name: string;
+  mime_type: string;
+  size_bytes: number;
+  description: string | null;
+  created_by: string | null;
+  created_at: string;
+  links: string[];
+}
+export interface EntityRef { entity: "cliente" | "proveedor" | "producto" | "cotizacion" | "venta" | "orden_compra" | "compra" | "gasto" | "importacion"; uid: string }
+export interface AuditRow {
+  id: number;
+  ts_utc: string;
+  user_name: string;
+  action: string;
+  entity: string;
+  entity_id: string | null;
+  before_json: string | null;
+  after_json: string | null;
+  reason: string | null;
 }
 
 /* ───── Negocio ───── */
@@ -265,7 +331,7 @@ export interface Dashboard {
 /* ───── Búsqueda global ───── */
 
 export interface SearchHit {
-  kind: "cliente" | "producto" | "venta" | "cotizacion" | "orden_compra";
+  kind: "cliente" | "proveedor" | "producto" | "venta" | "cotizacion" | "orden_compra" | "documento";
   uid: string;
   title: string;
   subtitle: string;

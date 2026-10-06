@@ -98,6 +98,16 @@ impl AppService {
         &self.data_dir
     }
 
+    /// Actualiza nombre y perfil en el registro del computador (la base de la empresa ya se
+    /// actualizó en la misma operación de `CompanySession::update_business`).
+    pub fn update_company(&self, uid: &str, name: &str, profile: BusinessProfile) -> AppResult<()> {
+        self.registry.execute(
+            "UPDATE companies SET name = ?2, profile = ?3 WHERE uid = ?1",
+            (uid, name, profile.as_str()),
+        )?;
+        Ok(())
+    }
+
     pub fn list_companies(&self) -> AppResult<Vec<CompanyInfo>> {
         let mut stmt = self.registry.prepare(
             "SELECT uid, name, profile, created_at FROM companies WHERE archived_at IS NULL ORDER BY created_at",
@@ -152,8 +162,9 @@ impl AppService {
         &mut self,
         name: &str,
         profile: BusinessProfile,
-        user: &str,
     ) -> AppResult<CreatedCompany> {
+        // Quien crea el negocio es su dueño (usuario inicial de la migración 0011).
+        let user = "dueno";
         let name = validate_name(name)?;
         let uid = uuid::Uuid::now_v7().to_string();
         let key = keys::generate_key()?;

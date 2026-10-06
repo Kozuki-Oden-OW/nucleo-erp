@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  ArrowRight, FileText, Moon, Package, Plus, Search, ShoppingBag, ShoppingCart, Sun, User, Users, Calculator, type LucideIcon,
+  ArrowRight, FileText, Moon, Package, Paperclip, Plus, Search, ShoppingBag, ShoppingCart, Sun, Truck, User, Users, Calculator, type LucideIcon,
 } from "lucide-react";
 import { useBackend, type SearchHit } from "../data";
 import { navigate } from "../lib/router";
@@ -23,10 +23,10 @@ interface Item {
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 const HIT_ICON: Record<SearchHit["kind"], LucideIcon> = {
-  cliente: User, producto: Package, venta: ShoppingBag, cotizacion: FileText, orden_compra: ShoppingCart,
+  cliente: User, proveedor: Truck, producto: Package, venta: ShoppingBag, cotizacion: FileText, orden_compra: ShoppingCart, documento: Paperclip,
 };
 const HIT_GROUP: Record<SearchHit["kind"], string> = {
-  cliente: "Clientes", producto: "Productos", venta: "Ventas", cotizacion: "Cotizaciones", orden_compra: "Órdenes de compra",
+  cliente: "Clientes", proveedor: "Proveedores", producto: "Productos", venta: "Ventas", cotizacion: "Cotizaciones", orden_compra: "Órdenes de compra", documento: "Documentos",
 };
 function hitHref(h: SearchHit): string {
   switch (h.kind) {
@@ -35,6 +35,8 @@ function hitHref(h: SearchHit): string {
     case "venta": return `/ventas/${h.uid}`;
     case "cotizacion": return `/cotizaciones/${h.uid}`;
     case "orden_compra": return `/compras/${h.uid}`;
+    case "documento": return `/documentos?ver=${h.uid}`;
+    case "proveedor": return `/proveedores/${h.uid}`;
   }
 }
 

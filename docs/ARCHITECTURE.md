@@ -44,7 +44,7 @@ nucleo-app   casos de uso, transacciones, auditoría, claves, respaldos
 ├─ app.db                         registro de negocios (nombre, perfil, carpeta). Sin datos de negocio.
 └─ companies\<uid>\
    ├─ company.db (+ -wal, -shm)   base cifrada con SQLCipher
-   └─ documents\                  adjuntos (cifrado por archivo: Fase 13)
+   └─ documents\                  adjuntos cifrados por archivo (AES-256-GCM, Fase 4)
 Documentos\NUCLEO ERP Respaldos\  respaldos .erpbackup
 ```
 
@@ -55,7 +55,7 @@ por negocio).
 
 - SQLite en modo **WAL**, `foreign_keys = ON`, `synchronous = NORMAL`, `busy_timeout = 5 s`.
 - Fase 1: una conexión por negocio abierto, protegida por `Mutex` en el estado de Tauri.
-- Fase 2/4: hilo escritor dedicado + lectores para listas grandes (Blueprint §2.3).
+- Hilo escritor dedicado + lectores: postergado a la Fase 12 (D-F4-11); hoy cada operación mide < 50 ms.
 - Cada caso de uso que escribe usa **una transacción** con el cambio + `audit_log`.
 
 ## 5. Números
@@ -77,9 +77,10 @@ por negocio).
 
 ## 7. Seguridad de la aplicación
 
-- Capacidades Tauri mínimas (`capabilities/default.json`): `core:default` y `dialog:allow-open`.
+- Capacidades Tauri mínimas (`capabilities/default.json`): `core:default`, `dialog:allow-open` y `dialog:allow-save`.
   Sin shell, sin HTTP, sin acceso libre al sistema de archivos.
 - Validación de entradas en Rust (nombre, RUT con módulo 11, correo).
+- Sesión y permisos en `nucleo_app::auth` (`Actor`): cada comando que lee o escribe datos pide su permiso.
 - Rutas UNC (`\\servidor\...`) rechazadas: SQLite por red corrompe datos.
 
 ## 8. Herramientas y sitio
@@ -90,5 +91,5 @@ por negocio).
 
 ## 9. Lo que falta (por fase)
 
-Ver [ROADMAP.md](ROADMAP.md). Los puntos abiertos de arquitectura son: hilo escritor y `tauri-specta`
-(Fase 4), usuarios/roles (Fase 4), PDF (Fase 5), cifrado de adjuntos y respaldo por bloques (Fase 13).
+Ver [ROADMAP.md](ROADMAP.md). Los puntos abiertos de arquitectura son: PDF (Fase 5), hilo escritor (Fase 12),
+clave envuelta con contraseña y respaldo por bloques (Fase 13), `tauri-specta` (al salir su versión estable).

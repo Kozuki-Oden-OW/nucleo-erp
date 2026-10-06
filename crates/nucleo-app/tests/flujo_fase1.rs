@@ -19,11 +19,7 @@ fn crear_escribir_respaldar_restaurar() {
 
     // 1. Crear negocio (perfil Emprendedor, sin datos tributarios).
     let created = app
-        .create_company(
-            "Ferretería Los Andes",
-            BusinessProfile::Emprendedor,
-            "admin",
-        )
+        .create_company("Ferretería Los Andes", BusinessProfile::Emprendedor)
         .unwrap();
     assert_eq!(created.recovery_key.split('-').count(), 13);
     let uid = created.company.uid.clone();
@@ -31,35 +27,32 @@ fn crear_escribir_respaldar_restaurar() {
     // 2. Escribir.
     let mut s = app.open_company(&uid).unwrap();
     assert!(!s.cipher_version().unwrap().is_empty());
-    s.add_customer(&cliente("Juan Pérez", Some("12.345.678-5")), "admin")
+    s.add_customer(&cliente("Juan Pérez", Some("12.345.678-5")))
         .unwrap();
-    s.add_customer(&cliente("Comercial Sur", None), "admin")
-        .unwrap();
+    s.add_customer(&cliente("Comercial Sur", None)).unwrap();
     assert!(
-        s.add_customer(&cliente("Otro", Some("12.345.678-9")), "admin")
+        s.add_customer(&cliente("Otro", Some("12.345.678-9")))
             .is_err()
     ); // DV malo
     assert!(
-        s.add_customer(&cliente("Duplicado", Some("12345678-5")), "admin")
+        s.add_customer(&cliente("Duplicado", Some("12345678-5")))
             .is_err()
     ); // RUT repetido
     assert_eq!(s.search_customers("perez", 10).unwrap().len(), 1);
 
     // 3. Respaldar (con verificación inmediata).
-    let done = s
-        .create_backup(backups.path(), "contraseña-larga", "admin")
-        .unwrap();
+    let done = s.create_backup(backups.path(), "contraseña-larga").unwrap();
     assert!(done.verified);
     assert!(done.file_name.starts_with("ferreteria-los-andes_"));
     assert_eq!(done.manifest.counts.get("customers"), Some(&2));
 
     // 4. Restaurar como empresa nueva.
     assert!(
-        app.restore_backup(done.path.as_ref(), "otra-clave-larga", "admin")
+        app.restore_backup(done.path.as_ref(), "otra-clave-larga", "dueno")
             .is_err()
     );
     let restored = app
-        .restore_backup(done.path.as_ref(), "contraseña-larga", "admin")
+        .restore_backup(done.path.as_ref(), "contraseña-larga", "dueno")
         .unwrap();
     assert!(restored.name.contains("(restaurada"));
     assert_eq!(app.list_companies().unwrap().len(), 2);
@@ -83,7 +76,7 @@ fn clave_de_recuperacion_rehabilita_la_empresa() {
     let data = tempfile::tempdir().unwrap();
     let mut app = AppService::open(data.path(), Box::new(MemoryKeyStore::default())).unwrap();
     let created = app
-        .create_company("Mi Negocio", BusinessProfile::Negocio, "admin")
+        .create_company("Mi Negocio", BusinessProfile::Negocio)
         .unwrap();
     let uid = created.company.uid.clone();
     drop(app);
@@ -108,19 +101,14 @@ fn clave_de_recuperacion_rehabilita_la_empresa() {
 fn validaciones_de_entrada() {
     let data = tempfile::tempdir().unwrap();
     let mut app = AppService::open(data.path(), Box::new(MemoryKeyStore::default())).unwrap();
-    assert!(
-        app.create_company("   ", BusinessProfile::Empresa, "admin")
-            .is_err()
-    );
-    let c = app
-        .create_company("X", BusinessProfile::Empresa, "admin")
-        .unwrap();
+    assert!(app.create_company("   ", BusinessProfile::Empresa).is_err());
+    let c = app.create_company("X", BusinessProfile::Empresa).unwrap();
     let mut s = app.open_company(&c.company.uid).unwrap();
-    assert!(s.add_customer(&cliente("", None), "admin").is_err());
+    assert!(s.add_customer(&cliente("", None)).is_err());
     let mut bad_mail = cliente("Ana", None);
     bad_mail.email = Some("ana-sin-arroba".into());
-    assert!(s.add_customer(&bad_mail, "admin").is_err());
-    assert!(s.create_backup(data.path(), "corta", "admin").is_err());
+    assert!(s.add_customer(&bad_mail).is_err());
+    assert!(s.create_backup(data.path(), "corta").is_err());
 }
 
 /// Almacén de claves que siempre falla (simula un Windows sin acceso al Credential Manager).
@@ -142,7 +130,7 @@ fn crear_negocio_es_todo_o_nada() {
     let data = tempfile::tempdir().unwrap();
     let mut app = AppService::open(data.path(), Box::new(BrokenKeyStore)).unwrap();
     assert!(
-        app.create_company("Mi Negocio", BusinessProfile::Emprendedor, "admin")
+        app.create_company("Mi Negocio", BusinessProfile::Emprendedor)
             .is_err()
     );
     assert!(app.list_companies().unwrap().is_empty());

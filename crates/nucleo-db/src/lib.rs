@@ -5,9 +5,11 @@
 //! la auditoría encadenada, la búsqueda FTS5 y las copias consistentes para respaldos.
 
 pub mod audit;
+pub mod core;
 pub mod customers;
 pub mod maintenance;
 pub mod migrations;
+pub mod users;
 
 use rusqlite::{Connection, OpenFlags};
 use std::path::{Path, PathBuf};
@@ -66,6 +68,9 @@ pub enum DbError {
     Duplicate(&'static str),
     #[error("la verificación de integridad encontró problemas: {0:?}")]
     Integrity(Vec<String>),
+    /// Una regla del negocio impide el cambio (mensaje listo para mostrar).
+    #[error("{0}")]
+    Rule(String),
 }
 
 pub type DbResult<T> = Result<T, DbError>;

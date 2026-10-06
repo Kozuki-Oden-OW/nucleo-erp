@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   BackendProvider, createDemoBackend, defaultBackend, errorMessage, useBackend, type AppInfo, type Backend, type CreatedCompany,
   type QuoteDetail, type SaleDetail, type SessionInfo,
 } from "./data";
 import { PrefsProvider } from "./lib/prefs";
+import { SessionProvider } from "./lib/session";
+import { Login } from "./screens/Login";
+import { Documents } from "./screens/documentos/Documents";
 import { navigate, useRoute, type Route } from "./lib/router";
 import { AppShell } from "./shell/AppShell";
 import { Dashboard } from "./screens/Dashboard";
@@ -42,6 +45,7 @@ function Root({ onDemo }: { onDemo?: () => void }) {
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [pendingKey, setPendingKey] = useState<CreatedCompany | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [locked, setLocked] = useState(false);
 
   const load = useCallback(async (openUid?: string) => {
     try {
@@ -64,12 +68,39 @@ function Root({ onDemo }: { onDemo?: () => void }) {
     return <RecoveryKey recoveryKey={pendingKey.recovery_key} onDone={() => { const uid = pendingKey.company.uid; setPendingKey(null); navigate("/inicio", { replace: true }); void load(uid); }} />;
   }
   if (info.companies.length === 0 || !session) return <Onboarding onCreated={setPendingKey} onDemo={onDemo} />;
+  if (session.login_required) {
+    return <Login info={info} session={session} locked={locked} onLogged={(s) => { setLocked(false); setSession(s); }} onSwitch={(uid) => void load(uid)} />;
+  }
 
   return (
-    <AppShell info={info} session={session} route={route} onSwitch={(uid) => void load(uid)}>
-      <Screen route={route} info={info} session={session} reload={() => void load()} />
-    </AppShell>
+    <SessionProvider session={session} setSession={setSession}>
+      <InactivityLock session={session} onLocked={(s) => { setLocked(true); setSession(s); }} />
+      <AppShell info={info} session={session} route={route} onSwitch={(uid) => void load(uid)}>
+        <Screen route={route} info={info} session={session} reload={() => void load()} />
+      </AppShell>
+    </SessionProvider>
   );
+}
+
+/** Bloquea la pantalla tras N minutos sin actividad, solo si el negocio usa contraseñas. */
+function InactivityLock({ session, onLocked }: { session: SessionInfo; onLocked: (s: SessionInfo) => void }) {
+  const backend = useBackend();
+  const active = session.login_users.length > 0 && session.lock_minutes > 0;
+  const cb = useRef(onLocked);
+  cb.current = onLocked;
+  useEffect(() => {
+    if (!active) return;
+    let timer = 0;
+    const reset = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => { backend.logout().then((s) => cb.current(s)).catch(() => {}); }, session.lock_minutes * 60_000);
+    };
+    const events = ["mousemove", "mousedown", "keydown", "wheel", "touchstart"] as const;
+    events.forEach((e) => window.addEventListener(e, reset, { passive: true }));
+    reset();
+    return () => { window.clearTimeout(timer); events.forEach((e) => window.removeEventListener(e, reset)); };
+  }, [active, session.lock_minutes, backend]);
+  return null;
 }
 
 function Screen({ route, info, session, reload }: { route: Route; info: AppInfo; session: SessionInfo; reload: () => void }) {
@@ -103,6 +134,8 @@ function Screen({ route, info, session, reload }: { route: Route; info: AppInfo;
       return has.has("comex") ? <ImportCalculator /> : <Proximamente id="comex" />;
     case "config":
       return <Config route={route} info={info} session={session} onChanged={reload} />;
+    case "documentos":
+      return has.has("documentos") ? <Documents route={route} /> : <Proximamente id="documentos" />;
     case "proximamente":
       return <Proximamente id={a ?? ""} />;
     default:

@@ -1,9 +1,10 @@
 // Estructura de pantalla (Blueprint §4.1): menú lateral, barra superior y área de trabajo.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  Bell, ChevronsLeft, ChevronsRight, FlaskConical, Monitor, Moon, PanelLeft, Plus, Search, Sun, TriangleAlert, FileWarning,
+  Bell, ChevronsLeft, ChevronsRight, FlaskConical, KeyRound, LogOut, Monitor, Moon, PanelLeft, Plus, Search, Sun, TriangleAlert, FileWarning,
 } from "lucide-react";
 import { useBackend, type AppInfo, type Dashboard, type SessionInfo } from "../data";
+import { useSession } from "../lib/session";
 import { navigate, type Route } from "../lib/router";
 import { usePrefs, type Theme } from "../lib/prefs";
 import { PROFILE_LABEL } from "../lib/format";
@@ -50,8 +51,10 @@ export function AppShell({
   const collapsed = override ?? (prefs.sidebarCollapsed || narrow);
   const toggleSidebar = () => (narrow ? setOverride(!collapsed) : set({ sidebarCollapsed: !collapsed }));
   const profile = session.company.profile;
-  const items = visibleNav(profile, prefs.extraModules);
-  const hidden = hiddenNav(profile, prefs.extraModules);
+  const { can, setSession } = useSession();
+  const items = visibleNav(profile, prefs.extraModules, can);
+  const hidden = hiddenNav(profile, prefs.extraModules, can);
+  const footer = NAV_FOOTER.filter((n) => !n.perm || can(n.perm));
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -139,7 +142,7 @@ export function AppShell({
             )}
           </nav>
           <div className="space-y-0.5 border-t border-line p-2">
-            {NAV_FOOTER.map(navButton)}
+            {footer.map(navButton)}
             <button
               onClick={toggleSidebar}
               className={cx("flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-muted hover:bg-surface-2 hover:text-ink", collapsed && "justify-center px-0")}
@@ -164,7 +167,7 @@ export function AppShell({
               <Kbd>Ctrl K</Kbd>
             </button>
             <div className="ml-auto flex shrink-0 items-center gap-2">
-              {backend.features.has("ventas") && (
+              {backend.features.has("ventas") && can("ventas.crear") && (
                 <Button size="sm" icon={Plus} onClick={() => navigate("/ventas/nueva")} title="Nueva venta (Alt+N)">
                   <span className="hidden sm:inline">Nueva venta</span>
                 </Button>
@@ -185,6 +188,7 @@ export function AppShell({
                 )}
                 {bell && <AlertsPopover data={alerts} onClose={() => setBell(false)} />}
               </div>
+              <UserMenu session={session} onLogout={async () => setSession(await backend.logout())} />
             </div>
           </header>
           <main className="min-h-0 flex-1 overflow-y-auto">
@@ -193,6 +197,39 @@ export function AppShell({
         </div>
       </div>
       <CommandPalette open={palette} onClose={() => setPalette(false)} />
+    </div>
+  );
+}
+
+function UserMenu({ session, onLogout }: { session: SessionInfo; onLogout: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    window.addEventListener("mousedown", h);
+    return () => window.removeEventListener("mousedown", h);
+  }, [open]);
+  const u = session.user;
+  if (!u) return null;
+  const initials = u.display_name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+  const passwords = session.login_users.length > 0;
+  return (
+    <div ref={ref} className="relative">
+      <button onClick={() => setOpen((o) => !o)} title={u.display_name} aria-label={`Usuario: ${u.display_name}`}
+        className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-soft text-[13px] font-semibold text-accent hover:brightness-95">
+        {initials || "?"}
+      </button>
+      {open && (
+        <div className="anim-in absolute right-0 top-11 z-30 w-64 rounded-xl border border-line bg-surface p-2 shadow-pop">
+          <div className="px-3 py-2">
+            <div className="font-medium text-ink">{u.display_name}</div>
+            <div className="text-xs text-muted">{u.username} · {u.roles.join(", ")}</div>
+          </div>
+          <button onClick={() => { navigate("/config/usuarios"); setOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-2"><KeyRound size={15} aria-hidden /> {passwords ? "Cambiar mi contraseña" : "Usuarios y contraseñas"}</button>
+          {passwords && <button onClick={() => { setOpen(false); onLogout(); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-2"><LogOut size={15} aria-hidden /> Cerrar sesión</button>}
+        </div>
+      )}
     </div>
   );
 }
