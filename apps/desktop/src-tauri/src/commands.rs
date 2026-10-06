@@ -8,7 +8,12 @@ use nucleo_app::core_ops::{
 use nucleo_app::nucleo_db::audit::{AuditRow, ChainReport};
 use nucleo_app::nucleo_db::core::{AttachmentRow, CurrencyRow, RateRow, SearchHit, SequenceRow};
 use nucleo_app::nucleo_db::customers::CustomerRow;
+use nucleo_app::nucleo_db::products::ProductRow;
 use nucleo_app::nucleo_db::users::{PermissionRow, RoleRow, UserRow};
+use nucleo_app::sales_ops::{
+    CustomerDetail, EffectInput, ExternalRefInput, NewProduct, ProductPatch, QuoteDetail,
+    QuoteInput, QuoteSummary, SaleDetail, SaleFilter, SaleInput, SaleSummary,
+};
 use nucleo_app::{
     AppError, AppService, BusinessProfile, CompanyInfo, CompanySession, CreatedCompany, NewCustomer,
 };
@@ -429,4 +434,140 @@ pub fn restore_backup(
         Ok(s.actor_name()?)
     })?;
     Ok(svc(&state)?.restore_backup(path.as_ref(), &password, &user)?)
+}
+
+/* ───────────────────────────── Ventas (Fase 5) ───────────────────────────── */
+
+#[tauri::command]
+pub fn search_products(state: State<'_, AppState>, query: String) -> CmdResult<Vec<ProductRow>> {
+    with_session(&state, |s| Ok(s.search_products(&query, 300)?))
+}
+
+#[tauri::command]
+pub fn add_product(state: State<'_, AppState>, input: NewProduct) -> CmdResult<ProductRow> {
+    with_session(&state, |s| Ok(s.add_product(&input)?))
+}
+
+#[tauri::command]
+pub fn customer(state: State<'_, AppState>, uid: String) -> CmdResult<CustomerDetail> {
+    with_session(&state, |s| Ok(s.customer_detail(&uid)?))
+}
+
+#[tauri::command]
+pub fn list_quotes(
+    state: State<'_, AppState>,
+    query: Option<String>,
+) -> CmdResult<Vec<QuoteSummary>> {
+    with_session(&state, |s| {
+        Ok(s.list_quotes(query.as_deref().unwrap_or(""))?)
+    })
+}
+
+#[tauri::command]
+pub fn quote(state: State<'_, AppState>, uid: String) -> CmdResult<QuoteDetail> {
+    with_session(&state, |s| Ok(s.quote(&uid)?))
+}
+
+#[tauri::command]
+pub fn save_quote(
+    state: State<'_, AppState>,
+    input: QuoteInput,
+    uid: Option<String>,
+) -> CmdResult<QuoteDetail> {
+    with_session(&state, |s| Ok(s.save_quote(&input, uid.as_deref())?))
+}
+
+#[tauri::command]
+pub fn set_quote_status(
+    state: State<'_, AppState>,
+    uid: String,
+    status: String,
+) -> CmdResult<QuoteDetail> {
+    with_session(&state, |s| Ok(s.set_quote_status(&uid, &status)?))
+}
+
+#[tauri::command]
+pub fn convert_quote(state: State<'_, AppState>, uid: String) -> CmdResult<SaleDetail> {
+    with_session(&state, |s| Ok(s.convert_quote(&uid)?))
+}
+
+#[tauri::command]
+pub fn list_sales(state: State<'_, AppState>, filter: SaleFilter) -> CmdResult<Vec<SaleSummary>> {
+    with_session(&state, |s| Ok(s.list_sales(&filter)?))
+}
+
+#[tauri::command]
+pub fn sale(state: State<'_, AppState>, uid: String) -> CmdResult<SaleDetail> {
+    with_session(&state, |s| Ok(s.sale(&uid)?))
+}
+
+#[tauri::command]
+pub fn save_sale(
+    state: State<'_, AppState>,
+    input: SaleInput,
+    uid: Option<String>,
+) -> CmdResult<SaleDetail> {
+    with_session(&state, |s| Ok(s.save_sale(&input, uid.as_deref())?))
+}
+
+#[tauri::command]
+pub fn effect_sale(
+    state: State<'_, AppState>,
+    uid: String,
+    input: EffectInput,
+) -> CmdResult<SaleDetail> {
+    with_session(&state, |s| Ok(s.effect_sale(&uid, &input)?))
+}
+
+#[tauri::command]
+pub fn register_payment(
+    state: State<'_, AppState>,
+    uid: String,
+    amount_minor: i64,
+    method: String,
+    date: String,
+) -> CmdResult<SaleDetail> {
+    with_session(&state, |s| {
+        Ok(s.register_payment(&uid, amount_minor, &method, &date)?)
+    })
+}
+
+#[tauri::command]
+pub fn mark_documented(
+    state: State<'_, AppState>,
+    uid: String,
+    reference: ExternalRefInput,
+) -> CmdResult<SaleDetail> {
+    with_session(&state, |s| Ok(s.mark_documented(&uid, &reference)?))
+}
+
+#[tauri::command]
+pub fn set_documentation_not_applicable(
+    state: State<'_, AppState>,
+    uid: String,
+) -> CmdResult<SaleDetail> {
+    with_session(&state, |s| Ok(s.set_documentation_not_applicable(&uid)?))
+}
+
+#[tauri::command]
+pub fn void_sale(state: State<'_, AppState>, uid: String, reason: String) -> CmdResult<SaleDetail> {
+    with_session(&state, |s| Ok(s.void_sale(&uid, &reason)?))
+}
+
+#[tauri::command]
+pub fn update_product(
+    state: State<'_, AppState>,
+    uid: String,
+    patch: ProductPatch,
+) -> CmdResult<ProductRow> {
+    with_session(&state, |s| Ok(s.update_product(&uid, &patch)?))
+}
+
+#[tauri::command]
+pub fn update_customer(
+    state: State<'_, AppState>,
+    uid: String,
+    input: NewCustomer,
+) -> CmdResult<CustomerRow> {
+    with_session(&state, |s| Ok(s.update_customer(&uid, &input)?))
 }

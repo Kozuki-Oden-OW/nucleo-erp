@@ -20,3 +20,7 @@ tauri-plugin-dialog = "2"
 serde.workspace = true
 data-encoding.workspace = true
 serde_json.workspace = true
+
+[dev-dependencies]
+tauri = { version = "2", features = ["test"] }
+tempfile.workspace = true

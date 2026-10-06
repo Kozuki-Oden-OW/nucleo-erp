@@ -36,9 +36,12 @@ pub struct BusinessSettings {
     pub documentation_reminder: bool,
     /// Calcular IVA informativo en los documentos (requiere un paquete normativo vigente).
     pub tax_enabled: bool,
-    /// Tasa vigente del paquete normativo (ppm) y su fuente; `None` si no hay paquete cargado.
+    /// Tasa que se aplica (ppm) y su origen: el paquete normativo vigente o, si no hay uno, la
+    /// tasa que el usuario anotó. `None` = sin tasa: los documentos no calculan impuesto.
     pub tax_rate_ppm: Option<i64>,
     pub tax_rule_source: Option<String>,
+    /// Tasa anotada por el usuario (D-F5-02), aunque un paquete normativo tenga prioridad.
+    pub tax_rate_user_ppm: Option<i64>,
 }
 
 /// Cambios a los datos del negocio. `None` = no cambia; texto vacío = borrar el dato.
@@ -54,6 +57,8 @@ pub struct BusinessPatch {
     pub email: Option<String>,
     pub documentation_reminder: Option<bool>,
     pub tax_enabled: Option<bool>,
+    /// Tasa anotada por el usuario en ppm; 0 = borrarla.
+    pub tax_rate_user_ppm: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -376,7 +381,15 @@ impl CompanySession {
         let stored = dbcore::get_setting(self.db.conn(), "negocio")?.unwrap_or_default();
         let s = |k: &str| stored.get(k).and_then(|v| v.as_str()).map(String::from);
         let b = |k: &str, d: bool| stored.get(k).and_then(|v| v.as_bool()).unwrap_or(d);
-        let rule = self.tax_rule()?;
+        let user_rate = stored.get("tax_rate_user_ppm").and_then(|v| v.as_i64());
+        let rule = self.tax_rule()?.or_else(|| {
+            user_rate.map(|r| {
+                (
+                    r,
+                    "Tasa anotada por ti en Configuración → Mi negocio".to_string(),
+                )
+            })
+        });
         Ok(BusinessSettings {
             name: self.name.clone(),
             profile: self.profile,
@@ -393,6 +406,7 @@ impl CompanySession {
             tax_enabled: b("tax_enabled", self.profile != BusinessProfile::Emprendedor),
             tax_rate_ppm: rule.as_ref().map(|r| r.0),
             tax_rule_source: rule.map(|r| r.1),
+            tax_rate_user_ppm: user_rate,
         })
     }
 
@@ -442,10 +456,18 @@ impl CompanySession {
         if let Some(v) = patch.tax_enabled {
             b.tax_enabled = v;
         }
+        if let Some(v) = patch.tax_rate_user_ppm {
+            if !(0..1_000_000).contains(&v) {
+                return Err(AppError::Validation(
+                    "la tasa debe estar entre 0 % y 100 %".into(),
+                ));
+            }
+            b.tax_rate_user_ppm = (v > 0).then_some(v);
+        }
         let stored = serde_json::json!({
             "rut": b.rut, "legal_name": b.legal_name, "activity": b.activity, "address": b.address,
             "phone": b.phone, "email": b.email, "documentation_reminder": b.documentation_reminder,
-            "tax_enabled": b.tax_enabled,
+            "tax_enabled": b.tax_enabled, "tax_rate_user_ppm": b.tax_rate_user_ppm,
         });
         let tx = self.db.conn_mut().transaction()?;
         dbcore::set_setting(&tx, "negocio", &stored)?;
@@ -473,7 +495,7 @@ impl CompanySession {
         tx.commit()?;
         self.name = b.name.clone();
         self.profile = b.profile;
-        Ok(b)
+        self.business()
     }
 
     pub fn security(&self) -> AppResult<SecuritySettings> {

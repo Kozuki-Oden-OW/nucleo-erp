@@ -2,11 +2,12 @@
 // Lo que aún no tiene comando responde con un error claro y la interfaz lo marca "próximamente".
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { AppError, type Backend, type Feature, type FileSource } from "./backend";
+import { AppError, type Backend, type Feature, type FileSource, type SaleFilter } from "./backend";
 import type {
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
-  Customer, CustomerDetail, Dashboard, EntityRef, NewCustomer, NewProduct, NewUser, PermissionRow, Product,
-  PurchaseOrderDetail, PurchaseOrderSummary, QuoteDetail, QuoteSummary, RateRow, RoleRow, SaleDetail, SaleSummary, SearchHit,
+  Customer, CustomerDetail, Dashboard, EffectInput, EntityRef, ExternalRefInput, NewCustomer, NewProduct, NewUser, PermissionRow,
+  Product, ProductPatch, PurchaseOrderDetail, PurchaseOrderSummary, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow, SaleDetail, SaleInput,
+  SaleSummary, SearchHit,
   SecuritySettings, SequenceRow, SessionInfo, UserPatch, UserRow,
 } from "./types";
 
@@ -30,6 +31,7 @@ function businessPatch(p: Partial<BusinessSettings>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(p)) {
     if (k === "tax_rate_ppm" || k === "tax_rule_source") continue;
+    if (k === "tax_rate_user_ppm") { out[k] = v ?? 0; continue; }
     out[k] = v === null ? "" : v;
   }
   return out;
@@ -39,6 +41,7 @@ export class TauriBackend implements Backend {
   readonly kind = "tauri" as const;
   readonly features: ReadonlySet<Feature> = new Set<Feature>([
     "clientes", "respaldos", "negocio", "busqueda", "usuarios", "documentos", "numeracion", "monedas", "auditoria",
+    "productos", "ventas",
   ]);
 
   async appInfo(): Promise<AppInfo> {
@@ -93,22 +96,26 @@ export class TauriBackend implements Backend {
 
   async ruleValue(): Promise<{ value: number; source: string } | null> { return null; }
   async dashboard(): Promise<Dashboard> { return soon(12); }
-  async customer(): Promise<CustomerDetail> { return soon(5); }
-  async searchProducts(): Promise<Product[]> { return soon(5); }
-  async addProduct(_input: NewProduct): Promise<Product> { return soon(5); }
-  async listQuotes(): Promise<QuoteSummary[]> { return soon(5); }
-  async quote(): Promise<QuoteDetail> { return soon(5); }
-  async saveQuote(): Promise<QuoteDetail> { return soon(5); }
-  async setQuoteStatus(): Promise<QuoteDetail> { return soon(5); }
-  async convertQuote(): Promise<SaleDetail> { return soon(5); }
-  async listSales(): Promise<SaleSummary[]> { return soon(5); }
-  async sale(): Promise<SaleDetail> { return soon(5); }
-  async saveSale(): Promise<SaleDetail> { return soon(5); }
-  async effectSale(): Promise<SaleDetail> { return soon(5); }
-  async registerPayment(): Promise<SaleDetail> { return soon(5); }
-  async markDocumented(): Promise<SaleDetail> { return soon(5); }
-  async setDocumentationNotApplicable(): Promise<SaleDetail> { return soon(5); }
-  async voidSale(): Promise<SaleDetail> { return soon(5); }
+  customer(uid: string) { return call<CustomerDetail>("customer", { uid }); }
+  searchProducts(query: string) { return call<Product[]>("search_products", { query }); }
+  addProduct(input: NewProduct) { return call<Product>("add_product", { input }); }
+  updateProduct(uid: string, patch: ProductPatch) { return call<Product>("update_product", { uid, patch }); }
+  updateCustomer(uid: string, input: NewCustomer) { return call<Customer>("update_customer", { uid, input }); }
+  listQuotes(query?: string) { return call<QuoteSummary[]>("list_quotes", { query: query ?? null }); }
+  quote(uid: string) { return call<QuoteDetail>("quote", { uid }); }
+  saveQuote(input: QuoteInput, uid?: string) { return call<QuoteDetail>("save_quote", { input, uid: uid ?? null }); }
+  setQuoteStatus(uid: string, status: "enviada" | "aceptada" | "rechazada" | "anulada") { return call<QuoteDetail>("set_quote_status", { uid, status }); }
+  convertQuote(uid: string) { return call<SaleDetail>("convert_quote", { uid }); }
+  listSales(filter: SaleFilter) { return call<SaleSummary[]>("list_sales", { filter: { query: filter.query ?? null, view: filter.view ?? null } }); }
+  sale(uid: string) { return call<SaleDetail>("sale", { uid }); }
+  saveSale(input: SaleInput, uid?: string) { return call<SaleDetail>("save_sale", { input, uid: uid ?? null }); }
+  effectSale(uid: string, input: EffectInput) { return call<SaleDetail>("effect_sale", { uid, input }); }
+  registerPayment(uid: string, amount_minor: number, method: string, date: string) {
+    return call<SaleDetail>("register_payment", { uid, amountMinor: amount_minor, method, date });
+  }
+  markDocumented(uid: string, ref: ExternalRefInput) { return call<SaleDetail>("mark_documented", { uid, reference: ref }); }
+  setDocumentationNotApplicable(uid: string) { return call<SaleDetail>("set_documentation_not_applicable", { uid }); }
+  voidSale(uid: string, reason: string) { return call<SaleDetail>("void_sale", { uid, reason }); }
   async listPurchaseOrders(): Promise<PurchaseOrderSummary[]> { return soon(6); }
   async purchaseOrder(): Promise<PurchaseOrderDetail> { return soon(6); }
   async receivePurchaseOrder(): Promise<PurchaseOrderDetail> { return soon(6); }

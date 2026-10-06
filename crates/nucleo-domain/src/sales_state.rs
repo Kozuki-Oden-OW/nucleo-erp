@@ -47,6 +47,7 @@ impl CommercialState {
                 | (Cotizada, Aceptada | Anulada)
                 | (Aceptada, Efectuada | Anulada)
                 | (Efectuada, Cerrada | Anulada)
+                | (Cerrada, Anulada)
         )
     }
 
@@ -127,7 +128,9 @@ mod tests {
     fn no_retrocede_ni_revive() {
         assert!(Efectuada.transition(Borrador).is_err());
         assert!(Anulada.transition(Efectuada).is_err());
-        assert!(Cerrada.transition(Anulada).is_err());
+        // Una venta cerrada se puede anular con motivo (D-F5-04), pero no reabrir.
+        assert_eq!(Cerrada.transition(Anulada).unwrap(), Anulada);
+        assert!(Cerrada.transition(Efectuada).is_err());
     }
 
     #[test]

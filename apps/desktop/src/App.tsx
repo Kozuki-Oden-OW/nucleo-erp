@@ -4,7 +4,9 @@ import {
   type QuoteDetail, type SaleDetail, type SessionInfo,
 } from "./data";
 import { PrefsProvider } from "./lib/prefs";
-import { SessionProvider } from "./lib/session";
+import { SessionProvider, useSession } from "./lib/session";
+import { FilePlus2, PackagePlus, ShoppingBag, UserPlus } from "lucide-react";
+import { formatMoney } from "./lib/format";
 import { Login } from "./screens/Login";
 import { Documents } from "./screens/documentos/Documents";
 import { navigate, useRoute, type Route } from "./lib/router";
@@ -22,7 +24,7 @@ import { DocEditor } from "./screens/ventas/DocEditor";
 import { QuoteView } from "./screens/ventas/QuoteView";
 import { SaleView } from "./screens/ventas/SaleView";
 import { SalesList } from "./screens/ventas/SalesList";
-import { Notice, Spinner } from "./ui/kit";
+import { Button, Notice, Spinner } from "./ui/kit";
 import { ToastProvider } from "./ui/overlay";
 
 export function App() {
@@ -156,18 +158,49 @@ function EditLoader({ kind, uid }: { kind: "sale" | "quote"; uid: string }) {
   return <DocEditor kind={docKind} existing={doc} />;
 }
 
-/** Inicio del escritorio mientras el dashboard real (Fase 12) no existe. */
+/** Inicio del escritorio mientras el dashboard completo (Fase 12) no existe. */
 function DesktopHome({ session }: { session: SessionInfo }) {
+  const backend = useBackend();
+  const { can } = useSession();
+  const [stats, setStats] = useState<{ receivable: number; receivableCount: number; pendingDoc: number } | null>(null);
+  const canSee = can("ventas.ver");
+  useEffect(() => {
+    if (!canSee) return;
+    Promise.all([backend.listSales({ view: "por_cobrar" }), backend.listSales({ view: "pendientes_doc" })])
+      .then(([r, d]) => setStats({ receivable: r.reduce((a, x) => a + x.total_minor - x.paid_minor, 0), receivableCount: r.length, pendingDoc: d.length }))
+      .catch(() => setStats(null));
+  }, [backend, canSee]);
+  const card = "rounded-xl border border-line bg-surface p-4 text-left shadow-card";
+  const label = "text-xs font-semibold uppercase tracking-wide text-muted";
   return (
     <div className="anim-in flex flex-col gap-6">
       <div>
         <h1 className="text-[22px] font-semibold tracking-tight">{session.company.name}</h1>
-        <p className="mt-1 text-sm text-muted">Tu negocio está creado y cifrado en este computador. Los módulos se habilitan fase a fase.</p>
+        <p className="mt-1 text-sm text-muted">Tus datos están cifrados en este computador. El panel completo del dueño llega con la Fase 12.</p>
       </div>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-line bg-surface p-4 shadow-card"><div className="text-xs font-semibold uppercase tracking-wide text-muted">Clientes</div><div className="num mt-2 text-[22px] font-semibold">{session.customers}</div></div>
-        <div className="rounded-xl border border-line bg-surface p-4 shadow-card"><div className="text-xs font-semibold uppercase tracking-wide text-muted">Cifrado</div><div className="mt-2 text-[17px] font-semibold text-success">SQLCipher {session.cipher_version.split(" ")[0]}</div></div>
-        <div className="rounded-xl border border-line bg-surface p-4 shadow-card"><div className="text-xs font-semibold uppercase tracking-wide text-muted">Auditoría</div><div className={`mt-2 text-[17px] font-semibold ${session.audit.ok ? "text-success" : "text-danger"}`}>{session.audit.ok ? `Íntegra (${session.audit.entries})` : "Alterada"}</div></div>
+      <div className="flex flex-wrap gap-2">
+        {can("ventas.crear") && <Button icon={ShoppingBag} onClick={() => navigate("/ventas/nueva")}>Nueva venta</Button>}
+        {can("ventas.crear") && <Button variant="secondary" icon={FilePlus2} onClick={() => navigate("/cotizaciones/nueva")}>Nueva cotización</Button>}
+        {can("clientes.editar") && <Button variant="secondary" icon={UserPlus} onClick={() => navigate("/clientes?nuevo=1")}>Nuevo cliente</Button>}
+        {can("productos.editar") && <Button variant="secondary" icon={PackagePlus} onClick={() => navigate("/productos?nuevo=1")}>Nuevo producto</Button>}
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <button className={card} onClick={() => navigate("/clientes")}><div className={label}>Clientes</div><div className="num mt-2 text-[22px] font-semibold">{session.customers}</div></button>
+        {stats && (
+          <button className={card} onClick={() => navigate("/ventas?tab=por_cobrar")}>
+            <div className={label}>Dinero que te deben</div>
+            <div className="num mt-2 text-[22px] font-semibold">{formatMoney(stats.receivable)}</div>
+            <div className="mt-1 text-xs text-muted">{stats.receivableCount} ventas por cobrar</div>
+          </button>
+        )}
+        {stats && (
+          <button className={card} onClick={() => navigate("/ventas?tab=pendientes_doc")}>
+            <div className={label}>Pendientes de documentar</div>
+            <div className={`num mt-2 text-[22px] font-semibold ${stats.pendingDoc > 0 ? "text-warning" : ""}`}>{stats.pendingDoc}</div>
+            <div className="mt-1 text-xs text-muted">Ventas sin factura o boleta anotada</div>
+          </button>
+        )}
+        <div className={card}><div className={label}>Auditoría</div><div className={`mt-2 text-[17px] font-semibold ${session.audit.ok ? "text-success" : "text-danger"}`}>{session.audit.ok ? `Íntegra (${session.audit.entries})` : "Alterada"}</div><div className="mt-1 text-xs text-muted">SQLCipher {session.cipher_version.split(" ")[0]}</div></div>
       </div>
       <Notice tone="info" title="Tus datos están en este computador">
         NÚCLEO no envía información a ningún servidor, no pide credenciales tributarias y funciona sin Internet. Crea respaldos periódicos

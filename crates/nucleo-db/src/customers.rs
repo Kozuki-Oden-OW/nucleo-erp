@@ -105,6 +105,44 @@ pub fn list(conn: &Connection, limit: u32, after_id: Option<i64>) -> DbResult<Ve
     Ok(rows.collect::<Result<_, _>>()?)
 }
 
+/// Cambia los datos de contacto del cliente.
+pub fn update(
+    conn: &Connection,
+    id: i64,
+    name: &str,
+    rut: Option<&str>,
+    email: Option<&str>,
+    phone: Option<&str>,
+) -> DbResult<()> {
+    let res = conn.execute(
+        "UPDATE customers SET name = ?2, rut = ?3, email = ?4, phone = ?5 WHERE id = ?1",
+        (id, name.trim(), rut, email, phone),
+    );
+    match res {
+        Err(rusqlite::Error::SqliteFailure(e, Some(msg)))
+            if e.code == rusqlite::ErrorCode::ConstraintViolation
+                && msg.contains("customers.rut") =>
+        {
+            Err(DbError::Duplicate("RUT"))
+        }
+        other => {
+            other?;
+            Ok(())
+        }
+    }
+}
+
+pub fn by_uid(conn: &Connection, uid: &str) -> DbResult<Option<CustomerRow>> {
+    use rusqlite::OptionalExtension;
+    Ok(conn
+        .query_row(
+            &format!("SELECT {COLS} FROM customers WHERE uid = ?1"),
+            [uid],
+            map,
+        )
+        .optional()?)
+}
+
 pub fn count(conn: &Connection) -> DbResult<i64> {
     Ok(conn.query_row(
         "SELECT count(*) FROM customers WHERE archived_at IS NULL",

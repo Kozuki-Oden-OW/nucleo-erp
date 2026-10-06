@@ -6,7 +6,7 @@
 import type {
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
   Customer, CustomerDetail, Dashboard, EffectInput, EntityRef, ExternalRefInput, NewCustomer, NewProduct, NewUser,
-  PermissionRow, Product, PurchaseOrderDetail, PurchaseOrderSummary, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow,
+  PermissionRow, Product, ProductPatch, PurchaseOrderDetail, PurchaseOrderSummary, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow,
   SaleDetail, SaleInput, SaleSummary, SearchHit, SecuritySettings, SequenceRow, SessionInfo, UserPatch, UserRow,
 } from "./types";
 
@@ -80,6 +80,8 @@ export interface Backend {
   addCustomer(input: NewCustomer): Promise<Customer>;
   searchProducts(query: string): Promise<Product[]>;
   addProduct(input: NewProduct): Promise<Product>;
+  updateProduct(uid: string, patch: ProductPatch): Promise<Product>;
+  updateCustomer(uid: string, input: NewCustomer): Promise<Customer>;
 
   // Ventas
   listQuotes(query?: string): Promise<QuoteSummary[]>;

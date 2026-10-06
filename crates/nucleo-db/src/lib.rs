@@ -9,6 +9,8 @@ pub mod core;
 pub mod customers;
 pub mod maintenance;
 pub mod migrations;
+pub mod products;
+pub mod sales;
 pub mod users;
 
 use rusqlite::{Connection, OpenFlags};

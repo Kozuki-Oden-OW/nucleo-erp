@@ -6,7 +6,7 @@ import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
   Customer, CustomerDetail, Dashboard, DocLink, EffectInput, EntityRef, ExternalRef, ExternalRefInput, Line, LineInput,
-  NewCustomer, NewProduct, NewUser, Payment, PermissionRow, Product, PurchaseOrderDetail, PurchaseOrderSummary, QuoteDetail,
+  NewCustomer, NewProduct, NewUser, Payment, PermissionRow, Product, ProductPatch, PurchaseOrderDetail, PurchaseOrderSummary, QuoteDetail,
   QuoteInput, QuoteStatus, QuoteSummary, RateRow, RoleRow, SaleDetail, SaleDocType, SaleInput, SaleSummary, SearchHit,
   SecuritySettings, SequenceRow, SessionInfo, Totals, UserPatch, UserRow,
 } from "../types";
@@ -71,7 +71,7 @@ export class DemoBackend implements Backend {
     this.biz = {
       name: DEMO_COMPANY, profile: "empresa", rut: "76.543.210-3", legal_name: "Comercial Los Andes SpA (ficticia)",
       activity: "Venta al por menor de artículos de ferretería", address: "Av. Ejemplo 1234, Puerto Ejemplo", phone: "+56 9 5555 0000",
-      email: "contacto@ejemplo.cl", documentation_reminder: true, tax_enabled: true, tax_rate_ppm: TAX_PPM, tax_rule_source: TAX_SOURCE,
+      email: "contacto@ejemplo.cl", documentation_reminder: true, tax_enabled: true, tax_rate_ppm: TAX_PPM, tax_rule_source: TAX_SOURCE, tax_rate_user_ppm: null,
     };
     this.seed();
   }
@@ -605,7 +605,7 @@ export class DemoBackend implements Backend {
       avg_days_between: dates.length > 1 ? Math.round(gaps / (dates.length - 1)) : null, recent: own.slice(0, 8).map((s) => this.summary(s)),
     });
   }
-  async addCustomer(input: NewCustomer): Promise<Customer> {
+  private customerFields(input: NewCustomer, selfUid?: string): Pick<Customer, "name" | "rut" | "email" | "phone"> {
     if (!input.name.trim()) throw new AppError("nombre", "El nombre del cliente es obligatorio.");
     let rut: string | null = null;
     if (input.rut?.trim()) {
@@ -613,12 +613,25 @@ export class DemoBackend implements Backend {
       const m = /^(\d{1,8})-?([\dK])$/.exec(clean);
       if (!m || rutDv(Number(m[1])) !== m[2]) throw new AppError("rut", "El RUT no es válido: revisa el dígito verificador.");
       rut = `${m[1]}-${m[2]}`;
-      if (this.customers.some((c) => c.rut === rut)) throw new AppError("rut_duplicado", "Ya existe un cliente con ese RUT.");
+      if (this.customers.some((c) => c.rut === rut && c.uid !== selfUid)) throw new AppError("rut_duplicado", "Ya existe un cliente con ese RUT.");
     }
-    const c: Customer = { id: this.customers.length + 1, uid: uid("cli"), name: input.name.trim(), rut, email: input.email?.trim() || null, phone: input.phone?.trim() || null, created_at: now() };
+    if (input.email?.trim() && !input.email.includes("@")) throw new AppError("correo", "El correo no tiene un formato válido.");
+    return { name: input.name.trim(), rut, email: input.email?.trim() || null, phone: input.phone?.trim() || null };
+  }
+  async addCustomer(input: NewCustomer): Promise<Customer> {
+    this.require("clientes.editar");
+    const c: Customer = { id: this.customers.length + 1, uid: uid("cli"), ...this.customerFields(input), created_at: now() };
     this.customers.push(c);
     this.log("cliente.crear", "cliente", c.uid);
     return wait(c);
+  }
+  async updateCustomer(u: string, input: NewCustomer): Promise<Customer> {
+    this.require("clientes.editar");
+    const c = this.customers.find((x) => x.uid === u);
+    if (!c) throw new AppError("no_encontrado", "No encontramos ese cliente.");
+    Object.assign(c, this.customerFields(input, u));
+    this.log("cliente.editar", "cliente", c.uid);
+    return wait({ ...c });
   }
   async searchProducts(query: string): Promise<Product[]> {
     const q = norm(query.trim());
@@ -626,11 +639,22 @@ export class DemoBackend implements Backend {
     const rows = words.length ? this.products.filter((p) => { const h = norm(`${p.name} ${p.sku}`); return words.every((w) => h.includes(w)); }) : this.products;
     return wait(rows, 30);
   }
+  async updateProduct(u: string, patch: ProductPatch): Promise<Product> {
+    this.require("productos.editar");
+    const p = this.products.find((x) => x.uid === u);
+    if (!p) throw new AppError("no_encontrado", "No encontramos ese producto.");
+    if (!patch.name.trim()) throw new AppError("nombre", "El nombre del producto es obligatorio.");
+    if (!patch.sku.trim()) throw new AppError("codigo", "El código es obligatorio.");
+    if (this.products.some((x) => x.uid !== u && x.sku.toLowerCase() === patch.sku.trim().toLowerCase())) throw new AppError("duplicado", "Ya existe un producto con ese código.");
+    Object.assign(p, { name: patch.name.trim(), sku: patch.sku.trim(), unit: patch.unit, price_minor: patch.price_minor, taxable: patch.taxable, min_milli: patch.min_milli });
+    this.log("producto.editar", "producto", p.uid);
+    return wait({ ...p });
+  }
   async addProduct(input: NewProduct): Promise<Product> {
     if (!input.name.trim()) throw new AppError("nombre", "El nombre del producto es obligatorio.");
     const p: Product = {
       uid: uid("pro"), sku: input.sku?.trim() || `P-${this.products.length + 1}`, name: input.name.trim(), unit: input.unit || "un", kind: input.kind,
-      price_minor: input.price_minor, cost_e4: (input.cost_minor ?? 0) * 10_000, on_hand_milli: 0, min_milli: 0, taxable: input.taxable ?? true,
+      price_minor: input.price_minor, cost_e4: (input.cost_minor ?? 0) * 10_000, on_hand_milli: input.kind === "producto" ? Math.max(0, input.initial_stock_milli ?? 0) : 0, min_milli: 0, taxable: input.taxable ?? true,
     };
     this.products.push(p);
     this.log("producto.crear", "producto", p.uid);

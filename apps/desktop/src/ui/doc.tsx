@@ -86,7 +86,9 @@ export const MoneyField = forwardRef<
       error={error}
       inputMode="decimal"
       value={text}
-      onFocus={(e) => { setFocused(true); setText(value === null ? "" : String(currency === "CLP" ? value : value / 100).replace(".", ",")); e.target.select(); }}
+      onFocus={(e) => { setFocused(true); setText(value === null ? "" : String(currency === "CLP" ? value : value / 100).replace(".", ","));
+        // Seleccionar después de que React cambie el texto: si no, el navegador pierde la selección y lo digitado se suma al final.
+        const el = e.target; requestAnimationFrame(() => { if (document.activeElement === el) el.select(); }); }}
       onBlur={() => { setFocused(false); }}
       onChange={(e) => { setText(e.target.value); onValue(parseMoney(e.target.value, currency)); }}
       inputClassName="text-right num"

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { open as openFile } from "@tauri-apps/plugin-dialog";
 import { Building2, Coins, DatabaseBackup, Hash, Lock, Palette, ShieldCheck, Users } from "lucide-react";
 import { useBackend, errorMessage, type AppInfo, type BackupDone, type BusinessProfile, type BusinessSettings, type SessionInfo } from "../../data";
-import { formatBytes, formatPpm } from "../../lib/format";
+import { formatBytes, formatPpm, parsePercent } from "../../lib/format";
 import { navigate, type Route } from "../../lib/router";
 import { usePrefs } from "../../lib/prefs";
 import { Button, Card, Checkbox, Field, Notice, PageHeader, Segmented, Spinner, cx } from "../../ui/kit";
@@ -70,12 +70,21 @@ function BusinessSection({ onChanged }: { onChanged: () => void }) {
   const editable = can("config.editar");
   const [b, setB] = useState<BusinessSettings | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [rateText, setRateText] = useState<string | null>(null);
   useEffect(() => { backend.business().then(setB).catch((e) => setErr(errorMessage(e))); }, [backend]);
   if (err) return <Notice tone="info" title="Próximamente">{err}</Notice>;
   if (!b) return <Spinner />;
   const set = (patch: Partial<BusinessSettings>) => setB({ ...b, ...patch });
+  const userRate = rateText ?? (b.tax_rate_user_ppm ? String(b.tax_rate_user_ppm / 10_000).replace(".", ",") : "");
+  const fromPackage = b.tax_rate_ppm !== null && b.tax_rate_ppm !== b.tax_rate_user_ppm;
   async function save() {
-    try { setB(await backend.updateBusiness(b!)); toast("success", "Datos del negocio guardados."); onChanged(); }
+    const patch: Partial<BusinessSettings> = { ...b! };
+    if (rateText !== null) {
+      const ppm = rateText.trim() === "" ? null : parsePercent(rateText);
+      if (rateText.trim() !== "" && (ppm === null || ppm <= 0 || ppm >= 1_000_000)) { toast("danger", "Escribe la tasa como porcentaje, por ejemplo 12,5."); return; }
+      patch.tax_rate_user_ppm = ppm;
+    }
+    try { setB(await backend.updateBusiness(patch)); setRateText(null); toast("success", "Datos del negocio guardados."); onChanged(); }
     catch (e) { toast("danger", errorMessage(e)); }
   }
   return (
@@ -112,10 +121,21 @@ function BusinessSection({ onChanged }: { onChanged: () => void }) {
           />
           <Checkbox
             label="Calcular IVA en mis documentos (informativo)"
-            hint={b.tax_rate_ppm ? `Tasa del paquete normativo vigente: ${formatPpm(b.tax_rate_ppm, 0)} · ${b.tax_rule_source ?? ""}` : "No hay un paquete normativo cargado: mientras tanto los documentos no calculan IVA. El paquete con la tasa y su fuente oficial llega con la Fase 5."}
+            hint={b.tax_rate_ppm ? `Tasa aplicada: ${formatPpm(b.tax_rate_ppm, 1)} · ${b.tax_rule_source ?? ""}` : "Anota abajo la tasa que aplicas. Sin una tasa, los documentos no calculan IVA."}
             checked={b.tax_enabled}
             onChange={(v) => set({ tax_enabled: v })}
           />
+          {b.tax_enabled && (
+            <div className="flex max-w-md flex-col gap-1.5">
+              <Field label="Tasa de IVA que aplicas" optional suffix="%" inputMode="decimal" value={userRate} disabled={!editable}
+                onChange={(e) => setRateText(e.target.value)} className="w-60" inputClassName="text-right num" />
+              <p className="text-xs leading-relaxed text-muted">
+                {fromPackage
+                  ? "Hay un paquete normativo vigente: su tasa tiene prioridad sobre la que anotes aquí."
+                  : "Verifica la tasa vigente en el sitio oficial del SII. NÚCLEO no la descarga ni la cambia por ti; el cálculo es solo informativo."}
+              </p>
+            </div>
+          )}
         </div>
       </Card>
       {editable ? <div><Button onClick={save}>Guardar cambios</Button></div> : <Notice tone="info">Solo el dueño o un administrador puede cambiar estos datos.</Notice>}

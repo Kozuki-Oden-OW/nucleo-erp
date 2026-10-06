@@ -2,6 +2,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+#[cfg(test)]
+mod ipc_tests;
 
 use nucleo_app::AppService;
 use nucleo_app::keys::OsKeyStore;
@@ -19,8 +21,66 @@ fn key_store() -> Box<dyn nucleo_app::KeyStore> {
     Box::new(OsKeyStore::new("NucleoERP"))
 }
 
+/// Registra todos los comandos IPC (también lo usan las pruebas del contrato con el runtime simulado).
+fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
+    builder.invoke_handler(tauri::generate_handler![
+        commands::app_info,
+        commands::create_company,
+        commands::open_company,
+        commands::session_info,
+        commands::login,
+        commands::logout,
+        commands::recover_key,
+        commands::business,
+        commands::update_business,
+        commands::security,
+        commands::update_security,
+        commands::list_users,
+        commands::roles,
+        commands::create_user,
+        commands::update_user,
+        commands::set_password,
+        commands::update_role_permissions,
+        commands::sequences,
+        commands::update_sequence,
+        commands::currencies,
+        commands::rates,
+        commands::set_rate,
+        commands::add_attachment,
+        commands::list_attachments,
+        commands::export_attachment,
+        commands::attachment_preview,
+        commands::archive_attachment,
+        commands::add_customer,
+        commands::search_customers,
+        commands::global_search,
+        commands::audit_log,
+        commands::verify_audit,
+        commands::create_backup,
+        commands::restore_backup,
+        commands::search_products,
+        commands::add_product,
+        commands::customer,
+        commands::list_quotes,
+        commands::quote,
+        commands::save_quote,
+        commands::set_quote_status,
+        commands::convert_quote,
+        commands::list_sales,
+        commands::sale,
+        commands::save_sale,
+        commands::effect_sale,
+        commands::register_payment,
+        commands::mark_documented,
+        commands::set_documentation_not_applicable,
+        commands::void_sale,
+        commands::update_product,
+        commands::update_customer,
+    ])
+}
+
 fn main() {
-    tauri::Builder::default()
+    with_commands(tauri::Builder::default())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // %LOCALAPPDATA%\NucleoERP en Windows (Blueprint §8.2).
@@ -39,42 +99,6 @@ fn main() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
-            commands::app_info,
-            commands::create_company,
-            commands::open_company,
-            commands::session_info,
-            commands::login,
-            commands::logout,
-            commands::recover_key,
-            commands::business,
-            commands::update_business,
-            commands::security,
-            commands::update_security,
-            commands::list_users,
-            commands::roles,
-            commands::create_user,
-            commands::update_user,
-            commands::set_password,
-            commands::update_role_permissions,
-            commands::sequences,
-            commands::update_sequence,
-            commands::currencies,
-            commands::rates,
-            commands::set_rate,
-            commands::add_attachment,
-            commands::list_attachments,
-            commands::export_attachment,
-            commands::attachment_preview,
-            commands::archive_attachment,
-            commands::add_customer,
-            commands::search_customers,
-            commands::global_search,
-            commands::audit_log,
-            commands::verify_audit,
-            commands::create_backup,
-            commands::restore_backup,
-        ])
         .run(tauri::generate_context!())
         .expect("no se pudo iniciar NÚCLEO ERP");
 }

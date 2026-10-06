@@ -2,6 +2,27 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [Sin publicar] — Fase 5 (Ventas)
+
+### Agregado
+- Ciclo de venta completo en el escritorio: cotización → "Convertir en venta" (sin volver a digitar) →
+  efectuada → abonos y pagos → "Marcar como documentada", con cierre automático cuando está pagada y
+  documentada.
+- Factura interna (FV) y venta (VEN) con la leyenda "DOCUMENTO INTERNO — NO TRIBUTARIO".
+- Al efectuar: descuenta stock al costo promedio, fija costo y margen de cada línea, crea la cuenta por
+  cobrar y, si es al contado, registra el pago en la caja.
+- Ventas a crédito con fecha de pago, abonos parciales, vistas "Por cobrar", "Pendientes de
+  documentación", "Borradores" y "Anuladas".
+- Anulación con motivo (también de ventas cerradas): devuelve el stock y anula los cobros; nada se borra.
+- Productos y servicios: crear (con stock inicial), editar ficha y precio, unidades de medida.
+- Clientes: editar datos y ficha con compras, deuda, última compra y frecuencia.
+- Tasa de IVA anotada por el usuario (informativa) mientras no exista un paquete normativo firmado.
+- Inicio del escritorio con accesos rápidos, dinero por cobrar y ventas pendientes de documentar.
+- Pruebas del contrato IPC de punta a punta con el runtime simulado de Tauri.
+
+### Corregido
+- Al entrar a un campo de monto con valor, el texto queda seleccionado y lo digitado lo reemplaza.
+
 ## [Sin publicar] — Fase 4 (Core)
 
 ### Agregado

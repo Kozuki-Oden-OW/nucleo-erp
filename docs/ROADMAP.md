@@ -9,8 +9,8 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | 2 | Modelo de datos | ✅ Completo (2026-10-05) — ver abajo |
 | 3 | Diseño UX | 🟡 Sistema de diseño y prototipos listos; falta la prueba con 3-5 usuarios — ver abajo |
 | 4 | Core (usuarios, roles, configuración, numeración, documentos, búsqueda) | ✅ Hito A cumplido (2026-10-06) — ver abajo |
-| 5 | Ventas | 🟡 En curso |
-| 6 | Compras | ⏳ |
+| 5 | Ventas | ✅ Completo (2026-10-06) — ver abajo |
+| 6 | Compras | 🟡 En curso |
 | 7 | Inventario (incluye stock real y futuro) | ⏳ |
 | 8 | Finanzas | ⏳ |
 | 9 | COMEX (requiere contador colaborador, D-07) | ⏳ |
@@ -82,6 +82,19 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | Búsqueda global filtrada por permisos; visor de auditoría | ✅ |
 | Pruebas: `hito_a` (flujo completo + respaldo/restauración con adjuntos) | ✅ |
 
+## Fase 5 — criterio de salida
+
+> Ciclo de venta completo sin re-digitar.
+
+| Entregable | Estado |
+|---|---|
+| Productos base (crear con stock inicial, editar, unidades) y clientes (crear, editar, ficha) | ✅ |
+| Cotización → "Convertir en venta" → efectuada → pagos → "Marcar como documentada" → cerrada | ✅ prueba `ventas.rs` y `ipc_tests.rs` |
+| Factura interna (FV) y venta (VEN) con leyenda de documento interno; impresión | ✅ |
+| Stock y costo al efectuar; cuenta por cobrar; contado y crédito; abonos | ✅ |
+| Anulación con motivo (devuelve stock, anula cobros) | ✅ |
+| Tasa de IVA informativa anotada por el usuario (sin valores normativos en el código) | ✅ |
+
 ## Sitio web
 
 | Entregable | Estado |
@@ -97,6 +110,6 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | Hilo escritor + lectores | 12 (Reportes) | Las operaciones del Core miden < 50 ms con un `Mutex` por negocio (D-F4-11) |
 | `tauri-specta` (tipos TS generados) | Al salir su versión estable | Sigue en *release candidate* (D-F4-11) |
 | Clave de datos envuelta con la contraseña del administrador | 13 (Seguridad) | Se diseña junto con la clave de recuperación (D-F4-12) |
-| Spike de PDF | 5 (Ventas) | El primer documento imprimible es la cotización |
+| Motor de PDF propio | Sin fecha | Se imprime con el diálogo del sistema (D-F5-07) |
 | Clave oficial de firma de normativa | 11 | Se genera cuando exista el primer paquete con fuentes verificadas |
 | Dashboard por bloques y "Atención" precalculada | 12 | Primera carga con caché fría ~1,3 s en el equipo de medición |

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FilePlus2, Plus, Search, ShoppingBag, UserPlus, Users } from "lucide-react";
+import { FilePlus2, Pencil, Plus, Search, ShoppingBag, UserPlus, Users } from "lucide-react";
 import { useBackend, errorMessage, type Customer, type CustomerDetail } from "../../data";
 import { formatDate, formatMoney, formatRut } from "../../lib/format";
 import { useTerm } from "../../lib/glosario";
@@ -54,26 +54,30 @@ export function Customers({ route }: { route: Route }) {
         empty={<EmptyState icon={Users} title={query ? "Sin coincidencias" : "Aún no tienes clientes"} action={<Button icon={Plus} onClick={() => navigate("/clientes?nuevo=1")}>Agregar cliente</Button>} />}
       />
       <NewCustomerDrawer open={creating} onClose={() => navigate("/clientes", { replace: true })} onCreated={(c) => { setVersion((v) => v + 1); navigate(`/clientes/${c.uid}`, { replace: true }); }} />
-      {openUid && backend.features.has("ventas") && <CustomerDrawer uid={openUid} onClose={() => navigate("/clientes", { replace: true })} />}
-      {openUid && !backend.features.has("ventas") && <BasicCustomerDrawer customer={rows?.find((c) => c.uid === openUid)} onClose={() => navigate("/clientes", { replace: true })} />}
+      {openUid && <CustomerDrawer uid={openUid} onClose={() => navigate("/clientes", { replace: true })} onChanged={() => setVersion((v) => v + 1)} />}
     </div>
   );
 }
 
-export function NewCustomerDrawer({ open, onClose, onCreated, initialName = "" }: { open: boolean; onClose: () => void; onCreated: (c: Customer) => void; initialName?: string }) {
+export function NewCustomerDrawer({ open, onClose, onCreated, initialName = "", editing }: { open: boolean; onClose: () => void; onCreated: (c: Customer) => void; initialName?: string; editing?: Customer }) {
   const backend = useBackend();
   const toast = useToast();
-  const [form, setForm] = useState({ name: initialName, rut: "", email: "", phone: "" });
+  const blank = () => editing
+    ? { name: editing.name, rut: editing.rut ? formatRut(editing.rut) : "", email: editing.email ?? "", phone: editing.phone ?? "" }
+    : { name: initialName, rut: "", email: "", phone: "" };
+  const [form, setForm] = useState(blank);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  useEffect(() => { if (open) { setForm({ name: initialName, rut: "", email: "", phone: "" }); setErr(null); } }, [open, initialName]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (open) { setForm(blank()); setErr(null); } }, [open, initialName, editing?.uid]);
 
   async function save(e?: React.FormEvent) {
     e?.preventDefault();
     setBusy(true); setErr(null);
     try {
-      const c = await backend.addCustomer({ name: form.name, rut: form.rut || undefined, email: form.email || undefined, phone: form.phone || undefined });
-      toast("success", `Cliente ${c.name} agregado.`);
+      const input = { name: form.name, rut: form.rut || undefined, email: form.email || undefined, phone: form.phone || undefined };
+      const c = editing ? await backend.updateCustomer(editing.uid, input) : await backend.addCustomer(input);
+      toast("success", editing ? "Cliente actualizado." : `Cliente ${c.name} agregado.`);
       onCreated(c);
     } catch (e2) { setErr(errorMessage(e2)); } finally { setBusy(false); }
   }
@@ -82,9 +86,9 @@ export function NewCustomerDrawer({ open, onClose, onCreated, initialName = "" }
     <Drawer
       open={open}
       onClose={onClose}
-      title="Nuevo cliente"
-      subtitle="Solo el nombre es obligatorio. Puedes completar el resto después."
-      footer={<><Button variant="ghost" onClick={onClose}>Cancelar</Button><Button onClick={() => save()} disabled={busy || !form.name.trim()}>Guardar cliente</Button></>}
+      title={editing ? "Editar cliente" : "Nuevo cliente"}
+      subtitle={editing ? "Los cambios no alteran documentos ya emitidos." : "Solo el nombre es obligatorio. Puedes completar el resto después."}
+      footer={<><Button variant="ghost" onClick={onClose}>Cancelar</Button><Button onClick={() => save()} disabled={busy || !form.name.trim()}>{editing ? "Guardar cambios" : "Guardar cliente"}</Button></>}
     >
       <form onSubmit={save} className="flex flex-col gap-4">
         <Field label="Nombre o razón social" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required data-autofocus />
@@ -98,26 +102,18 @@ export function NewCustomerDrawer({ open, onClose, onCreated, initialName = "" }
   );
 }
 
-/** Ficha básica (escritorio, antes de la Fase 5): datos y documentos adjuntos. */
-function BasicCustomerDrawer({ customer, onClose }: { customer: Customer | undefined; onClose: () => void }) {
-  if (!customer) return null;
-  return (
-    <Drawer open onClose={onClose} title={customer.name} subtitle={customer.rut ? `RUT ${formatRut(customer.rut)}` : undefined}>
-      <div className="flex flex-col gap-6">
-        <DefinitionList items={[{ label: "Correo", value: customer.email ?? "—" }, { label: "Teléfono", value: customer.phone ?? "—" }, { label: "Desde", value: new Date(customer.created_at).toLocaleDateString("es-CL") }]} />
-        <AttachmentsPanel link={{ entity: "cliente", uid: customer.uid }} />
-        <Notice tone="info">El historial de ventas, la deuda y la ficha inteligente llegan con la Fase 5 (Ventas).</Notice>
-      </div>
-    </Drawer>
-  );
-}
-
-function CustomerDrawer({ uid, onClose }: { uid: string; onClose: () => void }) {
+function CustomerDrawer({ uid, onClose, onChanged }: { uid: string; onClose: () => void; onChanged: () => void }) {
   const backend = useBackend();
   const t = useTerm();
+  const { can } = useSession();
   const [c, setC] = useState<CustomerDetail | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { setC(null); backend.customer(uid).then(setC).catch((e) => setErr(errorMessage(e))); }, [backend, uid]);
+  const [editing, setEditing] = useState(false);
+  const [version, setVersion] = useState(0);
+  useEffect(() => { backend.customer(uid).then(setC).catch((e) => setErr(errorMessage(e))); }, [backend, uid, version]);
+  if (editing && c) {
+    return <NewCustomerDrawer open editing={c} onClose={() => setEditing(false)} onCreated={() => { setEditing(false); setVersion((v) => v + 1); onChanged(); }} />;
+  }
   return (
     <Drawer
       open
@@ -127,6 +123,7 @@ function CustomerDrawer({ uid, onClose }: { uid: string; onClose: () => void }) 
       width="w-[min(640px,100vw)]"
       footer={c && (
         <>
+          {can("clientes.editar") && <Button variant="ghost" icon={Pencil} onClick={() => setEditing(true)}>Editar</Button>}
           <Button variant="secondary" icon={FilePlus2} onClick={() => navigate(`/cotizaciones/nueva?cliente=${c.uid}`)}>Cotizar</Button>
           <Button icon={ShoppingBag} onClick={() => navigate(`/ventas/nueva?cliente=${c.uid}`)}>Vender</Button>
         </>

@@ -9,6 +9,7 @@ pub mod core_ops;
 pub mod error;
 pub mod keys;
 pub mod registry;
+pub mod sales_ops;
 
 pub use company::{CompanySession, NewCustomer};
 pub use error::{AppError, AppResult};

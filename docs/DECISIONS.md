@@ -102,6 +102,20 @@ informativo, sin renta guiada · D-11 promociones no acumulables por defecto · 
 | D-F4-11 | Hilo escritor dedicado y `tauri-specta` se postergan | Con un `Mutex` por negocio las operaciones miden < 50 ms; `tauri-specta` sigue en *release candidate*. Se reevalúan en la Fase 12 (dashboard) y al publicarse su versión estable |
 | D-F4-12 | Envolver la clave de datos con la contraseña del administrador queda para la Fase 13 | Requiere diseñar la recuperación junto con la clave de recuperación existente |
 
+## Decisiones de la Fase 5
+
+| ID | Decisión | Motivo |
+|---|---|---|
+| D-F5-01 | El stock se descuenta al efectuar, en la bodega principal y al costo promedio vigente; se permite quedar bajo cero | La venta no se detiene por un inventario mal cargado; la Fase 7 agrega alertas y bloqueo opcional |
+| D-F5-02 | Mientras no exista un paquete normativo firmado, la persona anota la tasa de IVA que aplica (Configuración → Mi negocio); un paquete vigente tiene prioridad | El código sigue sin valores normativos (check_normativa) y el cálculo informativo queda bajo control del usuario |
+| D-F5-03 | Totales: redondeo comercial (mitad se aleja de cero) e impuesto sobre el neto del documento; sin tasa todo queda exento. Misma regla en TypeScript (vista previa) y Rust (valor guardado) | Coincidencia exacta entre lo que se ve al digitar y lo que se guarda |
+| D-F5-04 | Una venta cerrada también se anula con motivo (migración 0012). Anular devuelve el stock con un ajuste al costo de la venta y anula sus cobros; nada se borra | Corregir errores sin perder trazabilidad; las devoluciones parciales (DEV) llegan después |
+| D-F5-05 | Los cobros se registran en la caja "Caja", creada automáticamente; una sola cuota por venta | Bancos, cajas múltiples y cuotas llegan con Finanzas (Fase 8) |
+| D-F5-06 | La línea de tiempo de cada venta se arma desde la auditoría encadenada | Una sola fuente de verdad, imposible de editar |
+| D-F5-07 | Impresión con el diálogo del sistema (WebView2 → impresora o "Microsoft Print to PDF"); se posterga un motor de PDF propio | Sin dependencias pesadas; se reevalúa si hace falta generar PDF sin diálogo |
+| D-F5-08 | "Hoy" se toma de la hora local del computador (`date('now','localtime')` de SQLite) | Una venta de las 22:00 en Chile no debe quedar con la fecha de mañana (UTC) |
+| D-F5-09 | El contrato IPC se prueba de punta a punta con el runtime simulado de Tauri (`ipc_tests.rs`) usando los mismos argumentos que `tauri.ts` | Detecta nombres de argumentos o campos que no calzan sin abrir la aplicación |
+
 ## Dependencias y su justificación
 
 | Dependencia | Dónde | Por qué |

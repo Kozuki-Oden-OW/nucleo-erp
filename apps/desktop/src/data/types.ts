@@ -119,6 +119,8 @@ export interface BusinessSettings {
   /** Tasa informativa vigente según el paquete normativo cargado (ppm) y su origen. */
   tax_rate_ppm: number | null;
   tax_rule_source: string | null;
+  /** Tasa anotada por el usuario (se usa si no hay paquete normativo). */
+  tax_rate_user_ppm: number | null;
 }
 
 /* ───── Maestros ───── */
@@ -167,6 +169,17 @@ export interface NewProduct {
   price_minor: number;
   cost_minor?: number;
   taxable?: boolean;
+  /** Stock con que parte (milésimas). Solo productos. */
+  initial_stock_milli?: number;
+}
+
+export interface ProductPatch {
+  name: string;
+  sku: string;
+  unit: string;
+  price_minor: number;
+  taxable: boolean;
+  min_milli: number;
 }
 
 /* ───── Ventas ───── */

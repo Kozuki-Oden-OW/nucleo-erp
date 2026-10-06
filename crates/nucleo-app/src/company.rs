@@ -45,6 +45,35 @@ fn none_if_blank(s: &Option<String>) -> Option<String> {
         .filter(|v| !v.is_empty())
 }
 
+/// Valida y normaliza los datos de un cliente: (nombre, RUT compacto, correo, teléfono).
+type CustomerFields = (String, Option<String>, Option<String>, Option<String>);
+pub(crate) fn validate_customer(input: &NewCustomer) -> AppResult<CustomerFields> {
+    let name = validate_name(&input.name)?;
+    let rut = match none_if_blank(&input.rut) {
+        Some(r) => Some(
+            Rut::parse(&r)
+                .map_err(|e| AppError::Validation(format!("RUT: {e}")))?
+                .compact(),
+        ),
+        None => None,
+    };
+    let email = none_if_blank(&input.email);
+    if let Some(e) = &email
+        && (!e.contains('@') || e.len() > 254)
+    {
+        return Err(AppError::Validation(
+            "el correo no tiene un formato válido".into(),
+        ));
+    }
+    let phone = none_if_blank(&input.phone);
+    if phone.as_ref().is_some_and(|p| p.chars().count() > 40) {
+        return Err(AppError::Validation(
+            "el teléfono es demasiado largo".into(),
+        ));
+    }
+    Ok((name, rut, email, phone))
+}
+
 /// "Ferretería Los Andes" → "ferreteria-los-andes".
 pub fn slug(name: &str) -> String {
     let mut out = String::new();
@@ -141,24 +170,7 @@ impl CompanySession {
     pub fn add_customer(&mut self, input: &NewCustomer) -> AppResult<CustomerRow> {
         let user = self.require("clientes.editar")?.username.clone();
         let user = user.as_str();
-        let name = validate_name(&input.name)?;
-        let rut = match none_if_blank(&input.rut) {
-            Some(r) => Some(
-                Rut::parse(&r)
-                    .map_err(|e| AppError::Validation(format!("RUT: {e}")))?
-                    .compact(),
-            ),
-            None => None,
-        };
-        let email = none_if_blank(&input.email);
-        if let Some(e) = &email
-            && (!e.contains('@') || e.len() > 254)
-        {
-            return Err(AppError::Validation(
-                "el correo no tiene un formato válido".into(),
-            ));
-        }
-        let phone = none_if_blank(&input.phone);
+        let (name, rut, email, phone) = validate_customer(input)?;
         let uid = uuid::Uuid::now_v7().to_string();
         let created_at = now_utc();
         let tx = self.db.conn_mut().transaction()?;

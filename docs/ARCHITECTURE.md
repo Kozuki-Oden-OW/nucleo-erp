@@ -81,6 +81,7 @@ por negocio).
   Sin shell, sin HTTP, sin acceso libre al sistema de archivos.
 - Validación de entradas en Rust (nombre, RUT con módulo 11, correo).
 - Sesión y permisos en `nucleo_app::auth` (`Actor`): cada comando que lee o escribe datos pide su permiso.
+- El contrato IPC se prueba con el runtime simulado de Tauri (`src-tauri/src/ipc_tests.rs`).
 - Rutas UNC (`\\servidor\...`) rechazadas: SQLite por red corrompe datos.
 
 ## 8. Herramientas y sitio
@@ -91,5 +92,5 @@ por negocio).
 
 ## 9. Lo que falta (por fase)
 
-Ver [ROADMAP.md](ROADMAP.md). Los puntos abiertos de arquitectura son: PDF (Fase 5), hilo escritor (Fase 12),
+Ver [ROADMAP.md](ROADMAP.md). Los puntos abiertos de arquitectura son: hilo escritor (Fase 12),
 clave envuelta con contraseña y respaldo por bloques (Fase 13), `tauri-specta` (al salir su versión estable).
