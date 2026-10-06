@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { AppError, type Backend, type Feature, type FileSource, type PurchaseFilter, type SaleFilter } from "./backend";
 import type {
+  AdjustmentInput, InventoryOverview, InventorySettings, ProductInventory, ReorderInput, StockDocDone, StockDocRow, TransferInput, Warehouse,
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
   Customer, CustomerDetail, Dashboard, EffectInput, EntityRef, ExternalRefInput, NewCustomer, NewProduct, NewUser, PermissionRow,
   PriceHistoryRow, Product, ProductPatch, PurchaseDetail, PurchaseInput, PurchaseOrderDetail, PurchaseOrderInput, PurchaseOrderSummary,
@@ -42,7 +43,7 @@ export class TauriBackend implements Backend {
   readonly kind = "tauri" as const;
   readonly features: ReadonlySet<Feature> = new Set<Feature>([
     "clientes", "respaldos", "negocio", "busqueda", "usuarios", "documentos", "numeracion", "monedas", "auditoria",
-    "productos", "ventas", "compras",
+    "productos", "ventas", "compras", "inventario",
   ]);
 
   async appInfo(): Promise<AppInfo> {
@@ -133,6 +134,19 @@ export class TauriBackend implements Backend {
   registerPurchase(input: PurchaseInput) { return call<PurchaseDetail>("register_purchase", { input }); }
   payPurchase(uid: string, amount_minor: number, method: string, date: string) { return call<PurchaseDetail>("pay_purchase", { uid, amountMinor: amount_minor, method, date }); }
   voidPurchase(uid: string, reason: string) { return call<PurchaseDetail>("void_purchase", { uid, reason }); }
+  inventorySettings() { return call<InventorySettings>("inventory_settings"); }
+  updateInventorySettings(settings: InventorySettings) { return call<InventorySettings>("update_inventory_settings", { settings }); }
+  warehouses() { return call<Warehouse[]>("warehouses"); }
+  createWarehouse(name: string) { return call<Warehouse[]>("create_warehouse", { name }); }
+  renameWarehouse(uid: string, name: string) { return call<Warehouse[]>("rename_warehouse", { uid, name }); }
+  setDefaultWarehouse(uid: string) { return call<Warehouse[]>("set_default_warehouse", { uid }); }
+  archiveWarehouse(uid: string) { return call<Warehouse[]>("archive_warehouse", { uid }); }
+  adjustStock(input: AdjustmentInput) { return call<StockDocDone>("adjust_stock", { input }); }
+  transferStock(input: TransferInput) { return call<StockDocDone>("transfer_stock", { input: { ...input, notes: input.notes ?? null } }); }
+  stockDocuments() { return call<StockDocRow[]>("stock_documents"); }
+  inventoryOverview() { return call<InventoryOverview>("inventory_overview"); }
+  productInventory(uid: string, warehouseUid?: string) { return call<ProductInventory>("product_inventory", { uid, warehouseUid: warehouseUid ?? null }); }
+  updateReorderSettings(uid: string, input: ReorderInput) { return call<ProductInventory>("update_reorder_settings", { uid, input }); }
 }
 
 /** Selector de archivo del escritorio para adjuntar documentos. */

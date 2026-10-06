@@ -4,7 +4,7 @@ Modelo de datos del MVP, diseñado en la **Fase 2** a partir del Blueprint §5 y
 `02_INTELIGENCIA_COMERCIAL.md` §19. Cada negocio tiene su propio archivo `company.db` cifrado con
 SQLCipher (ADR-001, ADR-005).
 
-**Tamaño:** 91 tablas · 31 triggers · 68 índices · 1 vista · 3 índices de búsqueda FTS5 · 13 migraciones.
+**Tamaño:** 93 tablas · 31 triggers · 69 índices · 1 vista · 3 índices de búsqueda FTS5 · 14 migraciones.
 
 ## 1. Convenciones
 
@@ -40,6 +40,7 @@ Todo es entero: las sumas y los reportes se hacen en SQL sin perder exactitud y 
 | 11 | `0011_core.sql` | Fase 4: 37 permisos y 8 roles con su plantilla, bloqueo de usuarios (`failed_attempts`, `locked_until`), dueño inicial sin contraseña, monedas CLP/USD/EUR/CNY, adjuntos con descripción y archivado |
 | 12 | `0012_ventas.sql` | Fase 5: descuento porcentual por línea de venta, anulación de ventas cerradas, índices por número de documento |
 | 13 | `0013_compras.sql` | Fase 6: monto exento y motivo de anulación en órdenes de compra, bloqueo de montos de órdenes emitidas, índices de compras |
+| 14 | `0014_inventario.sql` | Fase 7: encabezados de ajustes y conteos (`stock_adjustments`) y de transferencias (`stock_transfers`), índice del kárdex |
 
 Las migraciones son transaccionales y versionadas con `PRAGMA user_version`. **Pre-1.0:** se pueden
 reescribir (en la Fase 2 se reemplazó la tabla mínima de clientes de la Fase 1); desde la primera beta

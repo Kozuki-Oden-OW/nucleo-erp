@@ -21,6 +21,9 @@ import { Purchases } from "./screens/compras/Purchases";
 import { BuyEditor } from "./screens/compras/BuyEditor";
 import { PoView } from "./screens/compras/PoView";
 import { PurchaseView } from "./screens/compras/PurchaseView";
+import { Inventory } from "./screens/inventario/Inventory";
+import { ProductStock } from "./screens/inventario/ProductStock";
+import { StockDocEditor } from "./screens/inventario/StockDocEditor";
 import { Config } from "./screens/config/Config";
 import { Products } from "./screens/productos/Products";
 import { DocEditor } from "./screens/ventas/DocEditor";
@@ -144,6 +147,12 @@ function Screen({ route, info, session, reload }: { route: Route; info: AppInfo;
     case "proveedores":
       navigate(a ? `/compras?tab=proveedores&ver=${a}` : "/compras?tab=proveedores", { replace: true });
       return null;
+    case "inventario":
+      if (!has.has("inventario")) return <Proximamente id="inventario" />;
+      if (a === "producto" && b) return <ProductStock key={b} uid={b} />;
+      if (a === "ajuste") return <StockDocEditor key="aju" mode="ajuste" />;
+      if (a === "transferencia") return <StockDocEditor key="tra" mode="transferencia" />;
+      return <Inventory route={route} />;
     case "comex":
       return has.has("comex") ? <ImportCalculator /> : <Proximamente id="comex" />;
     case "config":

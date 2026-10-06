@@ -5,9 +5,14 @@ use nucleo_app::company::BackupDone;
 use nucleo_app::core_ops::{
     BusinessPatch, BusinessSettings, CurrentUser, EntityRef, NewUser, SecuritySettings, UserPatch,
 };
+use nucleo_app::inventory_ops::{
+    AdjustmentInput, InventoryOverview, InventorySettings, ProductInventory, ReorderInput,
+    StockDocDone, TransferInput,
+};
 use nucleo_app::nucleo_db::audit::{AuditRow, ChainReport};
 use nucleo_app::nucleo_db::core::{AttachmentRow, CurrencyRow, RateRow, SearchHit, SequenceRow};
 use nucleo_app::nucleo_db::customers::CustomerRow;
+use nucleo_app::nucleo_db::inventory::{StockDocRow, WarehouseRow};
 use nucleo_app::nucleo_db::products::ProductRow;
 use nucleo_app::nucleo_db::purchases::PriceHistoryRow;
 use nucleo_app::nucleo_db::suppliers::SupplierRow;
@@ -705,4 +710,91 @@ pub fn void_purchase(
     reason: String,
 ) -> CmdResult<PurchaseDetail> {
     with_session(&state, |s| Ok(s.void_purchase(&uid, &reason)?))
+}
+
+/* ───────────────────────────── Inventario (Fase 7) ───────────────────────────── */
+
+#[tauri::command]
+pub fn inventory_settings(state: State<'_, AppState>) -> CmdResult<InventorySettings> {
+    with_session(&state, |s| Ok(s.inventory_settings()?))
+}
+
+#[tauri::command]
+pub fn update_inventory_settings(
+    state: State<'_, AppState>,
+    settings: InventorySettings,
+) -> CmdResult<InventorySettings> {
+    with_session(&state, |s| Ok(s.update_inventory_settings(&settings)?))
+}
+
+#[tauri::command]
+pub fn warehouses(state: State<'_, AppState>) -> CmdResult<Vec<WarehouseRow>> {
+    with_session(&state, |s| Ok(s.warehouses()?))
+}
+
+#[tauri::command]
+pub fn create_warehouse(state: State<'_, AppState>, name: String) -> CmdResult<Vec<WarehouseRow>> {
+    with_session(&state, |s| Ok(s.create_warehouse(&name)?))
+}
+
+#[tauri::command]
+pub fn rename_warehouse(
+    state: State<'_, AppState>,
+    uid: String,
+    name: String,
+) -> CmdResult<Vec<WarehouseRow>> {
+    with_session(&state, |s| Ok(s.rename_warehouse(&uid, &name)?))
+}
+
+#[tauri::command]
+pub fn set_default_warehouse(
+    state: State<'_, AppState>,
+    uid: String,
+) -> CmdResult<Vec<WarehouseRow>> {
+    with_session(&state, |s| Ok(s.set_default_warehouse(&uid)?))
+}
+
+#[tauri::command]
+pub fn archive_warehouse(state: State<'_, AppState>, uid: String) -> CmdResult<Vec<WarehouseRow>> {
+    with_session(&state, |s| Ok(s.archive_warehouse(&uid)?))
+}
+
+#[tauri::command]
+pub fn adjust_stock(state: State<'_, AppState>, input: AdjustmentInput) -> CmdResult<StockDocDone> {
+    with_session(&state, |s| Ok(s.adjust_stock(&input)?))
+}
+
+#[tauri::command]
+pub fn transfer_stock(state: State<'_, AppState>, input: TransferInput) -> CmdResult<StockDocDone> {
+    with_session(&state, |s| Ok(s.transfer_stock(&input)?))
+}
+
+#[tauri::command]
+pub fn stock_documents(state: State<'_, AppState>) -> CmdResult<Vec<StockDocRow>> {
+    with_session(&state, |s| Ok(s.stock_documents()?))
+}
+
+#[tauri::command]
+pub fn inventory_overview(state: State<'_, AppState>) -> CmdResult<InventoryOverview> {
+    with_session(&state, |s| Ok(s.inventory_overview()?))
+}
+
+#[tauri::command]
+pub fn product_inventory(
+    state: State<'_, AppState>,
+    uid: String,
+    warehouse_uid: Option<String>,
+) -> CmdResult<ProductInventory> {
+    with_session(&state, |s| {
+        Ok(s.product_inventory(&uid, warehouse_uid.as_deref())?)
+    })
+}
+
+#[tauri::command]
+pub fn update_reorder_settings(
+    state: State<'_, AppState>,
+    uid: String,
+    input: ReorderInput,
+) -> CmdResult<ProductInventory> {
+    with_session(&state, |s| Ok(s.update_reorder_settings(&uid, &input)?))
 }

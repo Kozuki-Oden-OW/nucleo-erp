@@ -284,3 +284,77 @@ fn ciclo_de_compra_por_ipc() {
     assert_eq!(o2["status"], "anulada");
     ipc.ok("purchase_order", json!({ "uid": ouid }));
 }
+
+#[test]
+fn inventario_por_ipc() {
+    let ipc = Ipc::new();
+    let created = ipc.ok(
+        "create_company",
+        json!({ "name": "Ferretería Stock", "profile": "empresa" }),
+    );
+    ipc.ok("open_company", json!({ "uid": created["company"]["uid"] }));
+    let p = ipc.ok("add_product", json!({ "input": { "name": "Tornillo", "unit": "un", "kind": "producto", "price_minor": 100, "cost_minor": 40, "initial_stock_milli": 50000 } }));
+    let prod = p["uid"].as_str().unwrap().to_string();
+    let ws = ipc.ok("create_warehouse", json!({ "name": "Sucursal centro" }));
+    let main = ws
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|w| w["is_default"] == true)
+        .unwrap()["uid"]
+        .clone();
+    let other = ws
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|w| w["is_default"] == false)
+        .unwrap()["uid"]
+        .clone();
+    ipc.ok(
+        "rename_warehouse",
+        json!({ "uid": other, "name": "Sucursal Centro" }),
+    );
+    let t = ipc.ok("transfer_stock", json!({ "input": { "from_uid": main, "to_uid": other, "date": HOY, "notes": null, "lines": [{ "product_uid": prod, "qty_milli": 10000 }] } }));
+    assert_eq!(t["number"], "TRA-000001");
+    let a = ipc.ok("adjust_stock", json!({ "input": { "warehouse_uid": main, "date": HOY, "kind": "conteo", "reason": "Conteo", "lines": [{ "product_uid": prod, "qty_milli": 39000 }] } }));
+    assert_eq!(a["moved_lines"], 1);
+    assert_eq!(
+        ipc.ok("stock_documents", json!({}))
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    let inv = ipc.ok(
+        "product_inventory",
+        json!({ "uid": prod, "warehouseUid": null }),
+    );
+    assert_eq!(inv["product"]["on_hand_milli"], 49000);
+    assert_eq!(inv["kardex"].as_array().unwrap().len(), 4);
+    let inv = ipc.ok(
+        "product_inventory",
+        json!({ "uid": prod, "warehouseUid": other }),
+    );
+    assert_eq!(inv["kardex"].as_array().unwrap().len(), 1);
+    ipc.ok("update_reorder_settings", json!({ "uid": prod, "input": { "min_milli": 5000, "safety_days": 5, "target_coverage_days": 20, "excess_coverage_days": 200, "lead_time_days": 3 } }));
+    let o = ipc.ok("inventory_overview", json!({}));
+    assert_eq!(o["rows"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        ipc.ok(
+            "update_inventory_settings",
+            json!({ "settings": { "allow_negative": false } })
+        )["allow_negative"],
+        false
+    );
+    assert_eq!(
+        ipc.ok("inventory_settings", json!({}))["allow_negative"],
+        false
+    );
+    ipc.ok("set_default_warehouse", json!({ "uid": other }));
+    assert!(
+        ipc.call("archive_warehouse", json!({ "uid": main }))
+            .is_err(),
+        "tiene stock"
+    );
+    assert_eq!(ipc.ok("warehouses", json!({})).as_array().unwrap().len(), 2);
+}

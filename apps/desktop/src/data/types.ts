@@ -405,6 +405,65 @@ export interface PurchaseInput {
 }
 export interface PriceHistoryRow { supplier_uid: string; supplier_name: string; date: string; document: string; unit_price_minor: number; qty_milli: number }
 
+/* ───── Inventario ───── */
+
+export interface InventorySettings { allow_negative: boolean }
+export interface Warehouse {
+  uid: string;
+  code: string;
+  name: string;
+  is_default: boolean;
+  archived: boolean;
+  stock_value_minor: number;
+  products_with_stock: number;
+}
+export type StockStatus = "sin_stock" | "riesgo_quiebre" | "bajo_minimo" | "exceso" | "sin_movimiento" | "ok";
+export interface StockAnalysis {
+  uid: string;
+  sku: string;
+  name: string;
+  unit: string;
+  on_hand_milli: number;
+  reserved_milli: number;
+  in_purchase_milli: number;
+  future_milli: number;
+  min_milli: number;
+  avg_cost_e4: number;
+  stock_value_minor: number;
+  sold_milli: number;
+  days_with_stock: number;
+  velocity_milli: number | null;
+  coverage_days: number | null;
+  next_arrival: string | null;
+  last_movement: string | null;
+  status: StockStatus;
+  advice: { kind: "comprar" | "no_comprar" | "exceso" | "sin_datos"; quantity_milli: number | null; explanation: string };
+}
+export interface InventoryOverview { window_days: number; total_value_minor: number; rows: StockAnalysis[] }
+export interface StockByWarehouse { warehouse_uid: string; warehouse_name: string; on_hand_milli: number; avg_cost_e4: number }
+export interface KardexRow {
+  id: number;
+  date: string;
+  warehouse_name: string;
+  kind: "entrada" | "salida" | "ajuste" | "transferencia_entrada" | "transferencia_salida" | "inicial";
+  document: string;
+  source_type: string;
+  source_uid: string | null;
+  qty_milli: number;
+  unit_cost_e4: number;
+  avg_cost_after_e4: number;
+  balance_milli: number;
+  reason: string | null;
+}
+export interface ReorderSettings { safety_days: number; target_coverage_days: number; excess_coverage_days: number; lead_time_days: number | null }
+export interface ProductInventory { product: Product; by_warehouse: StockByWarehouse[]; kardex: KardexRow[]; analysis: StockAnalysis | null; settings: ReorderSettings }
+export interface StockLineInput { product_uid: string; qty_milli: number }
+export interface AdjustmentInput { warehouse_uid: string; date: string; kind: "ajuste" | "conteo"; reason: string; lines: StockLineInput[] }
+export interface TransferInput { from_uid: string; to_uid: string; date: string; notes?: string; lines: StockLineInput[] }
+export interface StockDocDone { number: string; moved_lines: number }
+export interface StockDocRow { uid: string; number: string; kind: "ajuste" | "conteo" | "transferencia"; date: string; description: string; lines: number; created_by: string | null }
+export interface ReorderInput extends ReorderSettings { min_milli: number }
+
 /* ───── Dashboard ───── */
 
 export interface Dashboard {

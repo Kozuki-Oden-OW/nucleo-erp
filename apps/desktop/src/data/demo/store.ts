@@ -6,7 +6,8 @@ import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
   Customer, CustomerDetail, Dashboard, DocLink, EffectInput, EntityRef, ExternalRef, ExternalRefInput, Line, LineInput,
-  NewCustomer, NewProduct, NewUser, Payment, PermissionRow, PriceHistoryRow, Product, ProductPatch, PurchaseOrderDetail, PurchaseOrderSummary,
+  NewCustomer, NewProduct, NewUser, Payment, PermissionRow,
+  AdjustmentInput, InventoryOverview, InventorySettings, KardexRow, ProductInventory, ReorderInput, ReorderSettings, StockAnalysis, StockDocDone, StockDocRow, TransferInput, Warehouse, PriceHistoryRow, Product, ProductPatch, PurchaseOrderDetail, PurchaseOrderSummary,
   BuyLineInput, NewSupplier, PoLine, PoStatus, PurchaseDetail, PurchaseInput, PurchaseLine, PurchaseOrderInput, PurchaseSummary, ReceiveLine, Supplier, SupplierDetail, QuoteDetail,
   QuoteInput, QuoteStatus, QuoteSummary, RateRow, RoleRow, SaleDetail, SaleDocType, SaleInput, SaleSummary, SearchHit,
   SecuritySettings, SequenceRow, SessionInfo, Totals, UserPatch, UserRow,
@@ -35,6 +36,11 @@ interface PoRec {
   lines: PoLine[]; totals: Totals; notes: string | null; void_reason: string | null; receipts: { number: string; date: string }[];
   timeline: { at: string; text: string }[];
 }
+interface MoveRec {
+  id: number; date: string; product_uid: string; wh: string; kind: KardexRow["kind"]; document: string; source_type: string;
+  source_uid: string | null; qty: number; cost_e4: number; reason: string | null;
+}
+interface WhRec { uid: string; code: string; name: string; is_default: boolean; archived: boolean }
 interface PurRec {
   uid: string; number: string; supplier_uid: string; doc_kind: string | null; doc_number: string | null; issue_date: string;
   due_date: string | null; status: "registrada" | "anulada"; lines: PurchaseLine[]; totals: Totals; order_uid: string | null;
@@ -51,7 +57,7 @@ export class DemoBackend implements Backend {
   readonly kind = "demo" as const;
   readonly features: ReadonlySet<Feature> = new Set<Feature>([
     "dashboard", "clientes", "productos", "ventas", "compras", "comex", "negocio", "busqueda",
-    "usuarios", "documentos", "numeracion", "monedas", "auditoria",
+    "usuarios", "documentos", "numeracion", "monedas", "auditoria", "inventario",
   ]);
   private company = { uid: "demo-company", name: DEMO_COMPANY, profile: "empresa" as BusinessProfile, created_at: "2026-01-02T12:00:00Z" };
   private biz: BusinessSettings;
@@ -61,6 +67,11 @@ export class DemoBackend implements Backend {
   private sales: SaleRec[] = [];
   private pos: PoRec[] = [];
   private suppliers: Supplier[] = [];
+  private whs: WhRec[] = [];
+  private moves: MoveRec[] = [];
+  private stockDocs: StockDocRow[] = [];
+  private reorder: Record<string, ReorderSettings> = {};
+  private allowNegative = true;
   private purchases: PurRec[] = [];
   private seq: Record<string, number> = {};
   private history: Record<string, number> = {};
@@ -86,6 +97,7 @@ export class DemoBackend implements Backend {
       email: "contacto@ejemplo.cl", documentation_reminder: true, tax_enabled: true, tax_rate_ppm: TAX_PPM, tax_rule_source: TAX_SOURCE, tax_rate_user_ppm: null,
     };
     this.seed();
+    this.seedInventory();
   }
 
   private next(docType: string): string {
@@ -679,6 +691,7 @@ export class DemoBackend implements Backend {
       price_minor: input.price_minor, cost_e4: (input.cost_minor ?? 0) * 10_000, on_hand_milli: input.kind === "producto" ? Math.max(0, input.initial_stock_milli ?? 0) : 0, min_milli: 0, taxable: input.taxable ?? true,
     };
     this.products.push(p);
+    if (p.on_hand_milli > 0) this.mv(p.uid, p.on_hand_milli, "inicial", "Stock inicial", "AJU", null, "Stock inicial", this.today, p.cost_e4);
     this.log("producto.crear", "producto", p.uid);
     return wait(p);
   }
@@ -762,9 +775,13 @@ export class DemoBackend implements Backend {
     if (!["borrador", "cotizada", "aceptada"].includes(s.commercial_state)) throw new AppError("estado", "Esta venta ya fue efectuada o anulada.");
     if (input.mode === "credito" && !s.customer_uid) throw new AppError("credito", "Para vender a crédito elige un cliente: necesitamos saber quién te debe.");
     if (input.mode === "credito" && !input.due_date) throw new AppError("vencimiento", "Indica la fecha en que te pagarán.");
+    if (!this.allowNegative) {
+      const short = s.lines.filter((l) => { const p = this.products.find((x) => x.uid === l.product_uid); return p && p.kind === "producto" && this.whQty(p.uid, this.defWh().uid) < l.qty_milli; });
+      if (short.length) throw new AppError("sin_stock", `No hay stock suficiente en la bodega principal: ${short.map((l) => l.description).join(", ")}. Registra la compra o un ajuste, o permite vender sin stock.`);
+    }
     for (const l of s.lines) {
       const p = this.products.find((x) => x.uid === l.product_uid);
-      if (p && p.kind === "producto") { p.on_hand_milli -= l.qty_milli; l.unit_cost_e4 = p.cost_e4; }
+      if (p && p.kind === "producto") { p.on_hand_milli -= l.qty_milli; l.unit_cost_e4 = p.cost_e4; this.mv(p.uid, -l.qty_milli, "salida", s.number, s.doc_type, s.uid, null, s.issue_date); }
     }
     s.cost_minor = this.costOf(s.lines);
     s.commercial_state = "efectuada";
@@ -820,7 +837,7 @@ export class DemoBackend implements Backend {
     if (s.commercial_state === "efectuada" || s.commercial_state === "cerrada") {
       for (const l of s.lines) {
         const p = this.products.find((x) => x.uid === l.product_uid);
-        if (p && p.kind === "producto") p.on_hand_milli += l.qty_milli;
+        if (p && p.kind === "producto") { p.on_hand_milli += l.qty_milli; this.mv(p.uid, l.qty_milli, "ajuste", s.number, s.doc_type, s.uid, `Anulación de ${s.number}`); }
       }
     }
     s.commercial_state = "anulada";
@@ -828,6 +845,229 @@ export class DemoBackend implements Backend {
     s.timeline.push({ at: now(), text: `Anulada: ${reason.trim()} (stock devuelto)` });
     this.log("venta.anular", "venta", s.number);
     return wait(this.detail(s));
+  }
+
+  /* ───────────── Inventario ───────────── */
+
+  private defWh(): WhRec { return this.whs.find((w) => w.is_default)!; }
+  private mv(product_uid: string, qty: number, kind: MoveRec["kind"], document: string, source_type: string, source_uid: string | null, reason: string | null = null, date = this.today, cost_e4?: number, wh?: string): void {
+    const p = this.products.find((x) => x.uid === product_uid);
+    this.moves.push({ id: this.moves.length + 1, date, product_uid, wh: wh ?? this.defWh().uid, kind, document, source_type, source_uid, qty, cost_e4: cost_e4 ?? p?.cost_e4 ?? 0, reason });
+  }
+  /** Saldo de un producto en una bodega según el libro de movimientos. */
+  private whQty(product_uid: string, wh: string): number {
+    return this.moves.reduce((a, m) => a + (m.product_uid === product_uid && m.wh === wh ? m.qty : 0), 0);
+  }
+  private seedInventory(): void {
+    this.whs = [
+      { uid: "wh-principal", code: "B1", name: "Bodega principal", is_default: true, archived: false },
+      { uid: "wh-sala", code: "B2", name: "Sala de ventas", is_default: false, archived: false },
+    ];
+    const start = addDays(this.today, -150);
+    const history: MoveRec[] = [];
+    for (const s of this.sales) {
+      if (s.commercial_state !== "efectuada" && s.commercial_state !== "cerrada") continue;
+      for (const l of s.lines) {
+        if (!l.product_uid) continue;
+        const cost = l.unit_cost_e4 ?? this.products.find((p) => p.uid === l.product_uid)?.cost_e4 ?? 0;
+        history.push({ id: 0, date: s.issue_date, product_uid: l.product_uid, wh: "wh-principal", kind: "salida", document: s.number, source_type: s.doc_type, source_uid: s.uid, qty: -l.qty_milli, cost_e4: cost, reason: null });
+        // Ventas de los meses anteriores (ya resumidas en el gráfico): mismo ritmo, 45 y 90 días antes.
+        for (const back of [45, 90]) history.push({ id: 0, date: addDays(s.issue_date, -back), product_uid: l.product_uid, wh: "wh-principal", kind: "salida", document: "Venta (histórico)", source_type: s.doc_type, source_uid: null, qty: -l.qty_milli, cost_e4: cost, reason: null });
+      }
+    }
+    for (const o of this.pos) for (const r of o.receipts) for (const l of o.lines) if (l.product_uid) history.push({ id: 0, date: r.date, product_uid: l.product_uid, wh: "wh-principal", kind: "entrada", document: r.number, source_type: "OC", source_uid: o.uid, qty: l.received_milli, cost_e4: l.unit_cost_minor * 10_000, reason: null });
+    const tra = this.next("TRA");
+    const traDate = addDays(this.today, -25);
+    for (const p of this.products.filter((x) => x.kind === "producto")) {
+      const moved = history.filter((m) => m.product_uid === p.uid).reduce((a, m) => a + m.qty, 0);
+      history.push({ id: 0, date: start, product_uid: p.uid, wh: "wh-principal", kind: "inicial", document: "Stock inicial", source_type: "AJU", source_uid: null, qty: p.on_hand_milli - moved, cost_e4: p.cost_e4, reason: "Stock inicial" });
+      // Parte del stock de herramientas está exhibido en la sala de ventas.
+      if (p.unit === "un" && p.on_hand_milli >= 6000) {
+        const q = Math.floor(p.on_hand_milli / 3000) * 1000;
+        history.push({ id: 0, date: traDate, product_uid: p.uid, wh: "wh-principal", kind: "transferencia_salida", document: tra, source_type: "TRA", source_uid: null, qty: -q, cost_e4: p.cost_e4, reason: "A Sala de ventas" });
+        history.push({ id: 0, date: traDate, product_uid: p.uid, wh: "wh-sala", kind: "transferencia_entrada", document: tra, source_type: "TRA", source_uid: null, qty: q, cost_e4: p.cost_e4, reason: "Desde Bodega principal" });
+      }
+    }
+    history.sort((a, b) => a.date.localeCompare(b.date));
+    history.forEach((m, i) => (m.id = i + 1));
+    this.moves = history;
+    this.stockDocs = [{ uid: "tra-seed", number: tra, kind: "transferencia", date: traDate, description: "Bodega principal → Sala de ventas", lines: history.filter((m) => m.document === tra && m.qty > 0).length, created_by: "Dueño" }];
+  }
+  private whRow(w: WhRec): Warehouse {
+    let value = 0, count = 0;
+    for (const p of this.products) {
+      if (p.kind !== "producto") continue;
+      const q = this.whQty(p.uid, w.uid);
+      if (q !== 0) count++;
+      if (q > 0) value += Math.round((q * p.cost_e4) / 10_000_000);
+    }
+    return { ...w, stock_value_minor: value, products_with_stock: count };
+  }
+  private findWh(u: string): WhRec {
+    const w = this.whs.find((x) => x.uid === u);
+    if (!w) throw new AppError("no_encontrado", "No encontramos esa bodega.");
+    return w;
+  }
+  private analysis(p: Product): StockAnalysis {
+    const today = this.today;
+    const start = addDays(today, -89);
+    const mine = this.moves.filter((m) => m.product_uid === p.uid);
+    let balance = mine.filter((m) => m.date < start).reduce((a, m) => a + m.qty, 0);
+    let days = 0, sold = 0;
+    for (let d = start; d <= today; d = addDays(d, 1)) {
+      const opening = balance;
+      let soldToday = 0;
+      for (const m of mine) if (m.date === d) { balance += m.qty; if (m.kind === "salida" && (m.source_type === "VEN" || m.source_type === "FV")) soldToday -= m.qty; }
+      sold += soldToday;
+      if (opening > 0 || soldToday > 0) days++;
+    }
+    sold -= mine.filter((m) => m.kind === "ajuste" && (m.source_type === "VEN" || m.source_type === "FV") && m.qty > 0 && m.date >= start).reduce((a, m) => a + m.qty, 0);
+    sold = Math.max(0, sold);
+    const s = this.reorder[p.uid] ?? { safety_days: 7, target_coverage_days: 30, excess_coverage_days: 180, lead_time_days: null };
+    const lead = s.lead_time_days ?? 7;
+    const inPurchase = this.pos.filter((o) => o.status === "emitida" || o.status === "parcial").reduce((a, o) => a + o.lines.filter((l) => l.product_uid === p.uid).reduce((x, l) => x + l.qty_milli - l.received_milli, 0), 0);
+    const arrivals = this.pos.filter((o) => (o.status === "emitida" || o.status === "parcial") && o.expected_date && o.lines.some((l) => l.product_uid === p.uid && l.received_milli < l.qty_milli)).map((o) => o.expected_date!).sort();
+    const v = days >= 14 && days > 0 ? sold / 1000 / days : null;
+    const onHand = p.on_hand_milli / 1000;
+    const position = onHand + inPurchase / 1000;
+    const coverage = v && v > 0 ? Math.max(0, onHand) / v : null;
+    let advice: StockAnalysis["advice"];
+    if (!v) advice = { kind: "sin_datos", quantity_milli: null, explanation: "Faltan datos: se necesitan ventas en al menos 14 días con stock dentro de los últimos 90 días." };
+    else {
+      const safety = v * s.safety_days, rop = v * lead + safety, cov = position / v;
+      const r2 = (x: number) => x.toFixed(2).replace(".", ",");
+      if (cov > s.excess_coverage_days) advice = { kind: "exceso", quantity_milli: null, explanation: `Posición ${position} u ÷ velocidad ${r2(v)} u/día = ${cov.toFixed(1).replace(".", ",")} días de cobertura, sobre el umbral de ${s.excess_coverage_days} días.` };
+      else if (position > rop) advice = { kind: "no_comprar", quantity_milli: null, explanation: `Posición ${position} u > punto de reorden ${r2(rop)} u (velocidad ${r2(v)} × plazo ${lead} d + seguridad ${r2(safety)}).` };
+      else {
+        const raw = v * (lead + s.target_coverage_days) + safety - position;
+        const qty = Math.ceil(Math.max(0, raw));
+        advice = { kind: "comprar", quantity_milli: qty * 1000, explanation: `Velocidad ${r2(v)} u/día × (plazo ${lead} d + cobertura objetivo ${s.target_coverage_days} d) + seguridad ${r2(safety)} − posición ${position} = ${r2(raw)} u → ${qty} u.` };
+      }
+    }
+    const arrivalDays = arrivals[0] ? Math.max(0, daysBetween(today, arrivals[0])) : null;
+    const covDays = coverage === null ? null : Math.round(coverage);
+    const risk = covDays !== null && covDays < lead + s.safety_days && (arrivalDays === null || arrivalDays > covDays);
+    const last = mine.map((m) => m.date).sort().at(-1) ?? null;
+    const idle = last ? daysBetween(last, today) : 9999;
+    const status: StockAnalysis["status"] = p.on_hand_milli <= 0 ? "sin_stock" : risk ? "riesgo_quiebre" : p.min_milli > 0 && p.on_hand_milli <= p.min_milli ? "bajo_minimo" : advice.kind === "exceso" ? "exceso" : idle >= 90 && sold === 0 ? "sin_movimiento" : "ok";
+    return {
+      uid: p.uid, sku: p.sku, name: p.name, unit: p.unit, on_hand_milli: p.on_hand_milli, reserved_milli: 0, in_purchase_milli: inPurchase,
+      future_milli: p.on_hand_milli + inPurchase, min_milli: p.min_milli, avg_cost_e4: p.cost_e4,
+      stock_value_minor: p.on_hand_milli > 0 ? Math.round((p.on_hand_milli * p.cost_e4) / 10_000_000) : 0, sold_milli: sold, days_with_stock: days,
+      velocity_milli: v === null ? null : Math.round(v * 1000), coverage_days: covDays, next_arrival: arrivals[0] ?? null, last_movement: last, status, advice,
+    };
+  }
+
+  async inventorySettings(): Promise<InventorySettings> { return wait({ allow_negative: this.allowNegative }); }
+  async updateInventorySettings(x: InventorySettings): Promise<InventorySettings> {
+    this.require("config.editar");
+    this.allowNegative = x.allow_negative;
+    this.log("inventario.config", "negocio", "inventario");
+    return wait({ allow_negative: this.allowNegative });
+  }
+  async warehouses(): Promise<Warehouse[]> { this.require("inventario.ver"); return wait(this.whs.map((w) => this.whRow(w))); }
+  async createWarehouse(name: string): Promise<Warehouse[]> {
+    this.require("inventario.ajustar");
+    if (!name.trim()) throw new AppError("nombre", "El nombre de la bodega es obligatorio.");
+    const w: WhRec = { uid: uid("wh"), code: `B${this.whs.length + 1}`, name: name.trim(), is_default: false, archived: false };
+    this.whs.push(w);
+    this.log("bodega.crear", "bodega", w.uid);
+    return this.warehouses();
+  }
+  async renameWarehouse(u: string, name: string): Promise<Warehouse[]> {
+    this.require("inventario.ajustar");
+    if (!name.trim()) throw new AppError("nombre", "El nombre de la bodega es obligatorio.");
+    this.findWh(u).name = name.trim();
+    return this.warehouses();
+  }
+  async setDefaultWarehouse(u: string): Promise<Warehouse[]> {
+    this.require("inventario.ajustar");
+    const w = this.findWh(u);
+    this.whs.forEach((x) => (x.is_default = false));
+    w.is_default = true; w.archived = false;
+    return this.warehouses();
+  }
+  async archiveWarehouse(u: string): Promise<Warehouse[]> {
+    this.require("inventario.ajustar");
+    const w = this.whRow(this.findWh(u));
+    if (w.is_default) throw new AppError("principal", "La bodega principal no se archiva: elige otra como principal primero.");
+    if (w.products_with_stock > 0) throw new AppError("con_stock", "La bodega tiene stock: transfiérelo antes de archivarla.");
+    this.findWh(u).archived = true;
+    return this.warehouses();
+  }
+  async adjustStock(input: AdjustmentInput): Promise<StockDocDone> {
+    this.require("inventario.ajustar");
+    const w = this.findWh(input.warehouse_uid);
+    if (!input.reason.trim()) throw new AppError("motivo", "Escribe el motivo del ajuste (queda en el kárdex y la auditoría).");
+    if (!input.lines.length) throw new AppError("sin_lineas", "Agrega al menos un producto.");
+    const number = this.next("AJU");
+    let moved = 0;
+    for (const l of input.lines) {
+      const p = this.products.find((x) => x.uid === l.product_uid);
+      if (!p || p.kind !== "producto") continue;
+      const delta = input.kind === "conteo" ? l.qty_milli - this.whQty(p.uid, w.uid) : l.qty_milli;
+      if (delta === 0) continue;
+      p.on_hand_milli += delta;
+      this.mv(p.uid, delta, "ajuste", number, "AJU", null, input.reason.trim(), input.date, p.cost_e4, w.uid);
+      moved++;
+    }
+    if (!moved) { this.seq["AJU"]!--; throw new AppError("sin_cambios", input.kind === "conteo" ? "Lo contado coincide con el stock registrado: no hay nada que ajustar." : "Indica al menos una diferencia distinta de cero."); }
+    this.stockDocs.unshift({ uid: uid("aju"), number, kind: input.kind, date: input.date, description: `${w.name} · ${input.reason.trim()}`, lines: moved, created_by: this.me().display_name });
+    this.log(input.kind === "conteo" ? "inventario.conteo" : "inventario.ajuste", "ajuste", number, input.reason.trim());
+    return wait({ number, moved_lines: moved });
+  }
+  async transferStock(input: TransferInput): Promise<StockDocDone> {
+    this.require("inventario.ajustar");
+    const from = this.findWh(input.from_uid), to = this.findWh(input.to_uid);
+    if (from.uid === to.uid) throw new AppError("bodegas", "Elige bodegas de origen y destino distintas.");
+    if (!input.lines.length) throw new AppError("sin_lineas", "Agrega al menos un producto.");
+    for (const l of input.lines) {
+      const p = this.products.find((x) => x.uid === l.product_uid);
+      const have = this.whQty(l.product_uid, from.uid);
+      if (l.qty_milli <= 0) throw new AppError("cantidad", "Las cantidades a transferir deben ser mayores que cero.");
+      if (have < l.qty_milli) throw new AppError("cantidad", `${p?.name ?? "Producto"}: en ${from.name} hay ${have / 1000} y quieres mover ${l.qty_milli / 1000}.`);
+    }
+    const number = this.next("TRA");
+    for (const l of input.lines) {
+      this.mv(l.product_uid, -l.qty_milli, "transferencia_salida", number, "TRA", null, `A ${to.name}`, input.date, undefined, from.uid);
+      this.mv(l.product_uid, l.qty_milli, "transferencia_entrada", number, "TRA", null, `Desde ${from.name}`, input.date, undefined, to.uid);
+    }
+    this.stockDocs.unshift({ uid: uid("tra"), number, kind: "transferencia", date: input.date, description: `${from.name} → ${to.name}`, lines: input.lines.length, created_by: this.me().display_name });
+    this.log("inventario.transferir", "transferencia", number);
+    return wait({ number, moved_lines: input.lines.length });
+  }
+  async stockDocuments(): Promise<StockDocRow[]> { this.require("inventario.ver"); return wait(this.stockDocs); }
+  async inventoryOverview(): Promise<InventoryOverview> {
+    this.require("inventario.ver");
+    const rows = this.products.filter((p) => p.kind === "producto").map((p) => this.analysis(p)).sort((a, b) => a.name.localeCompare(b.name, "es"));
+    return wait({ window_days: 90, total_value_minor: rows.reduce((a, r) => a + r.stock_value_minor, 0), rows }, 120);
+  }
+  async productInventory(u: string, warehouseUid?: string): Promise<ProductInventory> {
+    this.require("inventario.ver");
+    const p = this.products.find((x) => x.uid === u);
+    if (!p) throw new AppError("no_encontrado", "No encontramos ese producto.");
+    const mine = this.moves.filter((m) => m.product_uid === u && (!warehouseUid || m.wh === warehouseUid)).sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id);
+    let bal = 0;
+    const kardex: KardexRow[] = mine.map((m) => {
+      bal += m.qty;
+      return { id: m.id, date: m.date, warehouse_name: this.whs.find((w) => w.uid === m.wh)?.name ?? "", kind: m.kind, document: m.document, source_type: m.source_type, source_uid: m.source_uid, qty_milli: m.qty, unit_cost_e4: m.cost_e4, avg_cost_after_e4: p.cost_e4, balance_milli: bal, reason: m.reason };
+    }).reverse();
+    return wait({
+      product: p,
+      by_warehouse: this.whs.filter((w) => !w.archived).map((w) => ({ warehouse_uid: w.uid, warehouse_name: w.name, on_hand_milli: this.whQty(u, w.uid), avg_cost_e4: p.cost_e4 })),
+      kardex, analysis: p.kind === "producto" ? this.analysis(p) : null,
+      settings: this.reorder[u] ?? { safety_days: 7, target_coverage_days: 30, excess_coverage_days: 180, lead_time_days: null },
+    });
+  }
+  async updateReorderSettings(u: string, input: ReorderInput): Promise<ProductInventory> {
+    this.require("inventario.ajustar");
+    const p = this.products.find((x) => x.uid === u);
+    if (!p) throw new AppError("no_encontrado", "No encontramos ese producto.");
+    if (input.excess_coverage_days <= input.target_coverage_days) throw new AppError("valores", "El umbral de exceso debe ser mayor que la cobertura objetivo.");
+    p.min_milli = input.min_milli;
+    this.reorder[u] = { safety_days: input.safety_days, target_coverage_days: input.target_coverage_days, excess_coverage_days: input.excess_coverage_days, lead_time_days: input.lead_time_days };
+    this.log("producto.reorden", "producto", u);
+    return this.productInventory(u);
   }
 
   /* ───────────── Proveedores y compras ───────────── */
@@ -875,9 +1115,10 @@ export class DemoBackend implements Backend {
     const bad = lines.findIndex((l) => !l.description.trim() || l.qty_milli <= 0 || l.unit_cost_minor < 0);
     if (bad >= 0) throw new AppError("linea_invalida", `Revisa la línea ${bad + 1}: necesita descripción, cantidad mayor que cero y costo.`);
   }
-  private stockIn(productUid: string | null, qty: number, costMinor: number): void {
+  private stockIn(productUid: string | null, qty: number, costMinor: number, doc = "REC", sourceType = "OC", sourceUid: string | null = null, date = this.today): void {
     const p = this.products.find((x) => x.uid === productUid);
     if (!p || p.kind !== "producto") return;
+    this.mv(p.uid, qty, "entrada", doc, sourceType, sourceUid, null, date, costMinor * 10_000);
     const base = Math.max(0, p.on_hand_milli);
     p.cost_e4 = base + qty > 0 ? Math.round((p.cost_e4 * base + costMinor * 10_000 * qty) / (base + qty)) : costMinor * 10_000;
     p.on_hand_milli += qty;
@@ -984,12 +1225,12 @@ export class DemoBackend implements Backend {
       const l = o.lines.find((x) => x.line_no === r.line_no);
       if (!l || r.qty_milli < 0 || r.qty_milli > l.qty_milli - l.received_milli) throw new AppError("cantidades", `Línea ${r.line_no}: puedes recibir hasta lo pendiente de la orden.`);
     }
+    const rec = this.next("REC");
     for (const r of plan) {
       const l = o.lines.find((x) => x.line_no === r.line_no)!;
       l.received_milli += r.qty_milli;
-      this.stockIn(l.product_uid, r.qty_milli, l.unit_cost_minor);
+      this.stockIn(l.product_uid, r.qty_milli, l.unit_cost_minor, rec, "OC", o.uid, date);
     }
-    const rec = this.next("REC");
     o.receipts.push({ number: rec, date });
     o.status = o.lines.every((l) => l.received_milli >= l.qty_milli) ? "recibida" : "parcial";
     o.timeline.push({ at: now(), text: `${o.status === "recibida" ? "Recibida completa" : "Recepción parcial"} (${rec}): stock y costo promedio actualizados` });
@@ -1024,7 +1265,7 @@ export class DemoBackend implements Backend {
     if (o) { c.timeline.push({ at: now(), text: `Asociado a la orden ${o.number}` }); o.timeline.push({ at: now(), text: `Documento de compra ${c.number} registrado` }); }
     if (input.receive_stock) {
       const any = lines.some((l) => this.products.find((p) => p.uid === l.product_uid)?.kind === "producto");
-      for (const l of lines) this.stockIn(l.product_uid, l.qty_milli, l.unit_cost_minor);
+      for (const l of lines) this.stockIn(l.product_uid, l.qty_milli, l.unit_cost_minor, c.number, "COM", c.uid, c.issue_date);
       if (any) { c.received_stock = true; c.timeline.push({ at: now(), text: `Mercadería ingresada a bodega (${this.next("REC")}): stock y costo promedio actualizados` }); }
     }
     if (input.paid_method) {
@@ -1054,7 +1295,7 @@ export class DemoBackend implements Backend {
     const c = this.findPur(u);
     if (!reason.trim()) throw new AppError("motivo", "Escribe el motivo de la anulación.");
     if (c.status === "anulada") throw new AppError("estado", "El documento ya está anulado.");
-    if (c.received_stock) for (const l of c.lines) { const p = this.products.find((x) => x.uid === l.product_uid); if (p && p.kind === "producto") p.on_hand_milli -= l.qty_milli; }
+    if (c.received_stock) for (const l of c.lines) { const p = this.products.find((x) => x.uid === l.product_uid); if (p && p.kind === "producto") { p.on_hand_milli -= l.qty_milli; this.mv(p.uid, -l.qty_milli, "ajuste", c.number, "COM", c.uid, `Anulación de ${c.number}`); } }
     c.status = "anulada"; c.void_reason = reason.trim();
     if (c.doc_number) c.doc_number = `${c.doc_number} (anulado ${c.number})`;
     c.timeline.push({ at: now(), text: `Anulado: ${reason.trim()}` });

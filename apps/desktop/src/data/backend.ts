@@ -4,6 +4,7 @@
 // Las pantallas solo conocen esta interfaz; así un prototipo de la Fase 3 se convierte en pantalla
 // real cuando el comando Rust correspondiente existe.
 import type {
+  AdjustmentInput, InventoryOverview, InventorySettings, ProductInventory, ReorderInput, StockDocDone, StockDocRow, TransferInput, Warehouse,
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
   Customer, CustomerDetail, Dashboard, EffectInput, EntityRef, ExternalRefInput, NewCustomer, NewProduct, NewUser,
   PermissionRow, PriceHistoryRow, Product, ProductPatch, PurchaseDetail, PurchaseInput, PurchaseOrderDetail, PurchaseOrderInput,
@@ -27,7 +28,7 @@ export interface SaleFilter {
 /** Módulos que el backend ya implementa. La interfaz oculta o marca "próximamente" lo que falte. */
 export type Feature =
   | "dashboard" | "clientes" | "productos" | "ventas" | "compras" | "comex" | "negocio" | "respaldos" | "busqueda"
-  | "usuarios" | "documentos" | "numeracion" | "monedas" | "auditoria";
+  | "usuarios" | "documentos" | "numeracion" | "monedas" | "auditoria" | "inventario";
 
 export interface Backend {
   readonly kind: "tauri" | "demo";
@@ -122,6 +123,21 @@ export interface Backend {
   registerPurchase(input: PurchaseInput): Promise<PurchaseDetail>;
   payPurchase(uid: string, amount_minor: number, method: string, date: string): Promise<PurchaseDetail>;
   voidPurchase(uid: string, reason: string): Promise<PurchaseDetail>;
+
+  // Inventario
+  inventorySettings(): Promise<InventorySettings>;
+  updateInventorySettings(s: InventorySettings): Promise<InventorySettings>;
+  warehouses(): Promise<Warehouse[]>;
+  createWarehouse(name: string): Promise<Warehouse[]>;
+  renameWarehouse(uid: string, name: string): Promise<Warehouse[]>;
+  setDefaultWarehouse(uid: string): Promise<Warehouse[]>;
+  archiveWarehouse(uid: string): Promise<Warehouse[]>;
+  adjustStock(input: AdjustmentInput): Promise<StockDocDone>;
+  transferStock(input: TransferInput): Promise<StockDocDone>;
+  stockDocuments(): Promise<StockDocRow[]>;
+  inventoryOverview(): Promise<InventoryOverview>;
+  productInventory(uid: string, warehouseUid?: string): Promise<ProductInventory>;
+  updateReorderSettings(uid: string, input: ReorderInput): Promise<ProductInventory>;
 }
 
 /** Error con mensaje en lenguaje claro, listo para mostrar. */

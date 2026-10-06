@@ -1179,6 +1179,7 @@ impl CompanySession {
         } else {
             method_label(method_code(&input.method)).to_string()
         };
+        self.check_stock_for_sale(s.id)?;
         let reminder = self.business()?.documentation_reminder;
         let doc_state = if reminder { "pendiente" } else { "no_aplica" };
         let lines = db::sale_lines(self.db.conn(), s.id)?;

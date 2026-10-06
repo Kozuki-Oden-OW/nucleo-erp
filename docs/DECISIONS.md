@@ -128,6 +128,19 @@ informativo, sin renta guiada · D-11 promociones no acumulables por defecto · 
 | D-F6-06 | Anular un documento anula la deuda y los pagos y, si ingresó mercadería directa, la saca del stock recalculando el costo; el número del proveedor queda marcado "(anulado …)" | Corrección sin borrar y sin chocar con la regla de no repetir documentos |
 | D-F6-07 | El costo de compra es el neto; el IVA de compras se muestra como crédito estimado informativo | Coherente con la contabilidad de costos y con el carácter no tributario de NÚCLEO |
 
+## Decisiones de la Fase 7
+
+| ID | Decisión | Motivo |
+|---|---|---|
+| D-F7-01 | Ventas y recepciones mueven la bodega principal; el stock se reparte con transferencias | Simple para la mayoría de las pymes; elegir bodega por documento llega con sucursales |
+| D-F7-02 | Velocidad de venta = unidades vendidas ÷ días con stock en los últimos 90 días (mínimo 14 días), reconstruyendo los días desde el libro de movimientos | No subestima la venta de productos que estuvieron agotados (Blueprint §19.5) |
+| D-F7-03 | Sugerencia de compra con la regla del dominio (`reorder_advice`) y su explicación paso a paso; plazo por defecto 7 días si el producto no tiene uno | Toda recomendación debe poder explicarse |
+| D-F7-04 | Ajustes y conteos guardan encabezado (AJU) con motivo obligatorio; el conteo calcula la diferencia contra el stock registrado | Trazabilidad: quién, cuándo, por qué y cuánto |
+| D-F7-05 | Las transferencias llevan el costo promedio de la bodega de origen y recalculan el promedio en la de destino | El costo sigue a la mercadería |
+| D-F7-06 | Se permite vender sin stock por defecto; el negocio puede prohibirlo | No detener la venta por un inventario mal cargado, pero dar control a quien lo quiera |
+| D-F7-07 | Recálculo retroactivo del costo (entradas con fecha pasada) y reservas por notas de venta se postergan | Requieren rehacer costos de ventas ya efectuadas; se diseñan con la contabilidad (Fase 10) |
+| D-F7-08 | El análisis se calcula al abrir la pantalla; la foto diaria (`stock_daily_snapshot`) y el cálculo en segundo plano llegan con el dashboard (Fase 12) | Medido en segundos para catálogos grandes; suficiente para el MVP |
+
 ## Dependencias y su justificación
 
 | Dependencia | Dónde | Por qué |

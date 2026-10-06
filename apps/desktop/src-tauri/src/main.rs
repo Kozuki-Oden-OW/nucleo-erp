@@ -92,6 +92,19 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         commands::register_purchase,
         commands::pay_purchase,
         commands::void_purchase,
+        commands::inventory_settings,
+        commands::update_inventory_settings,
+        commands::warehouses,
+        commands::create_warehouse,
+        commands::rename_warehouse,
+        commands::set_default_warehouse,
+        commands::archive_warehouse,
+        commands::adjust_stock,
+        commands::transfer_stock,
+        commands::stock_documents,
+        commands::inventory_overview,
+        commands::product_inventory,
+        commands::update_reorder_settings,
     ])
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Package, PackagePlus, Pencil, Search } from "lucide-react";
+import { Boxes, Package, PackagePlus, Pencil, Search } from "lucide-react";
 import { useBackend, errorMessage, type PriceHistoryRow, type Product } from "../../data";
 import { useSession } from "../../lib/session";
 import { formatDate, formatMoney, formatQty, parseQty } from "../../lib/format";
@@ -86,7 +86,9 @@ export function Products({ route }: { route: Route }) {
               ] : []),
             ]} />
             {can("compras.ver") && <PriceHistory productUid={product.uid} />}
-            <Notice tone="info">Stock real y proyectado, kárdex, ajustes, velocidad de venta y punto de reorden llegan en la Fase 7 (Inventario).</Notice>
+            {product.kind === "producto" && backend.features.has("inventario") && can("inventario.ver") && (
+              <Button variant="secondary" icon={Boxes} onClick={() => navigate(`/inventario/producto/${product.uid}`)}>Ver kárdex, bodegas y reposición</Button>
+            )}
           </div>
         )}
       </Drawer>

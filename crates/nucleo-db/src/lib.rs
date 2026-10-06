@@ -7,6 +7,7 @@
 pub mod audit;
 pub mod core;
 pub mod customers;
+pub mod inventory;
 pub mod maintenance;
 pub mod migrations;
 pub mod products;

@@ -11,8 +11,8 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | 4 | Core (usuarios, roles, configuración, numeración, documentos, búsqueda) | ✅ Hito A cumplido (2026-10-06) — ver abajo |
 | 5 | Ventas | ✅ Completo (2026-10-06) — ver abajo |
 | 6 | Compras | ✅ Completo (2026-10-06) — ver abajo |
-| 7 | Inventario (incluye stock real y futuro) | 🟡 En curso |
-| 8 | Finanzas | ⏳ |
+| 7 | Inventario (incluye stock real y futuro) | ✅ Hito B cumplido (2026-10-06) — ver abajo |
+| 8 | Finanzas | 🟡 En curso |
 | 9 | COMEX (requiere contador colaborador, D-07) | ⏳ |
 | 10 | Contabilidad (motor de asientos) | ⏳ |
 | 11 | Documentación externa e indicadores | ⏳ |
@@ -81,6 +81,19 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | Documentos adjuntos cifrados, vinculados, exportables y archivables; incluidos en respaldos | ✅ |
 | Búsqueda global filtrada por permisos; visor de auditoría | ✅ |
 | Pruebas: `hito_a` (flujo completo + respaldo/restauración con adjuntos) | ✅ |
+
+## Fase 7 — criterio de salida
+
+> Hito B: "opero mi negocio: vendo, compro y controlo stock".
+
+| Entregable | Estado |
+|---|---|
+| Multibodega, transferencias, ajustes y conteos con motivo | ✅ prueba `inventario.rs` e `ipc_tests.rs` |
+| Kárdex por producto y bodega con costo promedio | ✅ |
+| Stock real y futuro, velocidad (días con stock), cobertura, riesgo de quiebre, sin movimiento | ✅ |
+| Sugerencia de compra explicada y parámetros de reposición | ✅ |
+| Regla de stock negativo | ✅ |
+| Recálculo retroactivo de costos y reservas | ⏳ postergado (D-F7-07) |
 
 ## Fase 6 — criterio de salida
 

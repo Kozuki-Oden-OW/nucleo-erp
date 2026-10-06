@@ -2,6 +2,19 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [Sin publicar] — Fase 7 (Inventario) · Hito B
+
+### Agregado
+- Existencias con análisis por producto: stock, por llegar, unidades vendidas por día (solo días con
+  stock, últimos 90 días), días de cobertura, próxima llegada, estado (sin stock, riesgo de quiebre, bajo
+  el mínimo, exceso, sin movimiento) y sugerencia de compra con su cálculo explicado.
+- Kárdex por producto y bodega con saldo, costo y enlace al documento de origen.
+- Ajustes y conteos de inventario con motivo obligatorio (AJU) y transferencias entre bodegas (TRA).
+- Bodegas: crear, renombrar, elegir la principal y archivar (sin stock).
+- Parámetros de reposición por producto: mínimo, plazo del proveedor, días de seguridad, cobertura
+  objetivo y umbral de exceso.
+- Regla "Permitir vender aunque no haya stock" (si se desactiva, la venta se rechaza con el detalle).
+
 ## [Sin publicar] — Fase 6 (Compras)
 
 ### Agregado
