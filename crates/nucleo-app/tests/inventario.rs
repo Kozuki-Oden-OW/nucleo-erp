@@ -17,10 +17,16 @@ fn session() -> (tempfile::TempDir, AppService, CompanySession) {
     (data, app, s)
 }
 
+/// Fecha local (la misma que usa la aplicación: SQLite `localtime`) de hace `n` días.
 fn days_ago(n: i64) -> String {
-    let d = time::OffsetDateTime::now_utc().date() - time::Duration::days(n);
-    let fmt = time::macros::format_description!("[year]-[month]-[day]");
-    d.format(&fmt).unwrap()
+    rusqlite::Connection::open_in_memory()
+        .unwrap()
+        .query_row(
+            "SELECT date('now', 'localtime', ?1)",
+            [format!("-{n} days")],
+            |r| r.get(0),
+        )
+        .unwrap()
 }
 
 fn line(uid: &str, units: i64) -> StockLineInput {

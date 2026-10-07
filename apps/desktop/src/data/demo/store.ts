@@ -71,7 +71,7 @@ interface ImpRec {
   uid: string; number: string; supplier_uid: string | null; incoterm: string | null; incoterm_version: string | null; transport_mode: TransportMode | null;
   origin_country: string | null; origin_port: string | null; destination_port: string | null; currency_code: string; rate_e6: number | null;
   stage: ImportStage; purchase_date: string | null; production_eta: string | null; shipment_date: string | null; eta: string | null;
-  arrival_date: string | null; reception_date: string | null; allocation_basis: Basis; vat_ppm: number | null; vat_recoverable: boolean;
+  arrival_date: string | null; reception_date: string | null; allocation_basis: Basis; vat_ppm: number | null; vat_recoverable: boolean; notional_insurance_ppm: number | null;
   fob_minor: number | null; landed_total_clp: number | null; estimated_landed_clp: number | null; estimated_at: string | null;
   notes: string | null; void_reason: string | null; created_at: string; items: ImpItemRec[]; costs: ImpCostRec[];
   stages: StageChange[]; etas: EtaChange[]; receipts: { number: string; date: string }[]; timeline: { at: string; text: string }[];
@@ -1372,7 +1372,7 @@ export class DemoBackend implements Backend {
     const calc = landedCost({
       currency_decimals: this.impDecimals(h.currency_code),
       rate_e6: h.rate_e6 ?? (h.currency_code === "CLP" ? 1_000_000 : 0),
-      basis: h.allocation_basis, vat_ppm: h.vat_ppm, vat_recoverable: h.vat_recoverable,
+      basis: h.allocation_basis, vat_ppm: h.vat_ppm, vat_recoverable: h.vat_recoverable, notional_insurance_ppm: h.notional_insurance_ppm,
       items: h.items.map((i) => ({ qty_milli: i.qty_milli, unit_price_minor: i.unit_price_minor, weight_g: i.weight_g, volume_cm3: i.volume_cm3, duty_ppm: i.duty_ppm })),
       costs: h.costs.filter((c) => c.status === "vigente").map((c) => ({ kind: c.kind, amount_clp: this.impCostClp(c, h), basis: c.allocation_basis, recoverable: c.recoverable_tax })),
     });
@@ -1439,7 +1439,7 @@ export class DemoBackend implements Backend {
       destination_port: t(input.destination_port), currency_code: input.currency_code, rate_e6: input.rate_e6,
       purchase_date: input.purchase_date || null, production_eta: input.production_eta || null, shipment_date: input.shipment_date || null,
       arrival_date: input.arrival_date || null, allocation_basis: input.allocation_basis, vat_ppm: input.vat_ppm,
-      vat_recoverable: input.vat_recoverable, notes: t(input.notes),
+      vat_recoverable: input.vat_recoverable, notional_insurance_ppm: input.notional_insurance_ppm ?? null, notes: t(input.notes),
     };
   }
   private impSetEta(h: ImpRec, eta: string, reason: string | null): boolean {
@@ -1681,7 +1681,7 @@ export class DemoBackend implements Backend {
     const base = (n: string, stage: ImportStage, extra: Partial<ImpRec>): ImpRec => ({
       uid: `imp-${n}`, number: this.next("IMP"), supplier_uid: sup.uid, incoterm: "FOB", incoterm_version: "2020", transport_mode: "maritimo", origin_country: "China",
       origin_port: "Ningbo", destination_port: "San Antonio", currency_code: "USD", rate_e6: 945_000_000, stage, purchase_date: null, production_eta: null,
-      shipment_date: null, eta: null, arrival_date: null, reception_date: null, allocation_basis: "valor", vat_ppm: TAX_PPM, vat_recoverable: true, fob_minor: null,
+      shipment_date: null, eta: null, arrival_date: null, reception_date: null, allocation_basis: "valor", vat_ppm: TAX_PPM, vat_recoverable: true, notional_insurance_ppm: null, fob_minor: null,
       landed_total_clp: null, estimated_landed_clp: null, estimated_at: null, notes: null, void_reason: null, created_at: now(), items: [], costs: [], stages: [], etas: [],
       receipts: [], timeline: [], ...extra,
     });

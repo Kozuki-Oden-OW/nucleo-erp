@@ -673,6 +673,8 @@ export interface ImportDetail {
   allocation_basis: import("./comex").Basis;
   vat_ppm: number | null;
   vat_recoverable: boolean;
+  /** Seguro teórico (ppm de la mercadería) para el valor aduanero, si no se contrató seguro. */
+  notional_insurance_ppm: number | null;
   fob_minor: number | null;
   landed_total_clp: number | null;
   estimated_landed_clp: number | null;
@@ -719,6 +721,7 @@ export interface ImportInput {
   allocation_basis: import("./comex").Basis;
   vat_ppm: number | null;
   vat_recoverable: boolean;
+  notional_insurance_ppm?: number | null;
   notes: string | null;
   items: ImportItemInput[];
 }

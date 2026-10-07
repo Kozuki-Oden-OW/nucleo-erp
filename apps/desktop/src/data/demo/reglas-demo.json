@@ -12,6 +12,21 @@
       "code": "ARANCEL_GENERAL_PPM",
       "value": 60000,
       "source": "Valor ilustrativo para la demostración (arancel ad valorem general). En la operación real lo ingresa el usuario según su clasificación arancelaria."
+    },
+    {
+      "code": "SEGURO_TEORICO_PPM",
+      "value": 20000,
+      "source": "Valor ilustrativo para la demostración: seguro teórico cuando no se contrata seguro (Resolución DNA 2307 del 15-05-2019, cap. II, numeral 2.7 letra a, citada en una declaración jurada real). Verificar el porcentaje con el agente de aduana."
+    },
+    {
+      "code": "COMEX_PLATAFORMA_MAX_USD_CENTS",
+      "value": 50000,
+      "source": "Valor ilustrativo para la demostración: compras a distancia de hasta USD 500 con IVA cobrado por la plataforma, sin arancel (Ley 21.713; SII, octubre 2025). Verificar vigencia."
+    },
+    {
+      "code": "COMEX_COURIER_MAX_USD_CENTS",
+      "value": 300000,
+      "source": "Valor ilustrativo para la demostración: despacho simplificado por empresas de envío rápido hasta USD 3.000 (Aduana, 2019). Sobre ese monto se requiere agente de aduana. Verificar vigencia."
     }
   ]
 }

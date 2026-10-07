@@ -171,10 +171,12 @@ export function ImportView({ uid }: { uid: string }) {
               <Row label="Mercadería en pesos" v={c.fob_clp} />
               <Row label="+ Flete" v={c.freight_clp} />
               <Row label="+ Seguro" v={c.insurance_clp} />
+              {c.notional_insurance_clp > 0 && <Row label={`+ Seguro teórico${d.notional_insurance_ppm ? ` (${d.notional_insurance_ppm / 10_000} %)` : ""}, solo aduana`} v={c.notional_insurance_clp} />}
               <Row label="= Valor aduanero (CIF)" v={c.customs_value_clp} strong />
               <Row label={`+ Derechos${c.duty_entered ? " (de la declaración)" : " (por arancel)"}`} v={c.duty_clp} />
               <Row label={`IVA de importación${c.vat_entered ? " (de la declaración)" : d.vat_ppm !== null ? ` (${d.vat_ppm / 10_000} %)` : ""}`} v={c.vat_clp} muted={c.vat_in_cost_clp === 0} />
               <Row label="+ Gastos locales" v={c.local_clp} />
+              {c.notional_insurance_clp > 0 && <Row label="− Seguro teórico (no se paga)" v={c.notional_insurance_clp} />}
               <div className="mt-1 flex items-baseline justify-between border-t border-line pt-2"><dt className="font-semibold">Costo en bodega</dt><dd className="num text-lg font-semibold">{formatMoney(c.landed_clp)}</dd></div>
             </dl>
             {c.recoverable_clp > 0 && <p className="mt-2 text-xs text-muted">{formatMoney(c.recoverable_clp)} de impuestos se recuperan como crédito: se pagan, pero no suman al costo.</p>}

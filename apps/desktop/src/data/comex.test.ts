@@ -10,6 +10,7 @@ describe("COMEX: mismo cálculo que Rust (golden/comex.json)", () => {
       expect([r.customs_value_clp, r.duty_clp, r.vat_clp, r.recoverable_clp, r.landed_clp]).toEqual([e.customs_value_clp, e.duty_clp, e.vat_clp, e.recoverable_clp, e.landed_clp]);
       expect(r.items.map((x) => [x.landed_clp, x.unit_cost_e4])).toEqual(e.items.map((x) => [x.landed_clp, x.unit_cost_e4]));
       expect(r.items.reduce((a, x) => a + x.landed_clp, 0)).toBe(r.landed_clp);
+      if ("notional_insurance_clp" in e) expect(r.notional_insurance_clp).toBe(e.notional_insurance_clp);
     });
   }
   for (const c of golden.exportaciones) {

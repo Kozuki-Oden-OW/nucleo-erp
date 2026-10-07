@@ -1,80 +1,533 @@
 {
-  "_nota": "Casos golden de NÚCLEO COMEX. Tasas de EJEMPLO (no son valores reales). Estado: pendientes de revisión y firma por un contador o agente de aduana (D-07). Los ejecutan las pruebas de Rust (nucleo-domain) y de la interfaz (vitest) para garantizar que ambos cálculos coinciden.",
+  "_nota": "Casos golden de NÚCLEO COMEX. Los casos con estado 'pendiente_revision' usan tasas de EJEMPLO (no son valores reales) y esperan revisión y firma por un contador o agente de aduana (D-07). Los casos con estado 'caso_real' reproducen documentos reales (DIN, facturas, checkout) y su campo 'fuente' explica de dónde sale cada monto. Los ejecutan las pruebas de Rust (nucleo-domain) y de la interfaz (vitest) para garantizar que ambos cálculos coinciden.",
   "importaciones": [
     {
       "nombre": "Marítimo FOB: dos productos, arancel en uno, IVA recuperable, agente por unidades",
       "estado": "pendiente_revision",
       "input": {
-        "currency_decimals": 2, "rate_e6": 950000000, "basis": "unidades", "vat_ppm": 150000, "vat_recoverable": true,
+        "currency_decimals": 2,
+        "rate_e6": 950000000,
+        "basis": "unidades",
+        "vat_ppm": 150000,
+        "vat_recoverable": true,
         "items": [
-          { "qty_milli": 100000, "unit_price_minor": 1000, "weight_g": 500, "duty_ppm": 50000 },
-          { "qty_milli": 50000, "unit_price_minor": 2000, "weight_g": 3000 }
+          {
+            "qty_milli": 100000,
+            "unit_price_minor": 1000,
+            "weight_g": 500,
+            "duty_ppm": 50000
+          },
+          {
+            "qty_milli": 50000,
+            "unit_price_minor": 2000,
+            "weight_g": 3000
+          }
         ],
         "costs": [
-          { "kind": "flete", "amount_clp": 190000, "basis": "valor" },
-          { "kind": "seguro", "amount_clp": 19000 },
-          { "kind": "agente_aduana", "amount_clp": 100000 }
+          {
+            "kind": "flete",
+            "amount_clp": 190000,
+            "basis": "valor"
+          },
+          {
+            "kind": "seguro",
+            "amount_clp": 19000
+          },
+          {
+            "kind": "agente_aduana",
+            "amount_clp": 100000
+          }
         ]
       },
       "esperado": {
-        "customs_value_clp": 2109000, "duty_clp": 52725, "vat_clp": 324259, "recoverable_clp": 324259, "landed_clp": 2261725,
-        "items": [ { "landed_clp": 1173892, "unit_cost_e4": 117389200 }, { "landed_clp": 1087833, "unit_cost_e4": 217566600 } ]
+        "customs_value_clp": 2109000,
+        "duty_clp": 52725,
+        "vat_clp": 324259,
+        "recoverable_clp": 324259,
+        "landed_clp": 2261725,
+        "items": [
+          {
+            "landed_clp": 1173892,
+            "unit_cost_e4": 117389200
+          },
+          {
+            "landed_clp": 1087833,
+            "unit_cost_e4": 217566600
+          }
+        ]
       }
     },
     {
       "nombre": "Montos reales de la declaración reemplazan las tasas; IVA no recuperable",
       "estado": "pendiente_revision",
       "input": {
-        "currency_decimals": 2, "rate_e6": 950000000, "basis": "volumen", "vat_ppm": 150000, "vat_recoverable": true,
+        "currency_decimals": 2,
+        "rate_e6": 950000000,
+        "basis": "volumen",
+        "vat_ppm": 150000,
+        "vat_recoverable": true,
         "items": [
-          { "qty_milli": 100000, "unit_price_minor": 1000, "duty_ppm": 50000 },
-          { "qty_milli": 50000, "unit_price_minor": 2000 }
+          {
+            "qty_milli": 100000,
+            "unit_price_minor": 1000,
+            "duty_ppm": 50000
+          },
+          {
+            "qty_milli": 50000,
+            "unit_price_minor": 2000
+          }
         ],
         "costs": [
-          { "kind": "flete", "amount_clp": 190000, "basis": "valor" },
-          { "kind": "seguro", "amount_clp": 19000 },
-          { "kind": "agente_aduana", "amount_clp": 100000 },
-          { "kind": "derechos", "amount_clp": 50000 },
-          { "kind": "iva_importacion", "amount_clp": 300000 }
+          {
+            "kind": "flete",
+            "amount_clp": 190000,
+            "basis": "valor"
+          },
+          {
+            "kind": "seguro",
+            "amount_clp": 19000
+          },
+          {
+            "kind": "agente_aduana",
+            "amount_clp": 100000
+          },
+          {
+            "kind": "derechos",
+            "amount_clp": 50000
+          },
+          {
+            "kind": "iva_importacion",
+            "amount_clp": 300000
+          }
         ]
       },
       "esperado": {
-        "customs_value_clp": 2109000, "duty_clp": 50000, "vat_clp": 300000, "recoverable_clp": 0, "landed_clp": 2559000,
-        "items": [ { "landed_clp": 1307974, "unit_cost_e4": 130797400 }, { "landed_clp": 1251026, "unit_cost_e4": 250205200 } ]
+        "customs_value_clp": 2109000,
+        "duty_clp": 50000,
+        "vat_clp": 300000,
+        "recoverable_clp": 0,
+        "landed_clp": 2559000,
+        "items": [
+          {
+            "landed_clp": 1307974,
+            "unit_cost_e4": 130797400
+          },
+          {
+            "landed_clp": 1251026,
+            "unit_cost_e4": 250205200
+          }
+        ]
       }
     },
     {
       "nombre": "Aéreo: flete y transporte por peso, banco por valor, IVA no recuperable",
       "estado": "pendiente_revision",
       "input": {
-        "currency_decimals": 2, "rate_e6": 900000000, "basis": "peso", "vat_ppm": 150000, "vat_recoverable": false,
+        "currency_decimals": 2,
+        "rate_e6": 900000000,
+        "basis": "peso",
+        "vat_ppm": 150000,
+        "vat_recoverable": false,
         "items": [
-          { "qty_milli": 10000, "unit_price_minor": 5000, "weight_g": 2000, "duty_ppm": 0 },
-          { "qty_milli": 20000, "unit_price_minor": 1250, "weight_g": 250, "duty_ppm": 100000 }
+          {
+            "qty_milli": 10000,
+            "unit_price_minor": 5000,
+            "weight_g": 2000,
+            "duty_ppm": 0
+          },
+          {
+            "qty_milli": 20000,
+            "unit_price_minor": 1250,
+            "weight_g": 250,
+            "duty_ppm": 100000
+          }
         ],
         "costs": [
-          { "kind": "flete", "amount_clp": 90000 },
-          { "kind": "seguro", "amount_clp": 6750 },
-          { "kind": "transporte_interno", "amount_clp": 30000 },
-          { "kind": "gastos_bancarios", "amount_clp": 12000, "basis": "valor" }
+          {
+            "kind": "flete",
+            "amount_clp": 90000
+          },
+          {
+            "kind": "seguro",
+            "amount_clp": 6750
+          },
+          {
+            "kind": "transporte_interno",
+            "amount_clp": 30000
+          },
+          {
+            "kind": "gastos_bancarios",
+            "amount_clp": 12000,
+            "basis": "valor"
+          }
         ]
       },
       "esperado": {
-        "customs_value_clp": 771750, "duty_clp": 24525, "vat_clp": 119441, "recoverable_clp": 0, "landed_clp": 957716,
-        "items": [ { "landed_clp": 637475, "unit_cost_e4": 637475000 }, { "landed_clp": 320241, "unit_cost_e4": 160120500 } ]
+        "customs_value_clp": 771750,
+        "duty_clp": 24525,
+        "vat_clp": 119441,
+        "recoverable_clp": 0,
+        "landed_clp": 957716,
+        "items": [
+          {
+            "landed_clp": 637475,
+            "unit_cost_e4": 637475000
+          },
+          {
+            "landed_clp": 320241,
+            "unit_cost_e4": 160120500
+          }
+        ]
       }
     },
     {
       "nombre": "Compra en pesos (moneda CLP, tipo de cambio 1) sin impuestos",
       "estado": "pendiente_revision",
       "input": {
-        "currency_decimals": 0, "rate_e6": 1000000, "basis": "valor",
-        "items": [ { "qty_milli": 3000, "unit_price_minor": 10000 } ],
-        "costs": [ { "kind": "otros", "amount_clp": 1000 } ]
+        "currency_decimals": 0,
+        "rate_e6": 1000000,
+        "basis": "valor",
+        "items": [
+          {
+            "qty_milli": 3000,
+            "unit_price_minor": 10000
+          }
+        ],
+        "costs": [
+          {
+            "kind": "otros",
+            "amount_clp": 1000
+          }
+        ]
       },
       "esperado": {
-        "customs_value_clp": 30000, "duty_clp": 0, "vat_clp": 0, "recoverable_clp": 0, "landed_clp": 31000,
-        "items": [ { "landed_clp": 31000, "unit_cost_e4": 103333333 } ]
+        "customs_value_clp": 30000,
+        "duty_clp": 0,
+        "vat_clp": 0,
+        "recoverable_clp": 0,
+        "landed_clp": 31000,
+        "items": [
+          {
+            "landed_clp": 31000,
+            "unit_cost_e4": 103333333
+          }
+        ]
+      }
+    },
+    {
+      "nombre": "Caso real (DIN 2850015246, courier DHL con agente): estimación antes de la declaración, sin seguro contratado → seguro teórico 2 % del FOB, TLC Chile–China (arancel 0), IVA recuperable",
+      "estado": "caso_real",
+      "fuente": "Datos de una importación real del usuario (factura EB26CHI0529/0617-1, USD 10.382,50 + flete USD 1.750; tipo de cambio aduanero 935,57). El seguro teórico (USD 207,65) coincide con la provisión de fondos del agente; la DIN usa USD 210,70 porque la aduana recalculó el FOB (CPT − flete del AWB), por eso el valor aduanero difiere en $2.852 y el IVA estimado en $544 del real.",
+      "input": {
+        "currency_decimals": 2,
+        "rate_e6": 935570000,
+        "basis": "valor",
+        "vat_ppm": 190000,
+        "vat_recoverable": true,
+        "notional_insurance_ppm": 20000,
+        "items": [
+          {
+            "qty_milli": 250000,
+            "unit_price_minor": 125
+          },
+          {
+            "qty_milli": 200000,
+            "unit_price_minor": 200
+          },
+          {
+            "qty_milli": 150000,
+            "unit_price_minor": 900
+          },
+          {
+            "qty_milli": 100000,
+            "unit_price_minor": 1350
+          },
+          {
+            "qty_milli": 100000,
+            "unit_price_minor": 725
+          },
+          {
+            "qty_milli": 50000,
+            "unit_price_minor": 800
+          },
+          {
+            "qty_milli": 20000,
+            "unit_price_minor": 750
+          },
+          {
+            "qty_milli": 400000,
+            "unit_price_minor": 900
+          },
+          {
+            "qty_milli": 50000,
+            "unit_price_minor": 1050
+          },
+          {
+            "qty_milli": 20000,
+            "unit_price_minor": 4500
+          },
+          {
+            "qty_milli": 100000,
+            "unit_price_minor": 350
+          },
+          {
+            "qty_milli": 20000,
+            "unit_price_minor": 800
+          },
+          {
+            "qty_milli": 40000,
+            "unit_price_minor": 400
+          }
+        ],
+        "costs": [
+          {
+            "kind": "flete",
+            "amount_clp": 1637248
+          }
+        ]
+      },
+      "esperado": {
+        "customs_value_clp": 11545076,
+        "notional_insurance_clp": 194271,
+        "duty_clp": 0,
+        "vat_clp": 2193564,
+        "recoverable_clp": 2193564,
+        "landed_clp": 11350805,
+        "items": [
+          {
+            "landed_clp": 341645,
+            "unit_cost_e4": 13665800
+          },
+          {
+            "landed_clp": 437305,
+            "unit_cost_e4": 21865250
+          },
+          {
+            "landed_clp": 1475906,
+            "unit_cost_e4": 98393733
+          },
+          {
+            "landed_clp": 1475906,
+            "unit_cost_e4": 147590600
+          },
+          {
+            "landed_clp": 792615,
+            "unit_cost_e4": 79261500
+          },
+          {
+            "landed_clp": 437305,
+            "unit_cost_e4": 87461000
+          },
+          {
+            "landed_clp": 163990,
+            "unit_cost_e4": 81995000
+          },
+          {
+            "landed_clp": 3935747,
+            "unit_cost_e4": 98393675
+          },
+          {
+            "landed_clp": 573963,
+            "unit_cost_e4": 114792600
+          },
+          {
+            "landed_clp": 983937,
+            "unit_cost_e4": 491968500
+          },
+          {
+            "landed_clp": 382642,
+            "unit_cost_e4": 38264200
+          },
+          {
+            "landed_clp": 174922,
+            "unit_cost_e4": 87461000
+          },
+          {
+            "landed_clp": 174922,
+            "unit_cost_e4": 43730500
+          }
+        ]
+      }
+    },
+    {
+      "nombre": "Caso real (DIN 2850015246): montos reales — IVA pagado en la DIN, honorarios y gastos del agente y entrega DHL netos de IVA",
+      "estado": "caso_real",
+      "fuente": "IVA de importación $2.194.108 (DIN, pagado en TGR). Agente: factura 504 neto $272.835 (gasto despacho, EDI, ingreso datos courier, honorarios). DHL: factura 4895212 neto $133.787. El IVA de esas facturas de servicios es crédito y no se ingresa.",
+      "input": {
+        "currency_decimals": 2,
+        "rate_e6": 935570000,
+        "basis": "valor",
+        "vat_ppm": 190000,
+        "vat_recoverable": true,
+        "notional_insurance_ppm": 20000,
+        "items": [
+          {
+            "qty_milli": 250000,
+            "unit_price_minor": 125
+          },
+          {
+            "qty_milli": 200000,
+            "unit_price_minor": 200
+          },
+          {
+            "qty_milli": 150000,
+            "unit_price_minor": 900
+          },
+          {
+            "qty_milli": 100000,
+            "unit_price_minor": 1350
+          },
+          {
+            "qty_milli": 100000,
+            "unit_price_minor": 725
+          },
+          {
+            "qty_milli": 50000,
+            "unit_price_minor": 800
+          },
+          {
+            "qty_milli": 20000,
+            "unit_price_minor": 750
+          },
+          {
+            "qty_milli": 400000,
+            "unit_price_minor": 900
+          },
+          {
+            "qty_milli": 50000,
+            "unit_price_minor": 1050
+          },
+          {
+            "qty_milli": 20000,
+            "unit_price_minor": 4500
+          },
+          {
+            "qty_milli": 100000,
+            "unit_price_minor": 350
+          },
+          {
+            "qty_milli": 20000,
+            "unit_price_minor": 800
+          },
+          {
+            "qty_milli": 40000,
+            "unit_price_minor": 400
+          }
+        ],
+        "costs": [
+          {
+            "kind": "flete",
+            "amount_clp": 1637248
+          },
+          {
+            "kind": "iva_importacion",
+            "amount_clp": 2194108,
+            "recoverable": true
+          },
+          {
+            "kind": "agente_aduana",
+            "amount_clp": 272835
+          },
+          {
+            "kind": "transporte_interno",
+            "amount_clp": 133787
+          }
+        ]
+      },
+      "esperado": {
+        "customs_value_clp": 11545076,
+        "notional_insurance_clp": 194271,
+        "duty_clp": 0,
+        "vat_clp": 2194108,
+        "recoverable_clp": 2194108,
+        "landed_clp": 11757427,
+        "items": [
+          {
+            "landed_clp": 353884,
+            "unit_cost_e4": 14155360
+          },
+          {
+            "landed_clp": 452970,
+            "unit_cost_e4": 22648500
+          },
+          {
+            "landed_clp": 1528778,
+            "unit_cost_e4": 101918533
+          },
+          {
+            "landed_clp": 1528778,
+            "unit_cost_e4": 152877800
+          },
+          {
+            "landed_clp": 821009,
+            "unit_cost_e4": 82100900
+          },
+          {
+            "landed_clp": 452970,
+            "unit_cost_e4": 90594000
+          },
+          {
+            "landed_clp": 169865,
+            "unit_cost_e4": 84932500
+          },
+          {
+            "landed_clp": 4076738,
+            "unit_cost_e4": 101918450
+          },
+          {
+            "landed_clp": 594524,
+            "unit_cost_e4": 118904800
+          },
+          {
+            "landed_clp": 1019184,
+            "unit_cost_e4": 509592000
+          },
+          {
+            "landed_clp": 396349,
+            "unit_cost_e4": 39634900
+          },
+          {
+            "landed_clp": 181189,
+            "unit_cost_e4": 90594500
+          },
+          {
+            "landed_clp": 181189,
+            "unit_cost_e4": 45297250
+          }
+        ]
+      }
+    },
+    {
+      "nombre": "Compra por plataforma (Mercado Libre Internacional, ≤ USD 500): IVA cobrado al pagar, sin arancel, no recuperable con boleta",
+      "estado": "caso_real",
+      "fuente": "Checkout real observado el 6-10-2026: producto $31.159, envío gratis, impuestos $5.920, total $37.079.",
+      "input": {
+        "currency_decimals": 0,
+        "rate_e6": 1000000,
+        "basis": "valor",
+        "vat_ppm": 190000,
+        "vat_recoverable": false,
+        "items": [
+          {
+            "qty_milli": 1000,
+            "unit_price_minor": 31159
+          }
+        ],
+        "costs": []
+      },
+      "esperado": {
+        "customs_value_clp": 31159,
+        "notional_insurance_clp": 0,
+        "duty_clp": 0,
+        "vat_clp": 5920,
+        "recoverable_clp": 0,
+        "landed_clp": 37079,
+        "items": [
+          {
+            "landed_clp": 37079,
+            "unit_cost_e4": 370790000
+          }
+        ]
       }
     }
   ],
@@ -82,8 +535,28 @@
     {
       "nombre": "Un producto, dos costos de exportación",
       "estado": "pendiente_revision",
-      "input": { "currency_decimals": 2, "rate_e6": 900000000, "items": [ { "qty_milli": 1000000, "unit_price_minor": 500, "unit_cost_e4": 25000000 } ], "costs_clp": [600000, 150000] },
-      "esperado": { "revenue_clp": 4500000, "goods_cost_clp": 2500000, "profit_clp": 1250000, "margin_ppm": 277778, "breakeven_revenue_clp": 1687500 }
+      "input": {
+        "currency_decimals": 2,
+        "rate_e6": 900000000,
+        "items": [
+          {
+            "qty_milli": 1000000,
+            "unit_price_minor": 500,
+            "unit_cost_e4": 25000000
+          }
+        ],
+        "costs_clp": [
+          600000,
+          150000
+        ]
+      },
+      "esperado": {
+        "revenue_clp": 4500000,
+        "goods_cost_clp": 2500000,
+        "profit_clp": 1250000,
+        "margin_ppm": 277778,
+        "breakeven_revenue_clp": 1687500
+      }
     }
   ]
 }

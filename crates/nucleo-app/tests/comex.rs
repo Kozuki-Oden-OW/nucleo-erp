@@ -16,9 +16,15 @@ fn session() -> (tempfile::TempDir, AppService, CompanySession) {
     (data, app, s)
 }
 
+/// Fecha local (la misma que usa la aplicación: SQLite `localtime`) desplazada `n` días.
 fn day(n: i64) -> String {
-    let d = time::OffsetDateTime::now_utc().date() + time::Duration::days(n);
-    d.format(&time::macros::format_description!("[year]-[month]-[day]"))
+    rusqlite::Connection::open_in_memory()
+        .unwrap()
+        .query_row(
+            "SELECT date('now', 'localtime', ?1)",
+            [format!("{n:+} days")],
+            |r| r.get(0),
+        )
         .unwrap()
 }
 
@@ -84,6 +90,7 @@ fn folder(sup: &str, a: &str, b: &str) -> ImportInput {
         allocation_basis: "unidades".into(),
         vat_ppm: Some(150_000),
         vat_recoverable: true,
+        notional_insurance_ppm: None,
         notes: None,
         items: vec![
             ImportItemInput {
@@ -383,4 +390,27 @@ fn anular_importacion_anula_costos_y_pagos() {
         )
         .is_err()
     );
+}
+
+#[test]
+fn seguro_teorico_se_guarda_y_no_suma_al_costo() {
+    let (_d, _app, mut s) = session();
+    let sup = supplier(&mut s, "Proveedor sin seguro");
+    let a = product(&mut s, "Sensor A", 0, 0);
+    let b = product(&mut s, "Registrador B", 0, 0);
+    let mut input = folder(&sup, &a, &b);
+    input.notional_insurance_ppm = Some(20_000); // EJEMPLO: 2 % de la mercadería
+    let d = s.save_import(&input, None).unwrap();
+    assert_eq!(d.header.notional_insurance_ppm, Some(20_000));
+    let uid = d.header.uid.clone();
+    let d = s
+        .add_import_cost(&uid, &cost("flete", 190_000, true))
+        .unwrap();
+    // Mercadería US$ 2.000 × 950 = $1.900.000 → seguro teórico $38.000.
+    assert_eq!(d.calc.notional_insurance_clp, 38_000);
+    assert_eq!(d.calc.customs_value_clp, 1_900_000 + 190_000 + 38_000);
+    assert_eq!(d.calc.landed_clp, 1_900_000 + 190_000 + d.calc.duty_clp);
+    // Fuera de rango: se rechaza.
+    input.notional_insurance_ppm = Some(2_000_000);
+    assert!(s.save_import(&input, Some(&uid)).is_err());
 }

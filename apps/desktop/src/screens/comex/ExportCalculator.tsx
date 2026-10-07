@@ -11,6 +11,13 @@ import { Button, Card, cx, Field, IconButton, Notice, Select } from "../../ui/ki
 import { ProductPicker } from "../ventas/pickers";
 import { RateField } from "./common";
 
+// Costos que agrega cada Incoterm de venta además de llevar la mercadería al puerto (resumen propio).
+const FREIGHT = "Flete internacional", INSURANCE = "Seguro internacional", DELIVERY = "Entrega en destino", DUTIES = "Derechos e impuestos en destino";
+const INCOTERM_COSTS: Record<string, string[]> = {
+  EXW: [], FCA: [], FOB: [], CFR: [FREIGHT], CPT: [FREIGHT], CIF: [FREIGHT, INSURANCE], CIP: [FREIGHT, INSURANCE],
+  DAP: [FREIGHT, INSURANCE, DELIVERY], DDP: [FREIGHT, INSURANCE, DELIVERY, DUTIES],
+};
+
 interface Line { key: number; description: string; qty: string; price: number | null; cost_e4: number }
 interface Cost { key: number; label: string; amount: number | null }
 let seq = 0;
@@ -39,14 +46,17 @@ export function ExportCalculator() {
   }), [lines, costs, rate, decimals]);
   const showCost = can("costos.ver");
   const add = (p: Product | null, text: string) => { if (p || text) setLines((xs) => [...xs, { key: ++seq, description: p?.name ?? text, qty: "1", price: null, cost_e4: p?.cost_e4 ?? 0 }]); };
+  const missing = (INCOTERM_COSTS[incoterm] ?? []).filter((l) => !costs.some((c) => c.label.trim().toLowerCase() === l.toLowerCase()));
+  const addIncotermCosts = () => setCosts((xs) => [...xs, ...missing.map((label) => ({ key: ++seq, label, amount: null }))]);
   const totalQty = lines.reduce((a, l) => a + (parseQty(l.qty) ?? 0), 0);
   const beUnit = lines.length === 1 && totalQty > 0 && rate ? Math.ceil(((res.goods_cost_clp + res.costs_clp) * 1000 / totalQty) / (rate / 1_000_000) * 10 ** decimals) : null;
 
   return (
     <div className="flex flex-col gap-6">
       <Notice tone="info" icon={Info} title="Simulación de rentabilidad">
-        Calcula si te conviene exportar con el costo promedio de tus productos. No emite documentos de exportación. El tratamiento del IVA de las exportaciones
-        (venta exenta y recuperación del IVA de compras) está pendiente de revisión con un contador antes de incorporarlo.
+        Calcula si te conviene exportar con el costo promedio de tus productos. No emite documentos de exportación. Ingresa los costos sin IVA:
+        la venta al exterior no lleva IVA y el IVA de tus compras y servicios se recupera, pero ese tratamiento (y su devolución) está pendiente de revisión
+        con un contador antes de incorporarlo al cálculo.
       </Notice>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex min-w-0 flex-col gap-6">
@@ -58,6 +68,12 @@ export function ExportCalculator() {
               <Select label="Incoterm de la venta" value={incoterm} onChange={(e) => setIncoterm(e.target.value)} options={["EXW", "FCA", "FOB", "CFR", "CIF", "CPT", "CIP", "DAP", "DDP"].map((c) => ({ value: c, label: c }))}
                 hint={["EXW", "FCA", "FOB"].includes(incoterm) ? "El flete internacional lo paga tu cliente" : "Incluye en los costos el flete y seguro que pagas tú"} />
             </div>
+            {missing.length > 0 && (
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm">
+                <span className="text-muted">Vendiendo {incoterm} también pagas: {missing.join(", ").toLowerCase()}.</span>
+                <Button size="sm" variant="secondary" icon={Plus} onClick={addIncotermCosts}>Agregar a los costos</Button>
+              </div>
+            )}
           </Card>
           <Card title="Productos" padded={false}>
             <div className="overflow-x-auto">

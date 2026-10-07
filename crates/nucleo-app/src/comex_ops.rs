@@ -107,6 +107,9 @@ pub struct ImportInput {
     pub allocation_basis: String,
     pub vat_ppm: Option<i64>,
     pub vat_recoverable: bool,
+    /// Seguro teórico (% de la mercadería) para el valor aduanero si no se contrató seguro.
+    #[serde(default)]
+    pub notional_insurance_ppm: Option<i64>,
     pub notes: Option<String>,
     pub items: Vec<ImportItemInput>,
 }
@@ -218,6 +221,7 @@ fn landed_input(h: &ImportRow, items: &[ImportItemRow], costs: &[ImportCostView]
         basis: Basis::parse(&h.allocation_basis).unwrap_or(Basis::Valor),
         vat_ppm: h.vat_ppm,
         vat_recoverable: h.vat_recoverable,
+        notional_insurance_ppm: h.notional_insurance_ppm,
         items: items
             .iter()
             .map(|i| LandedItem {
@@ -376,6 +380,14 @@ impl CompanySession {
                 "la tasa de IVA de importación debe estar entre 0 % y 100 %".into(),
             ));
         }
+        if input
+            .notional_insurance_ppm
+            .is_some_and(|v| !(0..=1_000_000).contains(&v))
+        {
+            return Err(AppError::Validation(
+                "el seguro teórico debe estar entre 0 % y 100 %".into(),
+            ));
+        }
         if input.items.is_empty() || input.items.len() > MAX_LINES {
             return Err(AppError::Validation(
                 "agrega al menos un producto a la importación".into(),
@@ -462,6 +474,7 @@ impl CompanySession {
             allocation_basis: &input.allocation_basis,
             vat_ppm: input.vat_ppm,
             vat_recoverable: input.vat_recoverable,
+            notional_insurance_ppm: input.notional_insurance_ppm,
             notes: input
                 .notes
                 .as_deref()

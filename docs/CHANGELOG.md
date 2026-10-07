@@ -2,6 +2,32 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [Sin publicar] — COMEX con un caso real y compras por courier o plataforma
+
+### Agregado
+- Seguro teórico: si no se contrató seguro, la carpeta y la calculadora aceptan el % que declara el
+  agente; suma al valor aduanero (y por lo tanto al IVA y a los derechos) pero **no** al costo en
+  bodega, porque no se paga. Migración `0017_comex_seguro_teorico.sql`.
+- Calculadora de importación con tres modalidades: con agente de aduana (DIN), courier (trámite
+  simplificado, cargo del courier) y plataforma (IVA cobrado al pagar sobre producto + envío, sin
+  arancel, por defecto no recuperable con boleta). Avisa cuando la compra supera el límite de su
+  modalidad (los límites vienen del paquete normativo; en la demostración, valores ilustrativos).
+- Precios en USD o en pesos en la calculadora de importación; en modalidad plataforma se puede
+  escribir el IVA que muestra el resumen de compra (cupones y descuentos de impuestos) y otros cargos
+  (p. ej. garantía de envío).
+- Calculadora de exportación: según el Incoterm de venta propone agregar flete, seguro, entrega y
+  derechos en destino a los costos.
+- Casos golden reales: la importación DIN 2850015246 (estimación con seguro teórico y montos reales
+  de la DIN, del agente y de DHL) y una compra por Mercado Libre Internacional ($37.079, igual al
+  checkout observado).
+
+### Cambiado
+- La vista de la carpeta muestra el seguro teórico en el valor aduanero y lo descuenta del costo.
+
+### Corregido
+- Pruebas que comparaban "hoy" en UTC con la fecha local de la aplicación fallaban entre las 21:00 y
+  las 24:00 en Chile; ahora usan la misma fecha local.
+
 ## [Sin publicar] — Fase 9 (NÚCLEO COMEX) · en validación
 
 ### Agregado

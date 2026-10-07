@@ -17,9 +17,15 @@ fn session() -> (tempfile::TempDir, AppService, CompanySession) {
     (data, app, s)
 }
 
+/// Fecha local (la misma que usa la aplicación: SQLite `localtime`) desplazada `n` días.
 fn day(n: i64) -> String {
-    let d = time::OffsetDateTime::now_utc().date() + time::Duration::days(n);
-    d.format(&time::macros::format_description!("[year]-[month]-[day]"))
+    rusqlite::Connection::open_in_memory()
+        .unwrap()
+        .query_row(
+            "SELECT date('now', 'localtime', ?1)",
+            [format!("{n:+} days")],
+            |r| r.get(0),
+        )
         .unwrap()
 }
 

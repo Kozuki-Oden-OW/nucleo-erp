@@ -22,6 +22,9 @@ fn importaciones_golden() {
         ] {
             assert_eq!(e[k].as_i64(), Some(v), "{name}: {k}");
         }
+        if let Some(x) = e["notional_insurance_clp"].as_i64() {
+            assert_eq!(x, r.notional_insurance_clp, "{name}: seguro teórico");
+        }
         for (i, it) in e["items"].as_array().unwrap().iter().enumerate() {
             assert_eq!(
                 it["landed_clp"].as_i64(),

@@ -7,7 +7,9 @@
 //!
 //! Orden del cálculo (COMEX_RULES.md):
 //! 1. Valor de la mercadería (según el Incoterm de la factura) en la moneda de la importación → CLP.
-//! 2. Valor aduanero (CIF) = mercadería + flete + seguro, prorrateados a cada producto.
+//! 2. Valor aduanero (CIF) = mercadería + flete + seguro, prorrateados a cada producto. Si no se
+//!    contrató seguro, puede usarse un **seguro teórico** (% de la mercadería) que solo cuenta para
+//!    el valor aduanero: no es un costo pagado y no se suma al costo en bodega.
 //! 3. Derechos: los montos ingresados (de la declaración real) o, si no hay, el arancel de cada
 //!    producto sobre su valor aduanero.
 //! 4. IVA de importación: los montos ingresados o, si no hay, la tasa sobre (valor aduanero +
@@ -134,6 +136,10 @@ pub struct LandedInput {
     /// El IVA calculado se recupera como crédito (no va al costo).
     #[serde(default = "yes")]
     pub vat_recoverable: bool,
+    /// Seguro teórico para el valor aduanero cuando no se contrató seguro, en partes por millón
+    /// del valor de la mercadería. No es un costo pagado. Se ignora si hay costos de seguro.
+    #[serde(default)]
+    pub notional_insurance_ppm: Option<i64>,
     pub items: Vec<LandedItem>,
     #[serde(default)]
     pub costs: Vec<LandedCost>,
@@ -148,6 +154,8 @@ pub struct ItemBreakdown {
     pub fob_clp: i64,
     pub freight_clp: i64,
     pub insurance_clp: i64,
+    /// Seguro teórico: solo valor aduanero, no es costo.
+    pub notional_insurance_clp: i64,
     pub customs_value_clp: i64,
     pub duty_clp: i64,
     /// IVA de importación asignado al producto (recuperable o no).
@@ -168,6 +176,8 @@ pub struct LandedResult {
     pub fob_clp: i64,
     pub freight_clp: i64,
     pub insurance_clp: i64,
+    /// Seguro teórico (solo valor aduanero, no es costo).
+    pub notional_insurance_clp: i64,
     pub customs_value_clp: i64,
     pub duty_clp: i64,
     /// Los derechos vienen de montos ingresados (no de la tasa).
@@ -348,7 +358,22 @@ pub fn landed_cost(input: &LandedInput) -> LandedResult {
             add(&mut insurance, &part);
         }
     }
-    let cv: Vec<i64> = (0..n).map(|i| fob[i] + freight[i] + insurance[i]).collect();
+    // Seguro teórico: solo si no hay seguro contratado.
+    let mut notional = vec![0i64; n];
+    let has_insurance = input.costs.iter().any(|c| c.kind == CostKind::Seguro);
+    if let Some(ppm) = input.notional_insurance_ppm.filter(|p| *p > 0) {
+        if has_insurance {
+            notes.push("Hay un seguro contratado: no se usó el seguro teórico.".into());
+        } else {
+            let fob_total: i64 = fob.iter().sum();
+            let total = div_round(fob_total as i128 * ppm as i128, 1_000_000) as i64;
+            let w: Vec<i128> = fob.iter().map(|v| *v as i128).collect();
+            notional = allocate(total, &w);
+        }
+    }
+    let cv: Vec<i64> = (0..n)
+        .map(|i| fob[i] + freight[i] + insurance[i] + notional[i])
+        .collect();
     // 3. Derechos.
     let duty_lines: Vec<&LandedCost> = input
         .costs
@@ -439,12 +464,13 @@ pub fn landed_cost(input: &LandedInput) -> LandedResult {
     // 6. Totales por producto.
     let items: Vec<ItemBreakdown> = (0..n)
         .map(|i| {
-            let landed = cv[i] + duty_cost[i] + vat_cost[i] + local[i];
+            let landed = cv[i] - notional[i] + duty_cost[i] + vat_cost[i] + local[i];
             let q = input.items[i].qty_milli;
             ItemBreakdown {
                 fob_clp: fob[i],
                 freight_clp: freight[i],
                 insurance_clp: insurance[i],
+                notional_insurance_clp: notional[i],
                 customs_value_clp: cv[i],
                 duty_clp: duty[i],
                 vat_clp: vat[i],
@@ -475,6 +501,7 @@ pub fn landed_cost(input: &LandedInput) -> LandedResult {
         fob_clp: sum(|x| x.fob_clp),
         freight_clp: sum(|x| x.freight_clp),
         insurance_clp: sum(|x| x.insurance_clp),
+        notional_insurance_clp: sum(|x| x.notional_insurance_clp),
         customs_value_clp: sum(|x| x.customs_value_clp),
         duty_clp: duty_total,
         duty_entered,
@@ -592,6 +619,7 @@ mod tests {
             basis: Basis::Unidades,
             vat_ppm: Some(150_000), // tasa de EJEMPLO
             vat_recoverable: true,
+            notional_insurance_ppm: None,
             items: vec![
                 LandedItem {
                     qty_milli: 100_000,
@@ -681,6 +709,38 @@ mod tests {
             r.landed_clp,
             1_900_000 + 190_000 + 19_000 + 50_000 + 300_000 + 100_000
         );
+    }
+
+    #[test]
+    fn seguro_teorico_suma_al_valor_aduanero_pero_no_al_costo() {
+        let mut i = base();
+        // Sin seguro contratado: seguro teórico de EJEMPLO (2 %) sobre la mercadería ($1.900.000).
+        i.costs.retain(|c| c.kind != CostKind::Seguro);
+        i.notional_insurance_ppm = Some(20_000);
+        let r = landed_cost(&i);
+        assert_eq!(r.notional_insurance_clp, 38_000);
+        assert_eq!(r.insurance_clp, 0);
+        assert_eq!(r.customs_value_clp, 1_900_000 + 190_000 + 38_000);
+        // El IVA (recuperable) se calcula sobre el valor aduanero con seguro teórico…
+        assert_eq!(
+            r.vat_clp,
+            div_round((2_128_000 + r.duty_clp) as i128 * 150_000, 1_000_000) as i64
+        );
+        // …pero el costo en bodega no incluye el seguro teórico.
+        assert_eq!(r.landed_clp, 1_900_000 + 190_000 + r.duty_clp + 100_000);
+        assert_eq!(
+            r.items
+                .iter()
+                .map(|x| x.notional_insurance_clp)
+                .sum::<i64>(),
+            38_000
+        );
+        // Con seguro contratado, el teórico se ignora y se avisa.
+        let mut j = base();
+        j.notional_insurance_ppm = Some(20_000);
+        let r2 = landed_cost(&j);
+        assert_eq!(r2.notional_insurance_clp, 0);
+        assert!(r2.notes.iter().any(|n| n.contains("seguro teórico")));
     }
 
     #[test]

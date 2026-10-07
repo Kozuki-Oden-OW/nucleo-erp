@@ -167,6 +167,10 @@ informativo, sin renta guiada · D-11 promociones no acumulables por defecto · 
 | D-F9-06 | Solo los costos reales llevan cuenta por pagar (en pesos, al tipo de cambio del costo); el pago de la mercadería al proveedor extranjero y las diferencias de cambio llegan con la contabilidad (Fase 10) | Requiere moneda extranjera en CxP y asientos de diferencia de cambio |
 | D-F9-07 | Exportaciones: solo calculadora (V1); el tratamiento del IVA exportador queda pendiente de validación | Alcance V1 del §15 y validación de D-07 |
 | D-F9-08 | Incoterms® 2020 como contenido versionado con resumen propio (no el texto de la ICC) | Actualizable y sin reproducir texto protegido |
+| D-F9-09 | Seguro teórico como % de la mercadería en la carpeta (no como un costo): entra al valor aduanero y no al costo en bodega; se ignora si hay seguro contratado | Caso real DIN 2850015246: la aduana agrega seguro teórico cuando no se contrató seguro (Res. DNA 2307/2019); no es un pago |
+| D-F9-10 | El seguro teórico se calcula sobre el valor de la mercadería de la factura; la DIN puede usar otro FOB (p. ej. CPT − flete del AWB) y diferir por pocos pesos: los montos reales de la DIN reemplazan la estimación | Coincide con la provisión de fondos del agente; la diferencia se ve en "estimaste $X, costó $Y" |
+| D-F9-11 | Impuestos de importación se calculan en pesos sobre el total por producto; la aduana los calcula en dólares por línea y luego convierte: diferencias de pocos pesos se aceptan y los montos de la DIN mandan | Mantener un solo algoritmo entero para carpetas y calculadora |
+| D-F9-12 | Modalidades en la calculadora (agente, courier, plataforma) con límites en dólares que vienen del paquete normativo; en plataforma el IVA se calcula sobre producto + envío y por defecto no es crédito (boleta) | Checkouts observados en Mercado Libre y AliExpress (IVA = tasa × producto + envío, sin arancel) y normativa vigente desde oct-2025; pendiente de confirmar con el contador |
 
 ## Dependencias y su justificación
 

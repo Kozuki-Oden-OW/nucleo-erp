@@ -90,6 +90,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "comex",
         sql: include_str!("../migrations/0016_comex.sql"),
     },
+    Migration {
+        version: 17,
+        name: "comex_seguro_teorico",
+        sql: include_str!("../migrations/0017_comex_seguro_teorico.sql"),
+    },
 ];
 
 pub fn latest_version() -> i64 {
