@@ -78,6 +78,15 @@ jobs:
             --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "NÚCLEO ERP $VERSION" \
             --notes "Instalador para Windows 10/11 x64. Descarga oficial: https://www.nucleoerp.cl/descargar/"
 
+  # El sitio se publica desde main: el entorno github-pages solo acepta despliegues de esa rama
+  # (una etiqueta vX.Y.Z es rechazada). Se dispara web.yml sobre main, que descarga este instalador.
   web:
     needs: release
-    uses: ./.github/workflows/web.yml
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+    steps:
+      - name: Actualizar www.nucleoerp.cl
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run web.yml --repo "${{ github.repository }}" --ref main

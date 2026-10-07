@@ -2,6 +2,7 @@ name: Sitio web (www.nucleoerp.cl)
 
 # Publica apps/web en GitHub Pages con dominio propio. Si existe una versión publicada
 # (GitHub Release) con NucleoERPSetup.exe, lo incluye en /descargas/ con su SHA-256.
+# "Publicar versión" lo dispara sobre main al terminar (el entorno github-pages solo admite main).
 on:
   push:
     branches: [main]
