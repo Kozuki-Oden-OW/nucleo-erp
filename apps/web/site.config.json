@@ -5,5 +5,5 @@
   "donation_url": "",
   "contact_email": "",
   "stage_label": "vista previa técnica",
-  "stage_note": "Esta versión muestra la base del programa (negocios, clientes, cifrado, respaldos y auditoría). Todavía no incluye ventas ni inventario: úsala para conocer NÚCLEO, no para operar tu negocio."
+  "stage_note": "Incluye ventas y cotizaciones, compras, inventario con kárdex, dinero (cuentas, gastos y flujo de caja) e importaciones, con tus datos cifrados en tu computador. Es una versión de prueba: aún faltan la contabilidad, los reportes y la revisión de los cálculos por un contador. Úsala para conocer NÚCLEO y haz respaldos; espera la versión 1.0 para operar tu negocio solo con ella."
 }
