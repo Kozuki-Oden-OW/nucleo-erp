@@ -2,6 +2,18 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [0.2.0] — 2026-10-10
+
+Primera versión con impuestos y remuneraciones. Reúne las entradas «Sin publicar» de abajo desde la
+0.1.0 (fase 9):
+
+- **Impuestos:** borrador del F29 mensual y del F22 anual (Pro Pyme transparente).
+- **Remuneraciones:** trabajadores, indicadores del mes, liquidaciones, sueldo empresarial, Previred,
+  Libro de Remuneraciones Electrónico y finiquito.
+- **COMEX:** seguro teórico, compras por courier o plataforma y caso real de DIN.
+- Logo del negocio, firma opcional del instalador y acuerdo de contribución (CLA).
+- Al instalar sobre la 0.1.0 los datos se conservan; la base se actualiza sola al abrir.
+
 ## [Sin publicar] — Fase 10: Previred, LRE, finiquito y F22
 
 ### Agregado

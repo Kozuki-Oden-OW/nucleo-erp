@@ -16,3 +16,6 @@ dist-demo/
 
 # Material de referencia local (no se versiona)
 /contabilidad/
+
+# Archivos temporales de sincronización
+_sync*.tgz
