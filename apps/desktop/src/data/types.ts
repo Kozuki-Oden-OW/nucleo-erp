@@ -1,5 +1,6 @@
 // Contratos de datos entre la interfaz y el backend (Rust vía Tauri, o el backend de demostración).
 // Montos en unidad mínima (*_minor), cantidades en milésimas (qty_milli), proporciones en ppm.
+import type { CostSheet } from "./costing";
 
 export type BusinessProfile = "emprendedor" | "negocio" | "empresa";
 export type ViewMode = "simple" | "contador";
@@ -162,6 +163,17 @@ export interface Product {
   on_hand_milli: number;
   min_milli: number;
   taxable: boolean;
+  category_uid: string | null;
+  category: string | null;
+  /** Hoja con que se calculó el costo (costo avanzado), si se usó. */
+  cost_sheet: CostSheet | null;
+  /** Con movimientos de stock, el costo lo mueven las compras y los ajustes. */
+  has_movements: boolean;
+}
+export interface ProductCategory {
+  uid: string;
+  name: string;
+  product_count: number;
 }
 export interface NewProduct {
   sku?: string;
@@ -173,6 +185,8 @@ export interface NewProduct {
   taxable?: boolean;
   /** Stock con que parte (milésimas). Solo productos. */
   initial_stock_milli?: number;
+  category_uid?: string | null;
+  cost_sheet?: CostSheet | null;
 }
 
 export interface ProductPatch {
@@ -182,6 +196,10 @@ export interface ProductPatch {
   price_minor: number;
   taxable: boolean;
   min_milli: number;
+  category_uid?: string | null;
+  /** Nuevo costo en pesos (solo sin movimientos de stock). */
+  cost_minor?: number | null;
+  cost_sheet?: CostSheet | null;
 }
 
 /* ───── Ventas ───── */
@@ -1007,3 +1025,36 @@ export interface F22View {
   input: import("./f22").F22Input; result: import("./f22").F22Result; without_incentive: import("./f22").F22Result | null;
   checks: import("./f29").F29Note[]; status: string;
 }
+
+/* ───── Análisis y reportes (Fase 12) ───── */
+
+/** text · money · qty (milésimas) · pct (ppm) · int · date · month · ratio (centésimas) · days · rut · fx (centavos de otra moneda) */
+export type ReportColumnKind = "text" | "money" | "qty" | "pct" | "int" | "date" | "month" | "ratio" | "days" | "rut" | "fx";
+export type ReportCell = number | string | null;
+export interface ReportColumn { key: string; label: string; kind: ReportColumnKind }
+export interface ReportKpi { label: string; value: number; kind: ReportColumnKind; tone: "success" | "warning" | "danger" | null }
+export interface Report {
+  id: string;
+  title: string;
+  description: string;
+  from: string;
+  to: string;
+  uses_period: boolean;
+  columns: ReportColumn[];
+  rows: ReportCell[][];
+  totals: ReportCell[] | null;
+  links: (string | null)[];
+  kpis: ReportKpi[];
+  notes: string[];
+  chart: { label: number; series: number[] } | null;
+}
+export interface ReportDef {
+  id: string;
+  group: string;
+  title: string;
+  description: string;
+  uses_period: boolean;
+  groupings: [string, string][];
+  available: boolean;
+}
+export interface ReportParams { id: string; from?: string | null; to?: string | null; group?: string | null }

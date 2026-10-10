@@ -8,6 +8,7 @@
 //! (tasas, topes, tablas). Los recibe como parámetros desde `nucleo-rules`.
 
 pub mod comex;
+pub mod costing;
 pub mod customers;
 pub mod f22;
 pub mod f29;

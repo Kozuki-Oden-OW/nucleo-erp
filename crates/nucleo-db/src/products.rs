@@ -25,14 +25,23 @@ pub struct ProductRow {
     pub taxable: bool,
     #[serde(skip)]
     pub track_stock: bool,
+    /// Categoría (identificador y nombre), si tiene.
+    pub category_uid: Option<String>,
+    pub category: Option<String>,
+    /// Hoja con que se calculó el costo, tal como la anotó la persona.
+    pub cost_sheet: Option<serde_json::Value>,
+    /// `true` si el producto ya tiene movimientos de stock (el costo lo mueve el libro de stock).
+    pub has_movements: bool,
 }
 
 const SELECT: &str = "SELECT p.id, p.uid, coalesce(p.sku, ''), p.name, lower(p.unit_code),
         CASE p.kind WHEN 'servicio' THEN 'servicio' ELSE 'producto' END,
         p.price_minor, p.avg_cost_e4,
         coalesce((SELECT sum(b.on_hand_milli) FROM stock_balances b WHERE b.product_id = p.id), 0),
-        coalesce(p.min_stock_milli, 0), p.taxable, p.track_stock
-    FROM products p";
+        coalesce(p.min_stock_milli, 0), p.taxable, p.track_stock,
+        c.uid, c.name, p.cost_sheet_json,
+        EXISTS (SELECT 1 FROM stock_movements m WHERE m.product_id = p.id)
+    FROM products p LEFT JOIN categories c ON c.id = p.category_id";
 
 fn map(r: &Row<'_>) -> rusqlite::Result<ProductRow> {
     Ok(ProductRow {
@@ -48,6 +57,12 @@ fn map(r: &Row<'_>) -> rusqlite::Result<ProductRow> {
         min_milli: r.get(9)?,
         taxable: r.get::<_, i64>(10)? == 1,
         track_stock: r.get::<_, i64>(11)? == 1,
+        category_uid: r.get(12)?,
+        category: r.get(13)?,
+        cost_sheet: r
+            .get::<_, Option<String>>(14)?
+            .and_then(|j| serde_json::from_str(&j).ok()),
+        has_movements: r.get::<_, i64>(15)? == 1,
     })
 }
 
@@ -99,6 +114,8 @@ pub struct NewProductRow<'a> {
     pub price_minor: i64,
     pub cost_e4: i64,
     pub taxable: bool,
+    pub category_id: Option<i64>,
+    pub cost_sheet_json: Option<&'a str>,
     pub created_at: &'a str,
 }
 
@@ -119,9 +136,10 @@ pub fn insert(conn: &Connection, p: &NewProductRow<'_>) -> DbResult<ProductRow> 
     }
     let track = if p.kind == "servicio" { 0 } else { 1 };
     let res = conn.execute(
-        "INSERT INTO products (uid, kind, sku, name, unit_code, taxable, track_stock, price_minor, avg_cost_e4, created_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-        (
+        "INSERT INTO products (uid, kind, sku, name, unit_code, taxable, track_stock, price_minor, avg_cost_e4,
+            created_at, category_id, cost_sheet_json)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+        rusqlite::params![
             p.uid,
             p.kind,
             p.sku,
@@ -132,7 +150,9 @@ pub fn insert(conn: &Connection, p: &NewProductRow<'_>) -> DbResult<ProductRow> 
             p.price_minor,
             p.cost_e4,
             p.created_at,
-        ),
+            p.category_id,
+            p.cost_sheet_json,
+        ],
     );
     match res {
         Err(rusqlite::Error::SqliteFailure(e, Some(msg)))
@@ -162,6 +182,7 @@ pub struct ProductUpdate<'a> {
     pub price_minor: i64,
     pub taxable: bool,
     pub min_stock_milli: Option<i64>,
+    pub category_id: Option<i64>,
     pub updated_at: &'a str,
 }
 
@@ -180,7 +201,7 @@ pub fn update(conn: &Connection, id: i64, u: &ProductUpdate<'_>) -> DbResult<()>
     }
     let res = conn.execute(
         "UPDATE products SET name = ?2, sku = ?3, unit_code = ?4, price_minor = ?5, taxable = ?6,
-            min_stock_milli = ?7, updated_at = ?8 WHERE id = ?1",
+            min_stock_milli = ?7, updated_at = ?8, category_id = ?9 WHERE id = ?1",
         rusqlite::params![
             id,
             u.name.trim(),
@@ -189,7 +210,8 @@ pub fn update(conn: &Connection, id: i64, u: &ProductUpdate<'_>) -> DbResult<()>
             u.price_minor,
             u.taxable as i64,
             u.min_stock_milli,
-            u.updated_at
+            u.updated_at,
+            u.category_id
         ],
     );
     match res {
@@ -204,6 +226,42 @@ pub fn update(conn: &Connection, id: i64, u: &ProductUpdate<'_>) -> DbResult<()>
             Ok(())
         }
     }
+}
+
+/// Cambia el costo de un producto **sin movimientos de stock** (servicios o productos recién
+/// creados sin stock) y guarda la hoja con que se calculó. Con movimientos, el costo lo mueve el
+/// libro de stock y esta función lo rechaza.
+pub fn set_cost(
+    conn: &Connection,
+    id: i64,
+    cost_e4: i64,
+    cost_sheet_json: Option<&str>,
+    updated_at: &str,
+) -> DbResult<()> {
+    let moved: i64 = conn.query_row(
+        "SELECT count(*) FROM stock_movements WHERE product_id = ?1",
+        [id],
+        |r| r.get(0),
+    )?;
+    if moved > 0 {
+        return Err(DbError::Rule(
+            "el producto ya tiene movimientos de stock: su costo promedio lo mueven las compras y los ajustes".into(),
+        ));
+    }
+    conn.execute(
+        "UPDATE products SET avg_cost_e4 = ?2, cost_sheet_json = ?3, updated_at = ?4 WHERE id = ?1",
+        rusqlite::params![id, cost_e4, cost_sheet_json, updated_at],
+    )?;
+    Ok(())
+}
+
+/// Guarda solo la hoja de costo (como referencia), sin tocar el costo promedio.
+pub fn set_cost_sheet(conn: &Connection, id: i64, cost_sheet_json: Option<&str>) -> DbResult<()> {
+    conn.execute(
+        "UPDATE products SET cost_sheet_json = ?2 WHERE id = ?1",
+        rusqlite::params![id, cost_sheet_json],
+    )?;
+    Ok(())
 }
 
 /// Bodega por defecto; se crea "Bodega principal" la primera vez que se necesita.
@@ -306,6 +364,8 @@ mod tests {
             price_minor: 1000,
             cost_e4: 6_000_000,
             taxable: true,
+            category_id: None,
+            cost_sheet_json: None,
             created_at: T,
         }
     }

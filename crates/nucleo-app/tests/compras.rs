@@ -49,6 +49,8 @@ fn ciclo_de_compra_completo() {
             cost_minor: Some(6_000),
             taxable: Some(true),
             initial_stock_milli: Some(10_000),
+            category_uid: None,
+            cost_sheet: None,
         })
         .unwrap();
     let prov = s
@@ -196,6 +198,8 @@ fn compra_directa_con_ingreso_y_anulacion() {
             cost_minor: Some(1_000),
             taxable: Some(true),
             initial_stock_milli: Some(2_000),
+            category_uid: None,
+            cost_sheet: None,
         })
         .unwrap();
     let prov = s

@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "./backend";
 import type {
+  Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
   SeveranceForm, SeveranceView, Worker, WorkerInput,
@@ -14,7 +15,7 @@ import type {
   AdjustmentInput, InventoryOverview, InventorySettings, ProductInventory, ReorderInput, StockDocDone, StockDocRow, TransferInput, Warehouse,
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
   Customer, CustomerDetail, Dashboard, EffectInput, EntityRef, ExternalRefInput, NewCustomer, NewProduct, NewUser, PermissionRow,
-  PriceHistoryRow, Product, ProductPatch, PurchaseDetail, PurchaseInput, PurchaseOrderDetail, PurchaseOrderInput, PurchaseOrderSummary,
+  PriceHistoryRow, Product, ProductCategory, ProductPatch, PurchaseDetail, PurchaseInput, PurchaseOrderDetail, PurchaseOrderInput, PurchaseOrderSummary,
   PurchaseSummary, ReceiveLine, NewSupplier, Supplier, SupplierDetail, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow, SaleDetail, SaleInput,
   SaleSummary, SearchHit,
   SecuritySettings, SequenceRow, SessionInfo, UserPatch, UserRow,
@@ -46,7 +47,7 @@ export class TauriBackend implements Backend {
   readonly kind = "tauri" as const;
   readonly features: ReadonlySet<Feature> = new Set<Feature>([
     "clientes", "respaldos", "negocio", "busqueda", "usuarios", "documentos", "numeracion", "monedas", "auditoria",
-    "productos", "ventas", "compras", "inventario", "dinero", "dashboard", "comex", "impuestos", "remuneraciones",
+    "productos", "ventas", "compras", "inventario", "dinero", "dashboard", "comex", "impuestos", "remuneraciones", "reportes",
   ]);
 
   async appInfo(): Promise<AppInfo> {
@@ -107,6 +108,10 @@ export class TauriBackend implements Backend {
   addProduct(input: NewProduct) { return call<Product>("add_product", { input }); }
   updateProduct(uid: string, patch: ProductPatch) { return call<Product>("update_product", { uid, patch }); }
   updateCustomer(uid: string, input: NewCustomer) { return call<Customer>("update_customer", { uid, input }); }
+  productCategories() { return call<ProductCategory[]>("product_categories"); }
+  saveCategory(uid: string | null, name: string) { return call<ProductCategory[]>("save_category", { uid, name }); }
+  deleteCategory(uid: string) { return call<ProductCategory[]>("delete_category", { uid }); }
+  assignCategory(productUids: string[], categoryUid: string | null) { return call<ProductCategory[]>("assign_category", { productUids, categoryUid }); }
   listQuotes(query?: string) { return call<QuoteSummary[]>("list_quotes", { query: query ?? null }); }
   quote(uid: string) { return call<QuoteDetail>("quote", { uid }); }
   saveQuote(input: QuoteInput, uid?: string) { return call<QuoteDetail>("save_quote", { input, uid: uid ?? null }); }
@@ -231,6 +236,16 @@ export class TauriBackend implements Backend {
   severance(workerId: number, form: SeveranceForm) { return call<SeveranceView>("severance", { workerId, form }); }
   f22(year: number) { return call<F22View>("f22", { year }); }
   saveF22Inputs(year: number, inputs: F22Inputs) { return call<F22View>("save_f22_inputs", { year, inputs }); }
+
+  reportCatalog() { return call<ReportDef[]>("report_catalog"); }
+  report(params: ReportParams) { return call<Report>("report", { params }); }
+  async saveReportFile(reportId: string, fileName: string, bytes: Uint8Array): Promise<boolean> {
+    const ext = fileName.toLowerCase().endsWith(".csv") ? "csv" : "xlsx";
+    const path = await save({ defaultPath: fileName, title: "Guardar el reporte", filters: [ext === "csv" ? { name: "CSV", extensions: ["csv"] } : { name: "Excel", extensions: ["xlsx"] }] });
+    if (!path) return false;
+    await call<void>("save_report_file", { reportId, path, bytes: Array.from(bytes) });
+    return true;
+  }
 }
 
 /** Selector de archivo del escritorio para adjuntar documentos. */

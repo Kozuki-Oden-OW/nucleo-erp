@@ -5,6 +5,7 @@
 //! la auditoría encadenada, la búsqueda FTS5 y las copias consistentes para respaldos.
 
 pub mod audit;
+pub mod categories;
 pub mod comex;
 pub mod core;
 pub mod customers;
@@ -16,6 +17,7 @@ pub mod migrations;
 pub mod payroll;
 pub mod products;
 pub mod purchases;
+pub mod reports;
 pub mod sales;
 pub mod suppliers;
 pub mod taxes;

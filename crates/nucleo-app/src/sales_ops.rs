@@ -41,6 +41,12 @@ pub struct NewProduct {
     pub taxable: Option<bool>,
     /// Stock con que parte el producto (milésimas). Solo productos, no servicios.
     pub initial_stock_milli: Option<i64>,
+    /// Categoría (uid), opcional.
+    #[serde(default)]
+    pub category_uid: Option<String>,
+    /// Hoja de costo avanzado: si trae datos, el costo sale de ella.
+    #[serde(default)]
+    pub cost_sheet: Option<nucleo_domain::costing::CostSheet>,
 }
 
 /// Cambios a la ficha de un producto (el stock y el costo no se editan aquí).
@@ -52,6 +58,16 @@ pub struct ProductPatch {
     pub price_minor: i64,
     pub taxable: bool,
     pub min_milli: i64,
+    /// Categoría (uid); `None` = sin categoría.
+    #[serde(default)]
+    pub category_uid: Option<String>,
+    /// Nuevo costo (pesos). Solo se acepta si el producto no tiene movimientos de stock.
+    #[serde(default)]
+    pub cost_minor: Option<i64>,
+    /// Hoja de costo avanzado. Sin movimientos de stock fija el costo; con movimientos se guarda
+    /// solo como referencia.
+    #[serde(default)]
+    pub cost_sheet: Option<nucleo_domain::costing::CostSheet>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -525,6 +541,9 @@ impl CompanySession {
         if !(0..=MAX_PRICE_MINOR).contains(&cost) {
             return Err(AppError::Validation("el costo no es válido".into()));
         }
+        let sheet = self.prepare_cost_sheet(input.cost_sheet.as_ref())?;
+        let cost_e4 = sheet.as_ref().map(|(e4, _)| *e4).unwrap_or(cost * 10_000);
+        let category_id = self.category_id(input.category_uid.as_deref())?;
         let stock = input.initial_stock_milli.unwrap_or(0);
         if !(0..=MAX_QTY_MILLI).contains(&stock) || (stock > 0 && kind == "servicio") {
             return Err(AppError::Validation(
@@ -545,8 +564,10 @@ impl CompanySession {
                 unit_code: &unit,
                 kind,
                 price_minor: input.price_minor,
-                cost_e4: cost * 10_000,
+                cost_e4,
                 taxable: input.taxable.unwrap_or(true),
+                category_id,
+                cost_sheet_json: sheet.as_ref().map(|(_, j)| j.as_str()),
                 created_at: &now,
             },
         )?;
@@ -561,8 +582,8 @@ impl CompanySession {
                     date: &today,
                     kind: "inicial",
                     qty_milli: stock,
-                    unit_cost_e4: cost * 10_000,
-                    avg_cost_after_e4: cost * 10_000,
+                    unit_cost_e4: cost_e4,
+                    avg_cost_after_e4: cost_e4,
                     source_type: "AJU",
                     source_id: row.id,
                     source_line_id: None,
@@ -612,9 +633,32 @@ impl CompanySession {
             return Err(AppError::Validation("el stock mínimo no es válido".into()));
         }
         let unit = patch.unit.trim().to_uppercase();
+        let category_id = self.category_id(patch.category_uid.as_deref())?;
+        let sheet = self.prepare_cost_sheet(patch.cost_sheet.as_ref())?;
+        if let Some(c) = patch.cost_minor
+            && !(0..=MAX_PRICE_MINOR).contains(&c)
+        {
+            return Err(AppError::Validation("el costo no es válido".into()));
+        }
+        let can_cost = self.can("costos.ver");
         let now = now_utc();
         let user = self.actor_name()?;
         let tx = self.db.conn_mut().transaction()?;
+        if can_cost {
+            match (&sheet, patch.cost_minor) {
+                (Some((e4, json)), _) if !before.has_movements => {
+                    products::set_cost(&tx, before.id, *e4, Some(json), &now)?
+                }
+                (Some((_, json)), _) => products::set_cost_sheet(&tx, before.id, Some(json))?,
+                (None, Some(c)) if c * 10_000 != before.cost_e4 => {
+                    products::set_cost(&tx, before.id, c * 10_000, None, &now)?
+                }
+                (None, _) if patch.cost_sheet.is_some() => {
+                    products::set_cost_sheet(&tx, before.id, None)?
+                }
+                _ => {}
+            }
+        }
         products::update(
             &tx,
             before.id,
@@ -625,6 +669,7 @@ impl CompanySession {
                 price_minor: patch.price_minor,
                 taxable: patch.taxable,
                 min_stock_milli: (patch.min_milli > 0).then_some(patch.min_milli),
+                category_id,
                 updated_at: &now,
             },
         )?;

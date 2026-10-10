@@ -4,6 +4,7 @@
 //! transacción** que incluye el cambio y su registro de auditoría (Blueprint §2.3).
 
 pub mod auth;
+pub mod catalog_ops;
 pub mod comex_ops;
 pub mod company;
 pub mod core_ops;
@@ -16,6 +17,7 @@ pub mod keys;
 pub mod payroll_ops;
 pub mod purchase_ops;
 pub mod registry;
+pub mod report_ops;
 pub mod sales_ops;
 
 pub use company::{CompanySession, NewCustomer};

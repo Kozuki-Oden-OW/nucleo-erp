@@ -13,9 +13,11 @@ export interface Prefs {
   sidebarCollapsed: boolean;
   /** Módulos ocultos por el perfil que la persona decidió mostrar igual (Blueprint §3.2). */
   extraModules: string[];
+  /** Cómo escribe la persona los precios de venta: netos o con IVA (se guardan siempre netos). */
+  priceEntry: "neto" | "con_iva";
 }
 
-const DEFAULTS: Prefs = { theme: "sistema", density: "comoda", view: "simple", sidebarCollapsed: false, extraModules: [] };
+const DEFAULTS: Prefs = { theme: "sistema", density: "comoda", view: "simple", sidebarCollapsed: false, extraModules: [], priceEntry: "neto" };
 const KEY = "nucleo.prefs.v1";
 
 function load(): Prefs {

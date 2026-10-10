@@ -160,6 +160,89 @@ fn ciclo_de_venta_por_ipc() {
     ipc.ok("set_documentation_not_applicable", json!({ "uid": vuid }));
 
     ipc.ok("update_product", json!({ "uid": prod, "patch": { "name": "Martillo 16 oz", "sku": "MAR-16", "unit": "un", "price_minor": 11990, "taxable": true, "min_milli": 2000 } }));
+
+    // Categorías: las iniciales, crear, asignar en lote, renombrar y eliminar.
+    let cats = ipc.ok("product_categories", json!({}));
+    assert_eq!(cats.as_array().unwrap().len(), 6);
+    let cats = ipc.ok(
+        "save_category",
+        json!({ "uid": null, "name": "Herramientas" }),
+    );
+    let herr = cats
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "Herramientas")
+        .unwrap()["uid"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let cats = ipc.ok(
+        "assign_category",
+        json!({ "productUids": [prod], "categoryUid": herr }),
+    );
+    let c = cats
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["uid"] == herr.as_str())
+        .unwrap()
+        .clone();
+    assert_eq!(c["product_count"], 1);
+    ipc.ok(
+        "save_category",
+        json!({ "uid": herr, "name": "Herramientas manuales" }),
+    );
+    let p = ipc.ok("update_product", json!({ "uid": prod, "patch": { "name": "Martillo 16 oz", "sku": "MAR-16", "unit": "un", "price_minor": 11990, "taxable": true, "min_milli": 2000, "category_uid": herr } }));
+    assert_eq!(p["category"], "Herramientas manuales");
+    ipc.ok("delete_category", json!({ "uid": herr }));
+    // Servicio con costo avanzado: se fija y se puede corregir (no tiene stock).
+    let srv = ipc.ok("add_product", json!({ "input": { "name": "Mapeo térmico", "kind": "servicio", "price_minor": 350000,
+        "cost_sheet": { "labor_minor": 120000, "shipping_minor": 23800, "pesos_include_tax": true, "units_milli": 1000 } } }));
+    // La empresa de prueba usa una tasa de 10 %: 120.000 + 23.800 / 1,10.
+    assert_eq!(srv["cost_e4"], 1_416_360_000);
+    assert_eq!(srv["cost_sheet"]["labor_minor"], 120000);
+
+    // Análisis y reportes: todos se arman y la venta efectuada aparece.
+    let cat = ipc.ok("report_catalog", json!({}));
+    let ids: Vec<String> = cat
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|d| d["id"].as_str().unwrap().to_string())
+        .collect();
+    assert!(ids.len() >= 13);
+    for id in &ids {
+        let r = ipc.ok(
+            "report",
+            json!({ "params": { "id": id, "from": "2026-01-01", "to": HOY, "group": null } }),
+        );
+        assert_eq!(
+            r["rows"].as_array().unwrap().len(),
+            r["links"].as_array().unwrap().len(),
+            "{id}"
+        );
+    }
+    // La venta se emite con la fecha del día en que corre la prueba.
+    let r = ipc.ok(
+        "report",
+        json!({ "params": { "id": "ventas_cliente", "from": "2026-01-01", "to": "2035-12-31" } }),
+    );
+    assert_eq!(r["rows"].as_array().unwrap().len(), 1);
+    let r = ipc.ok("report", json!({ "params": { "id": "ventas_periodo", "from": "2026-01-01", "to": "2035-12-31", "group": "dia" } }));
+    assert_eq!(r["totals"][1], 1);
+    let dir = tempfile::tempdir().unwrap();
+    let dest = dir.path().join("ventas.csv");
+    ipc.ok("save_report_file", json!({ "reportId": "ventas_cliente", "path": dest.to_str().unwrap(), "bytes": [65, 59, 66] }));
+    assert_eq!(std::fs::read(&dest).unwrap(), b"A;B");
+    let bad = dir.path().join("x.exe");
+    assert!(
+        ipc.call(
+            "save_report_file",
+            json!({ "reportId": "ventas_cliente", "path": bad.to_str().unwrap(), "bytes": [1] })
+        )
+        .is_err()
+    );
     ipc.ok(
         "update_customer",
         json!({ "uid": cust, "input": { "name": "Constructora Sur Ltda." } }),

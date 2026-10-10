@@ -10,10 +10,11 @@ import type {
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
   Customer, CustomerDetail, Dashboard, DocLink, EffectInput, EntityRef, ExternalRef, ExternalRefInput, Line, LineInput,
   NewCustomer, NewProduct, NewUser, Payment, PermissionRow,
-  AdjustmentInput, InventoryOverview, InventorySettings, KardexRow, ProductInventory, ReorderInput, ReorderSettings, StockAnalysis, StockDocDone, StockDocRow, TransferInput, Warehouse, PriceHistoryRow, Product, ProductPatch, PurchaseOrderDetail, PurchaseOrderSummary,
+  AdjustmentInput, InventoryOverview, InventorySettings, KardexRow, ProductInventory, ReorderInput, ReorderSettings, StockAnalysis, StockDocDone, StockDocRow, TransferInput, Warehouse, PriceHistoryRow, Product, ProductCategory, ProductPatch, PurchaseOrderDetail, PurchaseOrderSummary,
   BuyLineInput, NewSupplier, PoLine, PoStatus, PurchaseDetail, PurchaseInput, PurchaseLine, PurchaseOrderInput, PurchaseSummary, ReceiveLine, Supplier, SupplierDetail, QuoteDetail,
   QuoteInput, QuoteStatus, QuoteSummary, RateRow, RoleRow, SaleDetail, SaleDocType, SaleInput, SaleSummary, SearchHit,
   SecuritySettings, SequenceRow, SessionInfo, Totals, UserPatch, UserRow,
+  Report, ReportDef, ReportParams,
   AccountInput, AccountKind, CalendarItem, DueRow, ExpenseCategory, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow,
   MoneyAccount, MoneyOverview, MoneyTransferInput, Recurring, RecurringInput,
   EtaChange, ImportCostInput, ImportDetail, ImportInput, ImportItemRow, ImportReceiveLine, ImportStage, ImportSummary, IncotermDef, StageChange, TransportMode,
@@ -22,8 +23,10 @@ import incotermsJson from "./incoterms.json";
 import { COST_LABEL, STAGE_LABEL, landedCost, toClp, type Basis, type CostKind, type LandedResult } from "../comex";
 import { DEMO_CATEGORIES, PROJECTION_WEEKS, agingAdd, emptyAging, methodCode, occurrences } from "./money";
 import { DEMO_PERMISSIONS, DEMO_ROLES } from "./roles";
-import { addDays, daysBetween, todayIso } from "../../lib/format";
-import { CUSTOMER_NAMES, DEMO_COMPANY, PAYMENT_METHODS, PRODUCT_ROWS, SUPPLIER_NAMES, rng, rutDv } from "./seed";
+import { CURRENCY_DIGITS, addDays, daysBetween, todayIso } from "../../lib/format";
+import { computeCostSheet, costSheetUsed, type CostSheet } from "../costing";
+import { REPORT_DEFS, buildReport, reportCatalog, type Facts } from "./reports";
+import { CUSTOMER_NAMES, DEMO_COMPANY, DEMO_PRODUCT_CATEGORIES, PAYMENT_METHODS, PRODUCT_ROWS, SUPPLIER_NAMES, rng, rutDv } from "./seed";
 import reglas from "./reglas-demo.json";
 import { MANUAL_CODES, computeF29, type F29Note, type PurchaseKind } from "../f29";
 import indicadoresDemo from "./indicadores-demo.json";
@@ -102,12 +105,13 @@ export class DemoBackend implements Backend {
   readonly kind = "demo" as const;
   readonly features: ReadonlySet<Feature> = new Set<Feature>([
     "dashboard", "clientes", "productos", "ventas", "compras", "comex", "negocio", "busqueda",
-    "usuarios", "documentos", "numeracion", "monedas", "auditoria", "inventario", "dinero", "impuestos", "remuneraciones",
+    "usuarios", "documentos", "numeracion", "monedas", "auditoria", "inventario", "dinero", "impuestos", "remuneraciones", "reportes",
   ]);
   private company = { uid: "demo-company", name: DEMO_COMPANY, profile: "empresa" as BusinessProfile, created_at: "2026-01-02T12:00:00Z" };
   private biz: BusinessSettings;
   private customers: Customer[] = [];
   private products: Product[] = [];
+  private pcats: ProductCategory[] = [];
   private quotes: QuoteRec[] = [];
   private sales: SaleRec[] = [];
   private pos: PoRec[] = [];
@@ -195,10 +199,13 @@ export class DemoBackend implements Backend {
         created_at: "2026-01-10T12:00:00Z",
       });
     });
+    for (const [name] of DEMO_PRODUCT_CATEGORIES) this.pcats.push({ uid: uid("cat"), name, product_count: 0 });
     for (const [sku, name, unit, price, cost, stock, min, service] of PRODUCT_ROWS) {
+      const ci = DEMO_PRODUCT_CATEGORIES.findIndex(([, skus]) => skus.includes(sku));
       this.products.push({
         uid: uid("pro"), sku, name, unit, kind: service ? "servicio" : "producto", price_minor: price, cost_e4: cost * 10_000,
         on_hand_milli: stock * 1000, min_milli: min * 1000, taxable: true,
+        category_uid: ci >= 0 ? this.pcats[ci]!.uid : null, category: null, cost_sheet: null, has_movements: false,
       });
     }
     // Historia mensual agregada (12 meses) para el gráfico.
@@ -731,8 +738,65 @@ export class DemoBackend implements Backend {
   async searchProducts(query: string): Promise<Product[]> {
     const q = norm(query.trim());
     const words = q.split(/\s+/).filter(Boolean);
-    const rows = words.length ? this.products.filter((p) => { const h = norm(`${p.name} ${p.sku}`); return words.every((w) => h.includes(w)); }) : this.products;
-    return wait(rows, 30);
+    const rows = words.length ? this.products.filter((p) => { const h = norm(`${p.name} ${p.sku} ${this.catName(p.category_uid) ?? ""}`); return words.every((w) => h.includes(w)); }) : this.products;
+    return wait(rows.map((p) => this.prodView(p)), 30);
+  }
+  private catName(u: string | null): string | null { return u ? this.pcats.find((c) => c.uid === u)?.name ?? null : null; }
+  /** Producto con los datos derivados (nombre de la categoría y si tiene movimientos). */
+  private prodView(p: Product): Product {
+    return { ...p, category: this.catName(p.category_uid), has_movements: this.moves.some((m) => m.product_uid === p.uid) };
+  }
+  private checkCat(u: string | null | undefined): string | null {
+    if (!u) return null;
+    if (!this.pcats.some((c) => c.uid === u)) throw new AppError("no_encontrado", "No encontramos esa categoría.");
+    return u;
+  }
+  private sheetCost(sheet: CostSheet | null | undefined): { e4: number; sheet: CostSheet } | null {
+    if (!costSheetUsed(sheet)) return null;
+    const s = { ...sheet!, currency: (sheet!.currency || "CLP").toUpperCase() };
+    s.currency_digits = s.currency === "CLP" ? 0 : CURRENCY_DIGITS[s.currency] ?? 2;
+    const r = computeCostSheet(s, this.taxPpm());
+    if (r.total === 0) throw new AppError("costo", r.notes[0] ?? "El costo avanzado quedó en cero.");
+    return { e4: r.unit_cost_e4, sheet: s };
+  }
+  async productCategories(): Promise<ProductCategory[]> {
+    return wait(this.pcats.map((c) => ({ ...c, product_count: this.products.filter((p) => p.category_uid === c.uid).length })).sort((a, b) => a.name.localeCompare(b.name, "es")));
+  }
+  async saveCategory(u: string | null, name: string): Promise<ProductCategory[]> {
+    this.require("productos.editar");
+    const n = name.trim();
+    if (!n || n.length > 80) throw new AppError("nombre", "El nombre de la categoría es obligatorio (hasta 80 caracteres).");
+    if (this.pcats.some((c) => c.uid !== u && norm(c.name) === norm(n))) throw new AppError("duplicado", "Ya existe una categoría con ese nombre.");
+    if (u) {
+      const c = this.pcats.find((x) => x.uid === u);
+      if (!c) throw new AppError("no_encontrado", "No encontramos esa categoría.");
+      c.name = n;
+      this.log("categoria.renombrar", "categoria", u);
+    } else {
+      const c = { uid: uid("cat"), name: n, product_count: 0 };
+      this.pcats.push(c);
+      this.log("categoria.crear", "categoria", c.uid);
+    }
+    return this.productCategories();
+  }
+  async deleteCategory(u: string): Promise<ProductCategory[]> {
+    this.require("productos.editar");
+    this.checkCat(u);
+    for (const p of this.products) if (p.category_uid === u) p.category_uid = null;
+    this.pcats = this.pcats.filter((c) => c.uid !== u);
+    this.log("categoria.eliminar", "categoria", u);
+    return this.productCategories();
+  }
+  async assignCategory(productUids: string[], categoryUid: string | null): Promise<ProductCategory[]> {
+    this.require("productos.editar");
+    const cat = this.checkCat(categoryUid);
+    for (const u of productUids) {
+      const p = this.products.find((x) => x.uid === u);
+      if (!p) throw new AppError("no_encontrado", "No encontramos ese producto.");
+      p.category_uid = cat;
+    }
+    this.log("categoria.asignar", "categoria", cat ?? "sin categoría");
+    return this.productCategories();
   }
   async updateProduct(u: string, patch: ProductPatch): Promise<Product> {
     this.require("productos.editar");
@@ -741,20 +805,35 @@ export class DemoBackend implements Backend {
     if (!patch.name.trim()) throw new AppError("nombre", "El nombre del producto es obligatorio.");
     if (!patch.sku.trim()) throw new AppError("codigo", "El código es obligatorio.");
     if (this.products.some((x) => x.uid !== u && x.sku.toLowerCase() === patch.sku.trim().toLowerCase())) throw new AppError("duplicado", "Ya existe un producto con ese código.");
-    Object.assign(p, { name: patch.name.trim(), sku: patch.sku.trim(), unit: patch.unit, price_minor: patch.price_minor, taxable: patch.taxable, min_milli: patch.min_milli });
+    const category_uid = this.checkCat(patch.category_uid);
+    const sheet = this.sheetCost(patch.cost_sheet);
+    const moved = this.moves.some((m) => m.product_uid === p.uid);
+    if (sheet) {
+      p.cost_sheet = sheet.sheet;
+      if (!moved) p.cost_e4 = sheet.e4;
+    } else {
+      if (patch.cost_sheet !== undefined) p.cost_sheet = null;
+      if (patch.cost_minor != null && patch.cost_minor * 10_000 !== p.cost_e4) {
+        if (moved) throw new AppError("regla", "El producto ya tiene movimientos de stock: su costo promedio lo mueven las compras y los ajustes.");
+        p.cost_e4 = patch.cost_minor * 10_000;
+      }
+    }
+    Object.assign(p, { name: patch.name.trim(), sku: patch.sku.trim(), unit: patch.unit, price_minor: patch.price_minor, taxable: patch.taxable, min_milli: patch.min_milli, category_uid });
     this.log("producto.editar", "producto", p.uid);
-    return wait({ ...p });
+    return wait(this.prodView(p));
   }
   async addProduct(input: NewProduct): Promise<Product> {
     if (!input.name.trim()) throw new AppError("nombre", "El nombre del producto es obligatorio.");
+    const sheet = this.sheetCost(input.cost_sheet);
     const p: Product = {
       uid: uid("pro"), sku: input.sku?.trim() || `P-${this.products.length + 1}`, name: input.name.trim(), unit: input.unit || "un", kind: input.kind,
-      price_minor: input.price_minor, cost_e4: (input.cost_minor ?? 0) * 10_000, on_hand_milli: input.kind === "producto" ? Math.max(0, input.initial_stock_milli ?? 0) : 0, min_milli: 0, taxable: input.taxable ?? true,
+      price_minor: input.price_minor, cost_e4: sheet ? sheet.e4 : (input.cost_minor ?? 0) * 10_000, on_hand_milli: input.kind === "producto" ? Math.max(0, input.initial_stock_milli ?? 0) : 0, min_milli: 0, taxable: input.taxable ?? true,
+      category_uid: this.checkCat(input.category_uid), category: null, cost_sheet: sheet?.sheet ?? null, has_movements: false,
     };
     this.products.push(p);
     if (p.on_hand_milli > 0) this.mv(p.uid, p.on_hand_milli, "inicial", "Stock inicial", "AJU", null, "Stock inicial", this.today, p.cost_e4);
     this.log("producto.crear", "producto", p.uid);
-    return wait(p);
+    return wait(this.prodView(p));
   }
 
   /* ───────────── Ventas ───────────── */
@@ -2604,6 +2683,73 @@ export class DemoBackend implements Backend {
     const p = this.checkPeriod(period);
     this.slips = this.slips.filter((x) => !(x.worker_id === workerId && x.period === p && x.status === "borrador"));
     return wait(this.slipView(this.worker(workerId), p, undefined));
+  }
+
+  /* ───────────── Análisis y reportes (Fase 12) ───────────── */
+
+  private canDo = (perm: string) => this.perms(this.me()).has(perm);
+  private reportFacts(): Facts {
+    const live = this.sales.filter((s) => s.commercial_state === "efectuada" || s.commercial_state === "cerrada");
+    const prod = (u: string | null) => (u ? this.products.find((p) => p.uid === u) : undefined);
+    const { rec, pay } = this.dues();
+    return {
+      today: this.today,
+      sales: live.map((s) => {
+        const c = s.customer_uid ? this.customers.find((x) => x.uid === s.customer_uid) : undefined;
+        return {
+          uid: s.uid, date: s.issue_date, customer_key: s.customer_uid ?? "ocasional", customer: c?.name ?? "Cliente ocasional", rut: c?.rut ?? null,
+          net: s.totals.net_minor + s.totals.exempt_minor, tax: s.totals.tax_minor, total: s.totals.total_minor, cost: s.cost_minor,
+          lines: s.lines.map((l) => {
+            const p = prod(l.product_uid);
+            return { product_uid: l.product_uid, sku: p?.sku ?? "", name: p?.name ?? l.description, category: p ? this.catName(p.category_uid) : null, unit: p?.unit ?? "",
+              qty: l.qty_milli, net: l.net_minor, cost: Math.round(((l.unit_cost_e4 ?? 0) * l.qty_milli) / 10_000_000) };
+          }),
+        };
+      }),
+      expenses: this.gastos.filter((g) => g.status === "registrado").map((g) => {
+        const k = this.cats.find((c) => c.id === g.category_id);
+        return { date: g.date, category_id: g.category_id, category: k?.name ?? "Otros", behavior: k?.behavior ?? "variable", net: g.net, tax: g.tax, total: g.total };
+      }),
+      purchases: this.purchases.filter((c) => c.status === "registrada").map((c) => ({
+        date: c.issue_date, supplier_key: c.supplier_uid, supplier: this.supplierName(c.supplier_uid), rut: this.suppliers.find((x) => x.uid === c.supplier_uid)?.rut ?? null,
+        net: c.totals.net_minor, exempt: c.totals.exempt_minor, tax: c.totals.tax_minor, total: c.totals.total_minor, pending: c.totals.total_minor - this.paidOf(c.payments),
+      })),
+      products: this.products.filter((p) => p.kind === "producto").map((p) => ({ uid: p.uid, sku: p.sku, name: p.name, category: this.catName(p.category_uid), stock: p.on_hand_milli, unit: p.unit, cost_e4: p.cost_e4 })),
+      receivables: rec.map((d) => ({ ...d, issue_date: this.sales.find((s) => `/ventas/${s.uid}` === d.link)?.issue_date ?? d.due_date })),
+      payables: pay,
+      cash: this.cashMoves().filter((m) => m.status === "vigente" && (m.kind === "cobro" || m.kind === "pago")).map((m) => ({ date: m.date, amount: m.amount_minor })),
+      openingCash: this.accs.reduce((a, x) => a + x.opening_minor, 0),
+      payroll: this.slips.filter((x) => x.status === "emitida" && x.snap).map((x) => ({ period: x.period, cost: x.snap!.result.employer_cost })),
+      imports: this.imps.filter((h) => h.stage !== "anulada").map((h) => ({
+        uid: h.uid, number: h.number, supplier: h.supplier_uid ? this.supplierName(h.supplier_uid) : "—", stage: h.stage, date: h.purchase_date ?? h.created_at.slice(0, 10),
+        eta: h.eta, currency: h.currency_code, fob: h.fob_minor, landed: h.landed_total_clp ?? h.estimated_landed_clp, units: h.items.reduce((a, i) => a + i.qty_milli, 0),
+      })),
+    };
+  }
+  async reportCatalog(): Promise<ReportDef[]> {
+    this.require("reportes.ver");
+    return wait(reportCatalog(this.canDo));
+  }
+  async report(params: ReportParams): Promise<Report> {
+    this.require("reportes.ver");
+    const def = REPORT_DEFS.find((d) => d.id === params.id);
+    if (!def) throw new AppError("no_encontrado", "No encontramos ese reporte.");
+    for (const p of def.perms) this.require(p);
+    const from = params.from || `${this.today.slice(0, 7)}-01`;
+    const to = params.to || this.today;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) throw new AppError("validacion", "Revisa las fechas del período.");
+    if (from > to) throw new AppError("validacion", "La fecha «desde» es posterior a «hasta».");
+    return wait(buildReport(def.id, this.reportFacts(), from, to, params.group ?? null, this.canDo), 90);
+  }
+  async saveReportFile(reportId: string, fileName: string, bytes: Uint8Array): Promise<boolean> {
+    this.require("reportes.exportar");
+    const type = fileName.endsWith(".csv") ? "text/csv;charset=utf-8" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type }));
+    const a = document.createElement("a");
+    a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    this.log("reporte.exportar", "reporte", reportId);
+    return true;
   }
 }
 

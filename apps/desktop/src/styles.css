@@ -30,6 +30,7 @@
   --info: #2457a6;
   --info-soft: #e5edfa;
   --chart-1: #0090aa;
+  --chart-2: #c9772b;
   --chart-grid: #e9edf1;
   --overlay: rgb(11 26 46 / 0.32);
   --shadow-1: 0 1px 2px rgb(11 26 46 / 0.06), 0 1px 1px rgb(11 26 46 / 0.04);
@@ -71,6 +72,7 @@
     --info: #7aa7f0;
     --info-soft: #172744;
     --chart-1: #2a9bb2;
+    --chart-2: #b9783a;
     --chart-grid: #232933;
     --overlay: rgb(0 0 0 / 0.55);
     --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
@@ -102,6 +104,7 @@
   --info: #7aa7f0;
   --info-soft: #172744;
   --chart-1: #2a9bb2;
+  --chart-2: #b9783a;
   --chart-grid: #232933;
   --overlay: rgb(0 0 0 / 0.55);
   --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);

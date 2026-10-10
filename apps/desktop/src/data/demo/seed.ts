@@ -80,3 +80,16 @@ export const PRODUCT_ROWS: [string, string, string, number, number, number, numb
 ];
 
 export { PAYMENT_METHODS } from "../catalogs";
+
+/** Categorías de la ferretería de demostración y los códigos de sus productos. */
+export const DEMO_PRODUCT_CATEGORIES: [string, string[]][] = [
+  ["Herramientas eléctricas", ["TAL-18V", "TAL-650", "ESM-115", "SIE-CIR"]],
+  ["Herramientas manuales", ["ATO-SET", "MAR-16", "HUI-25", "NIV-60", "ALI-SET", "LLA-SET"]],
+  ["Construcción", ["CEM-25", "YES-25", "ARE-M3", "ESC-5", "CAR-MAN"]],
+  ["Pinturas", ["PIN-LAT", "PIN-ESM", "BRO-2", "ROD-9", "DIL-1"]],
+  ["Fijaciones y adhesivos", ["TOR-6", "CLA-3", "TAR-8", "SIL-TR"]],
+  ["Electricidad e iluminación", ["CIN-AIS", "CAB-25", "ENC-DOB", "AMP-LED", "FOC-LED"]],
+  ["Seguridad", ["GUA-NIT", "LEN-SEG", "CAS-SEG"]],
+  ["Jardín y gasfitería", ["MAN-JAR", "LLA-JAR", "CAN-PVC", "COD-PVC"]],
+  ["Servicios", ["SRV-INS", "SRV-COR"]],
+];

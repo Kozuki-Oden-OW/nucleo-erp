@@ -1,0 +1,238 @@
+{
+  "descripcion": "Casos de la hoja de costo y del precio neto o con IVA (nucleo-domain::costing y data/costing.ts). Generado por gen_golden_costo.py.",
+  "casos": [
+    {
+      "nombre": "Compra en dólares de 100 sensores con flete con IVA",
+      "tax_ppm": 190000,
+      "input": {
+        "purchase_minor": 150000,
+        "currency": "USD",
+        "currency_digits": 2,
+        "fx_rate_e6": 950500000,
+        "freight_minor": 119000,
+        "shipping_minor": 0,
+        "labor_minor": 50000,
+        "other_minor": 0,
+        "units_milli": 100000,
+        "pesos_include_tax": true
+      },
+      "esperado": {
+        "purchase_clp": 1425750,
+        "freight": 100000,
+        "shipping": 0,
+        "labor": 50000,
+        "other": 0,
+        "total": 1575750,
+        "units_milli": 100000,
+        "unit_cost_e4": 157575000,
+        "unit_cost": 15758
+      }
+    },
+    {
+      "nombre": "Producto nacional neto, una unidad",
+      "tax_ppm": 190000,
+      "input": {
+        "purchase_minor": 23000,
+        "currency": "CLP",
+        "currency_digits": 0,
+        "fx_rate_e6": 0,
+        "freight_minor": 0,
+        "shipping_minor": 0,
+        "labor_minor": 0,
+        "other_minor": 0,
+        "units_milli": 1000,
+        "pesos_include_tax": false
+      },
+      "esperado": {
+        "purchase_clp": 23000,
+        "freight": 0,
+        "shipping": 0,
+        "labor": 0,
+        "other": 0,
+        "total": 23000,
+        "units_milli": 1000,
+        "unit_cost_e4": 230000000,
+        "unit_cost": 23000
+      }
+    },
+    {
+      "nombre": "Producto nacional con IVA, transporte y embalaje, lote de 12",
+      "tax_ppm": 190000,
+      "input": {
+        "purchase_minor": 142800,
+        "currency": "CLP",
+        "currency_digits": 0,
+        "fx_rate_e6": 0,
+        "freight_minor": 8990,
+        "shipping_minor": 0,
+        "labor_minor": 0,
+        "other_minor": 2380,
+        "units_milli": 12000,
+        "pesos_include_tax": true
+      },
+      "esperado": {
+        "purchase_clp": 120000,
+        "freight": 7555,
+        "shipping": 0,
+        "labor": 0,
+        "other": 2000,
+        "total": 129555,
+        "units_milli": 12000,
+        "unit_cost_e4": 107962500,
+        "unit_cost": 10796
+      }
+    },
+    {
+      "nombre": "Fabricación propia: insumos, mano de obra y envío, lote de 2,5 kg",
+      "tax_ppm": 190000,
+      "input": {
+        "purchase_minor": 10000,
+        "currency": "CLP",
+        "currency_digits": 0,
+        "fx_rate_e6": 0,
+        "freight_minor": 0,
+        "shipping_minor": 3570,
+        "labor_minor": 7500,
+        "other_minor": 0,
+        "units_milli": 2500,
+        "pesos_include_tax": true
+      },
+      "esperado": {
+        "purchase_clp": 8403,
+        "freight": 0,
+        "shipping": 3000,
+        "labor": 7500,
+        "other": 0,
+        "total": 18903,
+        "units_milli": 2500,
+        "unit_cost_e4": 75612000,
+        "unit_cost": 7561
+      }
+    },
+    {
+      "nombre": "Euros sin IVA en pesos, lote de 7",
+      "tax_ppm": null,
+      "input": {
+        "purchase_minor": 99999,
+        "currency": "EUR",
+        "currency_digits": 2,
+        "fx_rate_e6": 1023456789,
+        "freight_minor": 45000,
+        "shipping_minor": 0,
+        "labor_minor": 0,
+        "other_minor": 0,
+        "units_milli": 7000,
+        "pesos_include_tax": false
+      },
+      "esperado": {
+        "purchase_clp": 1023447,
+        "freight": 45000,
+        "shipping": 0,
+        "labor": 0,
+        "other": 0,
+        "total": 1068447,
+        "units_milli": 7000,
+        "unit_cost_e4": 1526352857,
+        "unit_cost": 152635
+      }
+    },
+    {
+      "nombre": "Negocio sin IVA marcado con IVA",
+      "tax_ppm": null,
+      "input": {
+        "purchase_minor": 11900,
+        "currency": "CLP",
+        "currency_digits": 0,
+        "fx_rate_e6": 0,
+        "freight_minor": 0,
+        "shipping_minor": 0,
+        "labor_minor": 0,
+        "other_minor": 0,
+        "units_milli": 1000,
+        "pesos_include_tax": true
+      },
+      "esperado": {
+        "purchase_clp": 11900,
+        "freight": 0,
+        "shipping": 0,
+        "labor": 0,
+        "other": 0,
+        "total": 11900,
+        "units_milli": 1000,
+        "unit_cost_e4": 119000000,
+        "unit_cost": 11900
+      }
+    },
+    {
+      "nombre": "Falta tipo de cambio",
+      "tax_ppm": 190000,
+      "input": {
+        "purchase_minor": 50000,
+        "currency": "USD",
+        "currency_digits": 2,
+        "fx_rate_e6": 0,
+        "freight_minor": 10000,
+        "shipping_minor": 0,
+        "labor_minor": 0,
+        "other_minor": 0,
+        "units_milli": 1000,
+        "pesos_include_tax": false
+      },
+      "esperado": {
+        "purchase_clp": 0,
+        "freight": 10000,
+        "shipping": 0,
+        "labor": 0,
+        "other": 0,
+        "total": 10000,
+        "units_milli": 1000,
+        "unit_cost_e4": 100000000,
+        "unit_cost": 10000
+      }
+    }
+  ],
+  "precios": [
+    {
+      "con_iva": 9990,
+      "tax_ppm": 190000,
+      "neto": 8395,
+      "con_iva_desde_neto": 9990
+    },
+    {
+      "con_iva": 39151,
+      "tax_ppm": 190000,
+      "neto": 32900,
+      "con_iva_desde_neto": 39151
+    },
+    {
+      "con_iva": 1000,
+      "tax_ppm": 190000,
+      "neto": 840,
+      "con_iva_desde_neto": 1000
+    },
+    {
+      "con_iva": 1,
+      "tax_ppm": 190000,
+      "neto": 1,
+      "con_iva_desde_neto": 1
+    },
+    {
+      "con_iva": 123457,
+      "tax_ppm": 190000,
+      "neto": 103745,
+      "con_iva_desde_neto": 123457
+    },
+    {
+      "con_iva": 5000,
+      "tax_ppm": null,
+      "neto": 5000,
+      "con_iva_desde_neto": 5000
+    },
+    {
+      "con_iva": 77777,
+      "tax_ppm": 100000,
+      "neto": 70706,
+      "con_iva_desde_neto": 77777
+    }
+  ]
+}

@@ -21,6 +21,7 @@ import { Impuestos } from "./screens/impuestos/Impuestos";
 import { Remuneraciones } from "./screens/remuneraciones/Remuneraciones";
 import { LiquidacionRoute } from "./screens/remuneraciones/Liquidacion";
 import { FiniquitoRoute } from "./screens/remuneraciones/Finiquito";
+import { Analisis } from "./screens/analisis/Analisis";
 import { ImportEditLoader, ImportEditor } from "./screens/comex/ImportEditor";
 import { ImportView } from "./screens/comex/ImportView";
 import { Purchases } from "./screens/compras/Purchases";
@@ -178,6 +179,8 @@ function Screen({ route, info, session, reload }: { route: Route; info: AppInfo;
       if (a === "finiquito" && b) return <FiniquitoRoute key={b} id={b} />;
       if (a === "liquidacion" && b) return <LiquidacionRoute key={route.raw} id={b} period={route.query.get("periodo")} />;
       return <Remuneraciones route={route} />;
+    case "analisis":
+      return has.has("reportes") ? <Analisis route={route} /> : <Proximamente id="analisis" />;
     case "config":
       return <Config route={route} info={info} session={session} onChanged={reload} />;
     case "documentos":

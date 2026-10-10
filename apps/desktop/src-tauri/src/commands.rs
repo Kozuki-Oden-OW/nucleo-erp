@@ -17,6 +17,7 @@ use nucleo_app::inventory_ops::{
     StockDocDone, TransferInput,
 };
 use nucleo_app::nucleo_db::audit::{AuditRow, ChainReport};
+use nucleo_app::nucleo_db::categories::CategoryRow as ProductCategoryRow;
 use nucleo_app::nucleo_db::comex::{ImportSummary, IncotermRow};
 use nucleo_app::nucleo_db::core::{AttachmentRow, CurrencyRow, RateRow, SearchHit, SequenceRow};
 use nucleo_app::nucleo_db::customers::CustomerRow;
@@ -34,6 +35,7 @@ use nucleo_app::purchase_ops::{
     NewSupplier, PoDetail, PoInput, PoSummary, PurchaseDetail, PurchaseFilter, PurchaseInput,
     PurchaseSummary, ReceiveLine, SupplierDetail,
 };
+use nucleo_app::report_ops::{Report, ReportDef, ReportParams};
 use nucleo_app::sales_ops::{
     CustomerDetail, EffectInput, ExternalRefInput, NewProduct, ProductPatch, QuoteDetail,
     QuoteInput, QuoteSummary, SaleDetail, SaleFilter, SaleInput, SaleSummary,
@@ -594,6 +596,39 @@ pub fn update_product(
     patch: ProductPatch,
 ) -> CmdResult<ProductRow> {
     with_session(&state, |s| Ok(s.update_product(&uid, &patch)?))
+}
+
+#[tauri::command]
+pub fn product_categories(state: State<'_, AppState>) -> CmdResult<Vec<ProductCategoryRow>> {
+    with_session(&state, |s| Ok(s.product_categories()?))
+}
+
+#[tauri::command]
+pub fn save_category(
+    state: State<'_, AppState>,
+    uid: Option<String>,
+    name: String,
+) -> CmdResult<Vec<ProductCategoryRow>> {
+    with_session(&state, |s| Ok(s.save_category(uid.as_deref(), &name)?))
+}
+
+#[tauri::command]
+pub fn delete_category(
+    state: State<'_, AppState>,
+    uid: String,
+) -> CmdResult<Vec<ProductCategoryRow>> {
+    with_session(&state, |s| Ok(s.delete_category(&uid)?))
+}
+
+#[tauri::command]
+pub fn assign_category(
+    state: State<'_, AppState>,
+    product_uids: Vec<String>,
+    category_uid: Option<String>,
+) -> CmdResult<Vec<ProductCategoryRow>> {
+    with_session(&state, |s| {
+        Ok(s.assign_category(&product_uids, category_uid.as_deref())?)
+    })
 }
 
 #[tauri::command]
@@ -1322,4 +1357,28 @@ pub fn save_f22_inputs(
     inputs: F22Inputs,
 ) -> CmdResult<F22View> {
     with_session(&state, |s| Ok(s.save_f22_inputs(year, &inputs)?))
+}
+
+/* ───────────────────────────── Análisis y reportes (Fase 12) ───────────────────────────── */
+
+#[tauri::command]
+pub fn report_catalog(state: State<'_, AppState>) -> CmdResult<Vec<ReportDef>> {
+    with_session(&state, |s| Ok(s.report_catalog()?))
+}
+
+#[tauri::command]
+pub fn report(state: State<'_, AppState>, params: ReportParams) -> CmdResult<Report> {
+    with_session(&state, |s| Ok(s.report(&params)?))
+}
+
+#[tauri::command]
+pub fn save_report_file(
+    state: State<'_, AppState>,
+    report_id: String,
+    path: String,
+    bytes: Vec<u8>,
+) -> CmdResult<()> {
+    with_session(&state, |s| {
+        Ok(s.save_report_file(&report_id, std::path::Path::new(&path), &bytes)?)
+    })
 }

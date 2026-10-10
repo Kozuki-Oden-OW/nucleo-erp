@@ -38,6 +38,8 @@ fn product(s: &mut CompanySession, name: &str, stock: i64, cost: i64) -> String 
         cost_minor: Some(cost),
         taxable: Some(true),
         initial_stock_milli: Some(stock),
+        category_uid: None,
+        cost_sheet: None,
     })
     .unwrap()
     .uid

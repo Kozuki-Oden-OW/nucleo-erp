@@ -4,6 +4,7 @@
 // Las pantallas solo conocen esta interfaz; así un prototipo de la Fase 3 se convierte en pantalla
 // real cuando el comando Rust correspondiente existe.
 import type {
+  Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
   SeveranceForm, SeveranceView, Worker, WorkerInput,
@@ -14,7 +15,7 @@ import type {
   AdjustmentInput, InventoryOverview, InventorySettings, ProductInventory, ReorderInput, StockDocDone, StockDocRow, TransferInput, Warehouse,
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
   Customer, CustomerDetail, Dashboard, EffectInput, EntityRef, ExternalRefInput, NewCustomer, NewProduct, NewUser,
-  PermissionRow, PriceHistoryRow, Product, ProductPatch, PurchaseDetail, PurchaseInput, PurchaseOrderDetail, PurchaseOrderInput,
+  PermissionRow, PriceHistoryRow, Product, ProductCategory, ProductPatch, PurchaseDetail, PurchaseInput, PurchaseOrderDetail, PurchaseOrderInput,
   PurchaseOrderSummary, PurchaseSummary, ReceiveLine, NewSupplier, Supplier, SupplierDetail, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow,
   SaleDetail, SaleInput, SaleSummary, SearchHit, SecuritySettings, SequenceRow, SessionInfo, UserPatch, UserRow,
 } from "./types";
@@ -35,7 +36,8 @@ export interface SaleFilter {
 /** Módulos que el backend ya implementa. La interfaz oculta o marca "próximamente" lo que falte. */
 export type Feature =
   | "dashboard" | "clientes" | "productos" | "ventas" | "compras" | "comex" | "negocio" | "respaldos" | "busqueda"
-  | "usuarios" | "documentos" | "numeracion" | "monedas" | "auditoria" | "inventario" | "dinero" | "impuestos" | "remuneraciones";
+  | "usuarios" | "documentos" | "numeracion" | "monedas" | "auditoria" | "inventario" | "dinero" | "impuestos" | "remuneraciones"
+  | "reportes";
 
 export interface Backend {
   readonly kind: "tauri" | "demo";
@@ -98,6 +100,13 @@ export interface Backend {
   addProduct(input: NewProduct): Promise<Product>;
   updateProduct(uid: string, patch: ProductPatch): Promise<Product>;
   updateCustomer(uid: string, input: NewCustomer): Promise<Customer>;
+  productCategories(): Promise<ProductCategory[]>;
+  /** Crea (sin uid) o renombra una categoría. */
+  saveCategory(uid: string | null, name: string): Promise<ProductCategory[]>;
+  /** Elimina la categoría; sus productos quedan sin categoría. */
+  deleteCategory(uid: string): Promise<ProductCategory[]>;
+  /** Pone (o quita, con null) la categoría de varios productos. */
+  assignCategory(productUids: string[], categoryUid: string | null): Promise<ProductCategory[]>;
 
   // Ventas
   listQuotes(query?: string): Promise<QuoteSummary[]>;
@@ -222,6 +231,12 @@ export interface Backend {
   // Renta anual: borrador del F22 Pro Pyme general (Fase 10, hito C).
   f22(year: number): Promise<F22View>;
   saveF22Inputs(year: number, inputs: F22Inputs): Promise<F22View>;
+
+  // Análisis y reportes (Fase 12): de solo lectura.
+  reportCatalog(): Promise<ReportDef[]>;
+  report(params: ReportParams): Promise<Report>;
+  /** Guarda un reporte exportado (Excel o CSV). En el escritorio pregunta dónde; false si se canceló. */
+  saveReportFile(reportId: string, fileName: string, bytes: Uint8Array): Promise<boolean>;
 }
 
 export type ImportView = "en_curso" | "cotizaciones" | "cerradas" | "anuladas" | "todas";

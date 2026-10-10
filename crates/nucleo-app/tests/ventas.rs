@@ -27,6 +27,8 @@ fn product(s: &mut CompanySession, name: &str, price: i64, cost: i64, stock_unit
         cost_minor: Some(cost),
         taxable: Some(true),
         initial_stock_milli: Some(stock_units * 1000),
+        category_uid: None,
+        cost_sheet: None,
     })
     .unwrap()
     .uid
@@ -259,6 +261,8 @@ fn factura_interna_al_contado_y_emprendedor_sin_impuesto() {
             cost_minor: None,
             taxable: Some(true),
             initial_stock_milli: None,
+            category_uid: None,
+            cost_sheet: None,
         })
         .unwrap();
     assert_eq!(servicio.unit, "sv");
@@ -378,6 +382,9 @@ fn editar_producto_y_cliente() {
                 price_minor: 1_490,
                 taxable: true,
                 min_milli: 3_000,
+                category_uid: None,
+                cost_minor: None,
+                cost_sheet: None,
             },
         )
         .unwrap();
@@ -393,7 +400,10 @@ fn editar_producto_y_cliente() {
                 unit: "zz".into(),
                 price_minor: 1,
                 taxable: true,
-                min_milli: 0
+                min_milli: 0,
+                category_uid: None,
+                cost_minor: None,
+                cost_sheet: None,
             }
         )
         .is_err()
