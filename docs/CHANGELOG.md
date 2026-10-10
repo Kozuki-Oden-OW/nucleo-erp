@@ -17,7 +17,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
   pagado en el año (con explicación y ajuste por código), remuneraciones, PPM de los F29 declarados
   con su reajuste, incentivo al ahorro 14 E con comparación, impuesto, saldo a favor y recuadros 18 a
   20. El cálculo reproduce al peso la planilla oficial del SII.
-- Diseño de la sincronización y la app móvil (`docs/SINCRONIZACION.md`).
+- Diseño de la app móvil de pago único, sin conexión y sincronizada por cable o WiFi local
+  (`docs/SINCRONIZACION.md`).
+- Acuerdo de contribución (`CLA.md`) y guía para contribuir (`CONTRIBUTING.md`); titular del proyecto:
+  FAVOR SpA.
 
 ## [Sin publicar] — Fase 10, hito B: sueldo empresarial y liquidaciones
 

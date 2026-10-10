@@ -14,8 +14,9 @@ credenciales y no se conecta con plataformas fiscales.
 | Estado | **Fase 2 completa** (modelo de datos). Aún no apto para uso productivo. |
 | Sitio | [www.nucleoerp.cl](https://www.nucleoerp.cl) (`apps/web`) |
 | Plataforma | Windows 10/11 x64 (macOS y Linux más adelante) |
-| Licencia | [AGPL-3.0-or-later](LICENSE) |
-| Modelo | Gratis, sin licencias ni activación. Donaciones voluntarias. |
+| Licencia | [AGPL-3.0-or-later](LICENSE) · © 2026 FAVOR SpA |
+| Modelo | Escritorio gratis, sin licencias ni activación. App móvil opcional de pago (en diseño, `docs/SINCRONIZACION.md`). |
+| Contribuir | [CONTRIBUTING.md](CONTRIBUTING.md) · requiere aceptar el [CLA](CLA.md) |
 
 ## Documentos del proyecto
 

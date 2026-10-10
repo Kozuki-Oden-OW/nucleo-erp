@@ -1,115 +1,126 @@
-# NÚCLEO ERP — Diseño: botón «Conectar», sincronización y app móvil
+# NÚCLEO ERP — Diseño: app móvil y sincronización por cable o WiFi
 
-> Estado: **diseño aprobado para planificar** (2026-10-10). Se implementa después del MVP de escritorio
-> (fase S, ver `ROADMAP.md`). Pedido del dueño del proyecto: «un botón de conectar a internet o
-> sincronizar con la app; una manera de ganar dinero sería cobrar $1.000 por la app a quien quiera
-> usarla desde el celular, y deben sincronizarse mutuamente».
+> Estado: **diseño aprobado para planificar** (2026-10-10, revisado el mismo día con las decisiones del
+> dueño). Se implementa después del MVP de escritorio (fase S, ver `ROADMAP.md`).
+>
+> Decisiones del dueño: «solo cobramos a la persona que quiera obtener la app en su celular; que también
+> funcione sin internet y luego se sincronice a través de un cable con el PC o por WiFi de la misma
+> red».
 
 ## 1. Qué se quiere lograr
 
-- El programa de escritorio sigue siendo **gratis, de código abierto y local**: funciona completo sin
-  internet y sin cuenta.
-- Quien quiera, aprieta **«Conectar»** y empareja su celular. Desde la app ve el negocio (ventas del
-  día, dinero por cobrar, stock, clientes) y registra cosas en terreno (una venta rápida, un gasto con
-  la foto de la boleta, un cobro). Lo que se hace en un lado aparece en el otro.
-- La **app cuesta $1.000 al mes** (suscripción en Google Play y App Store). Es la fuente de ingresos del
-  proyecto y paga el servidor de sincronización.
-- **Privacidad intacta:** «Tu empresa. Tus datos. Tu computador.» El servidor de NÚCLEO no puede leer
-  nada: solo guarda y reenvía paquetes cifrados que únicamente abren los dispositivos del negocio.
+- El programa de escritorio sigue **gratis, de código abierto y local**, sin cuenta y sin internet.
+- Quien quiera, compra la **app de NÚCLEO para el celular por $1.000** (pago único en Google Play o
+  App Store). Es la fuente de ingresos del proyecto.
+- La app **funciona sin conexión**: guarda sus datos cifrados en el celular y se puede usar en terreno
+  (ver el resumen del negocio, stock, clientes; registrar una venta rápida, un gasto con la foto de la
+  boleta o un cobro).
+- Celular y computador se **sincronizan entre ellos, sin pasar por internet**:
+  1. **por cable USB**, o
+  2. **por WiFi**, cuando ambos están en la misma red.
+- **No hay servidor de NÚCLEO** que guarde o reenvíe datos: no existe un tercero que pueda verlos, ni
+  costo mensual que cobrar. «Tu empresa. Tus datos. Tu computador» se cumple al pie de la letra.
 
 ## 2. Cómo se ve para la persona
 
-1. En el escritorio, **Configuración → Celular y sincronización → Conectar un celular**. El botón está
-   apagado por defecto; mientras esté apagado, el programa no abre ninguna conexión.
-2. El escritorio muestra un **código QR** (válido 10 minutos). La app lo escanea y queda emparejada. No
-   se pide correo ni contraseña.
-3. Un indicador en la barra superior dice el estado: *Sin conexión* · *Sincronizado hace 2 min* ·
-   *3 cambios por enviar*. Un clic muestra qué se envió y cuándo.
-4. Para quitar un celular perdido: **Dispositivos → Quitar**. Ese celular deja de recibir datos y la
-   llave del negocio se rota.
-5. Si la suscripción vence, la app queda en **solo lectura de lo último sincronizado**; el escritorio no
-   pierde nada.
+1. En el escritorio: **Configuración → Celular → Emparejar un celular**. El escritorio muestra un
+   código QR (válido 10 minutos). La app lo escanea y quedan emparejados. Sin correo ni contraseña.
+2. Para sincronizar, la persona elige en el escritorio **«Sincronizar ahora»** (o lo deja automático
+   mientras el celular esté conectado):
+   - **Con cable:** conecta el celular al computador. NÚCLEO lo detecta y sincroniza.
+   - **Por WiFi:** con ambos en la misma red, la app aparece en el escritorio y sincroniza.
+3. Un indicador muestra: *Celular sin sincronizar desde ayer* · *Sincronizado hace 2 min* · *3 cambios
+   del celular por revisar*.
+4. Si el celular se pierde: **Dispositivos → Quitar**. Ese celular deja de sincronizar y la llave del
+   negocio se cambia. Los datos del celular perdido siguen cifrados.
+5. El escritorio nunca abre conexiones hacia internet para esto; solo escucha en la red local o en el
+   cable mientras la sincronización está activada.
 
 ## 3. Arquitectura
 
 ```
- Escritorio (Tauri)                     Servidor NÚCLEO Sync                   App móvil (Tauri 2 móvil)
- SQLCipher + registro de cambios  ⇄  relé ciego: buzones cifrados,  ⇄  SQLCipher + registro de cambios
- autoridad de numeración              verificación de suscripción         borradores y consultas
-        ⇅ (misma red WiFi, sin servidor: descubrimiento local + TLS con llave fijada)
+ Escritorio (Tauri, Windows)                               App móvil (Tauri 2: Android e iOS)
+ SQLCipher + registro de cambios   ⇄  cable USB o WiFi local  ⇄   SQLCipher + registro de cambios
+ autoridad de numeración y documentos    (TLS con llaves fijadas al emparejar)     borradores y consultas
 ```
 
-- **Misma base de código:** la app móvil es la misma interfaz React y el mismo núcleo Rust compilados
-  con Tauri 2 para Android e iOS. Los cálculos (`nucleo-domain`) y las reglas no se duplican.
+- **Misma base de código:** la app es la misma interfaz React y el mismo núcleo Rust compilados con
+  Tauri 2 para Android e iOS. Los cálculos (`nucleo-domain`) y las reglas no se duplican.
 - **Registro de cambios (op-log):** cada tabla sincronizable escribe una fila en `change_log` en la
-  misma transacción (entidad, id estable `uid`, campos cambiados, reloj lógico híbrido y dispositivo).
-  Ya existe la base: todas las entidades tienen `uid` y la auditoría encadenada registra cada cambio.
-- **Dos transportes:**
-  1. **Red local (gratis):** si el celular y el computador están en la misma red, se sincronizan
-     directo, sin pasar por internet.
-  2. **NÚCLEO Sync por internet (pagado):** buzones de almacenar y reenviar. El servidor guarda
-     paquetes cifrados por 30 días o hasta que todos los dispositivos los confirman.
+  misma transacción (entidad, `uid` estable, campos cambiados, reloj lógico híbrido y dispositivo).
+  Todas las entidades ya tienen `uid` y la auditoría encadenada registra cada cambio.
+- **Un solo protocolo sobre dos caminos:** el escritorio y la app conversan por TCP con TLS mutuo
+  (cada lado conoce la llave del otro desde el emparejamiento). El camino cambia, el protocolo no:
+
+| Camino | Android | iPhone |
+|---|---|---|
+| **WiFi (misma red)** | Descubrimiento local (mDNS) y conexión directa | Igual (iOS pide permiso de «red local» la primera vez) |
+| **Cable USB** | «Anclaje de USB» del celular, que crea una red privada entre el cable y el PC; si el celular no lo permite, el protocolo de accesorios de Android (AOA) | El servicio de Apple para dispositivos conectados por cable (el mismo que usa «Dispositivos Apple» o iTunes en Windows), que permite conectar a un puerto de la app por el cable |
 
 ## 4. Seguridad y privacidad
 
 | Elemento | Diseño |
 |---|---|
-| Llave del negocio | Simétrica (XChaCha20-Poly1305), generada en el escritorio; nunca sale sin cifrar |
-| Emparejamiento | El QR lleva un secreto de un solo uso y la llave pública del escritorio; intercambio X25519 y la llave del negocio viaja cifrada al celular |
-| Qué ve el servidor | Identificador anónimo del espacio, identificadores de dispositivos, tamaños y horas de los paquetes. Nunca montos, nombres, RUT ni productos |
-| Cuenta | No hay correo ni contraseña. La suscripción se valida con el recibo de la tienda, asociado al identificador anónimo |
-| Revocación | Quitar un dispositivo rota la llave; los paquetes nuevos ya no los puede abrir |
-| Respaldos | Siguen siendo locales (`.erpbackup`); el servidor no es un respaldo |
-| Ley de datos personales | Minimización: el servidor no trata datos personales de clientes del negocio porque no puede leerlos (Ley 19.628 y Ley 21.719) |
-| Código | El servidor también es AGPL: cualquiera puede revisarlo o montar su propio relé |
+| Llave del negocio | Simétrica (XChaCha20-Poly1305), generada en el escritorio |
+| Emparejamiento | El QR lleva un secreto de un solo uso y la llave pública del escritorio; intercambio X25519; la llave del negocio viaja cifrada al celular |
+| Conexión | TLS mutuo con llaves fijadas: un tercero en la misma WiFi no puede leer ni hacerse pasar por el celular o el computador |
+| Datos en el celular | Base cifrada (SQLCipher) con la llave guardada en el almacén seguro del sistema (Keystore de Android, Keychain de iOS) |
+| Internet | No se usa para sincronizar. Solo la tienda necesita internet al comprar la app |
+| Revocación | Quitar un dispositivo cambia la llave y el escritorio deja de aceptarlo |
+| Respaldos | Siguen siendo los `.erpbackup` locales del escritorio |
+| Datos personales | NÚCLEO (el proveedor) no recibe ningún dato del negocio |
 
 ## 5. Reglas de sincronización (sin conflictos sorpresa)
 
 - **El escritorio es la autoridad** de lo que tiene efecto legal o numeración: folios internos (VEN,
   COM, GAS…), estados de documentos, liquidaciones emitidas, F29 y F22. El celular crea **borradores o
   solicitudes** (venta rápida, gasto, cobro) que el escritorio confirma y numera al recibirlos.
-- **Fichas (clientes, proveedores, productos):** se fusionan campo por campo; si dos dispositivos cambian
-  el mismo campo, gana el cambio más reciente según el reloj lógico híbrido y queda en la auditoría.
-- **Movimientos (pagos, stock, gastos):** solo se agregan, nunca se sobrescriben; anular es otro
-  movimiento. El stock se recalcula desde los movimientos, por lo que no se pisa.
-- **Lo que el celular recibe:** vistas de lectura (resumen del día, por cobrar y por pagar, stock,
-  clientes y productos) más los borradores que él mismo creó. No recibe la contabilidad completa ni
-  remuneraciones salvo que el dueño lo active por dispositivo (permisos por dispositivo).
-- **Sin conexión:** ambos lados trabajan normal y los cambios esperan en cola.
+- **Fichas (clientes, proveedores, productos):** se fusionan campo por campo; si dos lados cambian el
+  mismo campo, gana el cambio más reciente según el reloj lógico híbrido y queda en la auditoría.
+- **Movimientos (pagos, stock, gastos):** solo se agregan; anular es otro movimiento. El stock se
+  recalcula desde los movimientos.
+- **Qué recibe el celular:** resumen del negocio, por cobrar y por pagar, stock, clientes y productos,
+  más sus propios borradores. Contabilidad, impuestos y remuneraciones solo si el dueño lo autoriza
+  para ese dispositivo.
+- **Sin conexión por días:** ambos lados trabajan normal; los cambios esperan en cola hasta el próximo
+  cable o WiFi.
 
 ## 6. Modelo de cobro
 
 | | Escritorio | App móvil |
 |---|---|---|
-| Precio | Gratis (AGPL) | $1.000 al mes con IVA incluido, por negocio (no por dispositivo) |
-| Cobro | — | Suscripción de Google Play y App Store (ellos cobran, emiten la boleta al consumidor y entregan el recibo) |
-| Ingreso neto estimado | — | Del precio se descuenta el IVA y la comisión de la tienda (15 % en los programas para desarrolladores pequeños, por verificar): quedan cerca de $700 por negocio al mes |
-| Costo del servidor | — | Muy bajo: guarda paquetes cifrados pequeños por pocos días |
-| Prueba | — | 30 días gratis; la sincronización por red local podría quedar gratis siempre |
+| Precio | Gratis (AGPL) | **$1.000 pago único**, con IVA incluido, en Google Play y App Store |
+| Quién paga | — | Solo quien quiera la app en su celular. La sincronización por cable o WiFi está incluida |
+| Cobro y boleta | — | Los hace la tienda; FAVOR SpA recibe el pago neto de comisión |
+| Ingreso neto estimado | — | Del precio se descuenta el IVA y la comisión de la tienda (15 % en los programas para desarrolladores pequeños, por verificar): cerca de $700 por compra |
+| Costo de operación | — | Prácticamente cero: no hay servidor |
+| Licencia de la compra | — | Se valida dentro del celular con la firma de la tienda (Google Play y StoreKit 2 entregan compras firmadas verificables sin conexión) |
 
-- **Licencia en iOS:** la App Store no es compatible con la AGPL si el código tiene aportes de terceros.
-  Como el titular de los derechos del código puede publicar la app iOS con una licencia propia (doble licencia), conviene conservar esa titularidad.
-  Para mantener esa posibilidad, **todo aporte externo debe firmar un acuerdo de contribución (CLA)**.
-- Facturación a empresas que quieran factura (no boleta): fuera de la tienda, vía web, en una fase
-  posterior.
+- Más adelante se puede evaluar una versión «Pro» o funciones adicionales, pero el pago único cubre la
+  app y la sincronización.
+- **Licencia en iOS:** la App Store no es compatible con la AGPL cuando el código tiene aportes de
+  terceros. Por eso FAVOR SpA, titular del proyecto, recibe los aportes externos bajo el
+  [Acuerdo de Contribución](../CLA.md), que le permite publicar la app con licencia propia
+  (doble licencia) mientras la versión de escritorio sigue libre.
 
 ## 7. Fases
 
 | Fase | Entrega | Criterio de salida |
 |---|---|---|
-| S0 | `change_log` con reloj lógico híbrido en todas las tablas sincronizables; exportar e importar cambios a un archivo | Dos escritorios quedan iguales intercambiando archivos, con pruebas de conflictos |
-| S1 | Sincronización por red local escritorio ⇄ escritorio | Dos computadores del mismo negocio sincronizan sin internet |
-| S2 | Emparejamiento por QR, cifrado de extremo a extremo y relé NÚCLEO Sync | Prueba de seguridad: el servidor no puede leer ningún paquete |
-| S3 | App móvil (Android primero): resumen, stock, clientes, venta rápida, gasto con foto, cobro | Cinco pymes la usan una semana sin perder datos |
-| S4 | Suscripción en las tiendas, prueba de 30 días, gestión de dispositivos | Cobro de $1.000 funcionando en Google Play y luego App Store |
+| S0 | `change_log` con reloj lógico híbrido en las tablas sincronizables; exportar e importar cambios a un archivo | Dos bases quedan iguales intercambiando archivos, con pruebas de conflictos |
+| S1 | Protocolo de sincronización con TLS mutuo y emparejamiento por QR, probado entre dos escritorios en la misma red | Dos computadores sincronizan sin internet; un tercero en la red no puede leer ni inyectar datos |
+| S2 | App Android: datos sin conexión, resumen, stock, clientes, venta rápida, gasto con foto, cobro; sincronización por WiFi y por cable | Cinco pymes la usan una semana sin perder datos |
+| S3 | App iOS con sincronización por WiFi y por cable | Aprobada en la App Store |
+| S4 | Publicación de pago ($1.000) en Google Play y App Store, gestión de dispositivos | Compras validadas sin conexión |
 
-## 8. Riesgos y decisiones pendientes
+## 8. Riesgos y pendientes
 
-1. **Conflictos de inventario** cuando se vende el mismo producto en dos lados sin conexión: se acepta
+1. **Cable en iPhone desde Windows:** depende del servicio de Apple instalado con «Dispositivos Apple»
+   o iTunes; si no está, NÚCLEO avisa y ofrece la WiFi.
+2. **Anclaje de USB en Android:** algunos fabricantes u operadores lo bloquean; queda el protocolo de
+   accesorios (AOA) o la WiFi.
+3. **Conflictos de inventario** al vender el mismo producto en ambos lados sin sincronizar: se acepta
    stock negativo con aviso (ya existe la opción) y el escritorio concilia.
-2. **Revisión de las tiendas:** Apple exige su sistema de pagos para suscripciones digitales; precio
-   mínimo y tramos de precio en pesos chilenos por confirmar ($1.000 debe existir como tramo).
-3. **Soporte:** sin cuenta no hay «recuperar contraseña»: si se pierden todos los dispositivos y el
-   respaldo, no hay forma de recuperar los datos (igual que hoy, es la promesa de privacidad).
-4. **Pregunta para el dueño:** ¿la sincronización entre dos computadores del mismo negocio también es
-   de pago, o solo la app móvil? Propuesta: red local gratis; internet incluido en la suscripción.
+4. **Tiendas:** confirmar que existe el tramo de precio de $1.000 en Chile y el porcentaje de comisión.
+5. **Sin servidor no hay recuperación remota:** si se pierden el computador y el respaldo, los datos no
+   se pueden recuperar (es la promesa de privacidad).

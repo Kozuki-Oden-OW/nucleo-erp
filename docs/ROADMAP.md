@@ -22,7 +22,7 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | 15 | Instalador → **MVP** | ⏳ |
 | 16 | Inteligencia comercial (V1.1) | ⏳ |
 | 17 | Fidelidad (V1.2) | ⏳ |
-| S | Botón «Conectar», sincronización cifrada y app móvil de pago ($1.000/mes) — diseño en `SINCRONIZACION.md` | 📐 Diseñado (2026-10-10) |
+| S | App móvil de pago único ($1.000), sin conexión, sincronizada por cable USB o WiFi local — diseño en `SINCRONIZACION.md` | 📐 Diseñado (2026-10-10) |
 
 ## Fase 1 — criterio de salida
 
