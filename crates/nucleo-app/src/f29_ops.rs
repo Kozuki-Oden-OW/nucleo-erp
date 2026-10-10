@@ -152,6 +152,16 @@ pub struct F29View {
     pub declared: Option<F29Declared>,
     pub due_date: Option<String>,
     pub periods: Vec<F29PeriodSummary>,
+    /// Impuesto único de las liquidaciones emitidas pagadas en el mes (propuesto para el código 48).
+    pub payroll_tax: Option<PayrollTax>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct PayrollTax {
+    pub payslips: i64,
+    pub amount: i64,
+    /// `true` si el código 48 usa este monto (no hay uno ingresado a mano).
+    pub applied: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -188,7 +198,7 @@ pub struct RcvImportReport {
 
 /* ───────────────────────────── utilidades ───────────────────────────── */
 
-fn check_period(p: &str) -> AppResult<String> {
+pub(crate) fn check_period(p: &str) -> AppResult<String> {
     let p = p.trim();
     let ok = p.len() == 7
         && p.as_bytes()[4] == b'-'
@@ -209,13 +219,13 @@ fn ym(p: &str) -> (i32, u32) {
     (p[..4].parse().unwrap_or(2000), p[5..].parse().unwrap_or(1))
 }
 
-fn shift(p: &str, months: i32) -> String {
+pub(crate) fn shift(p: &str, months: i32) -> String {
     let (y, m) = ym(p);
     let idx = y * 12 + (m as i32 - 1) + months;
     format!("{:04}-{:02}", idx.div_euclid(12), idx.rem_euclid(12) + 1)
 }
 
-fn days_in(y: i32, m: u32) -> u32 {
+pub(crate) fn days_in(y: i32, m: u32) -> u32 {
     match m {
         2 if (y % 4 == 0 && y % 100 != 0) || y % 400 == 0 => 29,
         2 => 28,
@@ -224,7 +234,7 @@ fn days_in(y: i32, m: u32) -> u32 {
     }
 }
 
-fn range(p: &str) -> (String, String) {
+pub(crate) fn range(p: &str) -> (String, String) {
     let (y, m) = ym(p);
     (format!("{p}-01"), format!("{p}-{:02}", days_in(y, m)))
 }
@@ -781,6 +791,36 @@ impl CompanySession {
                 .filter_map(|(k, v)| k.parse::<u32>().ok().map(|c| (c, *v)))
                 .collect(),
         };
+        let mut input = input;
+        let (n_slips, slip_tax) = self.payroll_tax_paid(period)?;
+        let payroll_tax = (n_slips > 0).then(|| PayrollTax {
+            payslips: n_slips,
+            amount: slip_tax,
+            applied: !inputs.manual.contains_key("48"),
+        });
+        if let Some(pt) = payroll_tax.as_ref().filter(|p| p.applied) {
+            input.manual.insert(48, pt.amount);
+            checks.push(Note {
+                code: Some(48),
+                severity: Severity::Info,
+                text: format!(
+                    "El código 48 suma el impuesto único de {} liquidación(es) pagada(s) este mes ({}).",
+                    pt.payslips,
+                    money(pt.amount)
+                ),
+            });
+        } else if let Some(pt) = &payroll_tax
+            && inputs.manual.get("48") != Some(&pt.amount)
+        {
+            checks.push(Note {
+                code: Some(48),
+                severity: Severity::Aviso,
+                text: format!(
+                    "Ingresaste el código 48 a mano, pero las liquidaciones pagadas este mes retienen {}. Revisa cuál corresponde.",
+                    money(pt.amount)
+                ),
+            });
+        }
         let result = compute(&input);
         let declared = row
             .as_ref()
@@ -819,10 +859,11 @@ impl CompanySession {
             declared,
             due_date,
             periods,
+            payroll_tax,
         })
     }
 
-    fn require_open(&self, period: &str) -> AppResult<()> {
+    pub(crate) fn require_open(&self, period: &str) -> AppResult<()> {
         if db::f29_row(self.db.conn(), period)?.is_some_and(|r| r.status == "declarado") {
             return Err(AppError::Validation(
                 "este F29 está marcado como declarado: reábrelo para cambiarlo".into(),

@@ -12,6 +12,7 @@ pub mod finance;
 pub mod inventory;
 pub mod maintenance;
 pub mod migrations;
+pub mod payroll;
 pub mod products;
 pub mod purchases;
 pub mod sales;

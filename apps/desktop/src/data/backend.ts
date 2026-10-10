@@ -4,6 +4,7 @@
 // Las pantallas solo conocen esta interfaz; así un prototipo de la Fase 3 se convierte en pantalla
 // real cuando el comando Rust correspondiente existe.
 import type {
+  IndicatorsView, PayrollIndicators, PayrollView, PayslipMonth, PayslipView, Worker, WorkerInput,
   F29Inputs, F29View, RcvImportReport, TaxDocInput, TaxProfile,
   ImportCostInput, ImportDetail, ImportInput, ImportReceiveLine, ImportStage, ImportSummary, IncotermDef,
   AccountInput, CalendarItem, ExpenseCategory, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow, MoneyAccount,
@@ -32,7 +33,7 @@ export interface SaleFilter {
 /** Módulos que el backend ya implementa. La interfaz oculta o marca "próximamente" lo que falte. */
 export type Feature =
   | "dashboard" | "clientes" | "productos" | "ventas" | "compras" | "comex" | "negocio" | "respaldos" | "busqueda"
-  | "usuarios" | "documentos" | "numeracion" | "monedas" | "auditoria" | "inventario" | "dinero" | "impuestos";
+  | "usuarios" | "documentos" | "numeracion" | "monedas" | "auditoria" | "inventario" | "dinero" | "impuestos" | "remuneraciones";
 
 export interface Backend {
   readonly kind: "tauri" | "demo";
@@ -193,6 +194,19 @@ export interface Backend {
   setTaxDocumentKind(id: number, kind: string): Promise<F29View>;
   markF29Declared(period: string, declared77: number, declared91: number, folio: string | null): Promise<F29View>;
   reopenF29(period: string, reason: string): Promise<F29View>;
+
+  // Remuneraciones (Fase 10, hito B): sueldo empresarial y liquidaciones. NÚCLEO prepara y explica.
+  workers(): Promise<Worker[]>;
+  saveWorker(id: number | null, input: WorkerInput): Promise<Worker>;
+  payrollIndicators(period: string): Promise<IndicatorsView>;
+  savePayrollIndicators(period: string, indicators: PayrollIndicators, source: string | null): Promise<IndicatorsView>;
+  payroll(period: string): Promise<PayrollView>;
+  payslip(workerId: number, period: string): Promise<PayslipView>;
+  payslipById(id: number): Promise<PayslipView>;
+  savePayslip(workerId: number, period: string, month: PayslipMonth): Promise<PayslipView>;
+  emitPayslip(workerId: number, period: string, payDate: string): Promise<PayslipView>;
+  voidPayslip(id: number, reason: string): Promise<PayslipView>;
+  discardPayslip(workerId: number, period: string): Promise<PayslipView>;
 }
 
 export type ImportView = "en_curso" | "cotizaciones" | "cerradas" | "anuladas" | "todas";

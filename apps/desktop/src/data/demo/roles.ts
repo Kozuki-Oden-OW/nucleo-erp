@@ -1,4 +1,4 @@
-// Generado a partir de crates/nucleo-db/migrations/0011_core.sql (roles base y plantilla, Blueprint §10.4).
+// Generado a partir de crates/nucleo-db/migrations/0011_core.sql y 0020_remuneraciones.sql (roles base y plantilla, Blueprint §10.4).
 import type { PermissionRow, RoleRow } from "../types";
 
 export const DEMO_PERMISSIONS: PermissionRow[] = [
@@ -107,8 +107,12 @@ export const DEMO_PERMISSIONS: PermissionRow[] = [
     "description": "Ver proveedores"
   },
   {
+    "code": "remuneraciones.editar",
+    "description": "Preparar, emitir y anular liquidaciones de sueldo"
+  },
+  {
     "code": "remuneraciones.ver",
-    "description": "Ver remuneraciones (V2)"
+    "description": "Ver remuneraciones y liquidaciones"
   },
   {
     "code": "reportes.exportar",
@@ -184,6 +188,7 @@ export const DEMO_ROLES: RoleRow[] = [
       "productos.ver",
       "proveedores.editar",
       "proveedores.ver",
+      "remuneraciones.editar",
       "remuneraciones.ver",
       "reportes.exportar",
       "reportes.ver",
@@ -228,6 +233,7 @@ export const DEMO_ROLES: RoleRow[] = [
       "productos.ver",
       "proveedores.editar",
       "proveedores.ver",
+      "remuneraciones.editar",
       "remuneraciones.ver",
       "reportes.exportar",
       "reportes.ver",
@@ -338,6 +344,7 @@ export const DEMO_ROLES: RoleRow[] = [
     "is_system": true,
     "permissions": [
       "documentos.ver",
+      "remuneraciones.editar",
       "remuneraciones.ver"
     ]
   }

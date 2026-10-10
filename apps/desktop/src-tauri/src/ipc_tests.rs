@@ -605,3 +605,57 @@ fn logo_del_negocio_por_ipc() {
     let b = ipc.ok("set_business_logo", json!({ "logo": null }));
     assert!(b["logo"].is_null());
 }
+
+#[test]
+fn remuneraciones_por_ipc() {
+    let ipc = Ipc::new();
+    let created = ipc.ok(
+        "create_company",
+        json!({ "name": "Con sueldo", "profile": "negocio" }),
+    );
+    ipc.ok("open_company", json!({ "uid": created["company"]["uid"] }));
+    let w = ipc.ok(
+        "save_worker",
+        json!({ "id": null, "input": {
+        "rut": "12345678-5", "name": "Dueña", "is_owner": true, "position": null,
+        "start_date": "2025-01-01", "end_date": null,
+        "terms": { "contract": "sin_contrato", "base_salary": 1000000, "afp": "Uno" } } }),
+    );
+    assert_eq!(w["terms"]["health"], "fonasa");
+    let id = w["id"].clone();
+    // Indicadores mínimos (valores de la prueba, no normativos).
+    let ind = ipc.ok("save_payroll_indicators", json!({ "period": "2026-09", "source": "prueba", "indicators": {
+        "params": { "uf_e2": 4000000, "utm": 70000, "cap_pension_uf_e4": 900000, "cap_afc_uf_e4": 1350000,
+            "health_ppm": 70000, "tax_brackets": [ { "up_to_utm_e4": 135000, "factor_ppm": 0 }, { "up_to_utm_e4": null, "factor_ppm": 40000, "rebate_utm_e4": 5400 } ] },
+        "afp": [ { "name": "Uno", "rate_ppm": 100000 } ] } }));
+    assert_eq!(ind["saved"], true);
+    let v = ipc.ok("payslip", json!({ "workerId": id, "period": "2026-09" }));
+    assert_eq!(v["result"]["complete"], true);
+    assert_eq!(v["result"]["tax"], 0);
+    let v = ipc.ok(
+        "save_payslip",
+        json!({ "workerId": id, "period": "2026-09", "month": { "advance": 100000 } }),
+    );
+    assert_eq!(v["status"], "borrador");
+    let v = ipc.ok(
+        "emit_payslip",
+        json!({ "workerId": id, "period": "2026-09", "payDate": "2026-09-30" }),
+    );
+    assert_eq!(v["status"], "emitida");
+    let p = ipc.ok("payroll", json!({ "period": "2026-09" }));
+    assert_eq!(p["rows"][0]["status"], "emitida");
+    let v = ipc.ok("void_payslip", json!({ "id": v["id"], "reason": "prueba" }));
+    assert_eq!(v["status"], "anulada");
+    let v = ipc.ok("payslip_by_id", json!({ "id": v["id"] }));
+    assert_eq!(v["status"], "anulada");
+    let v = ipc.ok(
+        "discard_payslip",
+        json!({ "workerId": id, "period": "2026-09" }),
+    );
+    assert_eq!(v["status"], "nueva");
+    assert_eq!(ipc.ok("workers", json!({})).as_array().unwrap().len(), 1);
+    assert_eq!(
+        ipc.ok("payroll_indicators", json!({ "period": "2026-10" }))["from_period"],
+        "2026-09"
+    );
+}

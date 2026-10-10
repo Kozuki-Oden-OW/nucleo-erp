@@ -1,6 +1,14 @@
 # NÚCLEO ERP — Especificación funcional: Remuneraciones, imposiciones, LRE, Previred y F29
 
 > Estado: **borrador de analista para revisión del contador colaborador (D-07)**. Fecha: 2026-10-07.
+>
+> **Implementado (hito B, 2026-10-10):** pasos 1-12 y 14-16 de §1 para pyme simple (sueldo base o
+> sueldo empresarial proporcional a días, horas extra con la jornada pactada, haberes imponibles y no
+> imponibles, gratificación art. 50 o fija, topes en UF, AFP, salud Fonasa/Isapre, cesantía, aportes del
+> empleador configurables, impuesto único por tramos en UTM, descuentos y anticipo) en
+> `nucleo-domain::payroll`, con los "indicadores del mes" ingresados por la persona (D-F10-07) y el
+> impuesto al código 48 del F29 del mes de pago (D-F10-09). **Pendiente:** semana corrida, asignación
+> familiar, APV, finiquito, reliquidación del tope de gratificación, LRE y nómina Previred.
 > Alcance: pyme simple (trabajadores dependientes del sector privado, AFP o sin AFP, Fonasa/Isapre,
 > AFC, mutual/ISL, jornada ordinaria art. 22 o parcial art. 40 bis). NÚCLEO **prepara, valida, explica y
 > exporta**; no envía nada a la DT, Previred ni al SII.

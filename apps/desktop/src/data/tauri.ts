@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "./backend";
 import type {
+  IndicatorsView, PayrollIndicators, PayrollView, PayslipMonth, PayslipView, Worker, WorkerInput,
   F29Inputs, F29View, RcvImportReport, TaxDocInput, TaxProfile,
   ImportCostInput, ImportDetail, ImportInput, ImportReceiveLine, ImportStage, ImportSummary, IncotermDef,
   AccountInput, CalendarItem, ExpenseCategory, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow, MoneyAccount,
@@ -43,7 +44,7 @@ export class TauriBackend implements Backend {
   readonly kind = "tauri" as const;
   readonly features: ReadonlySet<Feature> = new Set<Feature>([
     "clientes", "respaldos", "negocio", "busqueda", "usuarios", "documentos", "numeracion", "monedas", "auditoria",
-    "productos", "ventas", "compras", "inventario", "dinero", "dashboard", "comex", "impuestos",
+    "productos", "ventas", "compras", "inventario", "dinero", "dashboard", "comex", "impuestos", "remuneraciones",
   ]);
 
   async appInfo(): Promise<AppInfo> {
@@ -201,6 +202,20 @@ export class TauriBackend implements Backend {
     return call<F29View>("mark_f29_declared", { period, declared77, declared91, folio });
   }
   reopenF29(period: string, reason: string) { return call<F29View>("reopen_f29", { period, reason }); }
+
+  workers() { return call<Worker[]>("workers"); }
+  saveWorker(id: number | null, input: WorkerInput) { return call<Worker>("save_worker", { id, input }); }
+  payrollIndicators(period: string) { return call<IndicatorsView>("payroll_indicators", { period }); }
+  savePayrollIndicators(period: string, indicators: PayrollIndicators, source: string | null) {
+    return call<IndicatorsView>("save_payroll_indicators", { period, indicators, source });
+  }
+  payroll(period: string) { return call<PayrollView>("payroll", { period }); }
+  payslip(workerId: number, period: string) { return call<PayslipView>("payslip", { workerId, period }); }
+  payslipById(id: number) { return call<PayslipView>("payslip_by_id", { id }); }
+  savePayslip(workerId: number, period: string, month: PayslipMonth) { return call<PayslipView>("save_payslip", { workerId, period, month }); }
+  emitPayslip(workerId: number, period: string, payDate: string) { return call<PayslipView>("emit_payslip", { workerId, period, payDate }); }
+  voidPayslip(id: number, reason: string) { return call<PayslipView>("void_payslip", { id, reason }); }
+  discardPayslip(workerId: number, period: string) { return call<PayslipView>("discard_payslip", { workerId, period }); }
 }
 
 /** Selector de archivo del escritorio para adjuntar documentos. */

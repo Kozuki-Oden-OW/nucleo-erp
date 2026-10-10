@@ -1,0 +1,1020 @@
+{
+  "_nota": "Casos golden de la liquidación de sueldo (nucleo-domain::payroll y apps/desktop/src/data/payroll.ts). Casos G-x de la guía MINEDUC nov-2016 (docs/REMUNERACIONES.md §7) con sus parámetros de 2016; casos 2026 con indicadores ilustrativos (Previred sept-2026, tabla SII sept-2026), no verificados por un contador (D-07). 'esperado' lo calcula un modelo de referencia independiente (fracciones exactas) y, cuando existe, se contrasta con el valor de la guía en 'guia'.",
+  "casos": [
+    {
+      "nombre": "G-1 Patricio Rojas, tal cual la guía MINEDUC p. 75 (rebaja solo el 7 % de salud)",
+      "estado": "pendiente_revision",
+      "input": {
+        "params": {
+          "uf_e2": 2605689,
+          "utm": 46091,
+          "imm": 257500,
+          "cap_pension_uf_e4": 743000,
+          "cap_afc_uf_e4": 1114000,
+          "health_ppm": 70000,
+          "afc": {
+            "worker_indefinite_ppm": 6000,
+            "employer_indefinite_ppm": 24000,
+            "employer_fixed_ppm": 30000
+          },
+          "employer": [
+            {
+              "code": "sis",
+              "label": "Seguro de invalidez y sobrevivencia (SIS)",
+              "rate_ppm": 14100
+            }
+          ],
+          "accident_ppm": 0,
+          "tax_brackets": [
+            {
+              "up_to_utm_e4": 135000,
+              "factor_ppm": 0,
+              "rebate_utm_e4": 0
+            },
+            {
+              "up_to_utm_e4": 300000,
+              "factor_ppm": 40000,
+              "rebate_utm_e4": 5400
+            },
+            {
+              "up_to_utm_e4": 500000,
+              "factor_ppm": 80000,
+              "rebate_utm_e4": 17400
+            },
+            {
+              "up_to_utm_e4": 700000,
+              "factor_ppm": 135000,
+              "rebate_utm_e4": 44900
+            },
+            {
+              "up_to_utm_e4": 900000,
+              "factor_ppm": 230000,
+              "rebate_utm_e4": 111400
+            },
+            {
+              "up_to_utm_e4": 1200000,
+              "factor_ppm": 304000,
+              "rebate_utm_e4": 178000
+            },
+            {
+              "up_to_utm_e4": 1500000,
+              "factor_ppm": 355000,
+              "rebate_utm_e4": 239200
+            },
+            {
+              "up_to_utm_e4": null,
+              "factor_ppm": 400000,
+              "rebate_utm_e4": 306700
+            }
+          ],
+          "gratification": {
+            "rate_ppm": 250000,
+            "cap_imm_e4": 47500
+          },
+          "overtime_surcharge_ppm": 500000,
+          "health_deduction": "legal_only"
+        },
+        "worker": {
+          "contract": "indefinido",
+          "afp_ppm": 114400,
+          "afp_name": "Capital",
+          "health": {
+            "kind": "isapre",
+            "plan_uf_e4": 30000
+          },
+          "health_name": "Consalud",
+          "afc": true,
+          "weekly_hours": 45
+        },
+        "base_salary": 600000,
+        "gratification": "art50",
+        "items": [
+          {
+            "label": "Horas extra (monto de la guía)",
+            "amount": 73888,
+            "lre": 2102
+          },
+          {
+            "label": "Bono de responsabilidad",
+            "amount": 85000,
+            "lre": 2111
+          },
+          {
+            "label": "Colación",
+            "amount": 66000,
+            "taxable": false,
+            "lre": 2301
+          },
+          {
+            "label": "Movilización",
+            "amount": 44000,
+            "taxable": false,
+            "lre": 2302
+          },
+          {
+            "label": "Viático",
+            "amount": 85000,
+            "taxable": false,
+            "lre": 2303
+          }
+        ],
+        "deductions": [
+          {
+            "label": "Préstamo Banco de Chile",
+            "amount": 25700
+          },
+          {
+            "label": "Seguro escolar",
+            "amount": 12000
+          },
+          {
+            "label": "Coopeuch",
+            "amount": 10000,
+            "lre": 3182
+          }
+        ],
+        "advance": 150000
+      },
+      "esperado": {
+        "total_taxable": 860815,
+        "pension_base": 860815,
+        "afc_base": 860815,
+        "afp": 98477,
+        "salud": 60257,
+        "salud_adicional": 17914,
+        "afc": 5165,
+        "tax_base": 696916,
+        "tax": 2988,
+        "tax_bracket": 2,
+        "total_earnings": 1055815,
+        "total_deductions": 232501,
+        "net": 823314,
+        "to_pay": 673314,
+        "employer_total": 32797,
+        "employer_cost": 1088612,
+        "employer_lines": {
+          "sis": 12137,
+          "afc_empleador": 20660
+        },
+        "horas_extra": 0,
+        "gratificacion": 101927
+      },
+      "guia": {
+        "total_taxable": 860815,
+        "afp": 98477,
+        "salud": 60257,
+        "salud_adicional": 17914,
+        "afc": 5165,
+        "tax_base": 696916,
+        "tax": 2988,
+        "total_earnings": 1055815,
+        "total_deductions": 232501,
+        "net": 823314,
+        "to_pay": 673314
+      }
+    },
+    {
+      "nombre": "G-1 con la regla del manual LRE p. 67 (rebaja toda la salud hasta el 7 % del tope)",
+      "estado": "pendiente_revision",
+      "input": {
+        "params": {
+          "uf_e2": 2605689,
+          "utm": 46091,
+          "imm": 257500,
+          "cap_pension_uf_e4": 743000,
+          "cap_afc_uf_e4": 1114000,
+          "health_ppm": 70000,
+          "afc": {
+            "worker_indefinite_ppm": 6000,
+            "employer_indefinite_ppm": 24000,
+            "employer_fixed_ppm": 30000
+          },
+          "employer": [
+            {
+              "code": "sis",
+              "label": "Seguro de invalidez y sobrevivencia (SIS)",
+              "rate_ppm": 14100
+            }
+          ],
+          "accident_ppm": 0,
+          "tax_brackets": [
+            {
+              "up_to_utm_e4": 135000,
+              "factor_ppm": 0,
+              "rebate_utm_e4": 0
+            },
+            {
+              "up_to_utm_e4": 300000,
+              "factor_ppm": 40000,
+              "rebate_utm_e4": 5400
+            },
+            {
+              "up_to_utm_e4": 500000,
+              "factor_ppm": 80000,
+              "rebate_utm_e4": 17400
+            },
+            {
+              "up_to_utm_e4": 700000,
+              "factor_ppm": 135000,
+              "rebate_utm_e4": 44900
+            },
+            {
+              "up_to_utm_e4": 900000,
+              "factor_ppm": 230000,
+              "rebate_utm_e4": 111400
+            },
+            {
+              "up_to_utm_e4": 1200000,
+              "factor_ppm": 304000,
+              "rebate_utm_e4": 178000
+            },
+            {
+              "up_to_utm_e4": 1500000,
+              "factor_ppm": 355000,
+              "rebate_utm_e4": 239200
+            },
+            {
+              "up_to_utm_e4": null,
+              "factor_ppm": 400000,
+              "rebate_utm_e4": 306700
+            }
+          ],
+          "gratification": {
+            "rate_ppm": 250000,
+            "cap_imm_e4": 47500
+          },
+          "overtime_surcharge_ppm": 500000,
+          "health_deduction": "up_to_cap"
+        },
+        "worker": {
+          "contract": "indefinido",
+          "afp_ppm": 114400,
+          "afp_name": "Capital",
+          "health": {
+            "kind": "isapre",
+            "plan_uf_e4": 30000
+          },
+          "health_name": "Consalud",
+          "afc": true,
+          "weekly_hours": 45
+        },
+        "base_salary": 600000,
+        "gratification": "art50",
+        "items": [
+          {
+            "label": "Horas extra (monto de la guía)",
+            "amount": 73888,
+            "lre": 2102
+          },
+          {
+            "label": "Bono de responsabilidad",
+            "amount": 85000,
+            "lre": 2111
+          },
+          {
+            "label": "Colación",
+            "amount": 66000,
+            "taxable": false,
+            "lre": 2301
+          },
+          {
+            "label": "Movilización",
+            "amount": 44000,
+            "taxable": false,
+            "lre": 2302
+          },
+          {
+            "label": "Viático",
+            "amount": 85000,
+            "taxable": false,
+            "lre": 2303
+          }
+        ],
+        "deductions": [
+          {
+            "label": "Préstamo Banco de Chile",
+            "amount": 25700
+          },
+          {
+            "label": "Seguro escolar",
+            "amount": 12000
+          },
+          {
+            "label": "Coopeuch",
+            "amount": 10000,
+            "lre": 3182
+          }
+        ],
+        "advance": 150000
+      },
+      "esperado": {
+        "total_taxable": 860815,
+        "pension_base": 860815,
+        "afc_base": 860815,
+        "afp": 98477,
+        "salud": 60257,
+        "salud_adicional": 17914,
+        "afc": 5165,
+        "tax_base": 679002,
+        "tax": 2271,
+        "tax_bracket": 2,
+        "total_earnings": 1055815,
+        "total_deductions": 231784,
+        "net": 824031,
+        "to_pay": 674031,
+        "employer_total": 32797,
+        "employer_cost": 1088612,
+        "employer_lines": {
+          "sis": 12137,
+          "afc_empleador": 20660
+        },
+        "horas_extra": 0,
+        "gratificacion": 101927
+      },
+      "guia": {
+        "tax_base": 679002,
+        "tax": 2271
+      }
+    },
+    {
+      "nombre": "G-1 corregido: 19 horas extra calculadas con 45 h y recargo 50 %",
+      "estado": "pendiente_revision",
+      "input": {
+        "params": {
+          "uf_e2": 2605689,
+          "utm": 46091,
+          "imm": 257500,
+          "cap_pension_uf_e4": 743000,
+          "cap_afc_uf_e4": 1114000,
+          "health_ppm": 70000,
+          "afc": {
+            "worker_indefinite_ppm": 6000,
+            "employer_indefinite_ppm": 24000,
+            "employer_fixed_ppm": 30000
+          },
+          "employer": [
+            {
+              "code": "sis",
+              "label": "Seguro de invalidez y sobrevivencia (SIS)",
+              "rate_ppm": 14100
+            }
+          ],
+          "accident_ppm": 0,
+          "tax_brackets": [
+            {
+              "up_to_utm_e4": 135000,
+              "factor_ppm": 0,
+              "rebate_utm_e4": 0
+            },
+            {
+              "up_to_utm_e4": 300000,
+              "factor_ppm": 40000,
+              "rebate_utm_e4": 5400
+            },
+            {
+              "up_to_utm_e4": 500000,
+              "factor_ppm": 80000,
+              "rebate_utm_e4": 17400
+            },
+            {
+              "up_to_utm_e4": 700000,
+              "factor_ppm": 135000,
+              "rebate_utm_e4": 44900
+            },
+            {
+              "up_to_utm_e4": 900000,
+              "factor_ppm": 230000,
+              "rebate_utm_e4": 111400
+            },
+            {
+              "up_to_utm_e4": 1200000,
+              "factor_ppm": 304000,
+              "rebate_utm_e4": 178000
+            },
+            {
+              "up_to_utm_e4": 1500000,
+              "factor_ppm": 355000,
+              "rebate_utm_e4": 239200
+            },
+            {
+              "up_to_utm_e4": null,
+              "factor_ppm": 400000,
+              "rebate_utm_e4": 306700
+            }
+          ],
+          "gratification": {
+            "rate_ppm": 250000,
+            "cap_imm_e4": 47500
+          },
+          "overtime_surcharge_ppm": 500000,
+          "health_deduction": "legal_only"
+        },
+        "worker": {
+          "contract": "indefinido",
+          "afp_ppm": 114400,
+          "afp_name": "Capital",
+          "health": {
+            "kind": "isapre",
+            "plan_uf_e4": 30000
+          },
+          "health_name": "Consalud",
+          "afc": true,
+          "weekly_hours": 45
+        },
+        "base_salary": 600000,
+        "gratification": "art50",
+        "items": [
+          {
+            "label": "Bono de responsabilidad",
+            "amount": 85000,
+            "lre": 2111
+          },
+          {
+            "label": "Colación",
+            "amount": 66000,
+            "taxable": false,
+            "lre": 2301
+          },
+          {
+            "label": "Movilización",
+            "amount": 44000,
+            "taxable": false,
+            "lre": 2302
+          },
+          {
+            "label": "Viático",
+            "amount": 85000,
+            "taxable": false,
+            "lre": 2303
+          }
+        ],
+        "deductions": [
+          {
+            "label": "Préstamo Banco de Chile",
+            "amount": 25700
+          },
+          {
+            "label": "Seguro escolar",
+            "amount": 12000
+          },
+          {
+            "label": "Coopeuch",
+            "amount": 10000,
+            "lre": 3182
+          }
+        ],
+        "advance": 150000,
+        "overtime_hours_e2": 1900
+      },
+      "esperado": {
+        "total_taxable": 875594,
+        "pension_base": 875594,
+        "afc_base": 875594,
+        "afp": 100168,
+        "salud": 61292,
+        "salud_adicional": 16879,
+        "afc": 5254,
+        "tax_base": 708880,
+        "tax": 3466,
+        "tax_bracket": 2,
+        "total_earnings": 1070594,
+        "total_deductions": 234759,
+        "net": 835835,
+        "to_pay": 685835,
+        "employer_total": 33360,
+        "employer_cost": 1103954,
+        "employer_lines": {
+          "sis": 12346,
+          "afc_empleador": 21014
+        },
+        "horas_extra": 88667,
+        "gratificacion": 101927
+      },
+      "guia": {}
+    },
+    {
+      "nombre": "G-3g/G-3h: AFP y Fonasa con tope de 74,3 UF (MINEDUC p. 44 y 48)",
+      "estado": "pendiente_revision",
+      "input": {
+        "params": {
+          "uf_e2": 2631353,
+          "utm": 46091,
+          "imm": 257500,
+          "cap_pension_uf_e4": 743000,
+          "cap_afc_uf_e4": 1114000,
+          "health_ppm": 70000,
+          "afc": {
+            "worker_indefinite_ppm": 6000,
+            "employer_indefinite_ppm": 24000,
+            "employer_fixed_ppm": 30000
+          },
+          "employer": [
+            {
+              "code": "sis",
+              "label": "Seguro de invalidez y sobrevivencia (SIS)",
+              "rate_ppm": 14100
+            }
+          ],
+          "accident_ppm": 0,
+          "tax_brackets": [
+            {
+              "up_to_utm_e4": 135000,
+              "factor_ppm": 0,
+              "rebate_utm_e4": 0
+            },
+            {
+              "up_to_utm_e4": 300000,
+              "factor_ppm": 40000,
+              "rebate_utm_e4": 5400
+            },
+            {
+              "up_to_utm_e4": 500000,
+              "factor_ppm": 80000,
+              "rebate_utm_e4": 17400
+            },
+            {
+              "up_to_utm_e4": 700000,
+              "factor_ppm": 135000,
+              "rebate_utm_e4": 44900
+            },
+            {
+              "up_to_utm_e4": 900000,
+              "factor_ppm": 230000,
+              "rebate_utm_e4": 111400
+            },
+            {
+              "up_to_utm_e4": 1200000,
+              "factor_ppm": 304000,
+              "rebate_utm_e4": 178000
+            },
+            {
+              "up_to_utm_e4": 1500000,
+              "factor_ppm": 355000,
+              "rebate_utm_e4": 239200
+            },
+            {
+              "up_to_utm_e4": null,
+              "factor_ppm": 400000,
+              "rebate_utm_e4": 306700
+            }
+          ],
+          "gratification": {
+            "rate_ppm": 250000,
+            "cap_imm_e4": 47500
+          },
+          "overtime_surcharge_ppm": 500000,
+          "health_deduction": "up_to_cap"
+        },
+        "worker": {
+          "contract": "indefinido",
+          "afp_ppm": 114800,
+          "afp_name": "Cuprum",
+          "health": {
+            "kind": "fonasa"
+          },
+          "afc": false
+        },
+        "base_salary": 2075000
+      },
+      "esperado": {
+        "total_taxable": 2075000,
+        "pension_base": 1955095,
+        "afc_base": 2075000,
+        "afp": 224445,
+        "salud": 136857,
+        "salud_adicional": 0,
+        "afc": 0,
+        "tax_base": 1713698,
+        "tax": 56898,
+        "tax_bracket": 3,
+        "total_earnings": 2075000,
+        "total_deductions": 418200,
+        "net": 1656800,
+        "to_pay": 1656800,
+        "employer_total": 27567,
+        "employer_cost": 2102567,
+        "employer_lines": {
+          "sis": 27567
+        },
+        "horas_extra": 0,
+        "gratificacion": 0
+      },
+      "guia": {
+        "pension_base": 1955095,
+        "afp": 224445,
+        "salud": 136857
+      }
+    },
+    {
+      "nombre": "Sueldo empresarial del dueño, septiembre 2026 (valores ilustrativos)",
+      "estado": "pendiente_revision",
+      "input": {
+        "params": {
+          "uf_e2": 4105720,
+          "utm": 71721,
+          "imm": 553553,
+          "cap_pension_uf_e4": 900000,
+          "cap_afc_uf_e4": 1352000,
+          "health_ppm": 70000,
+          "afc": {
+            "worker_indefinite_ppm": 6000,
+            "employer_indefinite_ppm": 24000,
+            "employer_fixed_ppm": 30000
+          },
+          "employer": [
+            {
+              "code": "sis",
+              "label": "SIS",
+              "rate_ppm": 17800
+            },
+            {
+              "code": "cuenta_individual",
+              "label": "Cuenta individual (Ley 21.735)",
+              "rate_ppm": 1000
+            },
+            {
+              "code": "rentabilidad_protegida",
+              "label": "Rentabilidad protegida (Ley 21.735)",
+              "rate_ppm": 9000
+            },
+            {
+              "code": "expectativa_vida",
+              "label": "Expectativa de vida (Ley 21.735)",
+              "rate_ppm": 7200
+            }
+          ],
+          "accident_ppm": 9300,
+          "tax_brackets": [
+            {
+              "up_to_utm_e4": 135000,
+              "factor_ppm": 0,
+              "rebate_utm_e4": 0
+            },
+            {
+              "up_to_utm_e4": 300000,
+              "factor_ppm": 40000,
+              "rebate_utm_e4": 5400
+            },
+            {
+              "up_to_utm_e4": 500000,
+              "factor_ppm": 80000,
+              "rebate_utm_e4": 17400
+            },
+            {
+              "up_to_utm_e4": 700000,
+              "factor_ppm": 135000,
+              "rebate_utm_e4": 44900
+            },
+            {
+              "up_to_utm_e4": 900000,
+              "factor_ppm": 230000,
+              "rebate_utm_e4": 111400
+            },
+            {
+              "up_to_utm_e4": 1200000,
+              "factor_ppm": 304000,
+              "rebate_utm_e4": 178000
+            },
+            {
+              "up_to_utm_e4": 3100000,
+              "factor_ppm": 350000,
+              "rebate_utm_e4": 233200
+            },
+            {
+              "up_to_utm_e4": null,
+              "factor_ppm": 400000,
+              "rebate_utm_e4": 388200
+            }
+          ],
+          "gratification": {
+            "rate_ppm": 250000,
+            "cap_imm_e4": 47500
+          },
+          "overtime_surcharge_ppm": 500000,
+          "health_deduction": "up_to_cap"
+        },
+        "worker": {
+          "contract": "sin_contrato",
+          "owner_salary": true,
+          "afp_ppm": 104600,
+          "afp_name": "Uno",
+          "health": {
+            "kind": "fonasa"
+          },
+          "afc": false
+        },
+        "base_salary": 2500000
+      },
+      "esperado": {
+        "total_taxable": 2500000,
+        "pension_base": 2500000,
+        "afc_base": 2500000,
+        "afp": 261500,
+        "salud": 175000,
+        "salud_adicional": 0,
+        "afc": 0,
+        "tax_base": 2063500,
+        "tax": 43811,
+        "tax_bracket": 2,
+        "total_earnings": 2500000,
+        "total_deductions": 480311,
+        "net": 2019689,
+        "to_pay": 2019689,
+        "employer_total": 110750,
+        "employer_cost": 2610750,
+        "employer_lines": {
+          "sis": 44500,
+          "cuenta_individual": 2500,
+          "rentabilidad_protegida": 22500,
+          "expectativa_vida": 18000,
+          "ley16744": 23250
+        },
+        "horas_extra": 0,
+        "gratificacion": 0
+      },
+      "guia": {
+        "tax": 43811
+      }
+    },
+    {
+      "nombre": "Sueldo sobre el tope imponible con Isapre cubierta por el 7 %, septiembre 2026 (ilustrativo)",
+      "estado": "pendiente_revision",
+      "input": {
+        "params": {
+          "uf_e2": 4105720,
+          "utm": 71721,
+          "imm": 553553,
+          "cap_pension_uf_e4": 900000,
+          "cap_afc_uf_e4": 1352000,
+          "health_ppm": 70000,
+          "afc": {
+            "worker_indefinite_ppm": 6000,
+            "employer_indefinite_ppm": 24000,
+            "employer_fixed_ppm": 30000
+          },
+          "employer": [
+            {
+              "code": "sis",
+              "label": "SIS",
+              "rate_ppm": 17800
+            },
+            {
+              "code": "cuenta_individual",
+              "label": "Cuenta individual (Ley 21.735)",
+              "rate_ppm": 1000
+            },
+            {
+              "code": "rentabilidad_protegida",
+              "label": "Rentabilidad protegida (Ley 21.735)",
+              "rate_ppm": 9000
+            },
+            {
+              "code": "expectativa_vida",
+              "label": "Expectativa de vida (Ley 21.735)",
+              "rate_ppm": 7200
+            }
+          ],
+          "accident_ppm": 9300,
+          "tax_brackets": [
+            {
+              "up_to_utm_e4": 135000,
+              "factor_ppm": 0,
+              "rebate_utm_e4": 0
+            },
+            {
+              "up_to_utm_e4": 300000,
+              "factor_ppm": 40000,
+              "rebate_utm_e4": 5400
+            },
+            {
+              "up_to_utm_e4": 500000,
+              "factor_ppm": 80000,
+              "rebate_utm_e4": 17400
+            },
+            {
+              "up_to_utm_e4": 700000,
+              "factor_ppm": 135000,
+              "rebate_utm_e4": 44900
+            },
+            {
+              "up_to_utm_e4": 900000,
+              "factor_ppm": 230000,
+              "rebate_utm_e4": 111400
+            },
+            {
+              "up_to_utm_e4": 1200000,
+              "factor_ppm": 304000,
+              "rebate_utm_e4": 178000
+            },
+            {
+              "up_to_utm_e4": 3100000,
+              "factor_ppm": 350000,
+              "rebate_utm_e4": 233200
+            },
+            {
+              "up_to_utm_e4": null,
+              "factor_ppm": 400000,
+              "rebate_utm_e4": 388200
+            }
+          ],
+          "gratification": {
+            "rate_ppm": 250000,
+            "cap_imm_e4": 47500
+          },
+          "overtime_surcharge_ppm": 500000,
+          "health_deduction": "up_to_cap"
+        },
+        "worker": {
+          "contract": "indefinido",
+          "afp_ppm": 112700,
+          "afp_name": "Habitat",
+          "health": {
+            "kind": "isapre",
+            "plan_uf_e4": 60000
+          },
+          "health_name": "Colmena",
+          "afc": true,
+          "weekly_hours": 42
+        },
+        "base_salary": 5000000,
+        "items": [
+          {
+            "label": "Colación",
+            "amount": 80000,
+            "taxable": false,
+            "lre": 2301
+          }
+        ]
+      },
+      "esperado": {
+        "total_taxable": 5000000,
+        "pension_base": 3695148,
+        "afc_base": 5000000,
+        "afp": 416443,
+        "salud": 258660,
+        "salud_adicional": 0,
+        "afc": 30000,
+        "tax_base": 4294897,
+        "tax": 257784,
+        "tax_bracket": 4,
+        "total_earnings": 5080000,
+        "total_deductions": 962887,
+        "net": 4117113,
+        "to_pay": 4117113,
+        "employer_total": 283695,
+        "employer_cost": 5363695,
+        "employer_lines": {
+          "sis": 65774,
+          "cuenta_individual": 3695,
+          "rentabilidad_protegida": 33256,
+          "expectativa_vida": 26605,
+          "afc_empleador": 120000,
+          "ley16744": 34365
+        },
+        "horas_extra": 0,
+        "gratificacion": 0
+      },
+      "guia": {}
+    },
+    {
+      "nombre": "Plazo fijo, 20 días, horas extra con 42 h y gratificación art. 50 (ilustrativo)",
+      "estado": "pendiente_revision",
+      "input": {
+        "params": {
+          "uf_e2": 4105720,
+          "utm": 71721,
+          "imm": 553553,
+          "cap_pension_uf_e4": 900000,
+          "cap_afc_uf_e4": 1352000,
+          "health_ppm": 70000,
+          "afc": {
+            "worker_indefinite_ppm": 6000,
+            "employer_indefinite_ppm": 24000,
+            "employer_fixed_ppm": 30000
+          },
+          "employer": [
+            {
+              "code": "sis",
+              "label": "SIS",
+              "rate_ppm": 17800
+            },
+            {
+              "code": "cuenta_individual",
+              "label": "Cuenta individual (Ley 21.735)",
+              "rate_ppm": 1000
+            },
+            {
+              "code": "rentabilidad_protegida",
+              "label": "Rentabilidad protegida (Ley 21.735)",
+              "rate_ppm": 9000
+            },
+            {
+              "code": "expectativa_vida",
+              "label": "Expectativa de vida (Ley 21.735)",
+              "rate_ppm": 7200
+            }
+          ],
+          "accident_ppm": 9300,
+          "tax_brackets": [
+            {
+              "up_to_utm_e4": 135000,
+              "factor_ppm": 0,
+              "rebate_utm_e4": 0
+            },
+            {
+              "up_to_utm_e4": 300000,
+              "factor_ppm": 40000,
+              "rebate_utm_e4": 5400
+            },
+            {
+              "up_to_utm_e4": 500000,
+              "factor_ppm": 80000,
+              "rebate_utm_e4": 17400
+            },
+            {
+              "up_to_utm_e4": 700000,
+              "factor_ppm": 135000,
+              "rebate_utm_e4": 44900
+            },
+            {
+              "up_to_utm_e4": 900000,
+              "factor_ppm": 230000,
+              "rebate_utm_e4": 111400
+            },
+            {
+              "up_to_utm_e4": 1200000,
+              "factor_ppm": 304000,
+              "rebate_utm_e4": 178000
+            },
+            {
+              "up_to_utm_e4": 3100000,
+              "factor_ppm": 350000,
+              "rebate_utm_e4": 233200
+            },
+            {
+              "up_to_utm_e4": null,
+              "factor_ppm": 400000,
+              "rebate_utm_e4": 388200
+            }
+          ],
+          "gratification": {
+            "rate_ppm": 250000,
+            "cap_imm_e4": 47500
+          },
+          "overtime_surcharge_ppm": 500000,
+          "health_deduction": "up_to_cap"
+        },
+        "worker": {
+          "contract": "plazo_fijo",
+          "afp_ppm": 105800,
+          "afp_name": "Modelo",
+          "health": {
+            "kind": "fonasa"
+          },
+          "afc": true,
+          "weekly_hours": 42
+        },
+        "base_salary": 600000,
+        "days": 20,
+        "overtime_hours_e2": 550,
+        "gratification": "art50",
+        "items": [
+          {
+            "label": "Movilización",
+            "amount": 30000,
+            "taxable": false
+          }
+        ]
+      },
+      "esperado": {
+        "total_taxable": 534375,
+        "pension_base": 534375,
+        "afc_base": 534375,
+        "afp": 56537,
+        "salud": 37406,
+        "salud_adicional": 0,
+        "afc": 0,
+        "tax_base": 440432,
+        "tax": 0,
+        "tax_bracket": 1,
+        "total_earnings": 564375,
+        "total_deductions": 93943,
+        "net": 470432,
+        "to_pay": 470432,
+        "employer_total": 39704,
+        "employer_cost": 604079,
+        "employer_lines": {
+          "sis": 9512,
+          "cuenta_individual": 534,
+          "rentabilidad_protegida": 4809,
+          "expectativa_vida": 3848,
+          "afc_empleador": 16031,
+          "ley16744": 4970
+        },
+        "horas_extra": 27500,
+        "gratificacion": 106875
+      },
+      "guia": {}
+    }
+  ]
+}

@@ -14,6 +14,7 @@ const WHAT: Record<string, string> = {
   comex: "Calculadora de importación, escenarios y carpetas de importación con etapas y ETA.",
   inicio: "El resumen de tu negocio: ventas, utilidad, dinero disponible y lo que requiere tu atención.",
   negocio: "Datos del negocio, perfil y preferencias de documentación.",
+  remuneraciones: "Liquidación del sueldo empresarial y de los trabajadores, con cotizaciones, impuesto único al F29 e impresión con tu logo.",
 };
 
 export function Proximamente({ id }: { id: string }) {

@@ -1,0 +1,125 @@
+{
+  "_nota": "Indicadores de remuneraciones de DEMOSTRACIÓN (septiembre 2026). No se usan en el escritorio: allí la persona los copia cada mes desde Previred y el SII. Pendientes de verificación por un contador (D-07).",
+  "period": "2026-09",
+  "source": "Ilustrativo: Previred, indicadores de septiembre 2026 (UF 30-09-2026, topes 90 y 135,2 UF, renta mínima, tasas AFP, SIS ago-oct 2026); SII, tabla del impuesto único de septiembre 2026; Ley 21.735 (cotización del empleador desde ago-2026). Verificar antes de usar.",
+  "indicators": {
+    "params": {
+      "uf_e2": 4105720,
+      "utm": 71721,
+      "imm": 553553,
+      "cap_pension_uf_e4": 900000,
+      "cap_afc_uf_e4": 1352000,
+      "health_ppm": 70000,
+      "afc": {
+        "worker_indefinite_ppm": 6000,
+        "employer_indefinite_ppm": 24000,
+        "employer_fixed_ppm": 30000
+      },
+      "employer": [
+        {
+          "code": "sis",
+          "label": "Seguro de invalidez y sobrevivencia (SIS)",
+          "rate_ppm": 17800,
+          "base": "pension"
+        },
+        {
+          "code": "cuenta_individual",
+          "label": "Cotización del empleador a la cuenta individual (Ley 21.735)",
+          "rate_ppm": 1000,
+          "base": "pension"
+        },
+        {
+          "code": "rentabilidad_protegida",
+          "label": "Cotización con rentabilidad protegida (Ley 21.735)",
+          "rate_ppm": 9000,
+          "base": "pension"
+        },
+        {
+          "code": "expectativa_vida",
+          "label": "Compensación por expectativa de vida (Ley 21.735)",
+          "rate_ppm": 7200,
+          "base": "pension"
+        }
+      ],
+      "accident_ppm": 9300,
+      "tax_brackets": [
+        {
+          "up_to_utm_e4": 135000,
+          "factor_ppm": 0,
+          "rebate_utm_e4": 0
+        },
+        {
+          "up_to_utm_e4": 300000,
+          "factor_ppm": 40000,
+          "rebate_utm_e4": 5400
+        },
+        {
+          "up_to_utm_e4": 500000,
+          "factor_ppm": 80000,
+          "rebate_utm_e4": 17400
+        },
+        {
+          "up_to_utm_e4": 700000,
+          "factor_ppm": 135000,
+          "rebate_utm_e4": 44900
+        },
+        {
+          "up_to_utm_e4": 900000,
+          "factor_ppm": 230000,
+          "rebate_utm_e4": 111400
+        },
+        {
+          "up_to_utm_e4": 1200000,
+          "factor_ppm": 304000,
+          "rebate_utm_e4": 178000
+        },
+        {
+          "up_to_utm_e4": 3100000,
+          "factor_ppm": 350000,
+          "rebate_utm_e4": 233200
+        },
+        {
+          "up_to_utm_e4": null,
+          "factor_ppm": 400000,
+          "rebate_utm_e4": 388200
+        }
+      ],
+      "gratification": {
+        "rate_ppm": 250000,
+        "cap_imm_e4": 47500
+      },
+      "overtime_surcharge_ppm": 500000,
+      "health_deduction": "up_to_cap"
+    },
+    "afp": [
+      {
+        "name": "Capital",
+        "rate_ppm": 114400
+      },
+      {
+        "name": "Cuprum",
+        "rate_ppm": 114400
+      },
+      {
+        "name": "Habitat",
+        "rate_ppm": 112700
+      },
+      {
+        "name": "PlanVital",
+        "rate_ppm": 111600
+      },
+      {
+        "name": "Provida",
+        "rate_ppm": 114500
+      },
+      {
+        "name": "Modelo",
+        "rate_ppm": 105800
+      },
+      {
+        "name": "Uno",
+        "rate_ppm": 104600
+      }
+    ]
+  }
+}

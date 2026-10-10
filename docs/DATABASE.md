@@ -46,6 +46,7 @@ Todo es entero: las sumas y los reportes se hacen en SQL sin perder exactitud y 
 | 17 | `0017_comex_seguro_teorico.sql` | Seguro teórico de la carpeta (`imports.notional_insurance_ppm`): solo valor aduanero, no es costo |
 | 18 | `0018_impuestos_f29.sql` | Registro de compras y ventas del período (`tax_documents`, `tax_import_batches`) y borradores del F29 (`f29_periods`, con lo declarado) |
 | 19 | `0019_comex_flete_documento.sql` | Flete según el documento de transporte (`imports.transport_freight_minor`), solo para el valor aduanero |
+| 20 | `0020_remuneraciones.sql` | Personas (`workers`, condiciones en `terms_json`), indicadores del mes (`payroll_indicators`), liquidaciones (`payslips`, foto congelada al emitir, una vigente por persona y mes) y permiso `remuneraciones.editar` |
 
 Las migraciones son transaccionales y versionadas con `PRAGMA user_version`. **Pre-1.0:** se pueden
 reescribir (en la Fase 2 se reemplazó la tabla mínima de clientes de la Fase 1); desde la primera beta

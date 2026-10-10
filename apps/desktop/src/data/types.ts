@@ -843,6 +843,8 @@ export interface F29View {
   declared: { declared_77: number; declared_91: number; folio: string | null; at: string | null } | null;
   due_date: string | null;
   periods: { period: string; status: string; declared_91: number | null }[];
+  /** Impuesto único de las liquidaciones emitidas pagadas en el mes (código 48). */
+  payroll_tax: { payslips: number; amount: number; applied: boolean } | null;
 }
 export interface TaxDocInput {
   direction: "venta" | "compra";
@@ -860,3 +862,94 @@ export interface TaxDocInput {
   note?: string | null;
 }
 export interface RcvImportReport { rows: number; skipped: string[]; other_period: number; view: F29View }
+
+/* ───────────────────────────── Remuneraciones (Fase 10, hito B) ───────────────────────────── */
+
+export interface AfpRate { name: string; rate_ppm: number }
+/** Indicadores del mes (Previred y SII): parámetros de la liquidación y tasas de las AFP. */
+export interface PayrollIndicators { params: import("./payroll").PayrollParams; afp: AfpRate[] }
+export interface IndicatorsView {
+  period: string;
+  indicators: PayrollIndicators;
+  source: string | null;
+  saved: boolean;
+  from_period: string | null;
+  updated_at: string | null;
+}
+export type ContractType = "indefinido" | "plazo_fijo" | "sin_contrato";
+export interface PayTerms {
+  contract: ContractType;
+  base_salary: number;
+  weekly_hours: number | null;
+  gratification: "ninguna" | "art50" | "fija";
+  gratification_amount: number;
+  overtime_surcharge_ppm: number | null;
+  afp: string | null;
+  health: "fonasa" | "isapre" | "ninguna";
+  health_name: string | null;
+  isapre_plan_uf_e4: number | null;
+  isapre_plan_clp: number | null;
+  afc: boolean;
+  employer_contrib: boolean;
+  accident: boolean;
+  items: import("./payroll").EarningItem[];
+  deductions: import("./payroll").DeductionItem[];
+}
+export interface Worker {
+  id: number;
+  rut: string;
+  name: string;
+  is_owner: boolean;
+  position: string | null;
+  start_date: string;
+  end_date: string | null;
+  active: boolean;
+  terms: PayTerms;
+}
+export type WorkerInput = Omit<Worker, "id">;
+export interface PayslipMonth {
+  days: number | null;
+  overtime_hours_e2: number;
+  items: import("./payroll").EarningItem[];
+  deductions: import("./payroll").DeductionItem[];
+  advance: number;
+}
+export type PayslipStatus = "nueva" | "borrador" | "emitida" | "anulada";
+export interface PayslipView {
+  id: number | null;
+  period: string;
+  status: PayslipStatus;
+  worker: Worker;
+  month: PayslipMonth;
+  days_suggested: number;
+  input: import("./payroll").PayslipInput;
+  result: import("./payroll").PayslipResult;
+  indicators_saved: boolean;
+  indicators_source: string | null;
+  pay_date: string | null;
+  default_pay_date: string;
+  emitted_at: string | null;
+  voided_at: string | null;
+  void_reason: string | null;
+}
+export interface PayrollRow {
+  worker: Worker;
+  payslip_id: number | null;
+  status: Exclude<PayslipStatus, "anulada">;
+  pay_date: string | null;
+  total_earnings: number;
+  tax: number;
+  to_pay: number;
+  employer_cost: number;
+  complete: boolean;
+}
+export interface PayrollView {
+  period: string;
+  indicators_saved: boolean;
+  indicators_from: string | null;
+  rows: PayrollRow[];
+  voided: number;
+  total_to_pay: number;
+  total_tax: number;
+  total_employer_cost: number;
+}

@@ -49,8 +49,8 @@ export function PerfilTab({ onSaved }: { onSaved: () => void }) {
         </fieldset>
       </Card>
       <Notice tone="info" title="Qué viene">
-        Con tu régimen, NÚCLEO preparará la renta anual (Formulario 22) desde lo cobrado y lo pagado en el año, y la liquidación del sueldo empresarial con sus cotizaciones,
-        cuyo impuesto único pasa directo al código 48 del F29.
+        Con tu régimen, NÚCLEO preparará la renta anual (Formulario 22) desde lo cobrado y lo pagado en el año. La liquidación del sueldo empresarial ya está en
+        Remuneraciones: su impuesto único pasa directo al código 48 del F29.
       </Notice>
     </div>
   );

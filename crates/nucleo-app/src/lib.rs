@@ -12,6 +12,7 @@ pub mod f29_ops;
 pub mod finance_ops;
 pub mod inventory_ops;
 pub mod keys;
+pub mod payroll_ops;
 pub mod purchase_ops;
 pub mod registry;
 pub mod sales_ops;

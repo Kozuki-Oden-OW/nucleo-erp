@@ -23,7 +23,7 @@ const SECTIONS: { title: string; codes: number[]; always?: number[] }[] = [
 const TOTALS = new Set([538, 537, 89, 77, 595, 91]);
 const SUBTRACT = new Set([510, 734, 528]);
 const MANUAL: { code: number; label: string; hint: string }[] = [
-  { code: 48, label: "Impuesto único de segunda categoría (48)", hint: "Del sueldo empresarial y de los trabajadores, según sus liquidaciones del mes" },
+  { code: 48, label: "Impuesto único de segunda categoría (48)", hint: "Del sueldo empresarial y de los trabajadores: se completa solo con las liquidaciones emitidas en Remuneraciones" },
   { code: 151, label: "Retención de honorarios (151)", hint: "Retenciones de las boletas de honorarios que pagaste este mes" },
   { code: 49, label: "Retención 3 % préstamo tasa 0, trabajadores (49)", hint: "" },
   { code: 155, label: "Retención 3 % préstamo tasa 0, honorarios (155)", hint: "" },
@@ -155,7 +155,12 @@ export function F29Tab({ view, onView, onGoRegistro, onGoConfig }: { view: F29Vi
             <div>
               <h3 className="mb-2 text-sm font-semibold text-ink">Retenciones e impuesto único</h3>
               <div className="grid gap-4 md:grid-cols-2">
-                {MANUAL.slice(0, 2).map((m) => <MoneyField key={m.code} label={m.label} hint={m.hint} value={inputs.manual?.[String(m.code)] ?? null} onValue={(v) => setManual(m.code, v)} />)}
+                {MANUAL.slice(0, 2).map((m) => {
+                  const pt = m.code === 48 ? view.payroll_tax : null;
+                  return <MoneyField key={m.code} label={m.label} value={inputs.manual?.[String(m.code)] ?? null} onValue={(v) => setManual(m.code, v)}
+                    placeholder={pt ? formatMoney(pt.amount) : undefined}
+                    hint={pt ? `De ${pt.payslips} liquidación(es) pagada(s) este mes: ${formatMoney(pt.amount)}. Déjalo vacío para usar ese monto.` : m.hint} />;
+                })}
               </div>
               <details className="mt-3">
                 <summary className="cursor-pointer text-sm text-accent">Otras retenciones</summary>

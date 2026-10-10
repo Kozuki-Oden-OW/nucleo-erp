@@ -148,6 +148,17 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         commands::set_tax_document_kind,
         commands::mark_f29_declared,
         commands::reopen_f29,
+        commands::workers,
+        commands::save_worker,
+        commands::payroll_indicators,
+        commands::save_payroll_indicators,
+        commands::payroll,
+        commands::payslip,
+        commands::payslip_by_id,
+        commands::save_payslip,
+        commands::emit_payslip,
+        commands::void_payslip,
+        commands::discard_payslip,
     ])
 }
 

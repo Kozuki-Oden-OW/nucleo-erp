@@ -25,6 +25,9 @@ use nucleo_app::nucleo_db::products::ProductRow;
 use nucleo_app::nucleo_db::purchases::PriceHistoryRow;
 use nucleo_app::nucleo_db::suppliers::SupplierRow;
 use nucleo_app::nucleo_db::users::{PermissionRow, RoleRow, UserRow};
+use nucleo_app::payroll_ops::{
+    Indicators, IndicatorsView, PayrollView, PayslipMonth, PayslipView, Worker, WorkerInput,
+};
 use nucleo_app::purchase_ops::{
     NewSupplier, PoDetail, PoInput, PoSummary, PurchaseDetail, PurchaseFilter, PurchaseInput,
     PurchaseSummary, ReceiveLine, SupplierDetail,
@@ -1170,4 +1173,92 @@ pub fn reopen_f29(
     reason: String,
 ) -> CmdResult<F29View> {
     with_session(&state, |s| Ok(s.reopen_f29(&period, &reason)?))
+}
+
+/* ───────────── Remuneraciones (Fase 10, hito B) ───────────── */
+
+#[tauri::command]
+pub fn workers(state: State<'_, AppState>) -> CmdResult<Vec<Worker>> {
+    with_session(&state, |s| Ok(s.workers()?))
+}
+
+#[tauri::command]
+pub fn save_worker(
+    state: State<'_, AppState>,
+    id: Option<i64>,
+    input: WorkerInput,
+) -> CmdResult<Worker> {
+    with_session(&state, |s| Ok(s.save_worker(id, &input)?))
+}
+
+#[tauri::command]
+pub fn payroll_indicators(state: State<'_, AppState>, period: String) -> CmdResult<IndicatorsView> {
+    with_session(&state, |s| Ok(s.payroll_indicators(&period)?))
+}
+
+#[tauri::command]
+pub fn save_payroll_indicators(
+    state: State<'_, AppState>,
+    period: String,
+    indicators: Indicators,
+    source: Option<String>,
+) -> CmdResult<IndicatorsView> {
+    with_session(&state, |s| {
+        Ok(s.save_payroll_indicators(&period, &indicators, source)?)
+    })
+}
+
+#[tauri::command]
+pub fn payroll(state: State<'_, AppState>, period: String) -> CmdResult<PayrollView> {
+    with_session(&state, |s| Ok(s.payroll(&period)?))
+}
+
+#[tauri::command]
+pub fn payslip(
+    state: State<'_, AppState>,
+    worker_id: i64,
+    period: String,
+) -> CmdResult<PayslipView> {
+    with_session(&state, |s| Ok(s.payslip(worker_id, &period)?))
+}
+
+#[tauri::command]
+pub fn payslip_by_id(state: State<'_, AppState>, id: i64) -> CmdResult<PayslipView> {
+    with_session(&state, |s| Ok(s.payslip_by_id(id)?))
+}
+
+#[tauri::command]
+pub fn save_payslip(
+    state: State<'_, AppState>,
+    worker_id: i64,
+    period: String,
+    month: PayslipMonth,
+) -> CmdResult<PayslipView> {
+    with_session(&state, |s| Ok(s.save_payslip(worker_id, &period, &month)?))
+}
+
+#[tauri::command]
+pub fn emit_payslip(
+    state: State<'_, AppState>,
+    worker_id: i64,
+    period: String,
+    pay_date: String,
+) -> CmdResult<PayslipView> {
+    with_session(&state, |s| {
+        Ok(s.emit_payslip(worker_id, &period, &pay_date)?)
+    })
+}
+
+#[tauri::command]
+pub fn void_payslip(state: State<'_, AppState>, id: i64, reason: String) -> CmdResult<PayslipView> {
+    with_session(&state, |s| Ok(s.void_payslip(id, &reason)?))
+}
+
+#[tauri::command]
+pub fn discard_payslip(
+    state: State<'_, AppState>,
+    worker_id: i64,
+    period: String,
+) -> CmdResult<PayslipView> {
+    with_session(&state, |s| Ok(s.discard_payslip(worker_id, &period)?))
 }

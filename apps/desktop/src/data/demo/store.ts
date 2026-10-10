@@ -4,6 +4,7 @@
 import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "../backend";
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
+  IndicatorsView, PayrollIndicators, PayrollRow, PayrollView, PayslipMonth, PayslipView, Worker, WorkerInput,
   F29Inputs, F29Source, F29View, RcvImportReport, TaxDocInput, TaxDocLine, TaxProfile,
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
   Customer, CustomerDetail, Dashboard, DocLink, EffectInput, EntityRef, ExternalRef, ExternalRefInput, Line, LineInput,
@@ -24,6 +25,9 @@ import { addDays, daysBetween, todayIso } from "../../lib/format";
 import { CUSTOMER_NAMES, DEMO_COMPANY, PAYMENT_METHODS, PRODUCT_ROWS, SUPPLIER_NAMES, rng, rutDv } from "./seed";
 import reglas from "./reglas-demo.json";
 import { MANUAL_CODES, computeF29, type F29Note, type PurchaseKind } from "../f29";
+import indicadoresDemo from "./indicadores-demo.json";
+import { EMPTY_MONTH, buildPayslipInput, computeFor, inPeriod, indicatorsNote, periodRange, suggestedDays } from "../payrollApp";
+import type { PayslipInput, PayslipResult } from "../payroll";
 import { parseRcv, rcvPurchaseKind, rcvSaleNotOfBusiness, siiTypeFromText } from "../rcv";
 
 const TAX_PPM: number = reglas.values[0]!.value;
@@ -84,6 +88,8 @@ const INCOTERMS = incotermsJson as IncotermDef[];
 let uidSeq = 0;
 const uid = (p: string) => `${p}-${(++uidSeq).toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 const wait = <T,>(v: T, ms = 60) => new Promise<T>((r) => setTimeout(() => r(structuredClone(v)), ms));
+/** Pesos como en los textos del escritorio ("$43.811"). */
+const fmtClp = (v: number) => `${v < 0 ? "−" : ""}$${String(Math.abs(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`;
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 const now = () => new Date().toISOString().slice(0, 19) + "Z";
 
@@ -91,7 +97,7 @@ export class DemoBackend implements Backend {
   readonly kind = "demo" as const;
   readonly features: ReadonlySet<Feature> = new Set<Feature>([
     "dashboard", "clientes", "productos", "ventas", "compras", "comex", "negocio", "busqueda",
-    "usuarios", "documentos", "numeracion", "monedas", "auditoria", "inventario", "dinero", "impuestos",
+    "usuarios", "documentos", "numeracion", "monedas", "auditoria", "inventario", "dinero", "impuestos", "remuneraciones",
   ]);
   private company = { uid: "demo-company", name: DEMO_COMPANY, profile: "empresa" as BusinessProfile, created_at: "2026-01-02T12:00:00Z" };
   private biz: BusinessSettings;
@@ -2151,6 +2157,7 @@ export class DemoBackend implements Backend {
     return out;
   }
   private buildF29(period: string): F29View {
+    this.seedPayroll();
     const rec = this.f29s[period];
     const inputs = rec?.inputs ?? {};
     const checks: F29Note[] = [];
@@ -2169,18 +2176,30 @@ export class DemoBackend implements Backend {
     const suggested = prevRec?.status === "declarado" ? prevRec.declared?.declared_77 ?? null : null;
     const remnant = inputs.remnant_amount ?? suggested ?? 0;
     const p = this.taxProf;
+    const [pFrom, pTo] = periodRange(period);
+    const paid = this.slips.filter((x) => x.status === "emitida" && x.pay_date! >= pFrom && x.pay_date! <= pTo);
+    const slipTax = paid.reduce((a, x) => a + x.snap!.result.tax, 0);
+    const manualIn = inputs.manual ?? {};
+    const payroll_tax = paid.length ? { payslips: paid.length, amount: slipTax, applied: !("48" in manualIn) } : null;
+    const manual = { ...manualIn };
+    if (payroll_tax?.applied) {
+      manual["48"] = slipTax;
+      checks.push({ code: 48, severity: "info", text: `El código 48 suma el impuesto único de ${paid.length} liquidación(es) pagada(s) este mes (${fmtClp(slipTax)}).` });
+    } else if (payroll_tax && manualIn["48"] !== slipTax) {
+      checks.push({ code: 48, severity: "aviso", text: `Ingresaste el código 48 a mano, pero las liquidaciones pagadas este mes retienen ${fmtClp(slipTax)}. Revisa cuál corresponde.` });
+    }
     const result = computeF29({
       docs: docs.map((d) => ({ direction: d.direction, sii_type: d.sii_type, count: d.count, exempt: d.exempt_minor, net: d.net_minor, tax: d.tax_minor,
         tax_non_recoverable: d.tax_non_rec_minor, common_use_tax: d.common_use_tax_minor, kind: d.kind, not_of_business: d.not_of_business })),
       remnant: remnant > 0 ? { amount: remnant, utm_prev: inputs.utm_prev ?? 0, utm_cur: inputs.utm_cur ?? 0, utm_decimals: p.utm_decimals } : null,
       ppm: p.ppm_rate_ppm !== null ? { rate_ppm: p.ppm_rate_ppm, credit: inputs.ppm_credit ?? 0, loss: !!inputs.ppm_loss, base_override: inputs.ppm_base_override ?? null } : null,
-      common_use_ppm: inputs.common_use_ppm ?? p.common_use_ppm, manual: inputs.manual ?? {},
+      common_use_ppm: inputs.common_use_ppm ?? p.common_use_ppm, manual,
     });
     const periods = Object.entries(this.f29s).map(([k, v]) => ({ period: k, status: v.status, declared_91: v.declared?.declared_91 ?? null })).sort((a, b) => b.period.localeCompare(a.period));
     return {
       period, status: rec?.status ?? "borrador", profile: { ...p }, inputs: structuredClone(inputs), remnant_suggested: suggested, remnant_from: suggested !== null ? prev : null,
       sources, docs, result, checks, declared: rec?.status === "declarado" ? rec.declared : null,
-      due_date: p.due_day ? `${this.shiftPeriod(period, 1)}-${String(p.due_day).padStart(2, "0")}` : null, periods,
+      due_date: p.due_day ? `${this.shiftPeriod(period, 1)}-${String(p.due_day).padStart(2, "0")}` : null, periods, payroll_tax,
     };
   }
   private requireOpenF29(period: string): void {
@@ -2282,6 +2301,185 @@ export class DemoBackend implements Backend {
     if (r) { r.status = "borrador"; }
     this.log("f29.reabrir", "f29", p, reason.trim());
     return wait(this.buildF29(p));
+  }
+
+  /* ───────────────────────────── Remuneraciones ───────────────────────────── */
+
+  private workersList: Worker[] = [
+    {
+      id: 1, rut: `${15_482_337}-${rutDv(15_482_337)}`, name: "Camila Rojas Soto", is_owner: true, position: "Gerenta general", start_date: "2025-03-01", end_date: null, active: true,
+      terms: { contract: "sin_contrato", base_salary: 1_800_000, weekly_hours: null, gratification: "ninguna", gratification_amount: 0, overtime_surcharge_ppm: null,
+        afp: "Modelo", health: "fonasa", health_name: null, isapre_plan_uf_e4: null, isapre_plan_clp: null, afc: false, employer_contrib: true, accident: true, items: [], deductions: [] },
+    },
+    {
+      id: 2, rut: `${19_874_210}-${rutDv(19_874_210)}`, name: "Diego Fuentes Lagos", is_owner: false, position: "Vendedor", start_date: "2026-04-06", end_date: null, active: true,
+      terms: { contract: "indefinido", base_salary: 650_000, weekly_hours: 42, gratification: "art50", gratification_amount: 0, overtime_surcharge_ppm: null,
+        afp: "Uno", health: "fonasa", health_name: null, isapre_plan_uf_e4: null, isapre_plan_clp: null, afc: true, employer_contrib: true, accident: true,
+        items: [{ label: "Colación", amount: 40_000, taxable: false, lre: 2301 }, { label: "Movilización", amount: 30_000, taxable: false, lre: 2302 }], deductions: [] },
+    },
+  ];
+  private indicatorsByPeriod: Record<string, { indicators: PayrollIndicators; source: string | null; at: string }> = {
+    [indicadoresDemo.period]: { indicators: indicadoresDemo.indicators as unknown as PayrollIndicators, source: indicadoresDemo.source, at: "2026-10-02T13:00:00Z" },
+  };
+  private slips: { id: number; worker_id: number; period: string; status: "borrador" | "emitida" | "anulada"; month: PayslipMonth;
+    pay_date: string | null; emitted_at: string | null; voided_at: string | null; void_reason: string | null;
+    snap: { worker: Worker; month: PayslipMonth; input: PayslipInput; result: PayslipResult; source: string | null } | null }[] = [];
+  private slipSeq = 0;
+  private payrollSeeded = false;
+
+  /** La liquidación de septiembre del dueño ya está emitida (su impuesto pasa al F29). */
+  private seedPayroll(): void {
+    if (this.payrollSeeded) return;
+    this.payrollSeeded = true;
+    const w = this.workersList[0]!, period = indicadoresDemo.period;
+    const ind = this.indicatorsByPeriod[period]!;
+    const input = buildPayslipInput(w, ind.indicators, EMPTY_MONTH, suggestedDays(w, period));
+    this.slips.push({ id: ++this.slipSeq, worker_id: w.id, period, status: "emitida", month: { ...EMPTY_MONTH }, pay_date: `${period}-30`,
+      emitted_at: "2026-09-30T18:00:00Z", voided_at: null, void_reason: null,
+      snap: { worker: structuredClone(w), month: { ...EMPTY_MONTH }, input, result: computeFor(w, ind.indicators, input), source: ind.source } });
+  }
+  private indicatorsView(period: string): IndicatorsView {
+    const own = this.indicatorsByPeriod[period];
+    const prevKey = Object.keys(this.indicatorsByPeriod).filter((k) => k < period).sort().pop() ?? null;
+    const rec = own ?? (prevKey ? this.indicatorsByPeriod[prevKey] : undefined);
+    return {
+      period, indicators: structuredClone(rec?.indicators ?? { params: {}, afp: [] }), source: rec?.source ?? null,
+      saved: !!own, from_period: own ? null : prevKey, updated_at: own ? own.at : null,
+    };
+  }
+  private worker(id: number): Worker {
+    const w = this.workersList.find((x) => x.id === id);
+    if (!w) throw new AppError("no_encontrado", "No se encontró esa persona.");
+    return w;
+  }
+  private currentSlip(workerId: number, period: string) {
+    return this.slips.find((x) => x.worker_id === workerId && x.period === period && x.status !== "anulada");
+  }
+  private slipView(w: Worker, period: string, slip: (typeof this.slips)[number] | undefined): PayslipView {
+    const defaultPay = periodRange(period)[1];
+    if (slip && slip.status !== "borrador" && slip.snap) {
+      return structuredClone({ id: slip.id, period, status: slip.status, worker: slip.snap.worker, month: slip.snap.month, days_suggested: slip.snap.input.days ?? 30,
+        input: slip.snap.input, result: slip.snap.result, indicators_saved: true, indicators_source: slip.snap.source, pay_date: slip.pay_date,
+        default_pay_date: defaultPay, emitted_at: slip.emitted_at, voided_at: slip.voided_at, void_reason: slip.void_reason });
+    }
+    const ind = this.indicatorsView(period);
+    const month = slip ? structuredClone(slip.month) : { ...EMPTY_MONTH };
+    const days = suggestedDays(w, period);
+    const input = buildPayslipInput(w, ind.indicators, month, month.days ?? days);
+    const result = computeFor(w, ind.indicators, input);
+    if (!ind.saved) { result.complete = false; result.notes.unshift({ code: null, severity: "falta", text: indicatorsNote(ind.from_period) }); }
+    return { id: slip?.id ?? null, period, status: slip ? "borrador" : "nueva", worker: structuredClone(w), month, days_suggested: days, input, result,
+      indicators_saved: ind.saved, indicators_source: ind.source, pay_date: null, default_pay_date: defaultPay, emitted_at: null, voided_at: null, void_reason: null };
+  }
+
+  async workers(): Promise<Worker[]> { this.require("remuneraciones.ver"); return wait(this.workersList); }
+  async saveWorker(id: number | null, input: WorkerInput): Promise<Worker> {
+    this.require("remuneraciones.editar");
+    if (!input.name.trim()) throw new AppError("validacion", "Ingresa el nombre.");
+    const m = input.rut.replace(/[.\s]/g, "").toUpperCase().match(/^(\d{1,8})-?([\dK])$/);
+    if (!m || rutDv(Number(m[1])) !== m[2]) throw new AppError("validacion", "RUT: el dígito verificador no corresponde.");
+    const rut = `${Number(m[1])}-${m[2]}`;
+    const dup = this.workersList.find((x) => x.rut === rut && x.id !== id);
+    if (dup) throw new AppError("validacion", `Ya existe una persona con el RUT ${rut} (${dup.name}).`);
+    if (input.terms.base_salary <= 0) throw new AppError("validacion", input.is_owner ? "Ingresa el monto del sueldo empresarial." : "Ingresa el sueldo base.");
+    if (input.end_date && input.end_date < input.start_date) throw new AppError("validacion", "La fecha de término no puede ser anterior a la de ingreso.");
+    if (input.terms.health === "isapre" && !(input.terms.isapre_plan_uf_e4 ?? 0) && !(input.terms.isapre_plan_clp ?? 0)) throw new AppError("validacion", "Ingresa el valor del plan de Isapre (en UF o en pesos).");
+    if (input.terms.gratification === "fija" && input.terms.gratification_amount <= 0) throw new AppError("validacion", "Ingresa el monto de la gratificación pactada.");
+    const w: Worker = { ...structuredClone(input), rut, name: input.name.trim(), id: id ?? Math.max(0, ...this.workersList.map((x) => x.id)) + 1 };
+    if (id === null) this.workersList.push(w); else { const i = this.workersList.findIndex((x) => x.id === id); if (i < 0) throw new AppError("no_encontrado", "No se encontró esa persona."); this.workersList[i] = w; }
+    this.log(id === null ? "remuneraciones.persona.crear" : "remuneraciones.persona.editar", "trabajador", String(w.id));
+    return wait(w);
+  }
+  async payrollIndicators(period: string): Promise<IndicatorsView> { this.require("remuneraciones.ver"); return wait(this.indicatorsView(this.checkPeriod(period))); }
+  async savePayrollIndicators(period: string, indicators: PayrollIndicators, source: string | null): Promise<IndicatorsView> {
+    this.require("remuneraciones.editar");
+    const p = this.checkPeriod(period);
+    const b = indicators.params.tax_brackets ?? [];
+    let prev = 0;
+    b.forEach((x, i) => {
+      const last = i === b.length - 1;
+      if (x.up_to_utm_e4 == null ? !last : x.up_to_utm_e4 <= prev) throw new AppError("validacion", "Los tramos del impuesto único deben ir de menor a mayor (solo el último sin límite).");
+      prev = x.up_to_utm_e4 ?? prev;
+    });
+    if (indicators.afp.some((a) => !a.name.trim())) throw new AppError("validacion", "Cada AFP necesita un nombre.");
+    this.indicatorsByPeriod[p] = { indicators: structuredClone(indicators), source: source?.trim() || null, at: now() };
+    this.log("remuneraciones.indicadores", "indicadores", p);
+    return wait(this.indicatorsView(p));
+  }
+  async payroll(period: string): Promise<PayrollView> {
+    this.require("remuneraciones.ver");
+    this.seedPayroll();
+    const p = this.checkPeriod(period);
+    const ind = this.indicatorsView(p);
+    const rows: PayrollRow[] = [];
+    for (const w of this.workersList) {
+      const slip = this.currentSlip(w.id, p);
+      if (!slip && !(w.active && inPeriod(w, p))) continue;
+      const v = this.slipView(w, p, slip);
+      rows.push({ worker: v.worker, payslip_id: v.id, status: v.status as PayrollRow["status"], pay_date: v.pay_date, total_earnings: v.result.total_earnings,
+        tax: v.result.tax, to_pay: v.result.to_pay, employer_cost: v.result.employer_cost, complete: v.result.complete });
+    }
+    return wait({ period: p, indicators_saved: ind.saved, indicators_from: ind.from_period, rows, voided: this.slips.filter((x) => x.period === p && x.status === "anulada").length,
+      total_to_pay: rows.reduce((a, r) => a + r.to_pay, 0), total_tax: rows.reduce((a, r) => a + r.tax, 0), total_employer_cost: rows.reduce((a, r) => a + r.employer_cost, 0) }, 120);
+  }
+  async payslip(workerId: number, period: string): Promise<PayslipView> {
+    this.require("remuneraciones.ver");
+    this.seedPayroll();
+    const p = this.checkPeriod(period);
+    return wait(this.slipView(this.worker(workerId), p, this.currentSlip(workerId, p)));
+  }
+  async payslipById(id: number): Promise<PayslipView> {
+    this.require("remuneraciones.ver");
+    const s = this.slips.find((x) => x.id === id);
+    if (!s) throw new AppError("no_encontrado", "No se encontró esa liquidación.");
+    return wait(this.slipView(this.worker(s.worker_id), s.period, s));
+  }
+  async savePayslip(workerId: number, period: string, month: PayslipMonth): Promise<PayslipView> {
+    this.require("remuneraciones.editar");
+    const p = this.checkPeriod(period);
+    const w = this.worker(workerId);
+    if (month.days !== null && (month.days < 0 || month.days > 30)) throw new AppError("validacion", "Los días trabajados deben estar entre 0 y 30.");
+    if (month.overtime_hours_e2 < 0 || month.advance < 0) throw new AppError("validacion", "Las horas extra y el anticipo no pueden ser negativos.");
+    if ([...month.items, ...month.deductions].some((x) => !x.label.trim() || x.amount < 0)) throw new AppError("validacion", "Cada haber y descuento necesita un nombre y un monto positivo.");
+    const cur = this.currentSlip(workerId, p);
+    if (cur?.status === "emitida") throw new AppError("estado", "Esta liquidación ya está emitida: anúlala para prepararla de nuevo.");
+    if (cur) cur.month = structuredClone(month);
+    else this.slips.push({ id: ++this.slipSeq, worker_id: workerId, period: p, status: "borrador", month: structuredClone(month), pay_date: null, emitted_at: null, voided_at: null, void_reason: null, snap: null });
+    this.log("remuneraciones.liquidacion.borrador", "liquidacion", `${w.name} ${p}`);
+    return wait(this.slipView(w, p, this.currentSlip(workerId, p)));
+  }
+  async emitPayslip(workerId: number, period: string, payDate: string): Promise<PayslipView> {
+    this.require("remuneraciones.editar");
+    const p = this.checkPeriod(period);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(payDate)) throw new AppError("validacion", "La fecha de pago no es una fecha válida.");
+    if (payDate.slice(0, 7) < p) throw new AppError("validacion", "La fecha de pago no puede ser anterior al mes de la liquidación.");
+    const w = this.worker(workerId);
+    let cur = this.currentSlip(workerId, p);
+    const v = this.slipView(w, p, cur);
+    if (v.status === "emitida") throw new AppError("estado", "Esta liquidación ya está emitida.");
+    if (!v.result.complete) throw new AppError("validacion", `Para emitir la liquidación falta: ${v.result.notes.filter((n) => n.severity === "falta").map((n) => n.text).join(" ")}`);
+    this.requireOpenF29(payDate.slice(0, 7));
+    if (!cur) { cur = { id: ++this.slipSeq, worker_id: workerId, period: p, status: "borrador", month: v.month, pay_date: null, emitted_at: null, voided_at: null, void_reason: null, snap: null }; this.slips.push(cur); }
+    Object.assign(cur, { status: "emitida", pay_date: payDate, emitted_at: now(), snap: { worker: v.worker, month: v.month, input: v.input, result: v.result, source: v.indicators_source } });
+    this.log("remuneraciones.liquidacion.emitir", "liquidacion", String(cur.id));
+    return wait(this.slipView(w, p, cur));
+  }
+  async voidPayslip(id: number, reason: string): Promise<PayslipView> {
+    this.require("remuneraciones.editar");
+    if (reason.trim().length < 3) throw new AppError("validacion", "Indica el motivo de la anulación.");
+    const s = this.slips.find((x) => x.id === id);
+    if (!s) throw new AppError("no_encontrado", "No se encontró esa liquidación.");
+    if (s.status !== "emitida") throw new AppError("estado", "Solo se anulan liquidaciones emitidas.");
+    if (s.pay_date) this.requireOpenF29(s.pay_date.slice(0, 7));
+    Object.assign(s, { status: "anulada", voided_at: now(), void_reason: reason.trim() });
+    this.log("remuneraciones.liquidacion.anular", "liquidacion", String(id), reason.trim());
+    return wait(this.slipView(this.worker(s.worker_id), s.period, s));
+  }
+  async discardPayslip(workerId: number, period: string): Promise<PayslipView> {
+    this.require("remuneraciones.editar");
+    const p = this.checkPeriod(period);
+    this.slips = this.slips.filter((x) => !(x.worker_id === workerId && x.period === p && x.status === "borrador"));
+    return wait(this.slipView(this.worker(workerId), p, undefined));
   }
 }
 

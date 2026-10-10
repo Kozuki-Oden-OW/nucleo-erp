@@ -2,6 +2,25 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [Sin publicar] — Fase 10, hito B: sueldo empresarial y liquidaciones
+
+### Agregado
+- Remuneraciones (menú "Remuneraciones"): liquidación mensual del sueldo empresarial del dueño y de
+  los trabajadores, con haberes, gratificación legal, horas extra, topes imponibles en UF, AFP,
+  salud (Fonasa o Isapre con plan en UF o pesos), seguro de cesantía, impuesto único por tramos en
+  UTM, descuentos, anticipo, líquido a pagar y aportes del empleador (SIS, cotización del empleador
+  de la Ley 21.735, cesantía, accidentes del trabajo). Cada monto explica su cálculo.
+- Indicadores del mes: UF, UTM, ingreso mínimo, topes, tasas de AFP, aportes del empleador y tabla
+  del impuesto único, copiados de Previred y del SII con su fuente; cada mes parte con los del mes
+  anterior y pide confirmarlos. Ningún valor normativo está escrito en el programa.
+- Emitir congela la liquidación (indicadores, condiciones y resultado) con su fecha de pago; su
+  impuesto único pasa solo al código 48 del F29 del mes de pago. Anular exige motivo y que ese F29
+  no esté marcado como declarado.
+- Liquidación imprimible con el logo y los datos del negocio y línea de firma.
+- Casos golden compartidos Rust/TypeScript (`golden/remuneraciones.json`): guía MINEDUC (Patricio,
+  topes de AFP y Fonasa) y casos 2026 ilustrativos, verificados con un modelo de referencia
+  independiente.
+
 ## [Sin publicar] — Logo del negocio y firma del instalador
 
 ### Agregado

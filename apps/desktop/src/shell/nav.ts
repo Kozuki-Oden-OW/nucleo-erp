@@ -1,6 +1,6 @@
 // Árbol de navegación (Blueprint §4.2) y visibilidad por perfil (§1.3).
 import {
-  Banknote, BarChart3, Boxes, Building2, FileText, Home, Landmark, Package, Settings, Ship, ShoppingBag, ShoppingCart, Users,
+  Banknote, BarChart3, Boxes, Building2, FileText, HandCoins, Home, Landmark, Package, Settings, Ship, ShoppingBag, ShoppingCart, Users,
   type LucideIcon,
 } from "lucide-react";
 import type { Feature } from "../data/backend";
@@ -41,6 +41,7 @@ export const NAV: NavItem[] = [
   { id: "dinero", label: "Dinero", icon: Banknote, href: "/dinero", profiles: ALL, feature: "dinero", phase: 8, perm: "dinero.ver" },
   { id: "comex", label: "COMEX", icon: Ship, href: "/comex", profiles: ["empresa"], feature: "comex", phase: 9, perm: "comex.ver" },
   { id: "contabilidad", label: "Impuestos", icon: Landmark, href: "/contabilidad", profiles: ["negocio", "empresa"], feature: "impuestos", phase: 10, perm: "contabilidad.ver" },
+  { id: "remuneraciones", label: "Remuneraciones", icon: HandCoins, href: "/remuneraciones", profiles: ["negocio", "empresa"], feature: "remuneraciones", phase: 10, perm: "remuneraciones.ver" },
   { id: "analisis", label: "Análisis y reportes", icon: BarChart3, href: "/analisis", profiles: ["negocio", "empresa"], phase: 12, perm: "reportes.ver" },
   { id: "documentos", label: "Documentos", icon: FileText, href: "/documentos", profiles: ALL, feature: "documentos", phase: 4, perm: "documentos.ver" },
 ];
