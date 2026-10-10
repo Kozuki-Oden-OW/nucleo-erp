@@ -1,0 +1,575 @@
+{
+  "_nota": "Casos golden del borrador del F29 (nucleo-domain::f29 y apps/desktop/src/data/f29.ts). Datos y tasas de EJEMPLO, no valores reales: UTM y tasa de PPM ilustrativas. Fuente de las reglas: instrucciones del F29 del SII (nov-2024). Pendientes de revisión por un contador (D-07). Las claves de 'codes' son números de código del formulario; solo se comparan las que aparecen.",
+  "casos": [
+    {
+      "nombre": "Pyme típica: facturas, boletas, ND, NC, supermercado, activo fijo, DIN, sin derecho, boleta recibida, remanente reajustado, PPM y retenciones",
+      "estado": "pendiente_revision",
+      "input": {
+        "docs": [
+          {
+            "direction": "venta",
+            "sii_type": 33,
+            "count": 12,
+            "net": 10000000,
+            "exempt": 0,
+            "tax": 1900000
+          },
+          {
+            "direction": "venta",
+            "sii_type": 34,
+            "count": 1,
+            "net": 0,
+            "exempt": 500000,
+            "tax": 0
+          },
+          {
+            "direction": "venta",
+            "sii_type": 39,
+            "count": 85,
+            "net": 2000000,
+            "exempt": 0,
+            "tax": 380000
+          },
+          {
+            "direction": "venta",
+            "sii_type": 56,
+            "count": 1,
+            "net": 50000,
+            "exempt": 0,
+            "tax": 9500
+          },
+          {
+            "direction": "venta",
+            "sii_type": 61,
+            "count": 1,
+            "net": 200000,
+            "exempt": 0,
+            "tax": 38000
+          },
+          {
+            "direction": "compra",
+            "sii_type": 33,
+            "count": 20,
+            "net": 6000000,
+            "exempt": 0,
+            "tax": 1140000,
+            "kind": "giro"
+          },
+          {
+            "direction": "compra",
+            "sii_type": 33,
+            "count": 1,
+            "net": 50000,
+            "exempt": 0,
+            "tax": 9500,
+            "kind": "supermercado"
+          },
+          {
+            "direction": "compra",
+            "sii_type": 33,
+            "count": 1,
+            "net": 1000000,
+            "exempt": 0,
+            "tax": 190000,
+            "kind": "activo_fijo"
+          },
+          {
+            "direction": "compra",
+            "sii_type": 61,
+            "count": 1,
+            "net": 100000,
+            "exempt": 0,
+            "tax": 19000
+          },
+          {
+            "direction": "compra",
+            "sii_type": 914,
+            "count": 1,
+            "net": 1500000,
+            "exempt": 0,
+            "tax": 285000
+          },
+          {
+            "direction": "compra",
+            "sii_type": 33,
+            "count": 1,
+            "net": 50000,
+            "exempt": 0,
+            "tax": 0,
+            "tax_non_recoverable": 9500,
+            "kind": "sin_derecho"
+          },
+          {
+            "direction": "compra",
+            "sii_type": 39,
+            "count": 1,
+            "net": 16807,
+            "exempt": 0,
+            "tax": 0
+          }
+        ],
+        "remnant": {
+          "amount": 120000,
+          "utm_prev": 69000,
+          "utm_cur": 69345
+        },
+        "ppm": {
+          "rate_ppm": 2500
+        },
+        "manual": {
+          "48": 35000,
+          "151": 122000
+        }
+      },
+      "esperado": {
+        "codes": {
+          "503": 12,
+          "502": 1900000,
+          "586": 1,
+          "142": 500000,
+          "110": 85,
+          "111": 380000,
+          "512": 1,
+          "513": 9500,
+          "509": 1,
+          "510": 38000,
+          "538": 2251500,
+          "564": 1,
+          "521": 50000,
+          "519": 20,
+          "520": 1140000,
+          "761": 1,
+          "762": 9500,
+          "524": 1,
+          "525": 190000,
+          "527": 1,
+          "528": 19000,
+          "534": 1,
+          "535": 285000,
+          "504": 120600,
+          "537": 1726100,
+          "77": 0,
+          "89": 525400,
+          "48": 35000,
+          "151": 122000,
+          "563": 12350000,
+          "115": 2500,
+          "62": 30875,
+          "595": 713275,
+          "547": 713275,
+          "91": 713275
+        },
+        "complete": true
+      }
+    },
+    {
+      "nombre": "Variante: remanente convertido a UTM con 2 decimales (cambia el resultado en $60)",
+      "estado": "pendiente_revision",
+      "input": {
+        "docs": [
+          {
+            "direction": "venta",
+            "sii_type": 33,
+            "count": 12,
+            "net": 10000000,
+            "exempt": 0,
+            "tax": 1900000
+          },
+          {
+            "direction": "venta",
+            "sii_type": 34,
+            "count": 1,
+            "net": 0,
+            "exempt": 500000,
+            "tax": 0
+          },
+          {
+            "direction": "venta",
+            "sii_type": 39,
+            "count": 85,
+            "net": 2000000,
+            "exempt": 0,
+            "tax": 380000
+          },
+          {
+            "direction": "venta",
+            "sii_type": 56,
+            "count": 1,
+            "net": 50000,
+            "exempt": 0,
+            "tax": 9500
+          },
+          {
+            "direction": "venta",
+            "sii_type": 61,
+            "count": 1,
+            "net": 200000,
+            "exempt": 0,
+            "tax": 38000
+          },
+          {
+            "direction": "compra",
+            "sii_type": 33,
+            "count": 20,
+            "net": 6000000,
+            "exempt": 0,
+            "tax": 1140000,
+            "kind": "giro"
+          },
+          {
+            "direction": "compra",
+            "sii_type": 33,
+            "count": 1,
+            "net": 50000,
+            "exempt": 0,
+            "tax": 9500,
+            "kind": "supermercado"
+          },
+          {
+            "direction": "compra",
+            "sii_type": 33,
+            "count": 1,
+            "net": 1000000,
+            "exempt": 0,
+            "tax": 190000,
+            "kind": "activo_fijo"
+          },
+          {
+            "direction": "compra",
+            "sii_type": 61,
+            "count": 1,
+            "net": 100000,
+            "exempt": 0,
+            "tax": 19000
+          },
+          {
+            "direction": "compra",
+            "sii_type": 914,
+            "count": 1,
+            "net": 1500000,
+            "exempt": 0,
+            "tax": 285000
+          },
+          {
+            "direction": "compra",
+            "sii_type": 33,
+            "count": 1,
+            "net": 50000,
+            "exempt": 0,
+            "tax": 0,
+            "tax_non_recoverable": 9500,
+            "kind": "sin_derecho"
+          },
+          {
+            "direction": "compra",
+            "sii_type": 39,
+            "count": 1,
+            "net": 16807,
+            "exempt": 0,
+            "tax": 0
+          }
+        ],
+        "remnant": {
+          "amount": 120000,
+          "utm_prev": 69000,
+          "utm_cur": 69345,
+          "utm_decimals": 2
+        },
+        "ppm": {
+          "rate_ppm": 2500
+        },
+        "manual": {
+          "48": 35000,
+          "151": 122000
+        }
+      },
+      "esperado": {
+        "codes": {
+          "504": 120660,
+          "537": 1726160,
+          "89": 525340,
+          "595": 713215,
+          "91": 713215
+        },
+        "complete": true
+      }
+    },
+    {
+      "nombre": "Variante: DIN de activo fijo deja remanente; igual se pagan retenciones y PPM",
+      "estado": "pendiente_revision",
+      "input": {
+        "docs": [
+          {
+            "direction": "venta",
+            "sii_type": 33,
+            "count": 12,
+            "net": 10000000,
+            "exempt": 0,
+            "tax": 1900000
+          },
+          {
+            "direction": "venta",
+            "sii_type": 34,
+            "count": 1,
+            "net": 0,
+            "exempt": 500000,
+            "tax": 0
+          },
+          {
+            "direction": "venta",
+            "sii_type": 39,
+            "count": 85,
+            "net": 2000000,
+            "exempt": 0,
+            "tax": 380000
+          },
+          {
+            "direction": "venta",
+            "sii_type": 56,
+            "count": 1,
+            "net": 50000,
+            "exempt": 0,
+            "tax": 9500
+          },
+          {
+            "direction": "venta",
+            "sii_type": 61,
+            "count": 1,
+            "net": 200000,
+            "exempt": 0,
+            "tax": 38000
+          },
+          {
+            "direction": "compra",
+            "sii_type": 33,
+            "count": 20,
+            "net": 6000000,
+            "exempt": 0,
+            "tax": 1140000,
+            "kind": "giro"
+          },
+          {
+            "direction": "compra",
+            "sii_type": 33,
+            "count": 1,
+            "net": 50000,
+            "exempt": 0,
+            "tax": 9500,
+            "kind": "supermercado"
+          },
+          {
+            "direction": "compra",
+            "sii_type": 33,
+            "count": 1,
+            "net": 1000000,
+            "exempt": 0,
+            "tax": 190000,
+            "kind": "activo_fijo"
+          },
+          {
+            "direction": "compra",
+            "sii_type": 61,
+            "count": 1,
+            "net": 100000,
+            "exempt": 0,
+            "tax": 19000
+          },
+          {
+            "direction": "compra",
+            "sii_type": 914,
+            "count": 1,
+            "net": 1500000,
+            "exempt": 0,
+            "tax": 285000
+          },
+          {
+            "direction": "compra",
+            "sii_type": 33,
+            "count": 1,
+            "net": 50000,
+            "exempt": 0,
+            "tax": 0,
+            "tax_non_recoverable": 9500,
+            "kind": "sin_derecho"
+          },
+          {
+            "direction": "compra",
+            "sii_type": 39,
+            "count": 1,
+            "net": 16807,
+            "exempt": 0,
+            "tax": 0
+          },
+          {
+            "direction": "compra",
+            "sii_type": 914,
+            "count": 1,
+            "net": 4210526,
+            "exempt": 0,
+            "tax": 800000,
+            "kind": "activo_fijo"
+          }
+        ],
+        "remnant": {
+          "amount": 120000,
+          "utm_prev": 69000,
+          "utm_cur": 69345
+        },
+        "ppm": {
+          "rate_ppm": 2500
+        },
+        "manual": {
+          "48": 35000,
+          "151": 122000
+        }
+      },
+      "esperado": {
+        "codes": {
+          "536": 1,
+          "553": 800000,
+          "537": 2526100,
+          "77": 274600,
+          "89": 0,
+          "595": 187875,
+          "91": 187875
+        },
+        "complete": true
+      }
+    },
+    {
+      "nombre": "Variante: pérdida tributaria suspende el PPM",
+      "estado": "pendiente_revision",
+      "input": {
+        "docs": [
+          {
+            "direction": "venta",
+            "sii_type": 33,
+            "count": 12,
+            "net": 10000000,
+            "exempt": 0,
+            "tax": 1900000
+          },
+          {
+            "direction": "venta",
+            "sii_type": 34,
+            "count": 1,
+            "net": 0,
+            "exempt": 500000,
+            "tax": 0
+          },
+          {
+            "direction": "venta",
+            "sii_type": 39,
+            "count": 85,
+            "net": 2000000,
+            "exempt": 0,
+            "tax": 380000
+          },
+          {
+            "direction": "venta",
+            "sii_type": 56,
+            "count": 1,
+            "net": 50000,
+            "exempt": 0,
+            "tax": 9500
+          },
+          {
+            "direction": "venta",
+            "sii_type": 61,
+            "count": 1,
+            "net": 200000,
+            "exempt": 0,
+            "tax": 38000
+          },
+          {
+            "direction": "compra",
+            "sii_type": 33,
+            "count": 20,
+            "net": 6000000,
+            "exempt": 0,
+            "tax": 1140000,
+            "kind": "giro"
+          },
+          {
+            "direction": "compra",
+            "sii_type": 33,
+            "count": 1,
+            "net": 50000,
+            "exempt": 0,
+            "tax": 9500,
+            "kind": "supermercado"
+          },
+          {
+            "direction": "compra",
+            "sii_type": 33,
+            "count": 1,
+            "net": 1000000,
+            "exempt": 0,
+            "tax": 190000,
+            "kind": "activo_fijo"
+          },
+          {
+            "direction": "compra",
+            "sii_type": 61,
+            "count": 1,
+            "net": 100000,
+            "exempt": 0,
+            "tax": 19000
+          },
+          {
+            "direction": "compra",
+            "sii_type": 914,
+            "count": 1,
+            "net": 1500000,
+            "exempt": 0,
+            "tax": 285000
+          },
+          {
+            "direction": "compra",
+            "sii_type": 33,
+            "count": 1,
+            "net": 50000,
+            "exempt": 0,
+            "tax": 0,
+            "tax_non_recoverable": 9500,
+            "kind": "sin_derecho"
+          },
+          {
+            "direction": "compra",
+            "sii_type": 39,
+            "count": 1,
+            "net": 16807,
+            "exempt": 0,
+            "tax": 0
+          }
+        ],
+        "remnant": {
+          "amount": 120000,
+          "utm_prev": 69000,
+          "utm_cur": 69345
+        },
+        "ppm": {
+          "rate_ppm": 2500,
+          "loss": true
+        },
+        "manual": {
+          "48": 35000,
+          "151": 122000
+        }
+      },
+      "esperado": {
+        "codes": {
+          "30": 1,
+          "595": 682400,
+          "91": 682400
+        },
+        "absent": [
+          62,
+          563,
+          115
+        ],
+        "complete": true
+      }
+    }
+  ]
+}

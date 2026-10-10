@@ -8,6 +8,7 @@ pub mod comex_ops;
 pub mod company;
 pub mod core_ops;
 pub mod error;
+pub mod f29_ops;
 pub mod finance_ops;
 pub mod inventory_ops;
 pub mod keys;

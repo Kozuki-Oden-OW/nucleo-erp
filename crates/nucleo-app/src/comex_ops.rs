@@ -110,6 +110,9 @@ pub struct ImportInput {
     /// Seguro teórico (% de la mercadería) para el valor aduanero si no se contrató seguro.
     #[serde(default)]
     pub notional_insurance_ppm: Option<i64>,
+    /// Flete según el AWB o BL (en la moneda de la importación), solo para el valor aduanero.
+    #[serde(default)]
+    pub transport_freight_minor: Option<i64>,
     pub notes: Option<String>,
     pub items: Vec<ImportItemInput>,
 }
@@ -222,6 +225,11 @@ fn landed_input(h: &ImportRow, items: &[ImportItemRow], costs: &[ImportCostView]
         vat_ppm: h.vat_ppm,
         vat_recoverable: h.vat_recoverable,
         notional_insurance_ppm: h.notional_insurance_ppm,
+        customs_freight_clp: h.transport_freight_minor.and_then(|f| {
+            h.rate_e6
+                .or((h.currency_code == "CLP").then_some(1_000_000))
+                .map(|r| to_clp(f, h.currency_decimals, r))
+        }),
         items: items
             .iter()
             .map(|i| LandedItem {
@@ -388,6 +396,14 @@ impl CompanySession {
                 "el seguro teórico debe estar entre 0 % y 100 %".into(),
             ));
         }
+        if input
+            .transport_freight_minor
+            .is_some_and(|v| !(0..=MAX_PRICE_MINOR).contains(&v))
+        {
+            return Err(AppError::Validation(
+                "revisa el flete del documento de transporte".into(),
+            ));
+        }
         if input.items.is_empty() || input.items.len() > MAX_LINES {
             return Err(AppError::Validation(
                 "agrega al menos un producto a la importación".into(),
@@ -475,6 +491,7 @@ impl CompanySession {
             vat_ppm: input.vat_ppm,
             vat_recoverable: input.vat_recoverable,
             notional_insurance_ppm: input.notional_insurance_ppm,
+            transport_freight_minor: input.transport_freight_minor,
             notes: input
                 .notes
                 .as_deref()

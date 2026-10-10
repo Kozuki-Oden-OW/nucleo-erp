@@ -13,3 +13,6 @@ dist-web/
 *.privkey
 nucleo-bench.db*
 dist-demo/
+
+# Material de referencia local (no se versiona)
+/contabilidad/

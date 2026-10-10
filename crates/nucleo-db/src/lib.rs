@@ -16,6 +16,7 @@ pub mod products;
 pub mod purchases;
 pub mod sales;
 pub mod suppliers;
+pub mod taxes;
 pub mod users;
 
 use rusqlite::{Connection, OpenFlags};

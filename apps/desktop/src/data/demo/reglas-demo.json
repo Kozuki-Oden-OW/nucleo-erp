@@ -16,7 +16,7 @@
     {
       "code": "SEGURO_TEORICO_PPM",
       "value": 20000,
-      "source": "Valor ilustrativo para la demostración: seguro teórico cuando no se contrata seguro (Resolución DNA 2307 del 15-05-2019, cap. II, numeral 2.7 letra a, citada en una declaración jurada real). Verificar el porcentaje con el agente de aduana."
+      "source": "Seguro teórico: 2 % del FOB declarado, en cualquier vía de transporte, cuando no se acredita una prima real (Compendio de Normas Aduaneras, cap. II, 2.7 letra a; confirmado por el agente de aduana, oct-2026)."
     },
     {
       "code": "COMEX_PLATAFORMA_MAX_USD_CENTS",
@@ -26,7 +26,17 @@
     {
       "code": "COMEX_COURIER_MAX_USD_CENTS",
       "value": 300000,
-      "source": "Valor ilustrativo para la demostración: despacho simplificado por empresas de envío rápido hasta USD 3.000 (Aduana, 2019). Sobre ese monto se requiere agente de aduana. Verificar vigencia."
+      "source": "Courier: hasta USD 3.000 FOB la empresa de envío rápido tramita y paga derechos e IVA a nombre del importador; sobre ese monto se requiere agente de aduana (Compendio de Normas Aduaneras; confirmado por el agente de aduana, oct-2026)."
+    },
+    {
+      "code": "COMEX_CARGA_SIN_AGENTE_MAX_USD_CENTS",
+      "value": 100000,
+      "source": "Carga general (no courier): sin agente de aduana solo hasta USD 1.000 FOB, con la declaración simplificada (DIPS). Confirmado por el agente de aduana, oct-2026."
+    },
+    {
+      "code": "COMEX_EXPORT_SIN_AGENTE_MAX_USD_CENTS",
+      "value": 200000,
+      "source": "Exportación: hasta USD 2.000 FOB se puede tramitar sin agente (DUS o DUSSI); sobre ese monto, con agente (Compendio de Normas Aduaneras, cap. IV). Confirmado por el agente de aduana, oct-2026."
     }
   ]
 }

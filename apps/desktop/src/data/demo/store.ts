@@ -4,6 +4,7 @@
 import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "../backend";
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
+  F29Inputs, F29Source, F29View, RcvImportReport, TaxDocInput, TaxDocLine, TaxProfile,
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
   Customer, CustomerDetail, Dashboard, DocLink, EffectInput, EntityRef, ExternalRef, ExternalRefInput, Line, LineInput,
   NewCustomer, NewProduct, NewUser, Payment, PermissionRow,
@@ -22,6 +23,8 @@ import { DEMO_PERMISSIONS, DEMO_ROLES } from "./roles";
 import { addDays, daysBetween, todayIso } from "../../lib/format";
 import { CUSTOMER_NAMES, DEMO_COMPANY, PAYMENT_METHODS, PRODUCT_ROWS, SUPPLIER_NAMES, rng, rutDv } from "./seed";
 import reglas from "./reglas-demo.json";
+import { MANUAL_CODES, computeF29, type F29Note, type PurchaseKind } from "../f29";
+import { parseRcv, rcvPurchaseKind, rcvSaleNotOfBusiness, siiTypeFromText } from "../rcv";
 
 const TAX_PPM: number = reglas.values[0]!.value;
 const TAX_SOURCE = `${reglas.code} · ${reglas.values[0]!.source}`;
@@ -71,7 +74,7 @@ interface ImpRec {
   uid: string; number: string; supplier_uid: string | null; incoterm: string | null; incoterm_version: string | null; transport_mode: TransportMode | null;
   origin_country: string | null; origin_port: string | null; destination_port: string | null; currency_code: string; rate_e6: number | null;
   stage: ImportStage; purchase_date: string | null; production_eta: string | null; shipment_date: string | null; eta: string | null;
-  arrival_date: string | null; reception_date: string | null; allocation_basis: Basis; vat_ppm: number | null; vat_recoverable: boolean; notional_insurance_ppm: number | null;
+  arrival_date: string | null; reception_date: string | null; allocation_basis: Basis; vat_ppm: number | null; vat_recoverable: boolean; notional_insurance_ppm: number | null; transport_freight_minor: number | null;
   fob_minor: number | null; landed_total_clp: number | null; estimated_landed_clp: number | null; estimated_at: string | null;
   notes: string | null; void_reason: string | null; created_at: string; items: ImpItemRec[]; costs: ImpCostRec[];
   stages: StageChange[]; etas: EtaChange[]; receipts: { number: string; date: string }[]; timeline: { at: string; text: string }[];
@@ -88,7 +91,7 @@ export class DemoBackend implements Backend {
   readonly kind = "demo" as const;
   readonly features: ReadonlySet<Feature> = new Set<Feature>([
     "dashboard", "clientes", "productos", "ventas", "compras", "comex", "negocio", "busqueda",
-    "usuarios", "documentos", "numeracion", "monedas", "auditoria", "inventario", "dinero",
+    "usuarios", "documentos", "numeracion", "monedas", "auditoria", "inventario", "dinero", "impuestos",
   ]);
   private company = { uid: "demo-company", name: DEMO_COMPANY, profile: "empresa" as BusinessProfile, created_at: "2026-01-02T12:00:00Z" };
   private biz: BusinessSettings;
@@ -1373,6 +1376,7 @@ export class DemoBackend implements Backend {
       currency_decimals: this.impDecimals(h.currency_code),
       rate_e6: h.rate_e6 ?? (h.currency_code === "CLP" ? 1_000_000 : 0),
       basis: h.allocation_basis, vat_ppm: h.vat_ppm, vat_recoverable: h.vat_recoverable, notional_insurance_ppm: h.notional_insurance_ppm,
+      customs_freight_clp: h.transport_freight_minor !== null ? toClp(h.transport_freight_minor, this.impDecimals(h.currency_code), h.rate_e6 ?? (h.currency_code === "CLP" ? 1_000_000 : 0)) : null,
       items: h.items.map((i) => ({ qty_milli: i.qty_milli, unit_price_minor: i.unit_price_minor, weight_g: i.weight_g, volume_cm3: i.volume_cm3, duty_ppm: i.duty_ppm })),
       costs: h.costs.filter((c) => c.status === "vigente").map((c) => ({ kind: c.kind, amount_clp: this.impCostClp(c, h), basis: c.allocation_basis, recoverable: c.recoverable_tax })),
     });
@@ -1439,7 +1443,7 @@ export class DemoBackend implements Backend {
       destination_port: t(input.destination_port), currency_code: input.currency_code, rate_e6: input.rate_e6,
       purchase_date: input.purchase_date || null, production_eta: input.production_eta || null, shipment_date: input.shipment_date || null,
       arrival_date: input.arrival_date || null, allocation_basis: input.allocation_basis, vat_ppm: input.vat_ppm,
-      vat_recoverable: input.vat_recoverable, notional_insurance_ppm: input.notional_insurance_ppm ?? null, notes: t(input.notes),
+      vat_recoverable: input.vat_recoverable, notional_insurance_ppm: input.notional_insurance_ppm ?? null, transport_freight_minor: input.transport_freight_minor ?? null, notes: t(input.notes),
     };
   }
   private impSetEta(h: ImpRec, eta: string, reason: string | null): boolean {
@@ -1681,7 +1685,7 @@ export class DemoBackend implements Backend {
     const base = (n: string, stage: ImportStage, extra: Partial<ImpRec>): ImpRec => ({
       uid: `imp-${n}`, number: this.next("IMP"), supplier_uid: sup.uid, incoterm: "FOB", incoterm_version: "2020", transport_mode: "maritimo", origin_country: "China",
       origin_port: "Ningbo", destination_port: "San Antonio", currency_code: "USD", rate_e6: 945_000_000, stage, purchase_date: null, production_eta: null,
-      shipment_date: null, eta: null, arrival_date: null, reception_date: null, allocation_basis: "valor", vat_ppm: TAX_PPM, vat_recoverable: true, notional_insurance_ppm: null, fob_minor: null,
+      shipment_date: null, eta: null, arrival_date: null, reception_date: null, allocation_basis: "valor", vat_ppm: TAX_PPM, vat_recoverable: true, notional_insurance_ppm: null, transport_freight_minor: null, fob_minor: null,
       landed_total_clp: null, estimated_landed_clp: null, estimated_at: null, notes: null, void_reason: null, created_at: now(), items: [], costs: [], stages: [], etas: [],
       receipts: [], timeline: [], ...extra,
     });
@@ -2066,6 +2070,211 @@ export class DemoBackend implements Backend {
     const n = Math.min(366, Math.max(1, days));
     return wait(this.calendarItems(this.today, addDays(this.today, n - 1)));
   }
+
+  /* ───────────────────────────── Impuestos: F29 ───────────────────────────── */
+
+  private taxProf: TaxProfile = { regime: "14d3", ppm_rate_ppm: 2_500, utm_decimals: null, due_day: 20, common_use_ppm: null };
+  private taxDocs: (TaxDocLine & { period: string; id: number })[] = [];
+  private taxBatches: { id: number; period: string; direction: "venta" | "compra"; file_name: string | null; rows: number; at: string }[] = [];
+  private f29s: Record<string, { status: "borrador" | "declarado"; inputs: F29Inputs; declared: F29View["declared"] }> = {
+    // El F29 de hace dos meses ya está declarado; el del mes pasado es el que toca preparar.
+    [addDays(addDays(todayIso().slice(0, 8) + "01", -1).slice(0, 8) + "01", -1).slice(0, 7)]: { status: "declarado", inputs: {}, declared: { declared_77: 0, declared_91: 412_380, folio: "7451230987", at: `${addDays(todayIso().slice(0, 8) + "01", -12)}T15:00:00Z` } },
+  };
+  private taxSeq = 0;
+
+  private checkPeriod(p: string): string {
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(p.trim())) throw new AppError("validacion", "El período debe tener el formato AAAA-MM.");
+    return p.trim();
+  }
+  private shiftPeriod(p: string, months: number): string {
+    const y = Number(p.slice(0, 4)), m = Number(p.slice(5, 7));
+    const idx = y * 12 + (m - 1) + months;
+    return `${String(Math.floor(idx / 12)).padStart(4, "0")}-${String((idx % 12 + 12) % 12 + 1).padStart(2, "0")}`;
+  }
+  private nucleoTaxDocs(period: string, sales: boolean, purchases: boolean, checks: F29Note[]): TaxDocLine[] {
+    const out: TaxDocLine[] = [];
+    const base = { id: null, tax_non_rec_minor: 0, common_use_tax_minor: 0, not_of_business: false, count: 1, origin: "nucleo" as const };
+    const check = (severity: F29Note["severity"], text: string) => checks.push({ code: null, severity, text });
+    if (sales) {
+      let pending = 0, pendingTotal = 0, voided = 0;
+      for (const s of this.sales) {
+        const date = s.external_ref?.issue_date ?? s.issue_date;
+        if (!date.startsWith(period)) continue;
+        if (s.commercial_state === "anulada") { if (s.documentation_state === "documentada") voided++; continue; }
+        if (!["efectuada", "cerrada"].includes(s.commercial_state)) continue;
+        if (s.documentation_state === "pendiente") { pending++; pendingTotal += s.totals.total_minor; continue; }
+        if (s.documentation_state !== "documentada") continue;
+        const t = siiTypeFromText(s.external_ref?.doc_kind ?? null, s.totals.tax_minor, s.totals.exempt_minor);
+        if (t === null) continue;
+        out.push({ ...base, direction: "venta", sii_type: t, folio: s.external_ref?.external_number ?? null, issue_date: date,
+          counterpart: s.customer_uid ? this.customers.find((c) => c.uid === s.customer_uid)?.name ?? null : null,
+          exempt_minor: s.totals.exempt_minor, net_minor: s.totals.net_minor, tax_minor: s.totals.tax_minor, kind: null, reference: s.number });
+      }
+      if (pending) check("aviso", `${pending} venta(s) del mes por ${clpText(pendingTotal)} siguen sin documentar: no entran al borrador hasta que anotes su factura o boleta.`);
+      if (voided) check("aviso", `${voided} venta(s) documentada(s) se anularon: si emitiste la factura o boleta, regístrala con su nota de crédito.`);
+    }
+    if (purchases) {
+      for (const p of this.purchases.filter((x) => x.status === "registrada" && x.issue_date.startsWith(period))) {
+        const t = siiTypeFromText(p.doc_kind, p.totals.tax_minor, p.totals.exempt_minor);
+        if (t === null) continue;
+        out.push({ ...base, direction: "compra", sii_type: t, folio: p.doc_number, issue_date: p.issue_date, counterpart: this.supplierName(p.supplier_uid),
+          exempt_minor: p.totals.exempt_minor, net_minor: p.totals.net_minor, tax_minor: p.totals.tax_minor, kind: "giro", reference: p.number });
+      }
+      const gastos = this.gastos.filter((g) => g.status === "registrado" && g.tax > 0 && g.date.startsWith(period));
+      if (gastos.length) check("aviso", `${gastos.length} gasto(s) con IVA se tomaron como facturas del giro. Si alguno se pagó con boleta, su IVA no da crédito: importa el registro de compras del SII para usar lo que realmente recibiste.`);
+      for (const g of gastos) out.push({ ...base, direction: "compra", sii_type: 33, folio: null, issue_date: g.date,
+        counterpart: g.supplier_uid ? this.supplierName(g.supplier_uid) : g.description, exempt_minor: 0, net_minor: g.net, tax_minor: g.tax, kind: "giro", reference: g.number });
+      let estimated = 0;
+      const din = new Map<string, TaxDocLine>();
+      for (const h of this.imps.filter((x) => x.stage !== "anulada")) {
+        for (const c of h.costs.filter((x) => x.kind === "iva_importacion" && x.status === "vigente" && x.cost_date?.startsWith(period))) {
+          if (c.is_estimate) { estimated++; continue; }
+          const amount = this.impCostClp(c, h);
+          const key = c.document_ref ?? `${h.number}·${c.cost_date}`;
+          const d = din.get(key) ?? { ...base, direction: "compra" as const, sii_type: 914, folio: c.document_ref, issue_date: c.cost_date, counterpart: "Servicio Nacional de Aduanas",
+            exempt_minor: 0, net_minor: 0, tax_minor: 0, kind: c.recoverable_tax ? "giro" as const : "sin_derecho" as const, reference: h.number };
+          if (c.recoverable_tax) d.tax_minor += amount; else d.tax_non_rec_minor += amount;
+          din.set(key, d);
+        }
+      }
+      out.push(...din.values());
+      if (estimated) check("aviso", `${estimated} IVA de importación del mes todavía es estimado: no entra al borrador hasta que ingreses el monto real de la declaración de ingreso.`);
+    }
+    return out;
+  }
+  private buildF29(period: string): F29View {
+    const rec = this.f29s[period];
+    const inputs = rec?.inputs ?? {};
+    const checks: F29Note[] = [];
+    const sources: F29Source[] = (["venta", "compra"] as const).map((dir) => {
+      const b = this.taxBatches.filter((x) => x.period === period && x.direction === dir);
+      const last = b[b.length - 1];
+      return last ? { direction: dir, source: "rcv" as const, file_name: last.file_name, imported_at: last.at, rows: b.reduce((a, x) => a + x.rows, 0) }
+        : { direction: dir, source: "nucleo" as const, file_name: null, imported_at: null, rows: 0 };
+    });
+    const docs: TaxDocLine[] = this.taxDocs.filter((d) => d.period === period).map(({ period: _p, ...d }) => d);
+    const useV = sources[0]!.source === "nucleo", useC = sources[1]!.source === "nucleo";
+    docs.push(...this.nucleoTaxDocs(period, useV, useC, checks));
+    if (useV || useC) checks.push({ code: null, severity: "info", text: "Parte del borrador usa los datos de NÚCLEO. Para que coincida con sii.cl, importa el Registro de Compras y Ventas del mes." });
+    const prev = this.shiftPeriod(period, -1);
+    const prevRec = this.f29s[prev];
+    const suggested = prevRec?.status === "declarado" ? prevRec.declared?.declared_77 ?? null : null;
+    const remnant = inputs.remnant_amount ?? suggested ?? 0;
+    const p = this.taxProf;
+    const result = computeF29({
+      docs: docs.map((d) => ({ direction: d.direction, sii_type: d.sii_type, count: d.count, exempt: d.exempt_minor, net: d.net_minor, tax: d.tax_minor,
+        tax_non_recoverable: d.tax_non_rec_minor, common_use_tax: d.common_use_tax_minor, kind: d.kind, not_of_business: d.not_of_business })),
+      remnant: remnant > 0 ? { amount: remnant, utm_prev: inputs.utm_prev ?? 0, utm_cur: inputs.utm_cur ?? 0, utm_decimals: p.utm_decimals } : null,
+      ppm: p.ppm_rate_ppm !== null ? { rate_ppm: p.ppm_rate_ppm, credit: inputs.ppm_credit ?? 0, loss: !!inputs.ppm_loss, base_override: inputs.ppm_base_override ?? null } : null,
+      common_use_ppm: inputs.common_use_ppm ?? p.common_use_ppm, manual: inputs.manual ?? {},
+    });
+    const periods = Object.entries(this.f29s).map(([k, v]) => ({ period: k, status: v.status, declared_91: v.declared?.declared_91 ?? null })).sort((a, b) => b.period.localeCompare(a.period));
+    return {
+      period, status: rec?.status ?? "borrador", profile: { ...p }, inputs: structuredClone(inputs), remnant_suggested: suggested, remnant_from: suggested !== null ? prev : null,
+      sources, docs, result, checks, declared: rec?.status === "declarado" ? rec.declared : null,
+      due_date: p.due_day ? `${this.shiftPeriod(period, 1)}-${String(p.due_day).padStart(2, "0")}` : null, periods,
+    };
+  }
+  private requireOpenF29(period: string): void {
+    if (this.f29s[period]?.status === "declarado") throw new AppError("estado", "Este F29 está marcado como declarado: reábrelo para cambiarlo.");
+  }
+  async taxProfile(): Promise<TaxProfile> { this.require("contabilidad.ver"); return wait({ ...this.taxProf }); }
+  async saveTaxProfile(profile: TaxProfile): Promise<TaxProfile> {
+    this.require("contabilidad.editar");
+    if (!["14d3", "14d8", "14a"].includes(profile.regime)) throw new AppError("validacion", "Régimen tributario no válido.");
+    if (profile.ppm_rate_ppm !== null && (profile.ppm_rate_ppm < 0 || profile.ppm_rate_ppm > 100_000)) throw new AppError("validacion", "La tasa de PPM debe estar entre 0 % y 10 %.");
+    this.taxProf = { ...profile };
+    this.log("impuestos.perfil", "impuestos", "perfil");
+    return wait({ ...this.taxProf });
+  }
+  async f29(period: string): Promise<F29View> { this.require("contabilidad.ver"); return wait(this.buildF29(this.checkPeriod(period)), 120); }
+  async saveF29Inputs(period: string, inputs: F29Inputs): Promise<F29View> {
+    this.require("contabilidad.editar");
+    const p = this.checkPeriod(period);
+    this.requireOpenF29(p);
+    for (const k of Object.keys(inputs.manual ?? {})) if (!MANUAL_CODES.includes(Number(k) as never)) throw new AppError("validacion", `El código ${k} no se ingresa a mano.`);
+    this.f29s[p] = { status: "borrador", declared: null, ...this.f29s[p], inputs: structuredClone(inputs) };
+    this.log("f29.datos", "f29", p);
+    return wait(this.buildF29(p));
+  }
+  async importRcv(period: string, direction: "venta" | "compra", fileName: string | null, text: string): Promise<RcvImportReport> {
+    this.require("contabilidad.editar");
+    const p = this.checkPeriod(period);
+    this.requireOpenF29(p);
+    let parsed;
+    try { parsed = parseRcv(text); } catch (e) { throw new AppError("validacion", `${(e as Error).message[0]!.toUpperCase()}${(e as Error).message.slice(1)}.`); }
+    if (!parsed.rows.length) throw new AppError("validacion", "El archivo no tiene documentos.");
+    this.taxDocs = this.taxDocs.filter((d) => !(d.period === p && d.direction === direction && d.origin === "rcv"));
+    this.taxBatches = this.taxBatches.filter((b) => !(b.period === p && b.direction === direction));
+    this.taxBatches.push({ id: ++this.taxSeq, period: p, direction, file_name: fileName, rows: parsed.rows.length, at: now() });
+    for (const r of parsed.rows) {
+      this.taxDocs.push({ period: p, id: ++this.taxSeq, origin: "rcv", direction, sii_type: r.sii_type, folio: r.folio, issue_date: r.issue_date,
+        counterpart: r.counterpart_name ?? r.counterpart_rut, count: r.count, exempt_minor: r.exempt, net_minor: r.net, tax_minor: r.tax,
+        tax_non_rec_minor: r.tax_non_recoverable, common_use_tax_minor: r.common_use_tax, kind: direction === "compra" ? rcvPurchaseKind(r) : null,
+        not_of_business: direction === "venta" && rcvSaleNotOfBusiness(r), reference: null });
+    }
+    this.log("f29.importar", "f29", p);
+    const otherPeriod = parsed.rows.filter((r) => r.issue_date && !r.issue_date.startsWith(p)).length;
+    return wait({ rows: parsed.rows.length, skipped: parsed.skipped.map(([n, m]) => `Línea ${n}: ${m}`), other_period: otherPeriod, view: this.buildF29(p) }, 300);
+  }
+  async clearRcv(period: string, direction: "venta" | "compra"): Promise<F29View> {
+    this.require("contabilidad.editar");
+    const p = this.checkPeriod(period);
+    this.requireOpenF29(p);
+    this.taxDocs = this.taxDocs.filter((d) => !(d.period === p && d.direction === direction && d.origin === "rcv"));
+    this.taxBatches = this.taxBatches.filter((b) => !(b.period === p && b.direction === direction));
+    this.log("f29.quitar_registro", "f29", p);
+    return wait(this.buildF29(p));
+  }
+  async addTaxDocument(period: string, d: TaxDocInput): Promise<F29View> {
+    this.require("contabilidad.editar");
+    const p = this.checkPeriod(period);
+    this.requireOpenF29(p);
+    if (!d.sii_type || d.sii_type > 999) throw new AppError("validacion", "Revisa el tipo de documento.");
+    this.taxDocs.push({ period: p, id: ++this.taxSeq, origin: "manual", direction: d.direction, sii_type: d.sii_type, folio: d.folio || null, issue_date: d.issue_date || null,
+      counterpart: d.counterpart_name || d.counterpart_rut || null, count: d.doc_count ?? 1, exempt_minor: d.exempt_minor, net_minor: d.net_minor, tax_minor: d.tax_minor,
+      tax_non_rec_minor: 0, common_use_tax_minor: 0, kind: d.direction === "compra" ? d.purchase_kind ?? "giro" : null, not_of_business: !!d.not_of_business, reference: null });
+    this.log("f29.documento", "f29", p);
+    return wait(this.buildF29(p));
+  }
+  async deleteTaxDocument(id: number): Promise<F29View> {
+    this.require("contabilidad.editar");
+    const d = this.taxDocs.find((x) => x.id === id);
+    if (!d) throw new AppError("no_encontrado", "No se encontró el documento.");
+    this.requireOpenF29(d.period);
+    if (d.origin !== "manual") throw new AppError("validacion", "Solo se quitan documentos ingresados a mano; para el registro del SII, vuelve a importarlo.");
+    this.taxDocs = this.taxDocs.filter((x) => x.id !== id);
+    this.log("f29.documento_quitar", "f29", d.period);
+    return wait(this.buildF29(d.period));
+  }
+  async setTaxDocumentKind(id: number, kind: string): Promise<F29View> {
+    this.require("contabilidad.editar");
+    const d = this.taxDocs.find((x) => x.id === id);
+    if (!d) throw new AppError("no_encontrado", "No se encontró el documento.");
+    this.requireOpenF29(d.period);
+    if (d.direction !== "compra") throw new AppError("validacion", "Solo las compras se clasifican.");
+    d.kind = kind as PurchaseKind;
+    this.log("f29.clasificar", "f29", d.period);
+    return wait(this.buildF29(d.period));
+  }
+  async markF29Declared(period: string, declared77: number, declared91: number, folio: string | null): Promise<F29View> {
+    this.require("contabilidad.editar");
+    const p = this.checkPeriod(period);
+    this.requireOpenF29(p);
+    if (declared77 < 0 || declared91 < 0) throw new AppError("validacion", "Revisa los montos declarados.");
+    this.f29s[p] = { inputs: this.f29s[p]?.inputs ?? {}, status: "declarado", declared: { declared_77: declared77, declared_91: declared91, folio: folio || null, at: now() } };
+    this.log("f29.declarar", "f29", p);
+    return wait(this.buildF29(p));
+  }
+  async reopenF29(period: string, reason: string): Promise<F29View> {
+    this.require("contabilidad.editar");
+    const p = this.checkPeriod(period);
+    if (!reason.trim()) throw new AppError("validacion", "Indica por qué se reabre.");
+    const r = this.f29s[p];
+    if (r) { r.status = "borrador"; }
+    this.log("f29.reabrir", "f29", p, reason.trim());
+    return wait(this.buildF29(p));
+  }
 }
 
 /** SHA-256 real del archivo (si el navegador lo permite), igual que el escritorio. */
@@ -2077,3 +2286,5 @@ async function sha256Hex(f: Blob): Promise<string> {
     return "";
   }
 }
+
+const clpText = (v: number) => `$${Math.round(v).toLocaleString("es-CL")}`;

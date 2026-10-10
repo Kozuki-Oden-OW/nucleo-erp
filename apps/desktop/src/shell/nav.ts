@@ -40,7 +40,7 @@ export const NAV: NavItem[] = [
   { id: "inventario", label: "Inventario", icon: Boxes, href: "/inventario", profiles: ALL, feature: "inventario", phase: 7, perm: "inventario.ver" },
   { id: "dinero", label: "Dinero", icon: Banknote, href: "/dinero", profiles: ALL, feature: "dinero", phase: 8, perm: "dinero.ver" },
   { id: "comex", label: "COMEX", icon: Ship, href: "/comex", profiles: ["empresa"], feature: "comex", phase: 9, perm: "comex.ver" },
-  { id: "contabilidad", label: "Contabilidad", icon: Landmark, href: "/contabilidad", profiles: ["empresa"], phase: 10, perm: "contabilidad.ver" },
+  { id: "contabilidad", label: "Impuestos", icon: Landmark, href: "/contabilidad", profiles: ["negocio", "empresa"], feature: "impuestos", phase: 10, perm: "contabilidad.ver" },
   { id: "analisis", label: "Análisis y reportes", icon: BarChart3, href: "/analisis", profiles: ["negocio", "empresa"], phase: 12, perm: "reportes.ver" },
   { id: "documentos", label: "Documentos", icon: FileText, href: "/documentos", profiles: ALL, feature: "documentos", phase: 4, perm: "documentos.ver" },
 ];

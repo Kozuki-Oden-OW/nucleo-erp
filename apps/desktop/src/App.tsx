@@ -17,6 +17,7 @@ import { Proximamente } from "./screens/Proximamente";
 import { RecoveryKey } from "./screens/RecoveryKey";
 import { Customers } from "./screens/clientes/Customers";
 import { Comex } from "./screens/comex/Comex";
+import { Impuestos } from "./screens/impuestos/Impuestos";
 import { ImportEditLoader, ImportEditor } from "./screens/comex/ImportEditor";
 import { ImportView } from "./screens/comex/ImportView";
 import { Purchases } from "./screens/compras/Purchases";
@@ -167,6 +168,8 @@ function Screen({ route, info, session, reload }: { route: Route; info: AppInfo;
       if (a === "importacion" && b && route.path[3] === "editar") return <ImportEditLoader key={b} uid={b} />;
       if (a === "importacion" && b) return <ImportView key={b} uid={b} />;
       return <Comex route={route} />;
+    case "contabilidad":
+      return has.has("impuestos") ? <Impuestos route={route} /> : <Proximamente id="contabilidad" />;
     case "config":
       return <Config route={route} info={info} session={session} onChanged={reload} />;
     case "documentos":

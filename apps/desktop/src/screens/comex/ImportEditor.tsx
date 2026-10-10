@@ -37,6 +37,7 @@ export function ImportEditor({ existing }: { existing?: ImportDetail }) {
     purchase_date: e?.purchase_date ?? "", shipment_date: e?.shipment_date ?? "", eta: e?.eta ?? "", allocation_basis: (e?.allocation_basis ?? "valor") as Basis,
     vat_ppm: e?.vat_ppm ?? null as number | null, vat_recoverable: e?.vat_recoverable ?? true, notes: e?.notes ?? "",
     notional_insurance_ppm: e?.notional_insurance_ppm ?? null as number | null,
+    transport_freight_minor: e?.transport_freight_minor ?? null as number | null,
   });
   const [notionalHint, setNotionalHint] = useState<{ value: number; source: string } | null>(null);
   const [rows, setRows] = useState<Row[]>(() => (e?.items ?? []).map((i) => ({
@@ -72,7 +73,7 @@ export function ImportEditor({ existing }: { existing?: ImportDetail }) {
   }));
   const preview = useMemo(() => landedCost({
     currency_decimals: decimals, rate_e6: f.rate_e6 ?? (f.currency_code === "CLP" ? 1_000_000 : 0), basis: f.allocation_basis,
-    vat_ppm: f.vat_ppm, vat_recoverable: f.vat_recoverable, notional_insurance_ppm: f.notional_insurance_ppm, items,
+    vat_ppm: f.vat_ppm, vat_recoverable: f.vat_recoverable, notional_insurance_ppm: f.notional_insurance_ppm, customs_freight_clp: f.transport_freight_minor !== null ? toClp(f.transport_freight_minor, decimals, f.rate_e6 ?? (f.currency_code === "CLP" ? 1_000_000 : 0)) : null, items,
     costs: (e?.costs ?? []).filter((c) => c.status === "vigente").map((c) => {
       const rate = c.rate_e6 ?? (c.currency_code === "CLP" ? 1_000_000 : c.currency_code === f.currency_code ? f.rate_e6 : null);
       return { kind: c.kind, amount_clp: rate ? toClp(c.amount_minor, c.currency_decimals, rate) : 0, basis: c.allocation_basis, recoverable: c.recoverable_tax };
@@ -95,7 +96,7 @@ export function ImportEditor({ existing }: { existing?: ImportDetail }) {
       origin_port: f.origin_port || null, destination_port: f.destination_port || null, currency_code: f.currency_code,
       rate_e6: f.currency_code === "CLP" ? null : f.rate_e6, purchase_date: f.purchase_date || null, production_eta: e?.production_eta ?? null,
       shipment_date: f.shipment_date || null, eta: f.eta || null, arrival_date: e?.arrival_date ?? null, allocation_basis: f.allocation_basis,
-      vat_ppm: f.vat_ppm, vat_recoverable: f.vat_recoverable, notional_insurance_ppm: f.notional_insurance_ppm, notes: f.notes || null, items,
+      vat_ppm: f.vat_ppm, vat_recoverable: f.vat_recoverable, notional_insurance_ppm: f.notional_insurance_ppm, transport_freight_minor: f.transport_freight_minor, notes: f.notes || null, items,
     };
     setBusy(true);
     try {
@@ -160,6 +161,8 @@ export function ImportEditor({ existing }: { existing?: ImportDetail }) {
               <Checkbox label="Recupero el IVA como crédito" hint="Si lo recuperas, no suma al costo del producto." checked={f.vat_recoverable} onChange={(v) => setF({ ...f, vat_recoverable: v })} />
               <PercentField label="Seguro teórico (si no contrataste seguro)" ppm={f.notional_insurance_ppm} onPpm={(v) => setF({ ...f, notional_insurance_ppm: v })} optional
                 hint={`% del valor de la mercadería que la aduana agrega al valor aduanero cuando no hay seguro. No se paga ni suma al costo; sí sube el IVA y los derechos.${notionalHint ? ` Demostración: ${notionalHint.value / 10_000} %.` : " Pregúntale a tu agente el porcentaje."}`} />
+              <MoneyField label={`Flete según el AWB o BL (${f.currency_code})`} currency={f.currency_code} value={f.transport_freight_minor} onValue={(v) => setF({ ...f, transport_freight_minor: v })}
+                hint="Solo si la factura trae el flete incluido (CPT, CFR) y el documento de transporte muestra otro: Aduanas declara ese flete y la diferencia pasa a la mercadería." />
             </div>
           </Card>
         </div>

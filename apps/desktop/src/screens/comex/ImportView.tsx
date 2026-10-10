@@ -171,6 +171,7 @@ export function ImportView({ uid }: { uid: string }) {
               <Row label="Mercadería en pesos" v={c.fob_clp} />
               <Row label="+ Flete" v={c.freight_clp} />
               <Row label="+ Seguro" v={c.insurance_clp} />
+              {c.customs_freight_clp !== c.freight_clp && <p className="text-xs text-muted">Para Aduanas: mercadería {formatMoney(c.customs_fob_clp)} y flete {formatMoney(c.customs_freight_clp)} (el del documento de transporte).</p>}
               {c.notional_insurance_clp > 0 && <Row label={`+ Seguro teórico${d.notional_insurance_ppm ? ` (${d.notional_insurance_ppm / 10_000} %)` : ""}, solo aduana`} v={c.notional_insurance_clp} />}
               <Row label="= Valor aduanero (CIF)" v={c.customs_value_clp} strong />
               <Row label={`+ Derechos${c.duty_entered ? " (de la declaración)" : " (por arancel)"}`} v={c.duty_clp} />

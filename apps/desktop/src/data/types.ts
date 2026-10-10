@@ -675,6 +675,8 @@ export interface ImportDetail {
   vat_recoverable: boolean;
   /** Seguro teórico (ppm de la mercadería) para el valor aduanero, si no se contrató seguro. */
   notional_insurance_ppm: number | null;
+  /** Flete según el AWB o BL (moneda de la importación), solo para el valor aduanero. */
+  transport_freight_minor: number | null;
   fob_minor: number | null;
   landed_total_clp: number | null;
   estimated_landed_clp: number | null;
@@ -722,6 +724,7 @@ export interface ImportInput {
   vat_ppm: number | null;
   vat_recoverable: boolean;
   notional_insurance_ppm?: number | null;
+  transport_freight_minor?: number | null;
   notes: string | null;
   items: ImportItemInput[];
 }
@@ -783,3 +786,75 @@ export interface BackupDone {
   verified: boolean;
   manifest: { created_at: string; counts: Record<string, number>; schema_version: number };
 }
+
+/* ───────────────────────────── Impuestos: F29 ───────────────────────────── */
+
+export type TaxRegime = "14d3" | "14d8" | "14a";
+export interface TaxProfile {
+  regime: TaxRegime;
+  /** Tasa de PPM de la empresa en ppm de los ingresos (0,25 % = 2.500). */
+  ppm_rate_ppm: number | null;
+  utm_decimals: number | null;
+  due_day: number | null;
+  common_use_ppm: number | null;
+}
+export interface F29Inputs {
+  remnant_amount?: number | null;
+  utm_prev?: number | null;
+  utm_cur?: number | null;
+  ppm_loss?: boolean;
+  ppm_credit?: number;
+  ppm_base_override?: number | null;
+  common_use_ppm?: number | null;
+  manual?: Record<string, number>;
+}
+export interface TaxDocLine {
+  origin: "rcv" | "manual" | "nucleo";
+  id: number | null;
+  direction: "venta" | "compra";
+  sii_type: number;
+  folio: string | null;
+  issue_date: string | null;
+  counterpart: string | null;
+  count: number;
+  exempt_minor: number;
+  net_minor: number;
+  tax_minor: number;
+  tax_non_rec_minor: number;
+  common_use_tax_minor: number;
+  kind: import("./f29").PurchaseKind | null;
+  not_of_business: boolean;
+  reference: string | null;
+}
+export interface F29Source { direction: "venta" | "compra"; source: "rcv" | "nucleo"; file_name: string | null; imported_at: string | null; rows: number }
+export interface F29View {
+  period: string;
+  status: "borrador" | "declarado";
+  profile: TaxProfile;
+  inputs: F29Inputs;
+  remnant_suggested: number | null;
+  remnant_from: string | null;
+  sources: F29Source[];
+  docs: TaxDocLine[];
+  result: import("./f29").F29Result;
+  checks: import("./f29").F29Note[];
+  declared: { declared_77: number; declared_91: number; folio: string | null; at: string | null } | null;
+  due_date: string | null;
+  periods: { period: string; status: string; declared_91: number | null }[];
+}
+export interface TaxDocInput {
+  direction: "venta" | "compra";
+  sii_type: number;
+  folio: string | null;
+  issue_date: string | null;
+  counterpart_rut: string | null;
+  counterpart_name: string | null;
+  doc_count?: number | null;
+  exempt_minor: number;
+  net_minor: number;
+  tax_minor: number;
+  purchase_kind?: import("./f29").PurchaseKind | null;
+  not_of_business?: boolean;
+  note?: string | null;
+}
+export interface RcvImportReport { rows: number; skipped: string[]; other_period: number; view: F29View }

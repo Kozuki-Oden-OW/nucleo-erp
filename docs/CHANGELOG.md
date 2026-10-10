@@ -2,6 +2,38 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [Sin publicar] — Fase 10, hito A: borrador del F29
+
+### Agregado
+- Impuestos (menú "Impuestos"): borrador del Formulario 29 del mes, código por código, con total a
+  pagar, remanente, PPM y explicación de cada monto. NÚCLEO no declara: copias los códigos en sii.cl.
+- Importación del Registro de Compras y Ventas descargado de sii.cl (CSV): reemplaza los datos de
+  NÚCLEO del mes; las compras se clasifican (del giro, supermercado, activo fijo, uso común, sin
+  derecho) y la clasificación se puede corregir. Documentos a mano (resumen de boletas, DIN).
+- Sin registro importado, el borrador usa ventas documentadas, compras, gastos con IVA e IVA real de
+  importaciones, y avisa lo que falta (ventas sin documentar, IVA de DIN estimado, gastos que podrían
+  ser boletas).
+- Datos del mes: remanente anterior reajustado con la UTM, impuesto único (48), retención de
+  honorarios (151) y otras retenciones, pérdida que suspende el PPM y crédito del código 68.
+- Configuración tributaria: régimen (Pro Pyme general, transparente o 14 A), tasa de PPM, día de
+  vencimiento, decimales de UTM y proporción de IVA de uso común.
+- "Ya lo declaré en sii.cl": guarda total, remanente y folio; bloquea el borrador (se puede reabrir con
+  motivo) y propone ese remanente el mes siguiente.
+- Cálculo en Rust (`nucleo-domain::f29`) con espejo en la interfaz y casos golden (`golden/f29.json`);
+  migración `0018_impuestos_f29.sql`.
+- Especificaciones para los próximos hitos: `docs/F29.md`, `docs/REMUNERACIONES.md`, `docs/F22.md` y los
+  casos prácticos del SII en `golden/f22_casos_sii.json`.
+
+### COMEX (respuestas del agente de aduana)
+- Flete según el AWB o BL en la carpeta (facturas CPT/CFR): el valor aduanero usa ese flete y la
+  diferencia pasa a la mercadería; el seguro teórico se calcula sobre esa mercadería. Con la DIN real
+  la estimación queda a $2 del valor aduanero y a $1 del IVA. Migración `0019_comex_flete_documento.sql`.
+- Avisos de despacho simplificado sin agente (carga general) y textos de exportación (DUS, factura de
+  exportación exenta, recuperación del IVA exportador, reintegro).
+
+### Corregido
+- El escritorio mostraba COMEX como "próximamente" aunque el módulo estaba listo.
+
 ## [Sin publicar] — COMEX con un caso real y compras por courier o plataforma
 
 ### Agregado

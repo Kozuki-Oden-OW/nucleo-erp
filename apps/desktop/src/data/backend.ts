@@ -4,6 +4,7 @@
 // Las pantallas solo conocen esta interfaz; así un prototipo de la Fase 3 se convierte en pantalla
 // real cuando el comando Rust correspondiente existe.
 import type {
+  F29Inputs, F29View, RcvImportReport, TaxDocInput, TaxProfile,
   ImportCostInput, ImportDetail, ImportInput, ImportReceiveLine, ImportStage, ImportSummary, IncotermDef,
   AccountInput, CalendarItem, ExpenseCategory, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow, MoneyAccount,
   MoneyOverview, MoneyTransferInput, Recurring, RecurringInput,
@@ -31,7 +32,7 @@ export interface SaleFilter {
 /** Módulos que el backend ya implementa. La interfaz oculta o marca "próximamente" lo que falte. */
 export type Feature =
   | "dashboard" | "clientes" | "productos" | "ventas" | "compras" | "comex" | "negocio" | "respaldos" | "busqueda"
-  | "usuarios" | "documentos" | "numeracion" | "monedas" | "auditoria" | "inventario" | "dinero";
+  | "usuarios" | "documentos" | "numeracion" | "monedas" | "auditoria" | "inventario" | "dinero" | "impuestos";
 
 export interface Backend {
   readonly kind: "tauri" | "demo";
@@ -176,6 +177,20 @@ export interface Backend {
   receiveImport(uid: string, lines: ImportReceiveLine[], date: string): Promise<ImportDetail>;
   closeImport(uid: string): Promise<ImportDetail>;
   voidImport(uid: string, reason: string): Promise<ImportDetail>;
+
+  // Impuestos: borrador del F29 (Fase 10). NÚCLEO no declara: prepara y explica.
+  taxProfile(): Promise<TaxProfile>;
+  saveTaxProfile(profile: TaxProfile): Promise<TaxProfile>;
+  f29(period: string): Promise<F29View>;
+  saveF29Inputs(period: string, inputs: F29Inputs): Promise<F29View>;
+  /** Registro de Compras o Ventas descargado de sii.cl (CSV). Reemplaza el importado antes. */
+  importRcv(period: string, direction: "venta" | "compra", fileName: string | null, text: string): Promise<RcvImportReport>;
+  clearRcv(period: string, direction: "venta" | "compra"): Promise<F29View>;
+  addTaxDocument(period: string, input: TaxDocInput): Promise<F29View>;
+  deleteTaxDocument(id: number): Promise<F29View>;
+  setTaxDocumentKind(id: number, kind: string): Promise<F29View>;
+  markF29Declared(period: string, declared77: number, declared91: number, folio: string | null): Promise<F29View>;
+  reopenF29(period: string, reason: string): Promise<F29View>;
 }
 
 export type ImportView = "en_curso" | "cotizaciones" | "cerradas" | "anuladas" | "todas";

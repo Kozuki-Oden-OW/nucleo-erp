@@ -528,3 +528,56 @@ fn comex_por_ipc() {
         0
     );
 }
+
+#[test]
+fn f29_por_ipc() {
+    let ipc = Ipc::new();
+    let created = ipc.ok(
+        "create_company",
+        json!({ "name": "Comercial", "profile": "empresa" }),
+    );
+    ipc.ok("open_company", json!({ "uid": created["company"]["uid"] }));
+    let p = ipc.ok("save_tax_profile", json!({ "profile": { "regime": "14d3", "ppm_rate_ppm": 2500, "utm_decimals": null, "due_day": 20, "common_use_ppm": null } }));
+    assert_eq!(p["regime"], "14d3");
+    let csv = "Tipo Doc;Folio;Rut cliente;Razon Social;Fecha Docto;Monto Exento;Monto Neto;Monto IVA;Monto total\n33;10;1-9;Cliente;03/09/2026;0;100000;19000;119000\n";
+    let r = ipc.ok("import_rcv", json!({ "period": "2026-09", "direction": "venta", "fileName": "RCV_VENTA.csv", "text": csv }));
+    assert_eq!(r["rows"], 1);
+    assert_eq!(r["view"]["result"]["codes"]["502"], 19000);
+    let v = ipc.ok(
+        "save_f29_inputs",
+        json!({ "period": "2026-09", "inputs": { "manual": { "48": 1000 } } }),
+    );
+    assert_eq!(v["result"]["codes"]["91"], 19000 + 250 + 1000);
+    let v = ipc.ok("add_tax_document", json!({ "period": "2026-09", "input": { "direction": "compra", "sii_type": 33, "folio": "5",
+        "issue_date": null, "counterpart_rut": null, "counterpart_name": "Proveedor", "net_minor": 10000, "tax_minor": 1900 } }));
+    let manual_id = v["docs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|d| d["origin"] == "manual")
+        .unwrap()["id"]
+        .clone();
+    ipc.ok(
+        "set_tax_document_kind",
+        json!({ "id": manual_id, "kind": "activo_fijo" }),
+    );
+    let v = ipc.ok("f29", json!({ "period": "2026-09" }));
+    assert_eq!(v["result"]["codes"]["525"], 1900);
+    ipc.ok("delete_tax_document", json!({ "id": manual_id }));
+    let v = ipc.ok(
+        "mark_f29_declared",
+        json!({ "period": "2026-09", "declared77": 0, "declared91": 20250, "folio": null }),
+    );
+    assert_eq!(v["status"], "declarado");
+    let v = ipc.ok(
+        "reopen_f29",
+        json!({ "period": "2026-09", "reason": "corrección" }),
+    );
+    assert_eq!(v["status"], "borrador");
+    let v = ipc.ok(
+        "clear_rcv",
+        json!({ "period": "2026-09", "direction": "venta" }),
+    );
+    assert_eq!(v["sources"][0]["source"], "nucleo");
+    assert_eq!(ipc.ok("tax_profile", json!({}))["ppm_rate_ppm"], 2500);
+}

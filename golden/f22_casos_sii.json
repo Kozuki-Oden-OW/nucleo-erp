@@ -1,0 +1,6594 @@
+{
+ "_nota": "Casos golden F22 AT 2026 extraídos automáticamente de las planillas de ejemplo del SII (valores calculados por Excel, cacheados en el .xlsx; sin redondeo adicional). Cada valor indica su celda de origen y, si corresponde, la fórmula. Valores marcados 'derivado_no_en_planilla' NO están en la planilla: los calculó el analista a partir de ella y requieren validación de un contador. Estado: pendiente_revision (D-07).",
+ "fuente_archivos": {
+  "14D3": "Régimen Pro pyme en base a retiros o distribuciones (art. 14 letra D) N° 3 de la LIR).xlsx",
+  "14D8": "Régimen Pro pyme transparente (art. 14 letra D) N° 8 de la LIR).xlsx",
+  "14A": "Régimen general (art. 14 letra A) de la LIR).xlsx"
+ },
+ "convencion_redondeo_excel": "ROUND(x,0) de Excel redondea .5 alejándose de cero (half away from zero); TRUNC(x,6) para factores",
+ "14D3": {
+  "regimen": "Pro Pyme general, art. 14 letra D) N° 3 LIR (contabilidad simplificada, base percibido/pagado)",
+  "empresa": "EC & GET Ltda. (ejemplo SII)",
+  "estado": "pendiente_revision",
+  "entradas": {
+   "capital": {
+    "socio1_participacion": {
+     "celda": "Antecedentes!J8",
+     "valor": 0.5,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "Sr. Ortiz %"
+    },
+    "socio1_capital_historico": {
+     "celda": "Antecedentes!K8",
+     "valor": 15000000
+    },
+    "socio1_capital_reajustado_2019": {
+     "celda": "Antecedentes!L8",
+     "valor": 15300000,
+     "formula": "=+K8*1.02"
+    },
+    "socio2_participacion": {
+     "celda": "Antecedentes!J9",
+     "valor": 0.5,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "Sr. Escudero %"
+    },
+    "socio2_capital_historico": {
+     "celda": "Antecedentes!K9",
+     "valor": 15000000,
+     "formula": "=+K8"
+    },
+    "socio2_capital_reajustado_2019": {
+     "celda": "Antecedentes!L9",
+     "valor": 15300000,
+     "formula": "=+K9*1.02"
+    },
+    "capital_total_historico": {
+     "celda": "Antecedentes!K10",
+     "valor": 30000000,
+     "formula": "=SUM(K8:K9)"
+    },
+    "capital_total_reajustado_2019": {
+     "celda": "Antecedentes!L10",
+     "valor": 30600000,
+     "formula": "=SUM(L8:L9)",
+     "descripcion": "usado como capital aportado en RAI (código 1494)"
+    }
+   },
+   "ingresos_giro": {
+    "ventas_no_relacionadas_neto": {
+     "celda": "Antecedentes!J15",
+     "valor": 95000000
+    },
+    "ventas_no_relacionadas_no_percibido": {
+     "celda": "Antecedentes!K15",
+     "valor": null
+    },
+    "ventas_no_relacionadas_percibido": {
+     "celda": "Antecedentes!L15",
+     "valor": 95000000,
+     "formula": "=+J15-K15"
+    },
+    "ventas_relac_14D3_neto": {
+     "celda": "Antecedentes!J16",
+     "valor": 8000000
+    },
+    "ventas_relac_14D3_no_percibido": {
+     "celda": "Antecedentes!K16",
+     "valor": 8000000
+    },
+    "ventas_relac_14D3_percibido": {
+     "celda": "Antecedentes!L16",
+     "valor": 0,
+     "formula": "=+J16-K16"
+    },
+    "ventas_relac_14A_neto": {
+     "celda": "Antecedentes!J17",
+     "valor": 5000000,
+     "descripcion": "se reconoce DEVENGADO (código 1587) aunque no esté percibido"
+    },
+    "ventas_relac_14A_no_percibido": {
+     "celda": "Antecedentes!K17",
+     "valor": 5000000
+    },
+    "ventas_relac_14A_percibido": {
+     "celda": "Antecedentes!L17",
+     "valor": 0,
+     "formula": "=+J17-K17"
+    },
+    "cobro_factura_dic2024": {
+     "celda": "Antecedentes!J18",
+     "valor": 8000000
+    },
+    "cobro_factura_dic2024_percibido": {
+     "celda": "Antecedentes!L18",
+     "valor": 8000000,
+     "formula": "=+J18-K18"
+    },
+    "total_neto": {
+     "celda": "Antecedentes!J19",
+     "valor": 116000000,
+     "formula": "=SUM(J15:J18)"
+    },
+    "total_no_percibido": {
+     "celda": "Antecedentes!K19",
+     "valor": 13000000,
+     "formula": "=SUM(K15:K18)"
+    },
+    "total_percibido": {
+     "celda": "Antecedentes!L19",
+     "valor": 103000000,
+     "formula": "=SUM(L15:L18)"
+    }
+   },
+   "otros_ingresos": {
+    "venta_computador_neto_percibido": {
+     "celda": "Antecedentes!L21",
+     "valor": 200125,
+     "formula": "=200000+92+17+8+4-2+5+1"
+    },
+    "credito_bancario_recibido": {
+     "celda": "Antecedentes!L22",
+     "valor": 8000000,
+     "descripcion": "no es ingreso tributable"
+    },
+    "total": {
+     "celda": "Antecedentes!L23",
+     "valor": 8200125,
+     "formula": "=SUM(L21:L22)"
+    }
+   },
+   "dividendos_percibidos": {
+    "div1_factor": {
+     "celda": "Antecedentes!J25",
+     "valor": 0.369863,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "14A, crédito sujeto a restitución con D° dev."
+    },
+    "div1_credito": {
+     "celda": "Antecedentes!K25",
+     "valor": 92466,
+     "formula": "=ROUND(+L25*J25,0)"
+    },
+    "div1_monto": {
+     "celda": "Antecedentes!L25",
+     "valor": 250000
+    },
+    "div2_factor": {
+     "celda": "Antecedentes!J26",
+     "valor": 0.142857,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "14D3, crédito no sujeto a restitución con D° dev."
+    },
+    "div2_credito": {
+     "celda": "Antecedentes!K26",
+     "valor": 28571,
+     "formula": "=ROUND(+L26*J26,0)"
+    },
+    "div2_monto": {
+     "celda": "Antecedentes!L26",
+     "valor": 200000
+    },
+    "div3_factor": {
+     "celda": "Antecedentes!J27",
+     "valor": 0.228747,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "crédito acumulado al 31.12.2016 con D° dev."
+    },
+    "div3_credito": {
+     "celda": "Antecedentes!K27",
+     "valor": 36600,
+     "formula": "=ROUND(+L27*J27,0)"
+    },
+    "div3_monto": {
+     "celda": "Antecedentes!L27",
+     "valor": 160000
+    },
+    "div4_monto_sin_credito": {
+     "celda": "Antecedentes!L28",
+     "valor": 30000
+    },
+    "div5_monto_INR": {
+     "celda": "Antecedentes!L29",
+     "valor": 80000,
+     "descripcion": "ingreso no constitutivo de renta → REX"
+    },
+    "total_credito": {
+     "celda": "Antecedentes!K30",
+     "valor": 157637,
+     "formula": "=SUM(K25:K29)"
+    },
+    "total_monto": {
+     "celda": "Antecedentes!L30",
+     "valor": 720000,
+     "formula": "=SUM(L25:L29)"
+    }
+   },
+   "renta_extranjera": {
+    "dividendo_usd": {
+     "celda": "Crédito IPE!K5",
+     "valor": 8000
+    },
+    "tipo_cambio": {
+     "celda": "Crédito IPE!K6",
+     "valor": 948.33,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "tasa_retencion_extranjera": {
+     "celda": "Crédito IPE!K7",
+     "valor": 0.15,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "tasa_corporativa_extranjera": {
+     "celda": "Crédito IPE!K8",
+     "valor": 0.32,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    }
+   },
+   "egresos": {
+    "compras_existencias_neto": {
+     "celda": "Antecedentes!J35",
+     "valor": 26000000
+    },
+    "compras_existencias_adeudado": {
+     "celda": "Antecedentes!K35",
+     "valor": 4000000
+    },
+    "compras_existencias_pagado": {
+     "celda": "Antecedentes!L35",
+     "valor": 22000000,
+     "formula": "=+J35-K35"
+    },
+    "camioneta_usada_neto": {
+     "celda": "Antecedentes!J36",
+     "valor": 2000000
+    },
+    "camioneta_usada_pagado": {
+     "celda": "Antecedentes!L36",
+     "valor": 2000000,
+     "formula": "=+J36-K36"
+    },
+    "remuneraciones_bruto": {
+     "celda": "Antecedentes!E37",
+     "valor": 8350000
+    },
+    "remuneraciones_adeudado": {
+     "celda": "Antecedentes!K37",
+     "valor": 350000
+    },
+    "remuneraciones_pagado": {
+     "celda": "Antecedentes!L37",
+     "valor": 8000000,
+     "formula": "=+E37-K37"
+    },
+    "honorarios_bruto": {
+     "celda": "Antecedentes!E38",
+     "valor": 1169591,
+     "formula": "=ROUND(1000000/(1-14.5%),0)"
+    },
+    "honorarios_retencion": {
+     "celda": "Antecedentes!K38",
+     "valor": 169591,
+     "formula": "=ROUND(E38*14.5%,0)"
+    },
+    "honorarios_pagado_liquido": {
+     "celda": "Antecedentes!L38",
+     "valor": 1000000,
+     "formula": "=+E38-K38"
+    },
+    "gastos_generales": {
+     "celda": "Antecedentes!L39",
+     "valor": 201000
+    },
+    "arriendos": {
+     "celda": "Antecedentes!L40",
+     "valor": 860000
+    },
+    "cotizaciones_dic2024_pagadas": {
+     "celda": "Antecedentes!L41",
+     "valor": 320000
+    },
+    "retenciones_IUSC_dic2024_pagadas": {
+     "celda": "Antecedentes!L42",
+     "valor": 185000
+    },
+    "pago_proveedores_2024": {
+     "celda": "Antecedentes!L43",
+     "valor": 2000000
+    },
+    "amortizacion_capital_credito": {
+     "celda": "Antecedentes!F44",
+     "valor": 220000,
+     "descripcion": "no es gasto"
+    },
+    "intereses_credito": {
+     "celda": "Antecedentes!H44",
+     "valor": 280000
+    },
+    "cuota_credito_total": {
+     "celda": "Antecedentes!L44",
+     "valor": 500000,
+     "formula": "=+F44+H44"
+    },
+    "intereses_multas_fiscales": {
+     "celda": "Antecedentes!L45",
+     "valor": 140000,
+     "descripcion": "gasto rechazado art. 21 inc. 2"
+    },
+    "pago_IDPC_AT2025": {
+     "celda": "Antecedentes!L46",
+     "valor": 2300000,
+     "descripcion": "gasto rechazado art. 21 inc. 2"
+    },
+    "ppm_pagados_historicos": {
+     "celda": "Antecedentes!L47",
+     "valor": 270000,
+     "formula": "=+E79"
+    },
+    "retiros_historicos": {
+     "celda": "Antecedentes!L48",
+     "valor": 16000000,
+     "formula": "=+E72"
+    },
+    "total_neto": {
+     "celda": "Antecedentes!J49",
+     "valor": 28000000,
+     "formula": "=SUM(J35:J48)"
+    },
+    "total_adeudado": {
+     "celda": "Antecedentes!K49",
+     "valor": 4519591,
+     "formula": "=SUM(K35:K48)"
+    },
+    "total_pagado": {
+     "celda": "Antecedentes!L49",
+     "valor": 55776000,
+     "formula": "=SUM(L35:L48)"
+    }
+   },
+   "cpts_inicial_codigo_1545_AT2025": {
+    "cpts_inicial": {
+     "celda": "Antecedentes!I51",
+     "valor": 54030000
+    }
+   },
+   "parametros": {
+    "ipc_anual": {
+     "celda": "Antecedentes!I58",
+     "valor": 0.034,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "ipc_oct_dic": {
+     "celda": "Antecedentes!I59",
+     "valor": 0.003,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "ipc_nov_dic": {
+     "celda": "Antecedentes!I60",
+     "valor": 0.003,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "uf_31_12_2025": {
+     "celda": "Antecedentes!I62",
+     "valor": 39727.96,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "tasa_idpc": {
+     "celda": "Antecedentes!I64",
+     "valor": 0.125,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "Ley 21.755 (nota en Antecedentes!C81)"
+    },
+    "factor_idpc": {
+     "celda": "Antecedentes!I65",
+     "valor": 0.142857,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "Circular N°53 de 2025 (Antecedentes!C83)"
+    },
+    "tasa_idpc_usada_en_BI": {
+     "celda": "BI y art.14 letra E)!J35",
+     "valor": 0.125,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "celda que efectivamente multiplica la base"
+    },
+    "tope_14E_porcentaje": {
+     "celda": "BI y art.14 letra E)!L44",
+     "valor": 0.5,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "tope_14E_monto_5000UF": {
+     "celda": "BI y art.14 letra E)!M44",
+     "valor": 198639800,
+     "formula": "=5000*Antecedentes!I62"
+    }
+   },
+   "retiros": {
+    "ortiz_fecha": {
+     "celda": "Antecedentes!D70",
+     "valor": "20.10.2025"
+    },
+    "ortiz_historico": {
+     "celda": "Antecedentes!E70",
+     "valor": 8000000
+    },
+    "ortiz_factor": {
+     "celda": "Antecedentes!F70",
+     "valor": 1.003,
+     "formula": "=1+I59",
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "ortiz_actualizado": {
+     "celda": "Antecedentes!G70",
+     "valor": 8024000,
+     "formula": "=ROUND(+E70*F70,0)"
+    },
+    "escudero_fecha": {
+     "celda": "Antecedentes!D71",
+     "valor": "20.11.2025"
+    },
+    "escudero_historico": {
+     "celda": "Antecedentes!E71",
+     "valor": 8000000,
+     "formula": "=+E70"
+    },
+    "escudero_factor": {
+     "celda": "Antecedentes!F71",
+     "valor": 1.003,
+     "formula": "=1+I60",
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "escudero_actualizado": {
+     "celda": "Antecedentes!G71",
+     "valor": 8024000,
+     "formula": "=ROUND(+E71*F71,0)"
+    },
+    "total_historico": {
+     "celda": "Antecedentes!E72",
+     "valor": 16000000,
+     "formula": "=SUM(E70:E71)"
+    },
+    "total_actualizado": {
+     "celda": "Antecedentes!G72",
+     "valor": 16048000,
+     "formula": "=SUM(G70:G71)"
+    }
+   },
+   "ppm": {
+    "oct_historico": {
+     "celda": "Antecedentes!E77",
+     "valor": 237500,
+     "formula": "=+J15*0.25%"
+    },
+    "oct_factor": {
+     "celda": "Antecedentes!F77",
+     "valor": 1.003,
+     "formula": "=1+I59",
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "oct_actualizado": {
+     "celda": "Antecedentes!G77",
+     "valor": 238213,
+     "formula": "=ROUND(+E77*F77,0)"
+    },
+    "nov_historico": {
+     "celda": "Antecedentes!E78",
+     "valor": 32500,
+     "formula": "=ROUND((J16+J17)*0.25%,0)"
+    },
+    "nov_factor": {
+     "celda": "Antecedentes!F78",
+     "valor": 1.003,
+     "formula": "=1+I60",
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "nov_actualizado": {
+     "celda": "Antecedentes!G78",
+     "valor": 32598,
+     "formula": "=ROUND(+E78*F78,0)"
+    },
+    "total_historico": {
+     "celda": "Antecedentes!E79",
+     "valor": 270000,
+     "formula": "=SUM(E77:E78)"
+    },
+    "total_actualizado": {
+     "celda": "Antecedentes!G79",
+     "valor": 270811,
+     "formula": "=SUM(G77:G78)",
+     "descripcion": "va a código 36 del F22 (PPM)"
+    }
+   },
+   "saldos_iniciales_registros_31_12_2024": {
+    "control": {
+     "celda": "Antecedentes!G93",
+     "valor": 23430000,
+     "formula": "=SUM(H93:J93)"
+    },
+    "RAI": {
+     "celda": "Antecedentes!H93",
+     "valor": 23350000
+    },
+    "REX_RAP": {
+     "celda": "Antecedentes!I93",
+     "valor": 0,
+     "formula": "=+Antecedentes!F167"
+    },
+    "REX_INR": {
+     "celda": "Antecedentes!J93",
+     "valor": 80000
+    },
+    "SAC_no_sujeto_restitucion_sin_devolucion": {
+     "celda": "Antecedentes!K93",
+     "valor": 0
+    },
+    "SAC_no_sujeto_restitucion_con_devolucion": {
+     "celda": "Antecedentes!L93",
+     "valor": 1028889
+    },
+    "SAC_sujeto_restitucion_con_devolucion": {
+     "celda": "Antecedentes!M93",
+     "valor": 92466
+    },
+    "SAC_factor_sujeto_restitucion": {
+     "celda": "Antecedentes!M90",
+     "valor": 0.111111,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "SAC_IPE_sin_devolucion": {
+     "celda": "Antecedentes!N93",
+     "valor": 0
+    },
+    "SAC_hasta_2016_con_devolucion": {
+     "celda": "Antecedentes!O93",
+     "valor": 34312
+    },
+    "SAC_hasta_2016_factor": {
+     "celda": "Antecedentes!O90",
+     "valor": 0.228746,
+     "formula": "=TRUNC(O93/P93,6)",
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "STUT": {
+     "celda": "Antecedentes!P93",
+     "valor": 150000
+    }
+   }
+  },
+  "intermedios": {
+   "credito_IPE": {
+    "renta_neta": {
+     "celda": "Crédito IPE!K13",
+     "valor": 7586640,
+     "formula": "=SUM(J14:J16)"
+    },
+    "dividendo_clp": {
+     "celda": "Crédito IPE!J14",
+     "valor": 7586640,
+     "formula": "=ROUND(K5*K6,0)"
+    },
+    "tope_individual": {
+     "celda": "Crédito IPE!K18",
+     "valor": 4593986,
+     "formula": "=MIN(J19:J22)"
+    },
+    "impuestos_soportados": {
+     "celda": "Crédito IPE!J19",
+     "valor": 5539035,
+     "formula": "=SUM(I20:I21)"
+    },
+    "impuesto_retencion": {
+     "celda": "Crédito IPE!I20",
+     "valor": 1338819,
+     "formula": "=ROUND(K5*K6/(1-K7)*K7,0)"
+    },
+    "impuesto_corporativo": {
+     "celda": "Crédito IPE!I21",
+     "valor": 4200216,
+     "formula": "=ROUND((K5*K6/(1-K7))/(1-K8)*K8,0)"
+    },
+    "tope_35pct_renta_bruta": {
+     "celda": "Crédito IPE!J22",
+     "valor": 4593986,
+     "formula": "=ROUND((J14+J19)*0.35,0)"
+    },
+    "base_tope_global": {
+     "celda": "Crédito IPE!I24",
+     "valor": 12180626,
+     "formula": "=SUM(H25:H26)"
+    },
+    "tope_global": {
+     "celda": "Crédito IPE!K24",
+     "valor": 4263219,
+     "formula": "=ROUND(I24*35%,0)"
+    },
+    "CTD": {
+     "celda": "Crédito IPE!K28",
+     "valor": 4263219,
+     "formula": "=MIN(J29:J30)",
+     "descripcion": "crédito total disponible"
+    },
+    "renta_imponible_extranjera": {
+     "celda": "Crédito IPE!K32",
+     "valor": 11849859,
+     "formula": "=SUM(J33:J34)"
+    },
+    "IPE_imputable_IDPC": {
+     "celda": "Crédito IPE!K38",
+     "valor": 1481232,
+     "formula": "=ROUND(K32*12.5%,0)",
+     "descripcion": "= renta imponible × 12,5% (tasa escrita en la fórmula)"
+    },
+    "IPE_imputable_IF_SAC": {
+     "celda": "Crédito IPE!K40",
+     "valor": 2781987,
+     "formula": "=K28-K38"
+    }
+   },
+   "base_imponible": {
+    "fila_5": {
+     "celda": "BI y art.14 letra E)!K5",
+     "valor": 95000000,
+     "formula": "=+Antecedentes!$L$15",
+     "descripcion": "Ventas netas año 2025 a entidades NO relacionadas"
+    },
+    "fila_6": {
+     "celda": "BI y art.14 letra E)!K6",
+     "valor": 5000000,
+     "formula": "=+Antecedentes!K17",
+     "descripcion": "Ventas netas año 2025 a entidades relacionadas sujetas al régimen de imputación parcial de créditos (art. 14 letra A))"
+    },
+    "fila_7": {
+     "celda": "BI y art.14 letra E)!K7",
+     "valor": 8000000,
+     "formula": "=Antecedentes!$L$18",
+     "descripcion": "Ingresos devengados en 2024 y percibidos en 2025"
+    },
+    "fila_8": {
+     "celda": "BI y art.14 letra E)!K8",
+     "valor": 108000000,
+     "formula": "=SUM(K5:K7)",
+     "descripcion": "Total ingresos del giro"
+    },
+    "fila_9": {
+     "celda": "BI y art.14 letra E)!K9",
+     "valor": 7586640,
+     "formula": "='Crédito IPE'!K13",
+     "descripcion": "Dividendo de fuente extranjera, percibido"
+    },
+    "fila_10": {
+     "celda": "BI y art.14 letra E)!K10",
+     "valor": 4263219,
+     "formula": "='Crédito IPE'!K28",
+     "descripcion": "CTD determinado"
+    },
+    "fila_11": {
+     "celda": "BI y art.14 letra E)!K11",
+     "valor": 11849859,
+     "formula": "=SUM(K9:K10)",
+     "descripcion": "Total ingresos de fuente extranjera"
+    },
+    "fila_12": {
+     "celda": "BI y art.14 letra E)!K12",
+     "valor": 200125,
+     "formula": "=+Antecedentes!L21",
+     "descripcion": "Ingresos netos por venta computador"
+    },
+    "fila_13": {
+     "celda": "BI y art.14 letra E)!K13",
+     "valor": 811,
+     "formula": "=+Antecedentes!$G$79-Antecedentes!$E$79",
+     "descripcion": "Reajuste PPM Pagados"
+    },
+    "fila_14": {
+     "celda": "BI y art.14 letra E)!K14",
+     "valor": 200936,
+     "formula": "=SUM(K12:K13)",
+     "descripcion": "Total otros ingresos"
+    },
+    "fila_15": {
+     "celda": "BI y art.14 letra E)!K15",
+     "valor": 120050795,
+     "formula": "=+K8+K11+K14",
+     "descripcion": "Total ingresos"
+    },
+    "fila_17": {
+     "celda": "BI y art.14 letra E)!K17",
+     "valor": -22000000,
+     "formula": "=-Antecedentes!L35",
+     "descripcion": "Compras netas existencias 2025"
+    },
+    "fila_18": {
+     "celda": "BI y art.14 letra E)!K18",
+     "valor": -2000000,
+     "formula": "=-Antecedentes!L43",
+     "descripcion": "Gastos adeudados en 2024 y pagados en 2025"
+    },
+    "fila_19": {
+     "celda": "BI y art.14 letra E)!K19",
+     "valor": -2000000,
+     "formula": "=-Antecedentes!L36",
+     "descripcion": "Compra neta camioneta de reparto, usada"
+    },
+    "fila_20": {
+     "celda": "BI y art.14 letra E)!K20",
+     "valor": -8505000,
+     "formula": "=-Antecedentes!L37-Antecedentes!L41-Antecedentes!L42",
+     "descripcion": "Remuneraciones del ejercicio, monto bruto"
+    },
+    "fila_21": {
+     "celda": "BI y art.14 letra E)!K21",
+     "valor": -1000000,
+     "formula": "=-Antecedentes!L38",
+     "descripcion": "Honorarios del ejercicio, monto bruto"
+    },
+    "fila_22": {
+     "celda": "BI y art.14 letra E)!K22",
+     "valor": -201000,
+     "formula": "=-Antecedentes!L39",
+     "descripcion": "Gastos generales"
+    },
+    "fila_23": {
+     "celda": "BI y art.14 letra E)!K23",
+     "valor": -860000,
+     "formula": "=-Antecedentes!L40",
+     "descripcion": "Arriendos"
+    },
+    "fila_24": {
+     "celda": "BI y art.14 letra E)!K24",
+     "valor": -280000,
+     "formula": "=-Antecedentes!H44",
+     "descripcion": "Interés por préstamo"
+    },
+    "fila_25": {
+     "celda": "BI y art.14 letra E)!K25",
+     "valor": -140000,
+     "formula": "=-Antecedentes!L45",
+     "descripcion": "Pago intereses y multas fiscales"
+    },
+    "fila_26": {
+     "celda": "BI y art.14 letra E)!K26",
+     "valor": -2300000,
+     "formula": "=-Antecedentes!L46",
+     "descripcion": "Pago IDPC AT 2025"
+    },
+    "fila_27": {
+     "celda": "BI y art.14 letra E)!K27",
+     "valor": -39286000,
+     "formula": "=SUM(K17:K26)",
+     "descripcion": "Total egresos del giro"
+    },
+    "fila_28": {
+     "celda": "BI y art.14 letra E)!K28",
+     "valor": -39286000,
+     "formula": "=+K27",
+     "descripcion": "Total de egresos anuales"
+    },
+    "fila_29": {
+     "celda": "BI y art.14 letra E)!K29",
+     "valor": 140000,
+     "formula": "=-K25",
+     "descripcion": "Pago intereses y multas fiscales"
+    },
+    "fila_30": {
+     "celda": "BI y art.14 letra E)!K30",
+     "valor": 2300000,
+     "formula": "=-K26",
+     "descripcion": "Pago IDPC AT 2025"
+    },
+    "fila_31": {
+     "celda": "BI y art.14 letra E)!K31",
+     "valor": 2440000,
+     "formula": "=SUM(K29:K30)",
+     "descripcion": "Total gastos rechazados incisio segundo artículo 21 LIR"
+    },
+    "fila_32": {
+     "celda": "BI y art.14 letra E)!K32",
+     "valor": 83204795,
+     "formula": "=K15+K28+K31",
+     "descripcion": "Base Imponible antes de incentivo al ahorro art. 14 letra E)"
+    },
+    "fila_33": {
+     "celda": "BI y art.14 letra E)!K33",
+     "valor": -32382398,
+     "formula": "=-K43",
+     "descripcion": "Deducción incentivo al ahorro art. 14 letra E)"
+    },
+    "fila_34": {
+     "celda": "BI y art.14 letra E)!K34",
+     "valor": 50822397,
+     "formula": "=+K32+K33",
+     "descripcion": "BASE IMPONIBLE IDPC"
+    },
+    "fila_35": {
+     "celda": "BI y art.14 letra E)!K35",
+     "valor": 6352800,
+     "formula": "=ROUND(+K34*J35,0)",
+     "descripcion": "IDPC, tasa"
+    },
+    "fila_38": {
+     "celda": "BI y art.14 letra E)!K38",
+     "valor": 83204795,
+     "formula": "=+K32",
+     "descripcion": "(=) Sub total Base Imponible"
+    },
+    "fila_39": {
+     "celda": "BI y art.14 letra E)!K39",
+     "valor": -16000000,
+     "formula": "=-Antecedentes!E72",
+     "descripcion": "(-) Retiros del ejercicio, históricos"
+    },
+    "fila_40": {
+     "celda": "BI y art.14 letra E)!K40",
+     "valor": -140000,
+     "formula": "=+'CPT Simplificado'!F8",
+     "descripcion": "(-) Intereses y multas fiscales, históricos"
+    },
+    "fila_41": {
+     "celda": "BI y art.14 letra E)!K41",
+     "valor": -2300000,
+     "formula": "=+'CPT Simplificado'!F9",
+     "descripcion": "(-) Pago IDPC AT 2025, histórico"
+    },
+    "fila_42": {
+     "celda": "BI y art.14 letra E)!K42",
+     "valor": 64764795,
+     "formula": "=SUM(K38:K41)",
+     "descripcion": "(=) BI Invertida"
+    },
+    "fila_43": {
+     "celda": "BI y art.14 letra E)!K43",
+     "valor": 32382398,
+     "formula": "=MIN(M44,MAX(ROUND(+L44*K42,0),0))",
+     "descripcion": "Deducción incentivo al ahorro art. 14 letra E) LIR (cantidad menor entre 50% BI Invertida o 5.000 UF = $198.639.800.-)"
+    }
+   },
+   "cpt_simplificado": {
+    "fila_4": {
+     "celda": "CPT Simplificado!F4",
+     "valor": 54030000,
+     "formula": "=+Antecedentes!I51",
+     "descripcion": "(+) Capital propio tributario al 01.01.2025"
+    },
+    "fila_5": {
+     "celda": "CPT Simplificado!F5",
+     "valor": 50822397,
+     "formula": "=+'BI y art.14 letra E)'!K34",
+     "descripcion": "(+) Base Imponible ejercicio"
+    },
+    "fila_6": {
+     "celda": "CPT Simplificado!F6",
+     "valor": 720000,
+     "formula": "=+Antecedentes!L30",
+     "descripcion": "(+) Total Dividendos percibidos"
+    },
+    "fila_7": {
+     "celda": "CPT Simplificado!F7",
+     "valor": -16000000,
+     "formula": "=-'RAI Final'!F5",
+     "descripcion": "(-) Retiros del ejercicio, históricos"
+    },
+    "fila_8": {
+     "celda": "CPT Simplificado!F8",
+     "valor": -140000,
+     "formula": "=-Antecedentes!L45",
+     "descripcion": "(-) Intereses y multas fiscales, históricos"
+    },
+    "fila_9": {
+     "celda": "CPT Simplificado!F9",
+     "valor": -2300000,
+     "formula": "=-Antecedentes!L46",
+     "descripcion": "(-) Pago IDPC AT 2025, histórico"
+    },
+    "fila_10": {
+     "celda": "CPT Simplificado!F10",
+     "valor": -2781987,
+     "formula": "=-'Crédito IPE'!K40",
+     "descripcion": "(-) Crédito IPE contra IF del ejercicio"
+    },
+    "fila_11": {
+     "celda": "CPT Simplificado!F11",
+     "valor": 32382398,
+     "formula": "=-'BI y art.14 letra E)'!K33",
+     "descripcion": "(+) Incentivo al ahorro art. 14 letra E)"
+    },
+    "fila_12": {
+     "celda": "CPT Simplificado!F12",
+     "valor": 116732808,
+     "formula": "=SUM(F3:F11)",
+     "descripcion": "(=)  Capital Propio Tributario Simplificado"
+    }
+   },
+   "rai_final": {
+    "fila_4": {
+     "celda": "RAI Final!F4",
+     "valor": 116732808,
+     "formula": "=+'CPT Simplificado'!F12",
+     "descripcion": "(+) Capital propio tributario simplificado al 31.12.2025"
+    },
+    "fila_5": {
+     "celda": "RAI Final!F5",
+     "valor": 16000000,
+     "formula": "=+Antecedentes!E72",
+     "descripcion": "(+) Retiros del ejercicio históricos al 31.12.2025"
+    },
+    "fila_6": {
+     "celda": "RAI Final!F6",
+     "valor": -160000,
+     "formula": "=-RTRE!H15-RTRE!I15",
+     "descripcion": "(-) Saldo registro REX positivo antes de imputación"
+    },
+    "fila_7": {
+     "celda": "RAI Final!F7",
+     "valor": -30600000,
+     "formula": "=-Antecedentes!L10",
+     "descripcion": "(- ) Capital social aportado histórico al 31.12.2025"
+    },
+    "fila_8": {
+     "celda": "RAI Final!F8",
+     "valor": 101972808,
+     "formula": "=SUM(F3:F7)",
+     "descripcion": "(=) Rentas afectas del ejercicio"
+    }
+   },
+   "rtre": [
+    {
+     "fila": 9,
+     "detalle": "Remanente ejercicio anterior histórico",
+     "columnas": {
+      "F": {
+       "celda": "RTRE!F9",
+       "valor": 23430000,
+       "formula": "=SUM(G9:I9)"
+      },
+      "G": {
+       "celda": "RTRE!G9",
+       "valor": 23350000,
+       "formula": "=+Antecedentes!H93"
+      },
+      "H": {
+       "celda": "RTRE!H9",
+       "valor": 0,
+       "formula": "=+Antecedentes!I93+Antecedentes!I93"
+      },
+      "I": {
+       "celda": "RTRE!I9",
+       "valor": 80000,
+       "formula": "=+Antecedentes!J93"
+      },
+      "J": {
+       "celda": "RTRE!J9",
+       "valor": 0,
+       "formula": "=+Antecedentes!K93"
+      },
+      "K": {
+       "celda": "RTRE!K9",
+       "valor": 1028889,
+       "formula": "=+Antecedentes!L93"
+      },
+      "L": {
+       "celda": "RTRE!L9",
+       "valor": 92466,
+       "formula": "=+Antecedentes!M93"
+      },
+      "M": {
+       "celda": "RTRE!M9",
+       "valor": 0,
+       "formula": "=+Antecedentes!N93"
+      },
+      "N": {
+       "celda": "RTRE!N9",
+       "valor": 34312,
+       "formula": "=+Antecedentes!O93"
+      },
+      "O": {
+       "celda": "RTRE!O9",
+       "valor": 150000,
+       "formula": "=+Antecedentes!P93"
+      }
+     }
+    },
+    {
+     "fila": 10,
+     "detalle": "(-) Reverso RAI",
+     "columnas": {
+      "F": {
+       "celda": "RTRE!F10",
+       "valor": -23350000,
+       "formula": "=SUM(G10:I10)"
+      },
+      "G": {
+       "celda": "RTRE!G10",
+       "valor": -23350000,
+       "formula": "=-G9"
+      }
+     }
+    },
+    {
+     "fila": 11,
+     "detalle": "(+) RAI del ejercicio",
+     "columnas": {
+      "F": {
+       "celda": "RTRE!F11",
+       "valor": 101972808,
+       "formula": "=SUM(G11:I11)"
+      },
+      "G": {
+       "celda": "RTRE!G11",
+       "valor": 101972808,
+       "formula": "=+'RAI Final'!F8"
+      }
+     }
+    },
+    {
+     "fila": 12,
+     "detalle": "(+) REX percibidos",
+     "columnas": {
+      "F": {
+       "celda": "RTRE!F12",
+       "valor": 80000,
+       "formula": "=SUM(G12:I12)"
+      },
+      "I": {
+       "celda": "RTRE!I12",
+       "valor": 80000,
+       "formula": "=+Antecedentes!L29"
+      }
+     }
+    },
+    {
+     "fila": 13,
+     "detalle": "(+) Crédito por IDPC sobre RLI",
+     "columnas": {
+      "E": {
+       "celda": "RTRE!E13",
+       "valor": 50822397,
+       "formula": "=+'BI y art.14 letra E)'!K34"
+      },
+      "J": {
+       "celda": "RTRE!J13",
+       "valor": 1481232,
+       "formula": "='Crédito IPE'!K38"
+      },
+      "K": {
+       "celda": "RTRE!K13",
+       "valor": 4871568,
+       "formula": "=+'BI y art.14 letra E)'!K35-J13"
+      },
+      "M": {
+       "celda": "RTRE!M13",
+       "valor": 2781987,
+       "formula": "='Crédito IPE'!K40"
+      }
+     }
+    },
+    {
+     "fila": 14,
+     "detalle": "(+) Crédito por IDPC sobre dividendo percibido",
+     "columnas": {
+      "K": {
+       "celda": "RTRE!K14",
+       "valor": 28571,
+       "formula": "=+Antecedentes!K26"
+      },
+      "L": {
+       "celda": "RTRE!L14",
+       "valor": 92466,
+       "formula": "=+Antecedentes!K25"
+      },
+      "N": {
+       "celda": "RTRE!N14",
+       "valor": 36600,
+       "formula": "=+Antecedentes!K27"
+      },
+      "O": {
+       "celda": "RTRE!O14",
+       "valor": 160000,
+       "formula": "=+Antecedentes!L27"
+      }
+     }
+    },
+    {
+     "fila": 15,
+     "detalle": "Subtotal antes de imputaciones",
+     "columnas": {
+      "F": {
+       "celda": "RTRE!F15",
+       "valor": 102132808,
+       "formula": "=SUM(F9:F14)"
+      },
+      "G": {
+       "celda": "RTRE!G15",
+       "valor": 101972808,
+       "formula": "=SUM(G9:G14)"
+      },
+      "H": {
+       "celda": "RTRE!H15",
+       "valor": 0,
+       "formula": "=SUM(H9:H14)"
+      },
+      "I": {
+       "celda": "RTRE!I15",
+       "valor": 160000,
+       "formula": "=SUM(I9:I14)"
+      },
+      "J": {
+       "celda": "RTRE!J15",
+       "valor": 1481232,
+       "formula": "=SUM(J9:J14)"
+      },
+      "K": {
+       "celda": "RTRE!K15",
+       "valor": 5929028,
+       "formula": "=SUM(K9:K14)"
+      },
+      "L": {
+       "celda": "RTRE!L15",
+       "valor": 184932,
+       "formula": "=SUM(L9:L14)"
+      },
+      "M": {
+       "celda": "RTRE!M15",
+       "valor": 2781987,
+       "formula": "=SUM(M9:M14)"
+      },
+      "N": {
+       "celda": "RTRE!N15",
+       "valor": 70912,
+       "formula": "=SUM(N9:N14)"
+      },
+      "O": {
+       "celda": "RTRE!O15",
+       "valor": 310000,
+       "formula": "=SUM(O9:O14)"
+      }
+     }
+    },
+    {
+     "fila": 16,
+     "detalle": "Menos retiros efectuados en el ejercicio:",
+     "columnas": {
+      "H": {
+       "celda": "RTRE!H16",
+       "valor": 0
+      }
+     }
+    },
+    {
+     "fila": 17,
+     "detalle": "Socio Sr. Ortiz",
+     "columnas": {
+      "E": {
+       "celda": "RTRE!E17",
+       "valor": 8000000,
+       "formula": "=+Antecedentes!E70"
+      },
+      "F": {
+       "celda": "RTRE!F17",
+       "valor": -8000000,
+       "formula": "=SUM(G17:I17)"
+      },
+      "G": {
+       "celda": "RTRE!G17",
+       "valor": -8000000,
+       "formula": "=-E17"
+      },
+      "J": {
+       "celda": "RTRE!J17",
+       "valor": -1481232,
+       "formula": "=-MIN(-G17/0.65*12.5%,J15)"
+      },
+      "K": {
+       "celda": "RTRE!K17",
+       "valor": -57228.032967000036,
+       "formula": "=((G17+M17)*L6)-J17",
+       "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+      },
+      "M": {
+       "celda": "RTRE!M17",
+       "valor": -2769231,
+       "formula": "=-E19"
+      }
+     }
+    },
+    {
+     "fila": 18,
+     "detalle": "Crédito máximo",
+     "columnas": {
+      "E": {
+       "celda": "RTRE!E18",
+       "valor": 1538462,
+       "formula": "=ROUND(+E17/0.65*12.5%,0)"
+      }
+     }
+    },
+    {
+     "fila": 19,
+     "detalle": "($8.000.000 / 0,65 x 22,5%) =",
+     "columnas": {
+      "E": {
+       "celda": "RTRE!E19",
+       "valor": 2769231,
+       "formula": "=ROUND(+E17/0.65*22.5%,0)"
+      }
+     }
+    },
+    {
+     "fila": 20,
+     "detalle": "Socio Sr. Escudero",
+     "columnas": {
+      "E": {
+       "celda": "RTRE!E20",
+       "valor": 8000000,
+       "formula": "=+Antecedentes!E71"
+      },
+      "F": {
+       "celda": "RTRE!F20",
+       "valor": -8000000,
+       "formula": "=SUM(G20:I20)"
+      },
+      "G": {
+       "celda": "RTRE!G20",
+       "valor": -8000000,
+       "formula": "=-E20"
+      },
+      "K": {
+       "celda": "RTRE!K20",
+       "valor": -1144678,
+       "formula": "=ROUND((G20+M20)*L6,0)"
+      },
+      "M": {
+       "celda": "RTRE!M20",
+       "valor": -12756,
+       "formula": "=MAX(G20/0.65*25%,-M15-M17)"
+      }
+     }
+    },
+    {
+     "fila": 21,
+     "detalle": "(-) Crédito IDPC  por gastos rechazados",
+     "columnas": {
+      "E": {
+       "celda": "RTRE!E21",
+       "valor": 140000,
+       "formula": "=+Antecedentes!L45"
+      },
+      "K": {
+       "celda": "RTRE!K21",
+       "valor": -20000,
+       "formula": "=-ROUND(E21*L6,0)"
+      }
+     }
+    },
+    {
+     "fila": 22,
+     "detalle": "Remanentes ejercicio siguiente",
+     "columnas": {
+      "F": {
+       "celda": "RTRE!F22",
+       "valor": 86132808,
+       "formula": "=SUM(F15:F21)"
+      },
+      "G": {
+       "celda": "RTRE!G22",
+       "valor": 85972808,
+       "formula": "=SUM(G15:G21)"
+      },
+      "H": {
+       "celda": "RTRE!H22",
+       "valor": 0,
+       "formula": "=SUM(H15:H21)"
+      },
+      "I": {
+       "celda": "RTRE!I22",
+       "valor": 160000,
+       "formula": "=SUM(I15:I21)"
+      },
+      "J": {
+       "celda": "RTRE!J22",
+       "valor": 0,
+       "formula": "=SUM(J15:J21)"
+      },
+      "K": {
+       "celda": "RTRE!K22",
+       "valor": 4707121.967033,
+       "formula": "=SUM(K15:K21)",
+       "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+      },
+      "L": {
+       "celda": "RTRE!L22",
+       "valor": 184932,
+       "formula": "=SUM(L15:L21)"
+      },
+      "M": {
+       "celda": "RTRE!M22",
+       "valor": 0,
+       "formula": "=SUM(M15:M21)"
+      },
+      "N": {
+       "celda": "RTRE!N22",
+       "valor": 70912,
+       "formula": "=SUM(N15:N21)"
+      },
+      "O": {
+       "celda": "RTRE!O22",
+       "valor": 310000,
+       "formula": "=SUM(O15:O21)"
+      }
+     }
+    }
+   ],
+   "datos_dj1948": [
+    {
+     "fila": 4,
+     "detalle": "Socio Sr. Ortiz",
+     "columnas": {
+      "C": {
+       "celda": "Datos para DJ 1948!C4",
+       "valor": "20.10.2025"
+      },
+      "D": {
+       "celda": "Datos para DJ 1948!D4",
+       "valor": 8000000,
+       "formula": "=-RTRE!G17"
+      },
+      "E": {
+       "celda": "Datos para DJ 1948!E4",
+       "valor": 8000000,
+       "formula": "=SUM(D4:D4)"
+      },
+      "G": {
+       "celda": "Datos para DJ 1948!G4",
+       "valor": 1481232,
+       "formula": "=-RTRE!J17"
+      },
+      "H": {
+       "celda": "Datos para DJ 1948!H4",
+       "valor": 57228.032967000036,
+       "formula": "=-RTRE!K17",
+       "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+      },
+      "I": {
+       "celda": "Datos para DJ 1948!I4",
+       "valor": 2769231,
+       "formula": "=-RTRE!M17"
+      },
+      "J": {
+       "celda": "Datos para DJ 1948!J4",
+       "valor": 4307691.032967,
+       "formula": "=SUM(G4:I4)",
+       "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+      }
+     }
+    },
+    {
+     "fila": 5,
+     "detalle": "Socio Sr. Escudero",
+     "columnas": {
+      "C": {
+       "celda": "Datos para DJ 1948!C5",
+       "valor": "20.11.2025"
+      },
+      "D": {
+       "celda": "Datos para DJ 1948!D5",
+       "valor": 8000000,
+       "formula": "=-RTRE!G20"
+      },
+      "E": {
+       "celda": "Datos para DJ 1948!E5",
+       "valor": 8000000,
+       "formula": "=SUM(D5:D5)"
+      },
+      "G": {
+       "celda": "Datos para DJ 1948!G5",
+       "valor": 0,
+       "formula": "=-RTRE!J20"
+      },
+      "H": {
+       "celda": "Datos para DJ 1948!H5",
+       "valor": 1144678,
+       "formula": "=-RTRE!K20"
+      },
+      "I": {
+       "celda": "Datos para DJ 1948!I5",
+       "valor": 12756,
+       "formula": "=-RTRE!M20"
+      },
+      "J": {
+       "celda": "Datos para DJ 1948!J5",
+       "valor": 1157434,
+       "formula": "=SUM(G5:I5)"
+      }
+     }
+    },
+    {
+     "fila": 6,
+     "detalle": "Total retiros del ejercicio",
+     "columnas": {
+      "D": {
+       "celda": "Datos para DJ 1948!D6",
+       "valor": 16000000,
+       "formula": "=SUM(D4:D5)"
+      },
+      "E": {
+       "celda": "Datos para DJ 1948!E6",
+       "valor": 16000000,
+       "formula": "=SUM(E4:E5)"
+      },
+      "G": {
+       "celda": "Datos para DJ 1948!G6",
+       "valor": 1481232,
+       "formula": "=SUM(G4:G5)"
+      },
+      "H": {
+       "celda": "Datos para DJ 1948!H6",
+       "valor": 1201906.032967,
+       "formula": "=SUM(H4:H5)",
+       "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+      },
+      "I": {
+       "celda": "Datos para DJ 1948!I6",
+       "valor": 2781987,
+       "formula": "=SUM(I4:I5)"
+      },
+      "J": {
+       "celda": "Datos para DJ 1948!J6",
+       "valor": 5465125.032967,
+       "formula": "=SUM(J4:J5)",
+       "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+      }
+     }
+    },
+    {
+     "fila": 10,
+     "detalle": "Socio Sr. Ortiz",
+     "columnas": {
+      "C": {
+       "celda": "Datos para DJ 1948!C10",
+       "valor": 1.003,
+       "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+      },
+      "D": {
+       "celda": "Datos para DJ 1948!D10",
+       "valor": 8024000,
+       "formula": "=ROUND(+D4*C10,0)"
+      },
+      "E": {
+       "celda": "Datos para DJ 1948!E10",
+       "valor": 8024000,
+       "formula": "=SUM(D10:D10)"
+      },
+      "G": {
+       "celda": "Datos para DJ 1948!G10",
+       "valor": 1485676,
+       "formula": "=ROUND(+G4*C10,0)"
+      },
+      "H": {
+       "celda": "Datos para DJ 1948!H10",
+       "valor": 57400,
+       "formula": "=ROUND(+H4*C10,0)"
+      },
+      "I": {
+       "celda": "Datos para DJ 1948!I10",
+       "valor": 2777539,
+       "formula": "=ROUND(+I4*C10,0)"
+      },
+      "J": {
+       "celda": "Datos para DJ 1948!J10",
+       "valor": 4320615,
+       "formula": "=SUM(G10:I10)"
+      }
+     }
+    },
+    {
+     "fila": 11,
+     "detalle": "Socio Sr. Escudero",
+     "columnas": {
+      "C": {
+       "celda": "Datos para DJ 1948!C11",
+       "valor": 1.003,
+       "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+      },
+      "D": {
+       "celda": "Datos para DJ 1948!D11",
+       "valor": 8024000,
+       "formula": "=ROUND(+D5*C11,0)"
+      },
+      "E": {
+       "celda": "Datos para DJ 1948!E11",
+       "valor": 8024000,
+       "formula": "=SUM(D11:D11)"
+      },
+      "G": {
+       "celda": "Datos para DJ 1948!G11",
+       "valor": 0,
+       "formula": "=ROUND(+G5*C11,0)"
+      },
+      "H": {
+       "celda": "Datos para DJ 1948!H11",
+       "valor": 1148112,
+       "formula": "=ROUND(+H5*C11,0)"
+      },
+      "I": {
+       "celda": "Datos para DJ 1948!I11",
+       "valor": 12794,
+       "formula": "=ROUND(+I5*C11,0)"
+      },
+      "J": {
+       "celda": "Datos para DJ 1948!J11",
+       "valor": 1160906,
+       "formula": "=SUM(G11:I11)"
+      }
+     }
+    },
+    {
+     "fila": 12,
+     "detalle": "Total retiros del ejercicio",
+     "columnas": {
+      "D": {
+       "celda": "Datos para DJ 1948!D12",
+       "valor": 16048000,
+       "formula": "=SUM(D10:D11)"
+      },
+      "E": {
+       "celda": "Datos para DJ 1948!E12",
+       "valor": 16048000,
+       "formula": "=SUM(E10:E11)"
+      },
+      "G": {
+       "celda": "Datos para DJ 1948!G12",
+       "valor": 1485676,
+       "formula": "=SUM(G10:G11)"
+      },
+      "H": {
+       "celda": "Datos para DJ 1948!H12",
+       "valor": 1205512,
+       "formula": "=SUM(H10:H11)"
+      },
+      "I": {
+       "celda": "Datos para DJ 1948!I12",
+       "valor": 2790333,
+       "formula": "=SUM(I10:I11)"
+      },
+      "J": {
+       "celda": "Datos para DJ 1948!J12",
+       "valor": 5481521,
+       "formula": "=SUM(J10:J11)"
+      }
+     }
+    }
+   ]
+  },
+  "f22_empresa": {
+   "recuadro_17": [
+    {
+     "codigo": 1400,
+     "valor": 95000000,
+     "celda": "R17 !D5",
+     "formula": "=SUMIF('BI y art.14 letra E)'!$C$5:$K$35,'R17 '!C5,'BI y art.14 letra E)'!$K$5:$K$35)",
+     "glosa": "Ingresos del giro percibidos"
+    },
+    {
+     "codigo": 1817,
+     "valor": 8000000,
+     "celda": "R17 !D6",
+     "formula": "=SUMIF('BI y art.14 letra E)'!$C$5:$K$35,'R17 '!C6,'BI y art.14 letra E)'!$K$5:$K$35)",
+     "glosa": "Ingresos del giro devengados en ejercicios anteriores y percibidos en el ejercicio actual"
+    },
+    {
+     "codigo": 1401,
+     "valor": 11849859,
+     "celda": "R17 !D7",
+     "formula": "=SUMIF('BI y art.14 letra E)'!$C$5:$K$35,'R17 '!C7,'BI y art.14 letra E)'!$K$5:$K$35)",
+     "glosa": "Rentas de fuente extranjera percibidas"
+    },
+    {
+     "codigo": 1587,
+     "valor": 5000000,
+     "celda": "R17 !D10",
+     "formula": "=SUMIF('BI y art.14 letra E)'!$C$5:$K$35,'R17 '!C10,'BI y art.14 letra E)'!$K$5:$K$35)",
+     "glosa": "Ingresos percibidos o devengados por operaciones con empresas relacionadas del art. 14 letra A) LIR"
+    },
+    {
+     "codigo": 1588,
+     "valor": 200936,
+     "celda": "R17 !D11",
+     "formula": "=SUMIF('BI y art.14 letra E)'!$C$5:$K$35,'R17 '!C11,'BI y art.14 letra E)'!$K$5:$K$35)",
+     "glosa": "Otros ingresos percibidos o devengados"
+    },
+    {
+     "codigo": 1410,
+     "valor": 120050795,
+     "celda": "R17 !D14",
+     "formula": "=SUM(D5:D13)",
+     "glosa": "Total de ingresos anuales"
+    },
+    {
+     "codigo": 1409,
+     "valor": 22000000,
+     "celda": "R17 !D18",
+     "formula": "=-SUMIF('BI y art.14 letra E)'!$C$5:$K$35,'R17 '!C18,'BI y art.14 letra E)'!$K$5:$K$35)",
+     "glosa": "Existencias, insumos y servicios del negocio, pagados"
+    },
+    {
+     "codigo": 1818,
+     "valor": 2000000,
+     "celda": "R17 !D19",
+     "formula": "=-SUMIF('BI y art.14 letra E)'!$C$5:$K$35,'R17 '!C19,'BI y art.14 letra E)'!$K$5:$K$35)",
+     "glosa": "Existencias, insumos y servicios del negocio adeudados en ejercicios anteriores y pagados en el ejercicio actual"
+    },
+    {
+     "codigo": 1411,
+     "valor": 8505000,
+     "celda": "R17 !D21",
+     "formula": "=-SUMIF('BI y art.14 letra E)'!$C$5:$K$35,'R17 '!C21,'BI y art.14 letra E)'!$K$5:$K$35)",
+     "glosa": "Remuneraciones pagadas"
+    },
+    {
+     "codigo": 1412,
+     "valor": 1000000,
+     "celda": "R17 !D22",
+     "formula": "=-SUMIF('BI y art.14 letra E)'!$C$5:$K$35,'R17 '!C22,'BI y art.14 letra E)'!$K$5:$K$35)",
+     "glosa": "Honorarios pagados"
+    },
+    {
+     "codigo": 1413,
+     "valor": 2000000,
+     "celda": "R17 !D23",
+     "formula": "=-SUMIF('BI y art.14 letra E)'!$C$5:$K$35,'R17 '!C23,'BI y art.14 letra E)'!$K$5:$K$35)",
+     "glosa": "Adquisición de bienes del activo fijo, pagados"
+    },
+    {
+     "codigo": 1415,
+     "valor": 860000,
+     "celda": "R17 !D24",
+     "formula": "=-SUMIF('BI y art.14 letra E)'!$C$5:$K$35,'R17 '!C24,'BI y art.14 letra E)'!$K$5:$K$35)",
+     "glosa": "Arriendos pagados"
+    },
+    {
+     "codigo": 1419,
+     "valor": 280000,
+     "celda": "R17 !D28",
+     "formula": "=-SUMIF('BI y art.14 letra E)'!$C$5:$K$35,'R17 '!C28,'BI y art.14 letra E)'!$K$5:$K$35)",
+     "glosa": "Intereses y reajustes pagados por préstamos y otros"
+    },
+    {
+     "codigo": 1422,
+     "valor": 2440000,
+     "celda": "R17 !D30",
+     "formula": "=-SUMIF('BI y art.14 letra E)'!$C$5:$K$35,'R17 '!C30,'BI y art.14 letra E)'!$K$5:$K$35)",
+     "glosa": "Partidas del art. 21 inc. 1° no afectados con IU 40% y del inc. 2° LIR pagados"
+    },
+    {
+     "codigo": 1424,
+     "valor": 201000,
+     "celda": "R17 !D32",
+     "formula": "=-SUMIF('BI y art.14 letra E)'!$C$5:$K$35,'R17 '!C32,'BI y art.14 letra E)'!$K$5:$K$35)",
+     "glosa": "Otros gastos deducibles de los ingresos"
+    },
+    {
+     "codigo": 1430,
+     "valor": 39286000,
+     "celda": "R17 !D37",
+     "formula": "=SUM(D15:D36)",
+     "glosa": "Total de egresos anuales"
+    },
+    {
+     "codigo": 1431,
+     "valor": 2440000,
+     "celda": "R17 !D38",
+     "formula": "=SUMIF('BI y art.14 letra E)'!$C$5:$K$35,'R17 '!C38,'BI y art.14 letra E)'!$K$5:$K$35)",
+     "glosa": "Partidas del inc. 1° no afectas al IU de tasa 40% y del inc. 2° del art. 21 LIR (históricos), incluidos en el total de egresos"
+    },
+    {
+     "codigo": 1729,
+     "valor": 83204795,
+     "celda": "R17 !D39",
+     "formula": "=+D14-D37+D38",
+     "glosa": "Base imponible antes de rebaja por incentivo al ahorro (art. 14 letra E) LIR) y/o por pago de IDPC voluntario (art. 14 letra A) N°6 LIR y art. 42° transitorio Ley N° 21.210) o pérdida tributaria"
+    },
+    {
+     "codigo": 1432,
+     "valor": 32382398,
+     "celda": "R17 !D40",
+     "formula": "=-SUMIF('BI y art.14 letra E)'!$C$5:$K$35,'R17 '!C40,'BI y art.14 letra E)'!$K$5:$K$35)",
+     "glosa": "Incentivo al ahorro según art. 14 letra E) LIR"
+    },
+    {
+     "codigo": 1440,
+     "valor": 50822397,
+     "celda": "R17 !D42",
+     "formula": "=+D39-D40-D41",
+     "glosa": "Base Imponible afecta a IDPC o pérdida tributaria del ejercicio"
+    }
+   ],
+   "recuadro_18": [
+    {
+     "codigo": 1703,
+     "valor": 116732808,
+     "celda": "R18 !D4",
+     "formula": "='R19'!D23",
+     "glosa": "CPTS positivo final (recuadro N° 19)"
+    },
+    {
+     "codigo": 1704,
+     "valor": 16000000,
+     "celda": "R18 !D7",
+     "formula": "=+'RAI Final'!F5",
+     "glosa": "Remesas, retiros o dividendos repartidos en el ejercicio, históricos"
+    },
+    {
+     "codigo": 1720,
+     "valor": 132732808,
+     "celda": "R18 !D8",
+     "formula": "=SUM(D4:D7)",
+     "glosa": "Subtotal"
+    },
+    {
+     "codigo": 1493,
+     "valor": 160000,
+     "celda": "R18 !D9",
+     "formula": "=-'RAI Final'!F6",
+     "glosa": "Saldo positivo del registro REX al término del ejercicio, antes de imputaciones"
+    },
+    {
+     "codigo": 1494,
+     "valor": 30600000,
+     "celda": "R18 !D10",
+     "formula": "=-'RAI Final'!F7",
+     "glosa": "Capital aportado, histórico (incluye aumentos y disminuciones efectivas)"
+    },
+    {
+     "codigo": 1500,
+     "valor": 101972808,
+     "celda": "R18 !D13",
+     "formula": "=+D8-SUM(D9:D12)",
+     "glosa": "Rentas afectas a IGC o IA (RAI) del ejercicio"
+    }
+   ],
+   "recuadro_19": [
+    {
+     "codigo": 1445,
+     "valor": 54030000,
+     "celda": "R19!D4",
+     "formula": "=+'CPT Simplificado'!F4",
+     "glosa": "CPT o CPTS positivo inicial"
+    },
+    {
+     "codigo": 1705,
+     "valor": 50822397,
+     "celda": "R19!D9",
+     "formula": "=+'CPT Simplificado'!F5",
+     "glosa": "Base imponible afecta a IDPC del ejercicio"
+    },
+    {
+     "codigo": 1726,
+     "valor": 720000,
+     "celda": "R19!D14",
+     "formula": "=+'CPT Simplificado'!F6",
+     "glosa": "Retiros o dividendos percibidos en el ejercicio por participaciones en otras empresas"
+    },
+    {
+     "codigo": 1479,
+     "valor": 16000000,
+     "celda": "R19!D15",
+     "formula": "=-'CPT Simplificado'!F7",
+     "glosa": "Remesas, retiros o dividendos repartidos en el ejercicio"
+    },
+    {
+     "codigo": 1708,
+     "valor": 2440000,
+     "celda": "R19!D16",
+     "formula": "=-'CPT Simplificado'!F8-'CPT Simplificado'!F9",
+     "glosa": "Partidas del inc. 1° no afectas al IU de tasa 40% y del inc. 2° del art. 21 LIR"
+    },
+    {
+     "codigo": 1379,
+     "valor": 2781987,
+     "celda": "R19!D18",
+     "formula": "='Crédito IPE'!K40",
+     "glosa": "Crédito total disponible imputable contra impuestos finales (IPE), del ejercicio"
+    },
+    {
+     "codigo": 1710,
+     "valor": 32382398,
+     "celda": "R19!D19",
+     "formula": "=+'CPT Simplificado'!F11",
+     "glosa": "Incentivo al ahorro según art. 14 letra E) LIR"
+    },
+    {
+     "codigo": 1545,
+     "valor": 116732808,
+     "celda": "R19!D23",
+     "formula": "=+D4+D9+D14-D15-D16-D18+D19",
+     "glosa": "CPTS positivo final"
+    }
+   ],
+   "recuadro_20": [
+    {
+     "codigo": 1451,
+     "valor": 23350000,
+     "celda": "R20!D6",
+     "formula": "=RTRE!G9",
+     "glosa": "Remanente ejercicio anterior o saldo inicial (saldo positivo)"
+    },
+    {
+     "codigo": 1454,
+     "valor": 80000,
+     "celda": "R20!N6",
+     "formula": "=RTRE!I9",
+     "glosa": "Remanente ejercicio anterior o saldo inicial (saldo positivo)"
+    },
+    {
+     "codigo": 1382,
+     "valor": 150000,
+     "celda": "R20!P6",
+     "formula": "=RTRE!O9",
+     "glosa": "Remanente ejercicio anterior o saldo inicial (saldo positivo)"
+    },
+    {
+     "codigo": 1459,
+     "valor": 23350000,
+     "celda": "R20!D11",
+     "formula": "=-RTRE!G10",
+     "glosa": "Reversos y/o disminuciones del ejercicio (propios)"
+    },
+    {
+     "codigo": 1463,
+     "valor": 101972808,
+     "celda": "R20!D12",
+     "formula": "=RTRE!G11",
+     "glosa": "Aumentos del ejercicio (propios)"
+    },
+    {
+     "codigo": 1470,
+     "valor": 80000,
+     "celda": "R20!N13",
+     "formula": "=RTRE!I12",
+     "glosa": "Otros aumentos del ejercicio"
+    },
+    {
+     "codigo": 1387,
+     "valor": 160000,
+     "celda": "R20!P13",
+     "formula": "=RTRE!O14",
+     "glosa": "Otros aumentos del ejercicio"
+    },
+    {
+     "codigo": 1475,
+     "valor": 16000000,
+     "celda": "R20!D15",
+     "formula": "=-(RTRE!G17+RTRE!G20)",
+     "glosa": "Retiros, dividendos o remesas imputados a los RTRE"
+    },
+    {
+     "codigo": 1484,
+     "valor": 85972808,
+     "celda": "R20!D17",
+     "formula": "=D6-D11+D12-D15",
+     "glosa": "Remanente ejercicio siguiente (saldo positivo)"
+    },
+    {
+     "codigo": 1487,
+     "valor": 160000,
+     "celda": "R20!N17",
+     "formula": "=N6-N11+N12+N13-N15",
+     "glosa": "Remanente ejercicio siguiente (saldo positivo)"
+    },
+    {
+     "codigo": 1391,
+     "valor": 310000,
+     "celda": "R20!P17",
+     "formula": "=P6-P11+P12+P13-P15",
+     "glosa": "Remanente ejercicio siguiente (saldo positivo)"
+    }
+   ],
+   "recuadro_21": [
+    {
+     "codigo": 1496,
+     "valor": 1028889,
+     "celda": "R21!F6",
+     "formula": "=RTRE!K9",
+     "glosa": "Remanente ejercicio anterior o saldo inicial (saldo positivo)"
+    },
+    {
+     "codigo": 1498,
+     "valor": 92466,
+     "celda": "R21!J6",
+     "formula": "=RTRE!L9",
+     "glosa": "Remanente ejercicio anterior o saldo inicial (saldo positivo)"
+    },
+    {
+     "codigo": 1502,
+     "valor": 34312,
+     "celda": "R21!P6",
+     "formula": "=RTRE!N9",
+     "glosa": "Remanente ejercicio anterior o saldo inicial (saldo positivo)"
+    },
+    {
+     "codigo": 1512,
+     "valor": 1481232,
+     "celda": "R21!D11",
+     "formula": "=RTRE!J13",
+     "glosa": "IDPC e IPE base imponible generada en el ejercicio"
+    },
+    {
+     "codigo": 1513,
+     "valor": 4871568,
+     "celda": "R21!F11",
+     "formula": "=RTRE!K13",
+     "glosa": "IDPC e IPE base imponible generada en el ejercicio"
+    },
+    {
+     "codigo": 1514,
+     "valor": 2781987,
+     "celda": "R21!L11",
+     "formula": "=RTRE!M13",
+     "glosa": "IDPC e IPE base imponible generada en el ejercicio"
+    },
+    {
+     "codigo": 1516,
+     "valor": 28571,
+     "celda": "R21!F12",
+     "formula": "=RTRE!K14",
+     "glosa": "IDPC e IPE retiros o dividendos percibidos"
+    },
+    {
+     "codigo": 1518,
+     "valor": 92466,
+     "celda": "R21!J12",
+     "formula": "=RTRE!L14",
+     "glosa": "IDPC e IPE retiros o dividendos percibidos"
+    },
+    {
+     "codigo": 1521,
+     "valor": 36600,
+     "celda": "R21!P12",
+     "formula": "=RTRE!N14",
+     "glosa": "IDPC e IPE retiros o dividendos percibidos"
+    },
+    {
+     "codigo": 1539,
+     "valor": 1481232,
+     "celda": "R21!D15",
+     "formula": "=-RTRE!J17",
+     "glosa": "Asignado a remesas, retiros o dividendos efectuados en el ejercicio"
+    },
+    {
+     "codigo": 1540,
+     "valor": 1201906.032967,
+     "celda": "R21!F15",
+     "formula": "=-(RTRE!K17+RTRE!K20)",
+     "glosa": "Asignado a remesas, retiros o dividendos efectuados en el ejercicio",
+     "nota_precision": "valor no entero almacenado por Excel; el F22 se declara en pesos enteros"
+    },
+    {
+     "codigo": 1543,
+     "valor": 2781987,
+     "celda": "R21!L15",
+     "formula": "=-(RTRE!M17+RTRE!M20)",
+     "glosa": "Asignado a remesas, retiros o dividendos efectuados en el ejercicio"
+    },
+    {
+     "codigo": 1558,
+     "valor": 20000,
+     "celda": "R21!F17",
+     "formula": "=-RTRE!K21",
+     "glosa": "IDPC e IPE asignado a gastos rechazados del art. 21 inc. 1° no afectos a IU 40% y del inc. 2° LIR"
+    },
+    {
+     "codigo": 1563,
+     "valor": 0,
+     "celda": "R21!D18",
+     "formula": "=D6+D11+D12-D15",
+     "glosa": "Remanente ejercicio siguiente (saldo positivo)"
+    },
+    {
+     "codigo": 1564,
+     "valor": 4707121.967033,
+     "celda": "R21!F18",
+     "formula": "=F6+F11+F12-F15-F17",
+     "glosa": "Remanente ejercicio siguiente (saldo positivo)",
+     "nota_precision": "valor no entero almacenado por Excel; el F22 se declara en pesos enteros"
+    },
+    {
+     "codigo": 1566,
+     "valor": 184932,
+     "celda": "R21!J18",
+     "formula": "=J6+J11+J12-J15",
+     "glosa": "Remanente ejercicio siguiente (saldo positivo)"
+    },
+    {
+     "codigo": 1567,
+     "valor": 0,
+     "celda": "R21!L18",
+     "formula": "=L6+L11+L12-L15",
+     "glosa": "Remanente ejercicio siguiente (saldo positivo)"
+    },
+    {
+     "codigo": 1569,
+     "valor": 70912,
+     "celda": "R21!P18",
+     "formula": "=P6+P11+P12-P15",
+     "glosa": "Remanente ejercicio siguiente (saldo positivo)"
+    }
+   ],
+   "linea_54_y_resultado_derivado_no_en_planilla": {
+    "advertencia": "La planilla no llena la línea 54 ni la liquidación final. Estos valores los deriva el analista; validar con contador y con las instrucciones oficiales del F22 AT 2026.",
+    "codigo_18_base_imponible": {
+     "valor": 50822397,
+     "desde": "BI y art.14 letra E)!K34 (= R17 código 1440)"
+    },
+    "idpc_bruto_base_x_tasa": {
+     "valor": 6352800,
+     "desde": "BI y art.14 letra E)!K35"
+    },
+    "codigo_19_rebajas": {
+     "valor": 1481232,
+     "desde": "Crédito IPE!K38 (crédito IPE imputable al IDPC). Supuesto: se rebaja en la línea 54."
+    },
+    "codigo_20_impuesto": {
+     "valor": 4871568,
+     "desde": "K35 - K38; coincide con RTRE!K13 (crédito IDPC con devolución generado = IDPC pagado en dinero)"
+    },
+    "codigo_36_ppm": {
+     "valor": 270811,
+     "desde": "Antecedentes!G79 (PPM reajustados)"
+    },
+    "codigo_305_resultado": {
+     "valor": 4600757,
+     "desde": "cód. 20 - cód. 36 (sin otros impuestos/créditos en el caso)"
+    },
+    "codigo_90_impuesto_adeudado": {
+     "valor": 4600757
+    },
+    "codigo_85_saldo_a_favor": {
+     "valor": 0
+    }
+   }
+  },
+  "dj_1948": {
+   "filas": [
+    {
+     "fila": 25,
+     "detalle": "20.10.2025",
+     "columnas": {
+      "B": {
+       "celda": "F1948!B25",
+       "valor": "20.10.2025",
+       "formula": "=Antecedentes!D70"
+      },
+      "C": {
+       "celda": "F1948!C25",
+       "valor": "18.000.000-0"
+      },
+      "D": {
+       "celda": "F1948!D25",
+       "valor": "Socio Sr. Ortiz",
+       "formula": "=Antecedentes!C70"
+      },
+      "F": {
+       "celda": "F1948!F25",
+       "valor": 8024000,
+       "formula": "='Datos para DJ 1948'!D10"
+      },
+      "T": {
+       "celda": "F1948!T25",
+       "valor": 1485676,
+       "formula": "='Datos para DJ 1948'!G10"
+      },
+      "U": {
+       "celda": "F1948!U25",
+       "valor": 57400,
+       "formula": "='Datos para DJ 1948'!H10"
+      },
+      "Z": {
+       "celda": "F1948!Z25",
+       "valor": 2777539,
+       "formula": "='Datos para DJ 1948'!I10"
+      },
+      "AH": {
+       "celda": "F1948!AH25",
+       "valor": 1
+      }
+     }
+    },
+    {
+     "fila": 26,
+     "detalle": "20.11.2025",
+     "columnas": {
+      "B": {
+       "celda": "F1948!B26",
+       "valor": "20.11.2025",
+       "formula": "=Antecedentes!D71"
+      },
+      "C": {
+       "celda": "F1948!C26",
+       "valor": "17.500.000-0"
+      },
+      "D": {
+       "celda": "F1948!D26",
+       "valor": "Socio Sr. Escudero ",
+       "formula": "=Antecedentes!C71"
+      },
+      "F": {
+       "celda": "F1948!F26",
+       "valor": 8024000,
+       "formula": "='Datos para DJ 1948'!D11"
+      },
+      "U": {
+       "celda": "F1948!U26",
+       "valor": 1148112,
+       "formula": "='Datos para DJ 1948'!H11"
+      },
+      "Z": {
+       "celda": "F1948!Z26",
+       "valor": 12794,
+       "formula": "='Datos para DJ 1948'!I11"
+      },
+      "AH": {
+       "celda": "F1948!AH26",
+       "valor": 2
+      }
+     }
+    }
+   ],
+   "resumen": [
+    {
+     "fila": 44,
+     "detalle": null,
+     "columnas": {
+      "C": {
+       "celda": "F1948!C44",
+       "valor": 16048000,
+       "formula": "=+SUM(F25:F26)"
+      },
+      "Q": {
+       "celda": "F1948!Q44",
+       "valor": 1485676,
+       "formula": "=+SUM(T25:T26)"
+      },
+      "R": {
+       "celda": "F1948!R44",
+       "valor": 1205512,
+       "formula": "=+SUM(U25:U26)"
+      },
+      "W": {
+       "celda": "F1948!W44",
+       "valor": 2790333,
+       "formula": "=+SUM(Z25:Z26)"
+      },
+      "AF": {
+       "celda": "F1948!AF44",
+       "valor": 2,
+       "formula": "=+COUNT(AH25:AH26)"
+      }
+     }
+    }
+   ]
+  },
+  "certificado_70_ortiz": [
+   {
+    "fila": 20,
+    "detalle": "20.10.2025",
+    "columnas": {
+     "B": {
+      "celda": "C70 Sr. Ortiz!B20",
+      "valor": "20.10.2025",
+      "formula": "='F1948'!B25"
+     },
+     "C": {
+      "celda": "C70 Sr. Ortiz!C20",
+      "valor": 1,
+      "formula": "='F1948'!AH25"
+     },
+     "D": {
+      "celda": "C70 Sr. Ortiz!D20",
+      "valor": "18.000.000-0",
+      "formula": "='F1948'!C25"
+     },
+     "F": {
+      "celda": "C70 Sr. Ortiz!F20",
+      "valor": 8000000,
+      "formula": "='Datos para DJ 1948'!E4"
+     },
+     "G": {
+      "celda": "C70 Sr. Ortiz!G20",
+      "valor": 1.003,
+      "formula": "='Datos para DJ 1948'!C10",
+      "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+     },
+     "H": {
+      "celda": "C70 Sr. Ortiz!H20",
+      "valor": 8024000,
+      "formula": "='Datos para DJ 1948'!E10"
+     },
+     "I": {
+      "celda": "C70 Sr. Ortiz!I20",
+      "valor": 8024000,
+      "formula": "='F1948'!F25"
+     },
+     "W": {
+      "celda": "C70 Sr. Ortiz!W20",
+      "valor": 1485676,
+      "formula": "='F1948'!T25"
+     },
+     "X": {
+      "celda": "C70 Sr. Ortiz!X20",
+      "valor": 57400,
+      "formula": "='F1948'!U25"
+     },
+     "AC": {
+      "celda": "C70 Sr. Ortiz!AC20",
+      "valor": 2777539,
+      "formula": "='F1948'!Z25"
+     }
+    }
+   },
+   {
+    "fila": 21,
+    "detalle": "TOTALES",
+    "columnas": {
+     "B": {
+      "celda": "C70 Sr. Ortiz!B21",
+      "valor": "TOTALES"
+     },
+     "G": {
+      "celda": "C70 Sr. Ortiz!G21",
+      "valor": "$"
+     },
+     "H": {
+      "celda": "C70 Sr. Ortiz!H21",
+      "valor": 8024000,
+      "formula": "=SUM(H20)"
+     },
+     "I": {
+      "celda": "C70 Sr. Ortiz!I21",
+      "valor": 8024000,
+      "formula": "=SUM(I20)"
+     },
+     "W": {
+      "celda": "C70 Sr. Ortiz!W21",
+      "valor": 1485676,
+      "formula": "=SUM(W20)"
+     },
+     "X": {
+      "celda": "C70 Sr. Ortiz!X21",
+      "valor": 57400,
+      "formula": "=SUM(X20)"
+     },
+     "AC": {
+      "celda": "C70 Sr. Ortiz!AC21",
+      "valor": 2777539,
+      "formula": "=SUM(AC20)"
+     }
+    }
+   }
+  ]
+ },
+ "14D8": {
+  "regimen": "Pro Pyme transparente, art. 14 letra D) N° 8 LIR (la empresa no paga IDPC; la base se atribuye a los dueños)",
+  "empresa": "NSD & GET Ltda. (ejemplo SII)",
+  "estado": "pendiente_revision",
+  "entradas": {
+   "capital": {
+    "socio1_participacion": {
+     "celda": "Antecedentes!J7",
+     "valor": 0.5,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "Sr. Estrada"
+    },
+    "socio1_historico": {
+     "celda": "Antecedentes!K7",
+     "valor": 15000000
+    },
+    "socio1_reajustado_2019": {
+     "celda": "Antecedentes!L7",
+     "valor": 15404999.999999998,
+     "formula": "=+K7*1.027",
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "socio2_participacion": {
+     "celda": "Antecedentes!J8",
+     "valor": 0.5,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "Sr. Escudero"
+    },
+    "socio2_historico": {
+     "celda": "Antecedentes!K8",
+     "valor": 15000000,
+     "formula": "=+K7"
+    },
+    "socio2_reajustado_2019": {
+     "celda": "Antecedentes!L8",
+     "valor": 15404999.999999998,
+     "formula": "=+K8*1.027",
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "total_historico": {
+     "celda": "Antecedentes!K9",
+     "valor": 30000000,
+     "formula": "=SUM(K7:K8)"
+    },
+    "total_reajustado_2019": {
+     "celda": "Antecedentes!L9",
+     "valor": 30809999.999999996,
+     "formula": "=SUM(L7:L8)",
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    }
+   },
+   "ingresos_giro": {
+    "ventas_no_relacionadas_J": {
+     "celda": "Antecedentes!J14",
+     "valor": 95000000
+    },
+    "ventas_no_relacionadas_L": {
+     "celda": "Antecedentes!L14",
+     "valor": 95000000,
+     "formula": "=+J14-K14"
+    },
+    "ventas_no_relacionadas_N": {
+     "celda": "Antecedentes!N14",
+     "valor": 95000000,
+     "formula": "=L14"
+    },
+    "ventas_relac_14D3_J": {
+     "celda": "Antecedentes!J15",
+     "valor": 8000000
+    },
+    "ventas_relac_14D3_K": {
+     "celda": "Antecedentes!K15",
+     "valor": 8000000
+    },
+    "ventas_relac_14D3_L": {
+     "celda": "Antecedentes!L15",
+     "valor": 0,
+     "formula": "=+J15-K15"
+    },
+    "ventas_relac_14A_J": {
+     "celda": "Antecedentes!J16",
+     "valor": 5000000
+    },
+    "ventas_relac_14A_K": {
+     "celda": "Antecedentes!K16",
+     "valor": 5000000
+    },
+    "ventas_relac_14A_L": {
+     "celda": "Antecedentes!L16",
+     "valor": 0,
+     "formula": "=+J16-K16"
+    },
+    "ventas_relac_14A_N": {
+     "celda": "Antecedentes!N16",
+     "valor": 5000000,
+     "formula": "=K16"
+    },
+    "cobro_factura_dic2024_J": {
+     "celda": "Antecedentes!J17",
+     "valor": 8000000
+    },
+    "cobro_factura_dic2024_L": {
+     "celda": "Antecedentes!L17",
+     "valor": 8000000,
+     "formula": "=+J17-K17"
+    },
+    "total_J": {
+     "celda": "Antecedentes!J18",
+     "valor": 116000000,
+     "formula": "=SUM(J14:J17)"
+    },
+    "total_K": {
+     "celda": "Antecedentes!K18",
+     "valor": 13000000,
+     "formula": "=SUM(K14:K17)"
+    },
+    "total_L": {
+     "celda": "Antecedentes!L18",
+     "valor": 103000000,
+     "formula": "=SUM(L14:L17)"
+    },
+    "total_tributable_control": {
+     "celda": "Antecedentes!O18",
+     "valor": 100000000,
+     "formula": "=SUM(N14:N17)"
+    }
+   },
+   "otros_ingresos": {
+    "venta_computador": {
+     "celda": "Antecedentes!L20",
+     "valor": 901125
+    },
+    "credito_bancario": {
+     "celda": "Antecedentes!L21",
+     "valor": 8000000,
+     "descripcion": "no tributable"
+    },
+    "total": {
+     "celda": "Antecedentes!L22",
+     "valor": 8901125,
+     "formula": "=SUM(L20:L21)"
+    },
+    "total_tributable_control": {
+     "celda": "Antecedentes!O22",
+     "valor": 901125,
+     "formula": "=SUM(N20:N21)"
+    }
+   },
+   "dividendos_percibidos": {
+    "div1_factor": {
+     "celda": "Antecedentes!J24",
+     "valor": 0.369863,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "div1_credito": {
+     "celda": "Antecedentes!K24",
+     "valor": 92466,
+     "formula": "=ROUND(+L24*J24,0)"
+    },
+    "div1_monto": {
+     "celda": "Antecedentes!L24",
+     "valor": 250000
+    },
+    "div2_factor": {
+     "celda": "Antecedentes!J25",
+     "valor": 0.142857,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "div2_credito": {
+     "celda": "Antecedentes!K25",
+     "valor": 28571,
+     "formula": "=ROUND(+L25*J25,0)"
+    },
+    "div2_monto": {
+     "celda": "Antecedentes!L25",
+     "valor": 200000
+    },
+    "div3_factor": {
+     "celda": "Antecedentes!J26",
+     "valor": 0.228747,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "div3_credito": {
+     "celda": "Antecedentes!K26",
+     "valor": 34312,
+     "formula": "=ROUND(+L26*J26,0)"
+    },
+    "div3_monto": {
+     "celda": "Antecedentes!L26",
+     "valor": 150000
+    },
+    "div4_monto": {
+     "celda": "Antecedentes!L27",
+     "valor": 30000
+    },
+    "div5_monto": {
+     "celda": "Antecedentes!L28",
+     "valor": 80000
+    },
+    "total_credito": {
+     "celda": "Antecedentes!K29",
+     "valor": 155349,
+     "formula": "=SUM(K24:K28)"
+    },
+    "total_monto": {
+     "celda": "Antecedentes!L29",
+     "valor": 710000,
+     "formula": "=SUM(L24:L28)"
+    }
+   },
+   "egresos": {
+    "compras_existencias_neto": {
+     "celda": "Antecedentes!J31",
+     "valor": 26000000
+    },
+    "compras_existencias_adeudado": {
+     "celda": "Antecedentes!K31",
+     "valor": 4000000
+    },
+    "compras_existencias_pagado": {
+     "celda": "Antecedentes!L31",
+     "valor": 22000000,
+     "formula": "=+J31-K31"
+    },
+    "camioneta_nueva_neto": {
+     "celda": "Antecedentes!J32",
+     "valor": 8000000,
+     "descripcion": "activo fijo nuevo sep-2025: gasto instantáneo + crédito 33 bis"
+    },
+    "camioneta_nueva_pagado": {
+     "celda": "Antecedentes!L32",
+     "valor": 8000000,
+     "formula": "=+J32-K32"
+    },
+    "remuneraciones_bruto": {
+     "celda": "Antecedentes!E33",
+     "valor": 8350000
+    },
+    "remuneraciones_adeudado": {
+     "celda": "Antecedentes!K33",
+     "valor": 350000
+    },
+    "remuneraciones_pagado": {
+     "celda": "Antecedentes!L33",
+     "valor": 8000000,
+     "formula": "=+E33-K33"
+    },
+    "honorarios_bruto": {
+     "celda": "Antecedentes!E34",
+     "valor": 1169591,
+     "formula": "=ROUND(1000000/(100%-14.5%),0)"
+    },
+    "honorarios_retencion": {
+     "celda": "Antecedentes!K34",
+     "valor": 169591,
+     "formula": "=ROUND(E34*14.5%,0)"
+    },
+    "honorarios_pagado": {
+     "celda": "Antecedentes!L34",
+     "valor": 1000000,
+     "formula": "=+E34-K34"
+    },
+    "gastos_generales": {
+     "celda": "Antecedentes!L35",
+     "valor": 201000
+    },
+    "arriendos": {
+     "celda": "Antecedentes!L36",
+     "valor": 860000
+    },
+    "cotizaciones_dic2024": {
+     "celda": "Antecedentes!L37",
+     "valor": 320000
+    },
+    "retenciones_dic2024": {
+     "celda": "Antecedentes!L38",
+     "valor": 185000
+    },
+    "pago_proveedores_2024": {
+     "celda": "Antecedentes!L39",
+     "valor": 2000000
+    },
+    "amortizacion_capital": {
+     "celda": "Antecedentes!F40",
+     "valor": 220000
+    },
+    "intereses_credito": {
+     "celda": "Antecedentes!H40",
+     "valor": 280000
+    },
+    "cuota_total": {
+     "celda": "Antecedentes!L40",
+     "valor": 500000,
+     "formula": "=+F40+H40"
+    },
+    "intereses_multas_fiscales": {
+     "celda": "Antecedentes!L41",
+     "valor": 140000,
+     "descripcion": "no se rebajan de la BI en 14D8; solo disminuyen CPTS (cód. 1577)"
+    },
+    "ppm_pagados": {
+     "celda": "Antecedentes!L42",
+     "valor": 270000,
+     "formula": "=+E73"
+    },
+    "retiros": {
+     "celda": "Antecedentes!L43",
+     "valor": 16000000,
+     "formula": "=+E66"
+    },
+    "total_neto": {
+     "celda": "Antecedentes!J44",
+     "valor": 34000000,
+     "formula": "=SUM(J31:J43)"
+    },
+    "total_adeudado": {
+     "celda": "Antecedentes!K44",
+     "valor": 4519591,
+     "formula": "=SUM(K31:K43)"
+    },
+    "total_pagado": {
+     "celda": "Antecedentes!L44",
+     "valor": 59476000,
+     "formula": "=SUM(L31:L43)"
+    }
+   },
+   "cpts_inicial_codigo_1581_AT2025": {
+    "cpts_inicial": {
+     "celda": "Antecedentes!H46",
+     "valor": 48731000
+    }
+   },
+   "parametros": {
+    "ipc_anual": {
+     "celda": "Antecedentes!D52",
+     "valor": 0.034,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "ipc_sep_dic": {
+     "celda": "Antecedentes!D53",
+     "valor": 0.007,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "ipc_oct_dic": {
+     "celda": "Antecedentes!D54",
+     "valor": 0.003,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "ipc_nov_dic": {
+     "celda": "Antecedentes!D55",
+     "valor": 0.003,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "uf_31_12_2025": {
+     "celda": "Antecedentes!D57",
+     "valor": 39727.96,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "tasa_credito_33bis": {
+     "celda": "Base Imponible !K46",
+     "valor": 483359.99999999994,
+     "formula": "=(K45*(1+Antecedentes!D53))*6%",
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "tasa 6% escrita en la fórmula"
+    }
+   },
+   "retiros": {
+    "estrada_fecha": {
+     "celda": "Antecedentes!D64",
+     "valor": "20.10.2025"
+    },
+    "estrada_historico": {
+     "celda": "Antecedentes!E64",
+     "valor": 8000000
+    },
+    "estrada_actualizado": {
+     "celda": "Antecedentes!G64",
+     "valor": 8024000,
+     "formula": "=ROUND(+E64*F64,0)"
+    },
+    "escudero_fecha": {
+     "celda": "Antecedentes!D65",
+     "valor": "20.11.2025"
+    },
+    "escudero_historico": {
+     "celda": "Antecedentes!E65",
+     "valor": 8000000,
+     "formula": "=+E64"
+    },
+    "escudero_actualizado": {
+     "celda": "Antecedentes!G65",
+     "valor": 8024000,
+     "formula": "=ROUND(+E65*F65,0)"
+    },
+    "total_historico": {
+     "celda": "Antecedentes!E66",
+     "valor": 16000000,
+     "formula": "=SUM(E64:E65)"
+    },
+    "total_actualizado": {
+     "celda": "Antecedentes!G66",
+     "valor": 16048000,
+     "formula": "=SUM(G64:G65)"
+    }
+   },
+   "ppm": {
+    "oct_historico": {
+     "celda": "Antecedentes!E71",
+     "valor": 237500,
+     "formula": "=+J14*0.25%"
+    },
+    "oct_actualizado": {
+     "celda": "Antecedentes!G71",
+     "valor": 238213,
+     "formula": "=ROUND(+E71*F71,0)"
+    },
+    "nov_historico": {
+     "celda": "Antecedentes!E72",
+     "valor": 32500,
+     "formula": "=ROUND((J15+J16)*0.25%,0)"
+    },
+    "nov_actualizado": {
+     "celda": "Antecedentes!G72",
+     "valor": 32598,
+     "formula": "=ROUND(+E72*F72,0)"
+    },
+    "total_historico": {
+     "celda": "Antecedentes!E73",
+     "valor": 270000,
+     "formula": "=SUM(E71:E72)"
+    },
+    "total_actualizado": {
+     "celda": "Antecedentes!G73",
+     "valor": 270811,
+     "formula": "=SUM(G71:G72)",
+     "descripcion": "PPM puestos a disposición de los socios"
+    }
+   },
+   "ingreso_diferido_saldo_cod1096_AT2025": {
+    "saldo": {
+     "celda": "Antecedentes!K75",
+     "valor": 5077426,
+     "descripcion": "6° año de amortización"
+    }
+   }
+  },
+  "intermedios": {
+   "base_imponible": {
+    "fila_4": {
+     "celda": "Base Imponible !K4",
+     "valor": 95000000,
+     "formula": "=+Antecedentes!L14",
+     "descripcion": "Ventas netas año 2025 a entidades NO relacionadas"
+    },
+    "fila_5": {
+     "celda": "Base Imponible !K5",
+     "valor": 5000000,
+     "formula": "=+Antecedentes!K16",
+     "descripcion": "Ventas netas año 2025 a entidades relacionadas sujetas al régimen de imputación parcial de créditos (art. 14 letra A))"
+    },
+    "fila_6": {
+     "celda": "Base Imponible !K6",
+     "valor": 8000000,
+     "formula": "=Antecedentes!L17",
+     "descripcion": "Ingresos devengados en 2024 y percibidos en 2025"
+    },
+    "fila_7": {
+     "celda": "Base Imponible !K7",
+     "valor": 108000000,
+     "formula": "=SUM(K4:K6)",
+     "descripcion": "Total ingresos del giro"
+    },
+    "fila_8": {
+     "celda": "Base Imponible !K8",
+     "valor": 901125,
+     "formula": "=+Antecedentes!L20",
+     "descripcion": "Ingresos netos por venta computador"
+    },
+    "fila_9": {
+     "celda": "Base Imponible !J9",
+     "valor": 250000,
+     "formula": "=+Antecedentes!L24",
+     "descripcion": "Dividendo 1, afecto a imptos. finales"
+    },
+    "fila_10": {
+     "celda": "Base Imponible !J10",
+     "valor": 200000,
+     "formula": "=+Antecedentes!L25",
+     "descripcion": "Dividendo 2, afecto a imptos. finales"
+    },
+    "fila_11": {
+     "celda": "Base Imponible !J11",
+     "valor": 150000,
+     "formula": "=+Antecedentes!L26",
+     "descripcion": "Dividendo 3, afecto a imptos. finales"
+    },
+    "fila_12": {
+     "celda": "Base Imponible !J12",
+     "valor": 30000,
+     "formula": "=+Antecedentes!L27",
+     "descripcion": "Dividendo 4, afecto a imptos. finales"
+    },
+    "fila_13": {
+     "celda": "Base Imponible !J13",
+     "valor": 80000,
+     "formula": "=+Antecedentes!L28",
+     "descripcion": "Dividendo 5, INR"
+    },
+    "fila_14": {
+     "celda": "Base Imponible !K14",
+     "valor": 710000,
+     "formula": "=SUM(J9:J13)",
+     "descripcion": "Total Dividendos Percibidos"
+    },
+    "fila_15": {
+     "celda": "Base Imponible !J15",
+     "valor": 92466,
+     "formula": "=+Antecedentes!K24",
+     "descripcion": "Crédito por IDPC, dividendo 1 sujeto a restitución con D° devolución."
+    },
+    "fila_16": {
+     "celda": "Base Imponible !J16",
+     "valor": 28571,
+     "formula": "=+Antecedentes!K25",
+     "descripcion": "Crédito por IDPC, dividendo 2 NO  sujeto a restitución con D° devolución."
+    },
+    "fila_17": {
+     "celda": "Base Imponible !J17",
+     "valor": 34312,
+     "formula": "=+Antecedentes!K26",
+     "descripcion": "Crédito por IDPC, dividendo 3 acumulado al 31.12.2016 con D° devolución."
+    },
+    "fila_18": {
+     "celda": "Base Imponible !K18",
+     "valor": 155349,
+     "formula": "=SUM(J15:J17)",
+     "descripcion": "Total crédito por IDPC recibidos"
+    },
+    "fila_19": {
+     "celda": "Base Imponible !K19",
+     "valor": 483359.99999999994,
+     "formula": "=+K47",
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "Crédito del artículo 33 bis de la LIR"
+    },
+    "fila_20": {
+     "celda": "Base Imponible !K20",
+     "valor": 811,
+     "formula": "=+Antecedentes!G73-Antecedentes!E73",
+     "descripcion": "Reajuste PPM Pagados"
+    },
+    "fila_21": {
+     "celda": "Base Imponible !K21",
+     "valor": 2250645,
+     "formula": "=SUM(K8:K20)",
+     "descripcion": "Total otros ingresos"
+    },
+    "fila_22": {
+     "celda": "Base Imponible !K22",
+     "valor": 1050012,
+     "formula": "=+K41",
+     "descripcion": "Ingreso diferido imputado en el ejercicio"
+    },
+    "fila_23": {
+     "celda": "Base Imponible !K23",
+     "valor": 111300657,
+     "formula": "=+K7+K21+K22",
+     "descripcion": "Total ingresos"
+    },
+    "fila_25": {
+     "celda": "Base Imponible !K25",
+     "valor": -22000000,
+     "formula": "=-Antecedentes!L31",
+     "descripcion": "Compras netas existencias 2025"
+    },
+    "fila_26": {
+     "celda": "Base Imponible !K26",
+     "valor": -2000000,
+     "formula": "=-Antecedentes!$L$39",
+     "descripcion": "Pago de proveedores 2024"
+    },
+    "fila_27": {
+     "celda": "Base Imponible !K27",
+     "valor": -8000000,
+     "formula": "=-Antecedentes!L32",
+     "descripcion": "Compra neta camioneta de reparto nueva, adquirida en septiembre 2025"
+    },
+    "fila_28": {
+     "celda": "Base Imponible !K28",
+     "valor": -8505000,
+     "formula": "=-Antecedentes!L33-Antecedentes!L37-Antecedentes!L38",
+     "descripcion": "Remuneraciones del ejercicio"
+    },
+    "fila_29": {
+     "celda": "Base Imponible !K29",
+     "valor": -1000000,
+     "formula": "=-Antecedentes!L34",
+     "descripcion": "Honorarios del ejercicio, monto bruto"
+    },
+    "fila_30": {
+     "celda": "Base Imponible !K30",
+     "valor": -201000,
+     "formula": "=-Antecedentes!L35",
+     "descripcion": "Gastos generales"
+    },
+    "fila_31": {
+     "celda": "Base Imponible !K31",
+     "valor": -860000,
+     "formula": "=-Antecedentes!L36",
+     "descripcion": "Arriendos"
+    },
+    "fila_32": {
+     "celda": "Base Imponible !K32",
+     "valor": -280000,
+     "formula": "=-Antecedentes!H40",
+     "descripcion": "Interés por préstamo"
+    },
+    "fila_33": {
+     "celda": "Base Imponible !K33",
+     "valor": -42846000,
+     "formula": "=SUM(K25:K32)",
+     "descripcion": "Total egresos del giro"
+    },
+    "fila_34": {
+     "celda": "Base Imponible !K34",
+     "valor": -42846000,
+     "formula": "=+K33",
+     "descripcion": "Total de egresos anuales"
+    },
+    "fila_35": {
+     "celda": "Base Imponible !K35",
+     "valor": 68454657,
+     "formula": "=K23+K34",
+     "descripcion": "BASE IMPONIBLE AFECTA A IMPUESTOS FINALES A ASIGNAR A LOS PROPIETARIOS"
+    },
+    "fila_40": {
+     "celda": "Base Imponible !K40",
+     "valor": 5250058,
+     "formula": "=ROUND(+Antecedentes!K75*(1+Antecedentes!D52),0)",
+     "descripcion": "Saldo ingreso diferido informado en el código 1096 del recuadro N° 7 del F-22 AT 2025, debidamente actualizado"
+    },
+    "fila_41": {
+     "celda": "Base Imponible !K41",
+     "valor": 1050012,
+     "formula": "=ROUND(K40/5,0)",
+     "descripcion": "Ingreso diferido actualizado a imputar en el AT 2026"
+    },
+    "fila_45": {
+     "celda": "Base Imponible !K45",
+     "valor": 8000000,
+     "formula": "=+Antecedentes!L32",
+     "descripcion": "Compra neta camioneta de reparto nueva, adquirida en septiembre 2025"
+    },
+    "fila_46": {
+     "celda": "Base Imponible !K46",
+     "valor": 483359.99999999994,
+     "formula": "=(K45*(1+Antecedentes!D53))*6%",
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "Crédito por adquisición de Activo Fijo establecido en el artículo 33 bis LIR (6%)"
+    },
+    "fila_47": {
+     "celda": "Base Imponible !K47",
+     "valor": 483359.99999999994,
+     "formula": "=+K46",
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "(=) Crédito determinado"
+    }
+   },
+   "cpt_simplificado": {
+    "fila_4": {
+     "celda": "CPT Simplificado!F4",
+     "valor": 48731000,
+     "formula": "=+Antecedentes!H46",
+     "descripcion": "(+) CPTS inicial al 01.01.2025"
+    },
+    "fila_5": {
+     "celda": "CPT Simplificado!F5",
+     "valor": 68454657,
+     "formula": "=+'Base Imponible '!K35",
+     "descripcion": "(+) Base imponible ejercicio"
+    },
+    "fila_6": {
+     "celda": "CPT Simplificado!F6",
+     "valor": -155349,
+     "formula": "=-'Base Imponible '!K18",
+     "descripcion": "(-) Créditos por IDPC por dividendos percibidos"
+    },
+    "fila_7": {
+     "celda": "CPT Simplificado!F7",
+     "valor": -16000000,
+     "formula": "=-Antecedentes!E66",
+     "descripcion": "(-) Retiros del ejercicio históricos"
+    },
+    "fila_8": {
+     "celda": "CPT Simplificado!F8",
+     "valor": -140000,
+     "formula": "=-Antecedentes!L41",
+     "descripcion": "(-) Intereses y multas fiscales históricos"
+    },
+    "fila_9": {
+     "celda": "CPT Simplificado!F9",
+     "valor": -1050012,
+     "formula": "=-'Base Imponible '!K22",
+     "descripcion": "(-) Ingreso diferido"
+    },
+    "fila_10": {
+     "celda": "CPT Simplificado!F10",
+     "valor": -483359.99999999994,
+     "formula": "=-'R22'!D15",
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "(-) Crédito 33 bis LIR"
+    },
+    "fila_11": {
+     "celda": "CPT Simplificado!F11",
+     "valor": 99356936,
+     "formula": "=SUM(F3:F10)",
+     "descripcion": "(=)  Capital Propio Tributario Simplificado"
+    }
+   },
+   "datos_certificacion": [
+    {
+     "fila": 7,
+     "detalle": "Socio Sr. Estrada",
+     "columnas": {
+      "C": {
+       "celda": "Datos para Certificación!C7",
+       "valor": 0.5,
+       "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+      },
+      "D": {
+       "celda": "Datos para Certificación!D7",
+       "valor": 34227329,
+       "formula": "=ROUND('Base Imponible '!$K$35*C7,0)"
+      },
+      "E": {
+       "celda": "Datos para Certificación!E7",
+       "valor": 525006,
+       "formula": "=ROUND('Base Imponible '!$K$22*C7,0)"
+      },
+      "F": {
+       "celda": "Datos para Certificación!F7",
+       "valor": 8000000,
+       "formula": "=+Antecedentes!E64"
+      },
+      "H": {
+       "celda": "Datos para Certificación!H7",
+       "valor": 31442,
+       "formula": "=ROUND((+'Base Imponible '!J16+'Base Imponible '!J17)*C7,0)"
+      },
+      "J": {
+       "celda": "Datos para Certificación!J7",
+       "valor": 46233,
+       "formula": "=ROUND(+'Base Imponible '!J15*C7,0)"
+      },
+      "M": {
+       "celda": "Datos para Certificación!M7",
+       "valor": 241679.99999999997,
+       "formula": "=+'Base Imponible '!K46/2",
+       "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+      },
+      "N": {
+       "celda": "Datos para Certificación!N7",
+       "valor": 135406,
+       "formula": "=ROUND(+Antecedentes!G73*C7,0)"
+      }
+     }
+    },
+    {
+     "fila": 8,
+     "detalle": "Socio Sr. Escudero",
+     "columnas": {
+      "C": {
+       "celda": "Datos para Certificación!C8",
+       "valor": 0.5,
+       "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+      },
+      "D": {
+       "celda": "Datos para Certificación!D8",
+       "valor": 34227328,
+       "formula": "=ROUND('Base Imponible '!$K$35*C8,0)-1"
+      },
+      "E": {
+       "celda": "Datos para Certificación!E8",
+       "valor": 525006,
+       "formula": "=ROUND('Base Imponible '!$K$22*C8,0)"
+      },
+      "F": {
+       "celda": "Datos para Certificación!F8",
+       "valor": 8000000,
+       "formula": "=+Antecedentes!E65"
+      },
+      "H": {
+       "celda": "Datos para Certificación!H8",
+       "valor": 31441,
+       "formula": "=+H7-1"
+      },
+      "J": {
+       "celda": "Datos para Certificación!J8",
+       "valor": 46233,
+       "formula": "=+J7"
+      },
+      "M": {
+       "celda": "Datos para Certificación!M8",
+       "valor": 241679.99999999997,
+       "formula": "=+M7",
+       "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+      },
+      "N": {
+       "celda": "Datos para Certificación!N8",
+       "valor": 135405,
+       "formula": "=+N7-1"
+      }
+     }
+    },
+    {
+     "fila": 9,
+     "detalle": "Totales",
+     "columnas": {
+      "C": {
+       "celda": "Datos para Certificación!C9",
+       "valor": 1,
+       "formula": "=SUM(C7:C8)"
+      },
+      "D": {
+       "celda": "Datos para Certificación!D9",
+       "valor": 68454657,
+       "formula": "=SUM(D7:D8)"
+      },
+      "E": {
+       "celda": "Datos para Certificación!E9",
+       "valor": 1050012,
+       "formula": "=SUM(E7:E8)"
+      },
+      "F": {
+       "celda": "Datos para Certificación!F9",
+       "valor": 16000000,
+       "formula": "=SUM(F7:F8)"
+      },
+      "G": {
+       "celda": "Datos para Certificación!G9",
+       "valor": 0,
+       "formula": "=SUM(G7:G8)"
+      },
+      "H": {
+       "celda": "Datos para Certificación!H9",
+       "valor": 62883,
+       "formula": "=SUM(H7:H8)"
+      },
+      "I": {
+       "celda": "Datos para Certificación!I9",
+       "valor": 0,
+       "formula": "=SUM(I7:I8)"
+      },
+      "J": {
+       "celda": "Datos para Certificación!J9",
+       "valor": 92466,
+       "formula": "=SUM(J7:J8)"
+      },
+      "K": {
+       "celda": "Datos para Certificación!K9",
+       "valor": 0,
+       "formula": "=SUM(K7:K8)"
+      },
+      "L": {
+       "celda": "Datos para Certificación!L9",
+       "valor": 0,
+       "formula": "=SUM(L7:L8)"
+      },
+      "M": {
+       "celda": "Datos para Certificación!M9",
+       "valor": 483359.99999999994,
+       "formula": "=SUM(M7:M8)",
+       "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+      },
+      "N": {
+       "celda": "Datos para Certificación!N9",
+       "valor": 270811,
+       "formula": "=SUM(N7:N8)"
+      }
+     }
+    }
+   ]
+  },
+  "f22_empresa": {
+   "recuadro_7": [
+    {
+     "codigo": 1358,
+     "valor": 5250058,
+     "celda": "R7!D5",
+     "formula": "='Base Imponible '!K40",
+     "glosa": "Saldo de ingreso diferido pendiente de tributación de acuerdo al art. 14 letra D) N°8, letra (d) de la LIR, art. 40° transitorio  de la Ley N° 21.210 y Circular N° 62 de 2020"
+    },
+    {
+     "codigo": 1184,
+     "valor": 1050012,
+     "celda": "R7!D6",
+     "formula": "='Base Imponible '!K41",
+     "glosa": "Ingreso  diferido a  imputar  en  el ejercicio"
+    },
+    {
+     "codigo": 1096,
+     "valor": 4200046,
+     "celda": "R7!D7",
+     "formula": "=D5-D6",
+     "glosa": "TOTAL Saldo ingreso diferido a imputar en los ejercicios siguientes"
+    }
+   ],
+   "recuadro_22": [
+    {
+     "codigo": 1600,
+     "valor": 95000000,
+     "celda": "R22!D5",
+     "formula": "=SUMIF('Base Imponible '!$C$4:$K$35,'R22'!C5,'Base Imponible '!$K$4:$K$35)",
+     "glosa": "Ingresos del giro percibidos"
+    },
+    {
+     "codigo": 1819,
+     "valor": 8000000,
+     "celda": "R22!D6",
+     "formula": "=SUMIF('Base Imponible '!$C$4:$K$35,'R22'!C6,'Base Imponible '!$K$4:$K$35)",
+     "glosa": "Ingresos del giro devengados en ejercicios anteriores y percibidos en el ejercicio actual"
+    },
+    {
+     "codigo": 1604,
+     "valor": 710000,
+     "celda": "R22!D10",
+     "formula": "=SUMIF('Base Imponible '!$C$4:$K$35,'R22'!C10,'Base Imponible '!$K$4:$K$35)",
+     "glosa": "Dividendos o retiros percibidos en el ejercicio, por participaciones en otras empresas"
+    },
+    {
+     "codigo": 1605,
+     "valor": 155349,
+     "celda": "R22!D11",
+     "formula": "=SUMIF('Base Imponible '!$C$4:$K$35,'R22'!C11,'Base Imponible '!$K$4:$K$35)",
+     "glosa": "Incremento por IDPC"
+    },
+    {
+     "codigo": 1606,
+     "valor": 5000000,
+     "celda": "R22!D12",
+     "formula": "=SUMIF('Base Imponible '!$C$4:$K$35,'R22'!C12,'Base Imponible '!$K$4:$K$35)",
+     "glosa": "Ingresos percibidos o devengados por operaciones con empresas relacionadas del art. 14 letra A) LIR"
+    },
+    {
+     "codigo": 1607,
+     "valor": 901936,
+     "celda": "R22!D13",
+     "formula": "=SUMIF('Base Imponible '!$C$4:$K$35,'R22'!C13,'Base Imponible '!$K$4:$K$35)",
+     "glosa": "Otros ingresos percibidos o devengados"
+    },
+    {
+     "codigo": 1608,
+     "valor": 1050012,
+     "celda": "R22!D14",
+     "formula": "=SUMIF('Base Imponible '!$C$4:$K$35,'R22'!C14,'Base Imponible '!$K$4:$K$35)",
+     "glosa": "Ingreso diferido imputado en el ejercicio, debidamente incrementado y reajustado, cuando corresponda"
+    },
+    {
+     "codigo": 1609,
+     "valor": 483359.99999999994,
+     "celda": "R22!D15",
+     "formula": "=SUMIF('Base Imponible '!$C$4:$K$35,'R22'!C15,'Base Imponible '!$K$4:$K$35)",
+     "glosa": "Crédito por activos fijos adquiridos en el ejercicio (art. 33 bis LIR)",
+     "nota_precision": "valor no entero almacenado por Excel; el F22 se declara en pesos enteros"
+    },
+    {
+     "codigo": 1610,
+     "valor": 111300657,
+     "celda": "R22!D16",
+     "formula": "=SUM(D5:D15)",
+     "glosa": "Total de ingresos anuales"
+    },
+    {
+     "codigo": 1614,
+     "valor": 22000000,
+     "celda": "R22!D20",
+     "formula": "=-SUMIF('Base Imponible '!$C$4:$K$35,'R22'!C20,'Base Imponible '!$K$4:$K$35)",
+     "glosa": "Existencias, insumos y servicios del negocio, pagados"
+    },
+    {
+     "codigo": 1820,
+     "valor": 2000000,
+     "celda": "R22!D21",
+     "formula": "=-SUMIF('Base Imponible '!$C$4:$K$35,'R22'!C21,'Base Imponible '!$K$4:$K$35)",
+     "glosa": "Existencias, insumos y servicios del negocio adeudados en ejercicios anteriores y pagados en el ejercicio actual"
+    },
+    {
+     "codigo": 1616,
+     "valor": 8505000,
+     "celda": "R22!D23",
+     "formula": "=-SUMIF('Base Imponible '!$C$4:$K$35,'R22'!C23,'Base Imponible '!$K$4:$K$35)",
+     "glosa": "Remuneraciones pagadas"
+    },
+    {
+     "codigo": 1617,
+     "valor": 1000000,
+     "celda": "R22!D24",
+     "formula": "=-SUMIF('Base Imponible '!$C$4:$K$35,'R22'!C24,'Base Imponible '!$K$4:$K$35)",
+     "glosa": "Honorarios pagados"
+    },
+    {
+     "codigo": 1618,
+     "valor": 8000000,
+     "celda": "R22!D25",
+     "formula": "=-SUMIF('Base Imponible '!$C$4:$K$35,'R22'!C25,'Base Imponible '!$K$4:$K$35)",
+     "glosa": "Adquisición de bienes del activo fijo, pagados"
+    },
+    {
+     "codigo": 1620,
+     "valor": 860000,
+     "celda": "R22!D26",
+     "formula": "=-SUMIF('Base Imponible '!$C$4:$K$35,'R22'!C26,'Base Imponible '!$K$4:$K$35)",
+     "glosa": "Arriendos pagados"
+    },
+    {
+     "codigo": 1622,
+     "valor": 280000,
+     "celda": "R22!D28",
+     "formula": "=-SUMIF('Base Imponible '!$C$4:$K$35,'R22'!C28,'Base Imponible '!$K$4:$K$35)",
+     "glosa": "Intereses y reajustes pagados por préstamos y otros"
+    },
+    {
+     "codigo": 1625,
+     "valor": 201000,
+     "celda": "R22!D30",
+     "formula": "=-SUMIF('Base Imponible '!$C$4:$K$35,'R22'!C30,'Base Imponible '!$K$4:$K$35)",
+     "glosa": "Otros gastos deducibles de los ingresos"
+    },
+    {
+     "codigo": 1629,
+     "valor": 42846000,
+     "celda": "R22!D35",
+     "formula": "=SUM(D17:D33)",
+     "glosa": "Total de egresos anuales"
+    },
+    {
+     "codigo": 1630,
+     "valor": 68454657,
+     "celda": "R22!D36",
+     "formula": "=+D16-D35",
+     "glosa": "Base imponible a asignar a propietarios que son contribuyentes de impuestos finales, o pérdida tributaria del ejercicio"
+    }
+   ],
+   "recuadro_23": [
+    {
+     "codigo": 1580,
+     "valor": 48731000,
+     "celda": "R23!D4",
+     "formula": "=+Antecedentes!H46",
+     "glosa": "CPT o CPTS positivo inicial"
+    },
+    {
+     "codigo": 1712,
+     "valor": 68454657,
+     "celda": "R23!D9",
+     "formula": "=+'CPT Simplificado'!$F$5",
+     "glosa": "Base imponible del ejercicio, asignable a los propietarios"
+    },
+    {
+     "codigo": 1576,
+     "valor": 16000000,
+     "celda": "R23!D12",
+     "formula": "=-'CPT Simplificado'!F7",
+     "glosa": "Remesas, retiros o dividendos repartidos en el ejercicio"
+    },
+    {
+     "codigo": 1715,
+     "valor": 1050012,
+     "celda": "R23!D13",
+     "formula": "=-'CPT Simplificado'!$F$9",
+     "glosa": "Ingreso diferido imputado en el ejercicio, debidamente incrementado y reajustado, cuando corresponda"
+    },
+    {
+     "codigo": 1577,
+     "valor": 140000,
+     "celda": "R23!D14",
+     "formula": "=-'CPT Simplificado'!$F$8",
+     "glosa": "Partidas de gastos no aceptados"
+    },
+    {
+     "codigo": 1716,
+     "valor": 483359.99999999994,
+     "celda": "R23!D15",
+     "formula": "=-'CPT Simplificado'!F10",
+     "glosa": "Crédito por activos fijos adquiridos en el ejercicio (art. 33 bis LIR)",
+     "nota_precision": "valor no entero almacenado por Excel; el F22 se declara en pesos enteros"
+    },
+    {
+     "codigo": 1578,
+     "valor": 155349,
+     "celda": "R23!D16",
+     "formula": "=-'CPT Simplificado'!F6",
+     "glosa": "Crédito por IDPC, por participaciones en otras empresas que incrementaron la BI del ejercicio."
+    },
+    {
+     "codigo": 1581,
+     "valor": 99356936,
+     "celda": "R23!D19",
+     "formula": "=+D4+D9-D13-D14-D16-D12-D15",
+     "glosa": "CPTS positivo final"
+    }
+   ],
+   "nota": "La empresa 14D8 no determina IDPC (no llena línea 54) y pone sus PPM a disposición de los dueños; sus montos van a la DJ 1947 y al certificado."
+  },
+  "dj_1947": {
+   "filas": [
+    {
+     "fila": 24,
+     "detalle": "11-9",
+     "columnas": {
+      "B": {
+       "celda": "F1947!B24",
+       "valor": 1
+      },
+      "C": {
+       "celda": "F1947!C24",
+       "valor": "11-9"
+      },
+      "D": {
+       "celda": "F1947!D24",
+       "valor": 34227329,
+       "formula": "='Datos para Certificación'!D7"
+      },
+      "F": {
+       "celda": "F1947!F24",
+       "valor": 525006,
+       "formula": "='Datos para Certificación'!E7"
+      },
+      "G": {
+       "celda": "F1947!G24",
+       "valor": 8000000,
+       "formula": "='Datos para Certificación'!F7"
+      },
+      "J": {
+       "celda": "F1947!J24",
+       "valor": 31442,
+       "formula": "='Datos para Certificación'!H7"
+      },
+      "L": {
+       "celda": "F1947!L24",
+       "valor": 46233,
+       "formula": "='Datos para Certificación'!J7"
+      },
+      "O": {
+       "celda": "F1947!O24",
+       "valor": 241679.99999999997,
+       "formula": "='Datos para Certificación'!M7",
+       "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+      },
+      "P": {
+       "celda": "F1947!P24",
+       "valor": 135406,
+       "formula": "='Datos para Certificación'!N7"
+      },
+      "Q": {
+       "celda": "F1947!Q24",
+       "valor": 1
+      }
+     }
+    },
+    {
+     "fila": 25,
+     "detalle": "20-5",
+     "columnas": {
+      "B": {
+       "celda": "F1947!B25",
+       "valor": 2
+      },
+      "C": {
+       "celda": "F1947!C25",
+       "valor": "20-5"
+      },
+      "D": {
+       "celda": "F1947!D25",
+       "valor": 34227328,
+       "formula": "='Datos para Certificación'!D8"
+      },
+      "F": {
+       "celda": "F1947!F25",
+       "valor": 525006,
+       "formula": "='Datos para Certificación'!E8"
+      },
+      "G": {
+       "celda": "F1947!G25",
+       "valor": 8000000,
+       "formula": "='Datos para Certificación'!F8"
+      },
+      "J": {
+       "celda": "F1947!J25",
+       "valor": 31441,
+       "formula": "='Datos para Certificación'!H8"
+      },
+      "L": {
+       "celda": "F1947!L25",
+       "valor": 46233,
+       "formula": "='Datos para Certificación'!J8"
+      },
+      "O": {
+       "celda": "F1947!O25",
+       "valor": 241679.99999999997,
+       "formula": "='Datos para Certificación'!M8",
+       "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+      },
+      "P": {
+       "celda": "F1947!P25",
+       "valor": 135405,
+       "formula": "='Datos para Certificación'!N8"
+      },
+      "Q": {
+       "celda": "F1947!Q25",
+       "valor": 2
+      }
+     }
+    }
+   ],
+   "resumen": [
+    {
+     "fila": 34,
+     "detalle": null,
+     "columnas": {
+      "B": {
+       "celda": "F1947!B34",
+       "valor": 2,
+       "formula": "=+COUNT(Q24:Q25)"
+      },
+      "D": {
+       "celda": "F1947!D34",
+       "valor": 68454657,
+       "formula": "=+SUM(D24:E25)"
+      },
+      "F": {
+       "celda": "F1947!F34",
+       "valor": 1050012,
+       "formula": "=+SUM(F24:F25)"
+      },
+      "G": {
+       "celda": "F1947!G34",
+       "valor": 16000000,
+       "formula": "=+SUM(G24:H25)"
+      },
+      "J": {
+       "celda": "F1947!J34",
+       "valor": 62883,
+       "formula": "=SUM(J24:J25)"
+      },
+      "L": {
+       "celda": "F1947!L34",
+       "valor": 92466,
+       "formula": "=SUM(L24:L25)"
+      },
+      "O": {
+       "celda": "F1947!O34",
+       "valor": 483359.99999999994,
+       "formula": "=SUM(O24:O25)",
+       "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+      },
+      "P": {
+       "celda": "F1947!P34",
+       "valor": 270811,
+       "formula": "=SUM(P24:P25)"
+      }
+     }
+    }
+   ]
+  },
+  "f22_socio_estrada": [
+   {
+    "codigo": 1598,
+    "valor": 46233,
+    "celda": "F22 Socio Estrada!G7",
+    "formula": "=+SUM(G8:G9)",
+    "glosa": "Rentas propias o por participaciones, según art. 14 letra D) N° 8 LIR"
+   },
+   {
+    "codigo": 1631,
+    "valor": 31442,
+    "celda": "F22 Socio Estrada!K7",
+    "formula": "=+SUM(K8:K9)",
+    "glosa": "Rentas propias o por participaciones, según art. 14 letra D) N° 8 LIR"
+   },
+   {
+    "codigo": 1632,
+    "valor": 34227329,
+    "celda": "F22 Socio Estrada!M7",
+    "formula": "=+SUM(M8:M9)",
+    "glosa": "Rentas propias o por participaciones, según art. 14 letra D) N° 8 LIR"
+   },
+   {
+    "codigo": 2011,
+    "valor": 46233,
+    "celda": "F22 Socio Estrada!G8",
+    "formula": "='F1947'!L24",
+    "glosa": "a) Propias"
+   },
+   {
+    "codigo": 2013,
+    "valor": 31442,
+    "celda": "F22 Socio Estrada!K8",
+    "formula": "='F1947'!J24",
+    "glosa": "a) Propias"
+   },
+   {
+    "codigo": 2014,
+    "valor": 34227329,
+    "celda": "F22 Socio Estrada!M8",
+    "formula": "='F1947'!D24",
+    "glosa": "a) Propias"
+   },
+   {
+    "codigo": 158,
+    "valor": 34227329,
+    "celda": "F22 Socio Estrada!M10",
+    "formula": "=M7",
+    "glosa": "SUB TOTAL (Si declara IA trasladar a código 133 o  32)"
+   },
+   {
+    "codigo": 170,
+    "valor": 34227329,
+    "celda": "F22 Socio Estrada!M12",
+    "formula": "=M10",
+    "glosa": "BASE IMPONIBLE ANUAL DE IUSC o IGC"
+   },
+   {
+    "codigo": 157,
+    "valor": 1286149,
+    "celda": "F22 Socio Estrada!M14",
+    "formula": "=ROUND(M12*'Tabla IGC'!E6-'Tabla IGC'!F6,0)",
+    "glosa": "IGC o IUSC, según tabla (arts. 47, 52 o 52 bis LIR)"
+   },
+   {
+    "codigo": 1035,
+    "valor": 16182,
+    "celda": "F22 Socio Estrada!M15",
+    "formula": "=ROUND(G7*35%,0)",
+    "glosa": "Débito fiscal por restitución crédito por IDPC, según art. 56 N° 3 inc. final LIR"
+   },
+   {
+    "codigo": 1638,
+    "valor": 241679.99999999997,
+    "celda": "F22 Socio Estrada!M17",
+    "formula": "='Datos para Certificación'!M7",
+    "glosa": "Crédito al IGC por art. 33 bis LIR, según art. 14 letra D) N°8 letra a) numeral (v) LIR",
+    "nota_precision": "valor no entero almacenado por Excel; el F22 se declara en pesos enteros"
+   },
+   {
+    "codigo": 610,
+    "valor": 77675,
+    "celda": "F22 Socio Estrada!M18",
+    "formula": "=G7+K7",
+    "glosa": "Crédito al IGC o IUSC por IDPC con derecho a devolución, según art. 56 N° 3 LIR"
+   },
+   {
+    "codigo": 304,
+    "valor": 982976,
+    "celda": "F22 Socio Estrada!M19",
+    "formula": "=M14+M15-M17-M18",
+    "glosa": "IGC O IUSC, DÉBITO FISCAL Y/O TASA ADICIONAL DETERMINADO"
+   },
+   {
+    "codigo": 31,
+    "valor": 982976,
+    "celda": "F22 Socio Estrada!M22",
+    "formula": "=M19",
+    "glosa": "IMPUESTOS"
+   },
+   {
+    "codigo": 1645,
+    "valor": 135406,
+    "celda": "F22 Socio Estrada!M24",
+    "formula": "='Datos para Certificación'!N7",
+    "glosa": "PPM puestos a disposición de los propietarios de empresas del régimen de transparencia tributaria del art. 14 letra D) N° 8 LIR"
+   },
+   {
+    "codigo": 305,
+    "valor": 847570,
+    "celda": "F22 Socio Estrada!M26",
+    "formula": "=M22-M24",
+    "glosa": "RESULTADO LIQUIDACIÓN ANUAL IMPUESTO A LA RENTA"
+   },
+   {
+    "codigo": 90,
+    "valor": 847570,
+    "celda": "F22 Socio Estrada!M28",
+    "formula": "=M26",
+    "glosa": "Impuesto adeudado"
+   }
+  ],
+  "tabla_igc_AT2026": [
+   {
+    "fila": 4,
+    "detalle": null,
+    "columnas": {
+     "B": {
+      "celda": "Tabla IGC!B4",
+      "valor": 1
+     },
+     "C": {
+      "celda": "Tabla IGC!C4",
+      "valor": 0
+     },
+     "D": {
+      "celda": "Tabla IGC!D4",
+      "valor": 11265804
+     },
+     "E": {
+      "celda": "Tabla IGC!E4",
+      "valor": 0
+     },
+     "F": {
+      "celda": "Tabla IGC!F4",
+      "valor": 0
+     }
+    }
+   },
+   {
+    "fila": 5,
+    "detalle": null,
+    "columnas": {
+     "B": {
+      "celda": "Tabla IGC!B5",
+      "valor": 2,
+      "formula": "=+B4+1"
+     },
+     "C": {
+      "celda": "Tabla IGC!C5",
+      "valor": 11265804.01,
+      "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+     },
+     "D": {
+      "celda": "Tabla IGC!D5",
+      "valor": 25035120
+     },
+     "E": {
+      "celda": "Tabla IGC!E5",
+      "valor": 0.04,
+      "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+     },
+     "F": {
+      "celda": "Tabla IGC!F5",
+      "valor": 450632.16000000003,
+      "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+     }
+    }
+   },
+   {
+    "fila": 6,
+    "detalle": null,
+    "columnas": {
+     "B": {
+      "celda": "Tabla IGC!B6",
+      "valor": 3,
+      "formula": "=+B5+1"
+     },
+     "C": {
+      "celda": "Tabla IGC!C6",
+      "valor": 25035120.01,
+      "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+     },
+     "D": {
+      "celda": "Tabla IGC!D6",
+      "valor": 41725200
+     },
+     "E": {
+      "celda": "Tabla IGC!E6",
+      "valor": 0.08,
+      "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+     },
+     "F": {
+      "celda": "Tabla IGC!F6",
+      "valor": 1452036.96,
+      "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+     }
+    }
+   },
+   {
+    "fila": 7,
+    "detalle": null,
+    "columnas": {
+     "B": {
+      "celda": "Tabla IGC!B7",
+      "valor": 4,
+      "formula": "=+B6+1"
+     },
+     "C": {
+      "celda": "Tabla IGC!C7",
+      "valor": 41725200.01,
+      "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+     },
+     "D": {
+      "celda": "Tabla IGC!D7",
+      "valor": 58415280
+     },
+     "E": {
+      "celda": "Tabla IGC!E7",
+      "valor": 0.135,
+      "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+     },
+     "F": {
+      "celda": "Tabla IGC!F7",
+      "valor": 3746922.96,
+      "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+     }
+    }
+   },
+   {
+    "fila": 8,
+    "detalle": null,
+    "columnas": {
+     "B": {
+      "celda": "Tabla IGC!B8",
+      "valor": 5,
+      "formula": "=+B7+1"
+     },
+     "C": {
+      "celda": "Tabla IGC!C8",
+      "valor": 58415280.01,
+      "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+     },
+     "D": {
+      "celda": "Tabla IGC!D8",
+      "valor": 75105360
+     },
+     "E": {
+      "celda": "Tabla IGC!E8",
+      "valor": 0.23,
+      "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+     },
+     "F": {
+      "celda": "Tabla IGC!F8",
+      "valor": 9296374.56,
+      "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+     }
+    }
+   },
+   {
+    "fila": 9,
+    "detalle": null,
+    "columnas": {
+     "B": {
+      "celda": "Tabla IGC!B9",
+      "valor": 6,
+      "formula": "=+B8+1"
+     },
+     "C": {
+      "celda": "Tabla IGC!C9",
+      "valor": 75105360.01,
+      "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+     },
+     "D": {
+      "celda": "Tabla IGC!D9",
+      "valor": 100140480
+     },
+     "E": {
+      "celda": "Tabla IGC!E9",
+      "valor": 0.304,
+      "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+     },
+     "F": {
+      "celda": "Tabla IGC!F9",
+      "valor": 14854171.200000001,
+      "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+     }
+    }
+   },
+   {
+    "fila": 10,
+    "detalle": null,
+    "columnas": {
+     "B": {
+      "celda": "Tabla IGC!B10",
+      "valor": 7,
+      "formula": "=+B9+1"
+     },
+     "C": {
+      "celda": "Tabla IGC!C10",
+      "valor": 100140480.01,
+      "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+     },
+     "D": {
+      "celda": "Tabla IGC!D10",
+      "valor": 258696240
+     },
+     "E": {
+      "celda": "Tabla IGC!E10",
+      "valor": 0.35,
+      "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+     },
+     "F": {
+      "celda": "Tabla IGC!F10",
+      "valor": 19460633.28,
+      "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+     }
+    }
+   },
+   {
+    "fila": 11,
+    "detalle": "y   más",
+    "columnas": {
+     "B": {
+      "celda": "Tabla IGC!B11",
+      "valor": 8,
+      "formula": "=+B10+1"
+     },
+     "C": {
+      "celda": "Tabla IGC!C11",
+      "valor": 258696240.01,
+      "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+     },
+     "D": {
+      "celda": "Tabla IGC!D11",
+      "valor": "y   más "
+     },
+     "E": {
+      "celda": "Tabla IGC!E11",
+      "valor": 0.4,
+      "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+     },
+     "F": {
+      "celda": "Tabla IGC!F11",
+      "valor": 32395445.28,
+      "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+     }
+    }
+   },
+   {
+    "fila": 13,
+    "detalle": "UTM Diciembre de 2025",
+    "columnas": {
+     "B": {
+      "celda": "Tabla IGC!B13",
+      "valor": "UTM Diciembre de 2025"
+     },
+     "F": {
+      "celda": "Tabla IGC!F13",
+      "valor": 69542
+     }
+    }
+   },
+   {
+    "fila": 14,
+    "detalle": "UTA Diciembre de 2025",
+    "columnas": {
+     "B": {
+      "celda": "Tabla IGC!B14",
+      "valor": "UTA Diciembre de 2025"
+     },
+     "F": {
+      "celda": "Tabla IGC!F14",
+      "valor": 834504,
+      "formula": "=+F13*12"
+     }
+    }
+   }
+  ],
+  "nota_igc": "F22 Socio Estrada!M14 aplica directamente el tramo 3 (Tabla IGC!E6/F6); no busca el tramo. NÚCLEO debe buscar el tramo por la base."
+ },
+ "14A": {
+  "regimen": "Régimen general semi-integrado, art. 14 letra A) LIR (contabilidad completa, devengado, RLI desde resultado financiero)",
+  "empresa": "Fénix Ltda. (ejemplo SII)",
+  "estado": "pendiente_revision",
+  "entradas": {
+   "capital": {
+    "socio1_participacion": {
+     "celda": "Antecedentes!K9",
+     "valor": 0.9,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "Sociedad NSD Ltda. (14D3)"
+    },
+    "socio1_31_12_2024": {
+     "celda": "Antecedentes!L9",
+     "valor": 104774175
+    },
+    "socio1_31_12_2025": {
+     "celda": "Antecedentes!M9",
+     "valor": 108336497,
+     "formula": "=ROUND(L9*(1+$M$49),0)"
+    },
+    "socio2_participacion": {
+     "celda": "Antecedentes!K10",
+     "valor": 0.1,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "Srta. Arriagada (IGC)"
+    },
+    "socio2_31_12_2024": {
+     "celda": "Antecedentes!L10",
+     "valor": 11641575
+    },
+    "socio2_31_12_2025": {
+     "celda": "Antecedentes!M10",
+     "valor": 12037389,
+     "formula": "=ROUND(L10*(1+$M$49),0)"
+    },
+    "total_31_12_2024": {
+     "celda": "Antecedentes!L11",
+     "valor": 116415750,
+     "formula": "=SUM(L9:L10)"
+    },
+    "total_31_12_2025": {
+     "celda": "Antecedentes!M11",
+     "valor": 120373886,
+     "formula": "=SUM(M9:M10)"
+    }
+   },
+   "rtre_31_12_2024": {
+    "control": {
+     "celda": "Antecedentes!F21",
+     "valor": 12985640,
+     "formula": "=SUM(G21:L21)"
+    },
+    "RAI": {
+     "celda": "Antecedentes!G21",
+     "valor": 12728890
+    },
+    "DDAN": {
+     "celda": "Antecedentes!H21",
+     "valor": 82160
+    },
+    "REX_RAP": {
+     "celda": "Antecedentes!I21",
+     "valor": 0
+    },
+    "REX_ISFUT": {
+     "celda": "Antecedentes!J21",
+     "valor": 0
+    },
+    "REX_rentas_exentas": {
+     "celda": "Antecedentes!K21",
+     "valor": 51350
+    },
+    "REX_INR": {
+     "celda": "Antecedentes!L21",
+     "valor": 123240
+    },
+    "SAC_no_sujeto_con_dev": {
+     "celda": "Antecedentes!M21",
+     "valor": 0
+    },
+    "SAC_sujeto_con_dev": {
+     "celda": "Antecedentes!N21",
+     "valor": -92466
+    },
+    "SAC_hasta2016": {
+     "celda": "Antecedentes!O21",
+     "valor": 0
+    },
+    "STUT": {
+     "celda": "Antecedentes!P21",
+     "valor": 0
+    },
+    "SAC_factor": {
+     "celda": "Antecedentes!N18",
+     "valor": 0.369863,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    }
+   },
+   "cpt_inicial_codigo_645_AT2025": {
+    "cpt_inicial": {
+     "celda": "Antecedentes!M23",
+     "valor": 115653480
+    }
+   },
+   "datos_rli": {
+    "resultado_balance": {
+     "celda": "Antecedentes!M27",
+     "valor": 83400500
+    },
+    "dividendo_percibido_14D3": {
+     "celda": "Antecedentes!M28",
+     "valor": 1000000
+    },
+    "credito_idpc_dividendo": {
+     "celda": "Antecedentes!M29",
+     "valor": 142857,
+     "formula": "=ROUND(M28*0.142857,0)"
+    },
+    "multas_fiscales": {
+     "celda": "Antecedentes!M31",
+     "valor": 49213
+    },
+    "donacion_club": {
+     "celda": "Antecedentes!M32",
+     "valor": 196850
+    },
+    "gasto_no_acreditado": {
+     "celda": "Antecedentes!M33",
+     "valor": 765054
+    },
+    "impuesto_renta_AT2025_pagado": {
+     "celda": "Antecedentes!M34",
+     "valor": 17280000
+    },
+    "colegiatura_hijo_socia": {
+     "celda": "Antecedentes!M35",
+     "valor": 3000000
+    },
+    "castigo_factura_365_dias": {
+     "celda": "Antecedentes!M36",
+     "valor": 2800000
+    },
+    "correccion_monetaria_registrada": {
+     "celda": "Antecedentes!M37",
+     "valor": 0
+    },
+    "dividendo_extranjero_usd": {
+     "celda": "Antecedentes!M38",
+     "valor": 8500
+    }
+   },
+   "retiros": {
+    "nsd_historico": {
+     "celda": "Antecedentes!K43",
+     "valor": 54000000
+    },
+    "nsd_cm": {
+     "celda": "Antecedentes!L43",
+     "valor": 0.022,
+     "formula": "=M50",
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "nsd_actualizado": {
+     "celda": "Antecedentes!M43",
+     "valor": 55188000,
+     "formula": "=+K43*(1+L43)"
+    },
+    "arriagada_historico": {
+     "celda": "Antecedentes!K44",
+     "valor": 6000000
+    },
+    "arriagada_cm": {
+     "celda": "Antecedentes!L44",
+     "valor": 0.016,
+     "formula": "=M51",
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "arriagada_actualizado": {
+     "celda": "Antecedentes!M44",
+     "valor": 6096000,
+     "formula": "=+K44*(1+L44)"
+    },
+    "total_historico": {
+     "celda": "Antecedentes!K45",
+     "valor": 60000000,
+     "formula": "=SUM(K43:K44)"
+    },
+    "total_actualizado": {
+     "celda": "Antecedentes!M45",
+     "valor": 61284000,
+     "formula": "=SUM(M43:M44)"
+    }
+   },
+   "parametros": {
+    "ipc_anual": {
+     "celda": "Antecedentes!M49",
+     "valor": 0.034,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "ipc_mar_dic": {
+     "celda": "Antecedentes!M50",
+     "valor": 0.022,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "ipc_abr_dic": {
+     "celda": "Antecedentes!M51",
+     "valor": 0.016,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "uf_31_12_2025": {
+     "celda": "Antecedentes!M55",
+     "valor": 39727.96,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "tipo_cambio_usd": {
+     "celda": "Antecedentes!M57",
+     "valor": 948.33,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "tasa_idpc": {
+     "celda": "RLI!K27",
+     "valor": 0.27,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "27%, escrita en la celda"
+    },
+    "tasa_IU_art21": {
+     "celda": "RLI!K30",
+     "valor": 0.4,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "tope_14E_pct": {
+     "celda": "RLI!M40",
+     "valor": 0.5,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    },
+    "tope_14E_5000UF": {
+     "celda": "RLI!N40",
+     "valor": 198639800,
+     "formula": "=5000*Antecedentes!M55"
+    },
+    "factor_SAC": {
+     "celda": "RTRE!O6",
+     "valor": 0.369863,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+    }
+   },
+   "nota": "Antecedentes!C53 dice que la sociedad 'decide pagar el IDPC en carácter de voluntario', pero ninguna celda lo usa (código 1157 vacío)."
+  },
+  "intermedios": {
+   "credito_IPE": {
+    "renta_neta": {
+     "celda": "Crédito IPE!K13",
+     "valor": 8060805,
+     "formula": "=SUM(J14:J16)"
+    },
+    "tope_individual": {
+     "celda": "Crédito IPE!K18",
+     "valor": 4881110,
+     "formula": "=MIN(J19:J22)"
+    },
+    "impuestos_soportados": {
+     "celda": "Crédito IPE!J19",
+     "valor": 5885224,
+     "formula": "=SUM(I20:I21)"
+    },
+    "tope_35pct": {
+     "celda": "Crédito IPE!J22",
+     "valor": 4881110,
+     "formula": "=ROUND((J14+J19)*35%,0)"
+    },
+    "tope_global": {
+     "celda": "Crédito IPE!K24",
+     "valor": 4529670,
+     "formula": "=ROUND(I24*35%,0)"
+    },
+    "CTD": {
+     "celda": "Crédito IPE!K28",
+     "valor": 4529670,
+     "formula": "=MIN(J29:J30)"
+    },
+    "renta_imponible": {
+     "celda": "Crédito IPE!K32",
+     "valor": 12590475,
+     "formula": "=SUM(J33:J34)"
+    },
+    "IPE_imputable_IDPC": {
+     "celda": "Crédito IPE!K38",
+     "valor": 3399428,
+     "formula": "=ROUND(K32*27%,0)"
+    },
+    "IPE_imputable_IF": {
+     "celda": "Crédito IPE!K40",
+     "valor": 1130242,
+     "formula": "=K28-K38"
+    }
+   },
+   "rli": {
+    "fila_4_L": {
+     "celda": "RLI!L4",
+     "valor": 83400500,
+     "formula": "=+Antecedentes!M27",
+     "descripcion": "Resultado financiero según balance al 31.12.2025"
+    },
+    "fila_6_J": {
+     "celda": "RLI!J6",
+     "valor": 49213,
+     "formula": "=+Antecedentes!M31",
+     "descripcion": "21.03; Multas fiscales, pagadas, reajustadas"
+    },
+    "fila_6_K": {
+     "celda": "RLI!K6",
+     "valor": 1.022,
+     "formula": "=1+Antecedentes!$M$50",
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "21.03; Multas fiscales, pagadas, reajustadas"
+    },
+    "fila_6_L": {
+     "celda": "RLI!L6",
+     "valor": 50296,
+     "formula": "=ROUND(+J6*K6,0)",
+     "descripcion": "21.03; Multas fiscales, pagadas, reajustadas"
+    },
+    "fila_7_J": {
+     "celda": "RLI!J7",
+     "valor": 196850,
+     "formula": "=+Antecedentes!M32",
+     "descripcion": "28.03; Donación Club Rayuela, reajustada"
+    },
+    "fila_7_K": {
+     "celda": "RLI!K7",
+     "valor": 1.022,
+     "formula": "=1+Antecedentes!$M$50",
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "28.03; Donación Club Rayuela, reajustada"
+    },
+    "fila_7_L": {
+     "celda": "RLI!L7",
+     "valor": 201181,
+     "formula": "=ROUND(+J7*K7,0)",
+     "descripcion": "28.03; Donación Club Rayuela, reajustada"
+    },
+    "fila_8_J": {
+     "celda": "RLI!J8",
+     "valor": 765054,
+     "formula": "=+Antecedentes!M33",
+     "descripcion": "25.04; Pago que no se ha acreditado la naturaleza ni efectividad, actualizados"
+    },
+    "fila_8_K": {
+     "celda": "RLI!K8",
+     "valor": 1.016,
+     "formula": "=1+Antecedentes!$M$51",
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "25.04; Pago que no se ha acreditado la naturaleza ni efectividad, actualizados"
+    },
+    "fila_8_L": {
+     "celda": "RLI!L8",
+     "valor": 777295,
+     "formula": "=ROUND(+J8*K8,0)",
+     "descripcion": "25.04; Pago que no se ha acreditado la naturaleza ni efectividad, actualizados"
+    },
+    "fila_9_J": {
+     "celda": "RLI!J9",
+     "valor": 17280000,
+     "formula": "=+Antecedentes!M34",
+     "descripcion": "30.04; Pago IDPC AT 2025, actualizados"
+    },
+    "fila_9_K": {
+     "celda": "RLI!K9",
+     "valor": 1.016,
+     "formula": "=1+Antecedentes!$M$51",
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "30.04; Pago IDPC AT 2025, actualizados"
+    },
+    "fila_9_L": {
+     "celda": "RLI!L9",
+     "valor": 17556480,
+     "formula": "=ROUND(+J9*K9,0)",
+     "descripcion": "30.04; Pago IDPC AT 2025, actualizados"
+    },
+    "fila_10_J": {
+     "celda": "RLI!J10",
+     "valor": 3000000,
+     "formula": "=+Antecedentes!M35",
+     "descripcion": "15.12; Colegiatura del hijo de la socia Srta. Arriagada"
+    },
+    "fila_10_K": {
+     "celda": "RLI!K10",
+     "valor": 1,
+     "descripcion": "15.12; Colegiatura del hijo de la socia Srta. Arriagada"
+    },
+    "fila_10_L": {
+     "celda": "RLI!L10",
+     "valor": 3000000,
+     "formula": "=ROUND(+J10*K10,0)",
+     "descripcion": "15.12; Colegiatura del hijo de la socia Srta. Arriagada"
+    },
+    "fila_11_L": {
+     "celda": "RLI!L11",
+     "valor": 4529670,
+     "formula": "='Crédito IPE'!K28",
+     "descripcion": "Crédito total disponible por Impuestos pagados en el exterior"
+    },
+    "fila_13_J": {
+     "celda": "RLI!J13",
+     "valor": 60000000,
+     "formula": "=+Antecedentes!K45",
+     "descripcion": "Corrección monetaria disminución de capital (retiros socios)"
+    },
+    "fila_13_K": {
+     "celda": "RLI!K13",
+     "valor": 61284000,
+     "formula": "=+Antecedentes!M45",
+     "descripcion": "Corrección monetaria disminución de capital (retiros socios)"
+    },
+    "fila_13_L": {
+     "celda": "RLI!L13",
+     "valor": 1284000,
+     "formula": "=+K13-J13",
+     "descripcion": "Corrección monetaria disminución de capital (retiros socios)"
+    },
+    "fila_14_L": {
+     "celda": "RLI!L14",
+     "valor": 27398922,
+     "formula": "=SUM(L6:L13)",
+     "descripcion": "Total agregados"
+    },
+    "fila_17_L": {
+     "celda": "RLI!L17",
+     "valor": -1000000,
+     "formula": "=-Antecedentes!M28",
+     "descripcion": "Dividendo percibido de fuente chilena"
+    },
+    "fila_18_L": {
+     "celda": "RLI!L18",
+     "valor": -2800000,
+     "formula": "=-Antecedentes!M36",
+     "descripcion": "Factura castigada tributariamente 2025"
+    },
+    "fila_19_L": {
+     "celda": "RLI!L19",
+     "valor": -777295,
+     "formula": "=-L8",
+     "descripcion": "25.04; Pago que no se ha acreditado la naturaleza ni efectividad, actualizados"
+    },
+    "fila_20_L": {
+     "celda": "RLI!L20",
+     "valor": -3000000,
+     "formula": "=-L10",
+     "descripcion": "15.12; Colegiatura del hijo de la socia Srta. Arriagada"
+    },
+    "fila_22_J": {
+     "celda": "RLI!J22",
+     "valor": 115653480,
+     "formula": "=+Antecedentes!M23",
+     "descripcion": "Corrección monetaria CPT inicial"
+    },
+    "fila_22_K": {
+     "celda": "RLI!K22",
+     "valor": 0.034,
+     "formula": "=+Antecedentes!M49",
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "Corrección monetaria CPT inicial"
+    },
+    "fila_22_L": {
+     "celda": "RLI!L22",
+     "valor": -3932218,
+     "formula": "=-ROUND(+J22*K22,0)",
+     "descripcion": "Corrección monetaria CPT inicial"
+    },
+    "fila_23_L": {
+     "celda": "RLI!L23",
+     "valor": -11509513,
+     "formula": "=SUM(L15:L22)",
+     "descripcion": "Total deducciones"
+    },
+    "fila_24_L": {
+     "celda": "RLI!L24",
+     "valor": 99289909,
+     "formula": "=+L23+L14+L4",
+     "descripcion": "Renta Líquida Imponible antes de rebaja por incentivo al ahorro según art. 14 letra E) LIR"
+    },
+    "fila_25_L": {
+     "celda": "RLI!L25",
+     "valor": -10098976,
+     "formula": "=-L41",
+     "descripcion": "Deducción incentivo al ahorro art. 14 letra E) LIR"
+    },
+    "fila_26_L": {
+     "celda": "RLI!L26",
+     "valor": 89190933,
+     "formula": "=+L24+L25",
+     "descripcion": "BASE IMPONIBLE IDPC"
+    },
+    "fila_27_K": {
+     "celda": "RLI!K27",
+     "valor": 0.27,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "IDPC, tasa"
+    },
+    "fila_27_L": {
+     "celda": "RLI!L27",
+     "valor": 24081552,
+     "formula": "=ROUND(+L26*K27,0)",
+     "descripcion": "IDPC, tasa"
+    },
+    "fila_29_L": {
+     "celda": "RLI!L29",
+     "valor": 777295,
+     "formula": "=-L19",
+     "descripcion": "BASE IMPONIBLE Impuesto Único de 40% sobre gastos rechazados inciso primero artículo 21 LIR"
+    },
+    "fila_30_K": {
+     "celda": "RLI!K30",
+     "valor": 0.4,
+     "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)",
+     "descripcion": "Tasa impuesto"
+    },
+    "fila_30_L": {
+     "celda": "RLI!L30",
+     "valor": 310918,
+     "formula": "=ROUND(+L29*K30,0)",
+     "descripcion": "Tasa impuesto"
+    },
+    "fila_32_L": {
+     "celda": "RLI!L32",
+     "valor": 3000000,
+     "formula": "=-L20",
+     "descripcion": "BASE IMPONIBLE sobre gastos rechazados inciso tercero artículo 21 LIR"
+    },
+    "fila_35_L": {
+     "celda": "RLI!L35",
+     "valor": 99289909,
+     "formula": "=+L24",
+     "descripcion": "(=) Sub total Base Imponible"
+    },
+    "fila_36_L": {
+     "celda": "RLI!L36",
+     "valor": -61284000,
+     "formula": "=-K13",
+     "descripcion": "(-) Retiros del ejercicio, actualizados"
+    },
+    "fila_37_L": {
+     "celda": "RLI!L37",
+     "valor": -50296,
+     "formula": "=-L6",
+     "descripcion": "(-) Intereses y multas fiscales, actualizados"
+    },
+    "fila_38_L": {
+     "celda": "RLI!L38",
+     "valor": -201181,
+     "formula": "=-L7",
+     "descripcion": "(-) Donación al Club Rayuela, actualizado"
+    },
+    "fila_39_L": {
+     "celda": "RLI!L39",
+     "valor": -17556480,
+     "formula": "=-L9",
+     "descripcion": "(-) Pago IDPC AT 2025, actualizado"
+    },
+    "fila_40_L": {
+     "celda": "RLI!L40",
+     "valor": 20197952,
+     "formula": "=SUM(L35:L39)",
+     "descripcion": "(=) RLI Invertida"
+    },
+    "fila_41_L": {
+     "celda": "RLI!L41",
+     "valor": 10098976,
+     "formula": "=MIN(MAX(ROUND(+M40*L40,0),0),N40)",
+     "descripcion": "Deducción incentivo al ahorro art. 14 letra E) LIR (cantidad menor entre 50% RLI Invertida o 5.000 UF = $198.639.800)"
+    }
+   },
+   "razonabilidad_cpt": {
+    "fila_4": {
+     "celda": "Razonabilidad CPT!F4",
+     "valor": 115653480,
+     "formula": "=+Antecedentes!M23",
+     "descripcion": "Capital propio tributario al 31.12.2024 informado en el código 645 del recuadro N° 14 F-22 AT 2025"
+    },
+    "fila_5": {
+     "celda": "Razonabilidad CPT!F5",
+     "valor": 3932218,
+     "formula": "=+ROUND(F4*E5,0)",
+     "descripcion": "Corrección monetaria CPT inicial"
+    },
+    "fila_6": {
+     "celda": "Razonabilidad CPT!F6",
+     "valor": 89190933,
+     "formula": "=+'R12'!K58",
+     "descripcion": "RLI del ejercicio"
+    },
+    "fila_7": {
+     "celda": "Razonabilidad CPT!F7",
+     "valor": 10098976,
+     "formula": "=+RLI!L41",
+     "descripcion": "Ajuste por incentivo al ahorro según art. 14 letra E) LIR"
+    },
+    "fila_8": {
+     "celda": "Razonabilidad CPT!F8",
+     "valor": 1000000,
+     "formula": "=Antecedentes!M28",
+     "descripcion": "Dividendos percibidos"
+    },
+    "fila_9": {
+     "celda": "Razonabilidad CPT!F9",
+     "valor": -61284000,
+     "formula": "=-'RAI Final'!F5",
+     "descripcion": "Retiros del ejercicio, reajustados al 31.12.2025"
+    },
+    "fila_10": {
+     "celda": "Razonabilidad CPT!F10",
+     "valor": -50296,
+     "formula": "=-RLI!L6",
+     "descripcion": "Multas fiscales pagadas, reajustadas al 31.12.2025"
+    },
+    "fila_11": {
+     "celda": "Razonabilidad CPT!F11",
+     "valor": -201181,
+     "formula": "=-RLI!L7",
+     "descripcion": "Donación al Club de Rayuela pagado, reajustado al 31.12.2025"
+    },
+    "fila_12": {
+     "celda": "Razonabilidad CPT!F12",
+     "valor": -17556480,
+     "formula": "=-RLI!L9",
+     "descripcion": "IDPC AT 2025 pagado, reajustado al 31.12.2025"
+    },
+    "fila_13": {
+     "celda": "Razonabilidad CPT!F13",
+     "valor": -1130242,
+     "formula": "=-'Crédito IPE'!K40",
+     "descripcion": "Crédito IPE contra IF del ejercicio"
+    },
+    "fila_14": {
+     "celda": "Razonabilidad CPT!F14",
+     "valor": 139653408,
+     "formula": "=SUM(F3:F13)",
+     "descripcion": "Capital Propio Tributario final"
+    }
+   },
+   "rai_final": {
+    "fila_4": {
+     "celda": "RAI Final!F4",
+     "valor": 139653408,
+     "formula": "=+'Razonabilidad CPT'!F14",
+     "descripcion": "(+) CPT al 31.12.2025 registrado en el código 645 del recuadro N° 14 del F-22 AT 2026"
+    },
+    "fila_5": {
+     "celda": "RAI Final!F5",
+     "valor": 61284000,
+     "formula": "=+Antecedentes!M45",
+     "descripcion": "(+) Retiros del ejercicio, reajustados al 31.12.2025"
+    },
+    "fila_6": {
+     "celda": "RAI Final!F6",
+     "valor": -180526,
+     "formula": "=-SUM(RTRE!I11:L11)",
+     "descripcion": "(-) Saldo del registro REX positivo antes de imputación, recuadro N° 15 del F-22 AT 2026"
+    },
+    "fila_7": {
+     "celda": "RAI Final!F7",
+     "valor": -120373886,
+     "formula": "=-Antecedentes!M11",
+     "descripcion": "(- ) Capital social aportado, reajustado al 31.12.2025"
+    },
+    "fila_8": {
+     "celda": "RAI Final!F8",
+     "valor": 80382996,
+     "formula": "=SUM(F3:F7)",
+     "descripcion": "(=) Rentas afectas del ejercicio"
+    }
+   },
+   "rtre": [
+    {
+     "fila": 9,
+     "detalle": "Remanente anterior",
+     "columnas": {
+      "F": {
+       "celda": "RTRE!F9",
+       "valor": 12985640,
+       "formula": "=SUM(G9:L9)"
+      },
+      "G": {
+       "celda": "RTRE!G9",
+       "valor": 12728890,
+       "formula": "=+Antecedentes!G21"
+      },
+      "H": {
+       "celda": "RTRE!H9",
+       "valor": 82160,
+       "formula": "=+Antecedentes!H21"
+      },
+      "I": {
+       "celda": "RTRE!I9",
+       "valor": 0,
+       "formula": "=+Antecedentes!I21"
+      },
+      "J": {
+       "celda": "RTRE!J9",
+       "valor": 0,
+       "formula": "=+Antecedentes!J21"
+      },
+      "K": {
+       "celda": "RTRE!K9",
+       "valor": 51350,
+       "formula": "=+Antecedentes!K21"
+      },
+      "L": {
+       "celda": "RTRE!L9",
+       "valor": 123240,
+       "formula": "=+Antecedentes!L21"
+      },
+      "M": {
+       "celda": "RTRE!M9",
+       "valor": 0,
+       "formula": "=+Antecedentes!M21"
+      },
+      "N": {
+       "celda": "RTRE!N9",
+       "valor": 0
+      },
+      "O": {
+       "celda": "RTRE!O9",
+       "valor": -92466,
+       "formula": "=+Antecedentes!N21"
+      },
+      "P": {
+       "celda": "RTRE!P9",
+       "valor": 0
+      },
+      "Q": {
+       "celda": "RTRE!Q9",
+       "valor": 0,
+       "formula": "=+Antecedentes!O21"
+      },
+      "R": {
+       "celda": "RTRE!R9",
+       "valor": 0,
+       "formula": "=+Antecedentes!P21"
+      }
+     }
+    },
+    {
+     "fila": 10,
+     "detalle": "Reajuste anual",
+     "columnas": {
+      "E": {
+       "celda": "RTRE!E10",
+       "valor": 0.034,
+       "formula": "=Antecedentes!M49",
+       "nota_precision": "valor no entero almacenado por Excel (falta ROUND en la fórmula o es tasa)"
+      },
+      "F": {
+       "celda": "RTRE!F10",
+       "valor": 441511,
+       "formula": "=SUM(G10:L10)"
+      },
+      "G": {
+       "celda": "RTRE!G10",
+       "valor": 432782,
+       "formula": "=ROUND(G9*$E$10,0)"
+      },
+      "H": {
+       "celda": "RTRE!H10",
+       "valor": 2793,
+       "formula": "=ROUND(H9*$E$10,0)"
+      },
+      "I": {
+       "celda": "RTRE!I10",
+       "valor": 0,
+       "formula": "=ROUND(I9*$E$10,0)"
+      },
+      "J": {
+       "celda": "RTRE!J10",
+       "valor": 0,
+       "formula": "=ROUND(J9*$E$10,0)"
+      },
+      "K": {
+       "celda": "RTRE!K10",
+       "valor": 1746,
+       "formula": "=ROUND(K9*$E$10,0)"
+      },
+      "L": {
+       "celda": "RTRE!L10",
+       "valor": 4190,
+       "formula": "=ROUND(L9*$E$10,0)"
+      },
+      "M": {
+       "celda": "RTRE!M10",
+       "valor": 0,
+       "formula": "=ROUND(M9*$E$10,0)"
+      },
+      "N": {
+       "celda": "RTRE!N10",
+       "valor": 0,
+       "formula": "=ROUND(N9*$E$10,0)"
+      },
+      "O": {
+       "celda": "RTRE!O10",
+       "valor": -3144,
+       "formula": "=ROUND(O9*$E$10,0)"
+      },
+      "P": {
+       "celda": "RTRE!P10",
+       "valor": 0,
+       "formula": "=ROUND(P9*$E$10,0)"
+      },
+      "Q": {
+       "celda": "RTRE!Q10",
+       "valor": 0,
+       "formula": "=ROUND(Q9*$E$10,0)"
+      },
+      "R": {
+       "celda": "RTRE!R10",
+       "valor": 0,
+       "formula": "=ROUND(R9*$E$10,0)"
+      }
+     }
+    },
+    {
+     "fila": 11,
+     "detalle": "Remanente reajustado",
+     "columnas": {
+      "F": {
+       "celda": "RTRE!F11",
+       "valor": 13427151,
+       "formula": "=SUM(G11:L11)"
+      },
+      "G": {
+       "celda": "RTRE!G11",
+       "valor": 13161672,
+       "formula": "=SUM(G9:G10)"
+      },
+      "H": {
+       "celda": "RTRE!H11",
+       "valor": 84953,
+       "formula": "=SUM(H9:H10)"
+      },
+      "I": {
+       "celda": "RTRE!I11",
+       "valor": 0,
+       "formula": "=SUM(I9:I10)"
+      },
+      "J": {
+       "celda": "RTRE!J11",
+       "valor": 0,
+       "formula": "=SUM(J9:J10)"
+      },
+      "K": {
+       "celda": "RTRE!K11",
+       "valor": 53096,
+       "formula": "=SUM(K9:K10)"
+      },
+      "L": {
+       "celda": "RTRE!L11",
+       "valor": 127430,
+       "formula": "=SUM(L9:L10)"
+      },
+      "M": {
+       "celda": "RTRE!M11",
+       "valor": 0,
+       "formula": "=SUM(M9:M10)"
+      },
+      "N": {
+       "celda": "RTRE!N11",
+       "valor": 0,
+       "formula": "=SUM(N9:N10)"
+      },
+      "O": {
+       "celda": "RTRE!O11",
+       "valor": -95610,
+       "formula": "=SUM(O9:O10)"
+      },
+      "P": {
+       "celda": "RTRE!P11",
+       "valor": 0,
+       "formula": "=SUM(P9:P10)"
+      },
+      "Q": {
+       "celda": "RTRE!Q11",
+       "valor": 0,
+       "formula": "=SUM(Q9:Q10)"
+      },
+      "R": {
+       "celda": "RTRE!R11",
+       "valor": 0,
+       "formula": "=SUM(R9:R10)"
+      }
+     }
+    },
+    {
+     "fila": 13,
+     "detalle": "(-) Reverso registro RAI ejercicio anterior",
+     "columnas": {
+      "F": {
+       "celda": "RTRE!F13",
+       "valor": -13161672,
+       "formula": "=SUM(G13:L13)"
+      },
+      "G": {
+       "celda": "RTRE!G13",
+       "valor": -13161672,
+       "formula": "=-G11"
+      }
+     }
+    },
+    {
+     "fila": 14,
+     "detalle": "(+) Rentas afectas del ejercicio",
+     "columnas": {
+      "F": {
+       "celda": "RTRE!F14",
+       "valor": 80382996,
+       "formula": "=SUM(G14:L14)"
+      },
+      "G": {
+       "celda": "RTRE!G14",
+       "valor": 80382996,
+       "formula": "=+'RAI Final'!F8"
+      }
+     }
+    },
+    {
+     "fila": 15,
+     "detalle": "(+) Crédito por IDPC sobre RLI",
+     "columnas": {
+      "N": {
+       "celda": "RTRE!N15",
+       "valor": 3399428,
+       "formula": "='Crédito IPE'!K38"
+      },
+      "O": {
+       "celda": "RTRE!O15",
+       "valor": 20682124,
+       "formula": "=+RLI!L27-N15"
+      },
+      "P": {
+       "celda": "RTRE!P15",
+       "valor": 1130242,
+       "formula": "='Crédito IPE'!K40"
+      }
+     }
+    },
+    {
+     "fila": 16,
+     "detalle": "(+) Crédito por IDPC sobre dividendo percibido",
+     "columnas": {
+      "O": {
+       "celda": "RTRE!O16",
+       "valor": 142857,
+       "formula": "=Antecedentes!M29"
+      }
+     }
+    },
+    {
+     "fila": 18,
+     "detalle": "Subtotal antes de imputaciones",
+     "columnas": {
+      "F": {
+       "celda": "RTRE!F18",
+       "valor": 80648475,
+       "formula": "=SUM(F11:F16)"
+      },
+      "G": {
+       "celda": "RTRE!G18",
+       "valor": 80382996,
+       "formula": "=SUM(G11:G16)"
+      },
+      "H": {
+       "celda": "RTRE!H18",
+       "valor": 84953,
+       "formula": "=SUM(H11:H16)"
+      },
+      "I": {
+       "celda": "RTRE!I18",
+       "valor": 0,
+       "formula": "=SUM(I11:I16)"
+      },
+      "J": {
+       "celda": "RTRE!J18",
+       "valor": 0,
+       "formula": "=SUM(J11:J16)"
+      },
+      "K": {
+       "celda": "RTRE!K18",
+       "valor": 53096,
+       "formula": "=SUM(K11:K16)"
+      },
+      "L": {
+       "celda": "RTRE!L18",
+       "valor": 127430,
+       "formula": "=SUM(L11:L16)"
+      },
+      "M": {
+       "celda": "RTRE!M18",
+       "valor": 0,
+       "formula": "=SUM(M11:M16)"
+      },
+      "N": {
+       "celda": "RTRE!N18",
+       "valor": 3399428,
+       "formula": "=SUM(N11:N16)"
+      },
+      "O": {
+       "celda": "RTRE!O18",
+       "valor": 20729371,
+       "formula": "=SUM(O11:O16)"
+      },
+      "P": {
+       "celda": "RTRE!P18",
+       "valor": 1130242,
+       "formula": "=SUM(P11:P16)"
+      },
+      "Q": {
+       "celda": "RTRE!Q18",
+       "valor": 0,
+       "formula": "=SUM(Q11:Q16)"
+      },
+      "R": {
+       "celda": "RTRE!R18",
+       "valor": 0,
+       "formula": "=SUM(R11:R16)"
+      }
+     }
+    },
+    {
+     "fila": 20,
+     "detalle": "20.03, Retiro socio Sociedad  NSD Ltda.(1)",
+     "columnas": {
+      "E": {
+       "celda": "RTRE!E20",
+       "valor": 55188000,
+       "formula": "=+Antecedentes!M43"
+      },
+      "F": {
+       "celda": "RTRE!F20",
+       "valor": -55188000,
+       "formula": "=SUM(G20:L20)"
+      },
+      "G": {
+       "celda": "RTRE!G20",
+       "valor": -55188000,
+       "formula": "=-E20"
+      },
+      "N": {
+       "celda": "RTRE!N20",
+       "valor": -3399428,
+       "formula": "=ROUND(MAX((G20*O6),-N18),0)"
+      },
+      "O": {
+       "celda": "RTRE!O20",
+       "valor": -17430606,
+       "formula": "=ROUND(((G20+P20)*O6)-N20,0)"
+      },
+      "P": {
+       "celda": "RTRE!P20",
+       "valor": -1130242,
+       "formula": "=ROUND(MAX(G20/0.65*8%,-P18),0)"
+      }
+     }
+    },
+    {
+     "fila": 22,
+     "detalle": "13.04, Retiro socia Srta. Arriagada(2)",
+     "columnas": {
+      "E": {
+       "celda": "RTRE!E22",
+       "valor": 6096000,
+       "formula": "=Antecedentes!M44"
+      },
+      "F": {
+       "celda": "RTRE!F22",
+       "valor": -6096000,
+       "formula": "=SUM(G22:L22)"
+      },
+      "G": {
+       "celda": "RTRE!G22",
+       "valor": -6096000,
+       "formula": "=-E22"
+      },
+      "O": {
+       "celda": "RTRE!O22",
+       "valor": -2254685,
+       "formula": "=ROUND(-MIN(ABS(+G22*O6),(O18+O20)),0)"
+      }
+     }
+    },
+    {
+     "fila": 25,
+     "detalle": "21.03; Multas fiscales, pagadas",
+     "columnas": {
+      "E": {
+       "celda": "RTRE!E25",
+       "valor": 50296,
+       "formula": "=+RLI!L6"
+      },
+      "O": {
+       "celda": "RTRE!O25",
+       "valor": -18603,
+       "formula": "=-ROUND(E25*O6,0)"
+      }
+     }
+    },
+    {
+     "fila": 26,
+     "detalle": "28.03; Donación Club Rayuela",
+     "columnas": {
+      "E": {
+       "celda": "RTRE!E26",
+       "valor": 201181,
+       "formula": "=+RLI!L7"
+      },
+      "O": {
+       "celda": "RTRE!O26",
+       "valor": -74409,
+       "formula": "=-ROUND(E26*O6,0)"
+      }
+     }
+    },
+    {
+     "fila": 27,
+     "detalle": "Remanentes ejercicio siguiente",
+     "columnas": {
+      "F": {
+       "celda": "RTRE!F27",
+       "valor": 19364475,
+       "formula": "=SUM(G27:L27)"
+      },
+      "G": {
+       "celda": "RTRE!G27",
+       "valor": 19098996,
+       "formula": "=SUM(G18:G26)"
+      },
+      "H": {
+       "celda": "RTRE!H27",
+       "valor": 84953,
+       "formula": "=SUM(H18:H26)"
+      },
+      "I": {
+       "celda": "RTRE!I27",
+       "valor": 0,
+       "formula": "=SUM(I18:I26)"
+      },
+      "J": {
+       "celda": "RTRE!J27",
+       "valor": 0,
+       "formula": "=SUM(J18:J26)"
+      },
+      "K": {
+       "celda": "RTRE!K27",
+       "valor": 53096,
+       "formula": "=SUM(K18:K26)"
+      },
+      "L": {
+       "celda": "RTRE!L27",
+       "valor": 127430,
+       "formula": "=SUM(L18:L26)"
+      },
+      "M": {
+       "celda": "RTRE!M27",
+       "valor": 0,
+       "formula": "=SUM(M18:M26)"
+      },
+      "N": {
+       "celda": "RTRE!N27",
+       "valor": 0,
+       "formula": "=SUM(N18:N26)"
+      },
+      "O": {
+       "celda": "RTRE!O27",
+       "valor": 951068,
+       "formula": "=SUM(O18:O26)"
+      },
+      "P": {
+       "celda": "RTRE!P27",
+       "valor": 0,
+       "formula": "=SUM(P18:P26)"
+      },
+      "Q": {
+       "celda": "RTRE!Q27",
+       "valor": 0,
+       "formula": "=SUM(Q18:Q26)"
+      },
+      "R": {
+       "celda": "RTRE!R27",
+       "valor": 0,
+       "formula": "=SUM(R18:R26)"
+      }
+     }
+    }
+   ],
+   "retiros_situacion": [
+    {
+     "fila": 5,
+     "detalle": "Retiros afectos socio N° 1",
+     "columnas": {
+      "H": {
+       "celda": "Retiros y situacion Trib.!H5",
+       "valor": 55188000,
+       "formula": "=SUM(G6:G9)"
+      },
+      "P": {
+       "celda": "Retiros y situacion Trib.!P5",
+       "valor": 6096000,
+       "formula": "=SUM(O6:O9)"
+      }
+     }
+    },
+    {
+     "fila": 6,
+     "detalle": "• Retiros afectos con crédito NO sujeto a restitución",
+     "columnas": {
+      "G": {
+       "celda": "Retiros y situacion Trib.!G6",
+       "valor": 0
+      },
+      "O": {
+       "celda": "Retiros y situacion Trib.!O6",
+       "valor": 0
+      }
+     }
+    },
+    {
+     "fila": 7,
+     "detalle": "•  Retiros afectos con crédito sujeto a restitución",
+     "columnas": {
+      "G": {
+       "celda": "Retiros y situacion Trib.!G7",
+       "valor": 55188000,
+       "formula": "=+RTRE!E20"
+      },
+      "O": {
+       "celda": "Retiros y situacion Trib.!O7",
+       "valor": 6096000,
+       "formula": "=RTRE!E22"
+      }
+     }
+    },
+    {
+     "fila": 8,
+     "detalle": "•  Retiros afectos con crédito TEF",
+     "columnas": {
+      "G": {
+       "celda": "Retiros y situacion Trib.!G8",
+       "valor": 0
+      },
+      "O": {
+       "celda": "Retiros y situacion Trib.!O8",
+       "valor": 0
+      }
+     }
+    },
+    {
+     "fila": 9,
+     "detalle": "•  Retiros afectos sin crédito",
+     "columnas": {
+      "G": {
+       "celda": "Retiros y situacion Trib.!G9",
+       "valor": 0
+      },
+      "O": {
+       "celda": "Retiros y situacion Trib.!O9",
+       "valor": 0
+      }
+     }
+    },
+    {
+     "fila": 10,
+     "detalle": "Retiros calificados como rentas con tributación cumplida",
+     "columnas": {
+      "H": {
+       "celda": "Retiros y situacion Trib.!H10",
+       "valor": 0,
+       "formula": "=SUM(G11:G12)"
+      },
+      "P": {
+       "celda": "Retiros y situacion Trib.!P10",
+       "valor": 0,
+       "formula": "=SUM(O11:O12)"
+      }
+     }
+    },
+    {
+     "fila": 11,
+     "detalle": "•  Imputados al RAP",
+     "columnas": {
+      "G": {
+       "celda": "Retiros y situacion Trib.!G11",
+       "valor": 0,
+       "formula": "=-RTRE!I20"
+      },
+      "O": {
+       "celda": "Retiros y situacion Trib.!O11",
+       "valor": 0
+      }
+     }
+    },
+    {
+     "fila": 12,
+     "detalle": "•  Imputados al ISFUT",
+     "columnas": {
+      "G": {
+       "celda": "Retiros y situacion Trib.!G12",
+       "valor": 0,
+       "formula": "=-RTRE!J20"
+      },
+      "O": {
+       "celda": "Retiros y situacion Trib.!O12",
+       "valor": 0
+      }
+     }
+    },
+    {
+     "fila": 13,
+     "detalle": "Retiros exentos",
+     "columnas": {
+      "H": {
+       "celda": "Retiros y situacion Trib.!H13",
+       "valor": 0
+      },
+      "P": {
+       "celda": "Retiros y situacion Trib.!P13",
+       "valor": 0
+      }
+     }
+    },
+    {
+     "fila": 14,
+     "detalle": "Retiros INR",
+     "columnas": {
+      "H": {
+       "celda": "Retiros y situacion Trib.!H14",
+       "valor": 0
+      },
+      "P": {
+       "celda": "Retiros y situacion Trib.!P14",
+       "valor": 0
+      }
+     }
+    },
+    {
+     "fila": 15,
+     "detalle": "Total retiros socio N° 1, reajustados",
+     "columnas": {
+      "H": {
+       "celda": "Retiros y situacion Trib.!H15",
+       "valor": 55188000,
+       "formula": "=SUM(H5:H14)"
+      },
+      "P": {
+       "celda": "Retiros y situacion Trib.!P15",
+       "valor": 6096000,
+       "formula": "=SUM(P5:P14)"
+      }
+     }
+    },
+    {
+     "fila": 18,
+     "detalle": "Crédito por IDPC sujeto a restitución con devolución",
+     "columnas": {
+      "H": {
+       "celda": "Retiros y situacion Trib.!H18",
+       "valor": 17430606,
+       "formula": "=-RTRE!O20"
+      },
+      "P": {
+       "celda": "Retiros y situacion Trib.!P18",
+       "valor": 2254685,
+       "formula": "=-RTRE!O22"
+      }
+     }
+    },
+    {
+     "fila": 19,
+     "detalle": "Crédito por IDPC sujeto a restitución sin devolución",
+     "columnas": {
+      "H": {
+       "celda": "Retiros y situacion Trib.!H19",
+       "valor": 3399428,
+       "formula": "=-RTRE!N20"
+      },
+      "P": {
+       "celda": "Retiros y situacion Trib.!P19",
+       "valor": 0
+      }
+     }
+    },
+    {
+     "fila": 20,
+     "detalle": "Crédito por IDPC no sujeto a restitución sin devolución",
+     "columnas": {
+      "H": {
+       "celda": "Retiros y situacion Trib.!H20",
+       "valor": 0
+      },
+      "P": {
+       "celda": "Retiros y situacion Trib.!P20",
+       "valor": 0
+      }
+     }
+    },
+    {
+     "fila": 21,
+     "detalle": "Total créditos por IDPC socio N° 1, reajustados",
+     "columnas": {
+      "H": {
+       "celda": "Retiros y situacion Trib.!H21",
+       "valor": 20830034,
+       "formula": "=SUM(H18:H20)"
+      },
+      "P": {
+       "celda": "Retiros y situacion Trib.!P21",
+       "valor": 2254685,
+       "formula": "=SUM(P18:P20)"
+      }
+     }
+    },
+    {
+     "fila": 23,
+     "detalle": "Crédito IPE contra impuestos finales",
+     "columnas": {
+      "H": {
+       "celda": "Retiros y situacion Trib.!H23",
+       "valor": 1130242,
+       "formula": "=-RTRE!P20"
+      }
+     }
+    }
+   ]
+  },
+  "f22_empresa": {
+   "recuadro_12": [
+    {
+     "codigo": 1657,
+     "valor": 116095312,
+     "celda": "R12!K5",
+     "formula": "=124156117-K6+'Crédito IPE'!J19",
+     "glosa": "Ingresos del giro percibidos o devengados"
+    },
+    {
+     "codigo": 1658,
+     "valor": 13946029,
+     "celda": "R12!K6",
+     "formula": "='Crédito IPE'!K13+'Crédito IPE'!J19",
+     "glosa": "Rentas de fuente extranjera"
+    },
+    {
+     "codigo": 1660,
+     "valor": 1000000,
+     "celda": "R12!K8",
+     "formula": "=Antecedentes!M28",
+     "glosa": "Otros ingresos percibidos o devengados"
+    },
+    {
+     "codigo": 1662,
+     "valor": 23611617,
+     "celda": "R12!K10",
+     "formula": "=19600500+4011117",
+     "glosa": "Remuneraciones"
+    },
+    {
+     "codigo": 1670,
+     "valor": 18144000,
+     "celda": "R12!K21",
+     "glosa": "Gastos por impuesto renta e impuesto diferido"
+    },
+    {
+     "codigo": 1671,
+     "valor": 5885224,
+     "celda": "R12!K22",
+     "formula": "='Crédito IPE'!J19",
+     "glosa": "Otros gastos deducidos de los ingresos brutos"
+    },
+    {
+     "codigo": 1672,
+     "valor": 83400500,
+     "celda": "R12!K23",
+     "formula": "=+SUM(K5:O8)-SUM(K9:O22)",
+     "glosa": "Resultado financiero"
+    },
+    {
+     "codigo": 1673,
+     "valor": 3932218,
+     "celda": "R12!K25",
+     "formula": "=-SUMIF(RLI!$C$4:$L$25,'R12'!J25,RLI!$L$4:$L$25)",
+     "glosa": "Corrección monetaria saldo deudor (art. 32 N° 1 LIR)"
+    },
+    {
+     "codigo": 1674,
+     "valor": 1284000,
+     "celda": "R12!K26",
+     "formula": "=SUMIF(RLI!$C$4:$L$25,'R12'!J26,RLI!$L$4:$L$25)",
+     "glosa": "Corrección monetaria saldo acreedor (art. 32 N° 2 LIR)"
+    },
+    {
+     "codigo": 1144,
+     "valor": 17606776,
+     "celda": "R12!K27",
+     "formula": "=SUMIF(RLI!$C$4:$L$25,'R12'!J27,RLI!$L$4:$L$25)",
+     "glosa": "Partidas del inc. 1° no afectas al IU de tasa 40% y del inc. 2° del art. 21 LIR, reajustados"
+    },
+    {
+     "codigo": 1676,
+     "valor": 4529670,
+     "celda": "R12!K30",
+     "formula": "=SUMIF(RLI!$C$4:$L$25,'R12'!J30,RLI!$L$4:$L$25)",
+     "glosa": "Rentas tributables no reconocidas financieramente"
+    },
+    {
+     "codigo": 1677,
+     "valor": 201181,
+     "celda": "R12!K31",
+     "formula": "=SUMIF(RLI!$C$4:$L$25,'R12'!J31,RLI!$L$4:$L$25)",
+     "glosa": "Gastos agregados por donaciones"
+    },
+    {
+     "codigo": 1678,
+     "valor": 3777295,
+     "celda": "R12!K32",
+     "formula": "=SUMIF(RLI!$C$4:$L$25,'R12'!J32,RLI!$L$4:$L$25)",
+     "glosa": "Gastos que se deben agregar a la RLI según el art. 33 N° 1 LIR"
+    },
+    {
+     "codigo": 1176,
+     "valor": 2800000,
+     "celda": "R12!K40",
+     "formula": "=-SUMIF(RLI!$C$4:$L$25,'R12'!J40,RLI!$L$4:$L$25)",
+     "glosa": "Castigo de deudas incobrables, según art. 31 inc. 4° N° 4 LIR"
+    },
+    {
+     "codigo": 1682,
+     "valor": 777295,
+     "celda": "R12!K46",
+     "formula": "=-SUMIF(RLI!$C$4:$L$25,'R12'!J46,RLI!$L$4:$L$25)",
+     "glosa": "Gastos rechazados afectos a la tributación del art. 21 inc. 1°  LIR"
+    },
+    {
+     "codigo": 1683,
+     "valor": 3000000,
+     "celda": "R12!K47",
+     "formula": "=-SUMIF(RLI!$C$4:$L$25,'R12'!J47,RLI!$L$4:$L$25)",
+     "glosa": "Gastos rechazados afectos a la tributación del art. 21 inc. 3° LIR"
+    },
+    {
+     "codigo": 1686,
+     "valor": 1000000,
+     "celda": "R12!K50",
+     "formula": "=-SUMIF(RLI!$C$4:$L$25,'R12'!J50,RLI!$L$4:$L$25)",
+     "glosa": "Dividendos y/o utilidades sociales percibidos o devengados (art. 33 N° 2 LIR)"
+    },
+    {
+     "codigo": 1728,
+     "valor": 99289909,
+     "celda": "R12!K55",
+     "formula": "=SUM(K23,K26:O38)-SUM(K25,K39:O54)",
+     "glosa": "Renta líquida imponible antes de rebaja por incentivo al ahorro (art. 14 letra E) LIR) y/o por pago de IDPC voluntario (art. 14 letra A) N°6 LIR y art. 42° transitorio Ley N° 21.210) o pérdida tributaria"
+    },
+    {
+     "codigo": 1154,
+     "valor": 10098976,
+     "celda": "R12!K56",
+     "formula": "=-SUMIF(RLI!$C$4:$L$25,'R12'!J56,RLI!$L$4:$L$25)",
+     "glosa": "Incentivo al ahorro según art. 14 letra E) LIR"
+    },
+    {
+     "codigo": 1690,
+     "valor": 89190933,
+     "celda": "R12!K58",
+     "formula": "=+K55-K56-K57",
+     "glosa": "Renta líquida imponible afecta a IDPC o pérdida tributaria del ejercicio"
+    }
+   ],
+   "recuadro_13": [
+    {
+     "codigo": 1698,
+     "valor": 139653408,
+     "celda": "R13!J4",
+     "formula": "=+'RAI Final'!F4",
+     "glosa": "CPT positivo final (recuadro N° 14)"
+    },
+    {
+     "codigo": 1699,
+     "valor": 61284000,
+     "celda": "R13!J7",
+     "formula": "=+'RAI Final'!F5",
+     "glosa": "Remesas, retiros o dividendos repartidos en el ejercicio, reajustados"
+    },
+    {
+     "codigo": 1718,
+     "valor": 200937408,
+     "celda": "R13!J8",
+     "formula": "=SUM(J6:N7,J4)",
+     "glosa": "Subtotal"
+    },
+    {
+     "codigo": 1693,
+     "valor": 180526,
+     "celda": "R13!J9",
+     "formula": "=-'RAI Final'!F6",
+     "glosa": "Saldo positivo del registro REX al término del ejercicio, antes de imputaciones"
+    },
+    {
+     "codigo": 844,
+     "valor": 120373886,
+     "celda": "R13!J10",
+     "formula": "=-'RAI Final'!F7",
+     "glosa": "Capital aportado debidamente reajustado (incluye aumentos y disminuciones efectivas)"
+    },
+    {
+     "codigo": 1199,
+     "valor": 80382996,
+     "celda": "R13!J13",
+     "formula": "=-SUM(J9:N12)+J8",
+     "glosa": "Rentas afectas a IGC o IA (RAI) del ejercicio"
+    }
+   ],
+   "recuadro_14": [
+    {
+     "codigo": 1145,
+     "valor": 115653480,
+     "celda": "R14!J4",
+     "formula": "=+'Razonabilidad CPT'!F4",
+     "glosa": "CPT positivo inicial"
+    },
+    {
+     "codigo": 1177,
+     "valor": 3932218,
+     "celda": "R14!J6",
+     "formula": "=ROUND(+J4*H6,0)",
+     "glosa": "Corrección monetaria capital propio tributario inicial"
+    },
+    {
+     "codigo": 1694,
+     "valor": 89190933,
+     "celda": "R14!J9",
+     "formula": "=+'R12'!K58",
+     "glosa": "Renta líquida imponible afecta a IDPC del ejercicio"
+    },
+    {
+     "codigo": 1180,
+     "valor": 1000000,
+     "celda": "R14!J14",
+     "formula": "=+'R12'!K50",
+     "glosa": "Retiros o dividendos percibidos en el ejercicio por participaciones en otras empresas"
+    },
+    {
+     "codigo": 1182,
+     "valor": 61284000,
+     "celda": "R14!J15",
+     "formula": "=+'RAI Final'!F5",
+     "glosa": "Remesas, retiros o dividendos repartidos en el ejercicio, reajustados"
+    },
+    {
+     "codigo": 1697,
+     "valor": 17606776,
+     "celda": "R14!J16",
+     "formula": "=+'R12'!K27",
+     "glosa": "Partidas del inc. 1° no afectas al IU de tasa 40% y del inc. 2° del art. 21 LIR, reajustados"
+    },
+    {
+     "codigo": 1188,
+     "valor": 1130242,
+     "celda": "R14!J20",
+     "formula": "='Crédito IPE'!K40",
+     "glosa": "Crédito total disponible imputable contra impuestos finales (IPE), del ejercicio"
+    },
+    {
+     "codigo": 1701,
+     "valor": 10098976,
+     "celda": "R14!J21",
+     "formula": "=+'Razonabilidad CPT'!F7",
+     "glosa": "Incentivo al ahorro según art. 14 letra E) LIR"
+    },
+    {
+     "codigo": 645,
+     "valor": 139854589,
+     "celda": "R14!J25",
+     "formula": "=SUM(J4,J6:N7,J9,J11:N12,J14,J17,J21:N23)-SUM(J5,J8,J10,J13,J15:N16,J18:N20,J24)",
+     "glosa": "CPT positivo final"
+    }
+   ],
+   "recuadro_15": [
+    {
+     "codigo": 1200,
+     "valor": 13161672,
+     "celda": "R15!D6",
+     "formula": "=RTRE!G11",
+     "glosa": "Remanente ejercicio anterior o saldo inicial reajustado (saldo positivo)"
+    },
+    {
+     "codigo": 1211,
+     "valor": 84953,
+     "celda": "R15!F6",
+     "formula": "=RTRE!H11",
+     "glosa": "Remanente ejercicio anterior o saldo inicial reajustado (saldo positivo)"
+    },
+    {
+     "codigo": 1234,
+     "valor": 53096,
+     "celda": "R15!N6",
+     "formula": "=RTRE!K11",
+     "glosa": "Remanente ejercicio anterior o saldo inicial reajustado (saldo positivo)"
+    },
+    {
+     "codigo": 1246,
+     "valor": 127430,
+     "celda": "R15!P6",
+     "formula": "=RTRE!L11",
+     "glosa": "Remanente ejercicio anterior o saldo inicial reajustado (saldo positivo)"
+    },
+    {
+     "codigo": 1204,
+     "valor": 13161672,
+     "celda": "R15!D11",
+     "formula": "=-RTRE!G13",
+     "glosa": "Reversos y/o disminuciones del ejercicio (propios)"
+    },
+    {
+     "codigo": 1205,
+     "valor": 80382996,
+     "celda": "R15!D12",
+     "formula": "=RTRE!G14",
+     "glosa": "Aumentos del ejercicio (propios)"
+    },
+    {
+     "codigo": 1208,
+     "valor": 61284000,
+     "celda": "R15!D15",
+     "formula": "=-(RTRE!G20+RTRE!G22)",
+     "glosa": "Remesas, retiros o dividendos imputados a los RTRE, reajustados"
+    },
+    {
+     "codigo": 1210,
+     "valor": 19098996,
+     "celda": "R15!D17",
+     "formula": "=RTRE!G27",
+     "glosa": "Remanente ejercicio siguiente (saldo positivo)"
+    },
+    {
+     "codigo": 1220,
+     "valor": 84953,
+     "celda": "R15!F17",
+     "formula": "=RTRE!H27",
+     "glosa": "Remanente ejercicio siguiente (saldo positivo)"
+    },
+    {
+     "codigo": 1244,
+     "valor": 53096,
+     "celda": "R15!N17",
+     "formula": "=RTRE!K27",
+     "glosa": "Remanente ejercicio siguiente (saldo positivo)"
+    },
+    {
+     "codigo": 1256,
+     "valor": 127430,
+     "celda": "R15!P17",
+     "formula": "=RTRE!L27",
+     "glosa": "Remanente ejercicio siguiente (saldo positivo)"
+    }
+   ],
+   "recuadro_16": [
+    {
+     "codigo": 1302,
+     "valor": 95610,
+     "celda": "R16!J7",
+     "formula": "=-RTRE!O11",
+     "glosa": "Remanente ejercicio anterior o saldo inicial (saldo negativo)"
+    },
+    {
+     "codigo": 1292,
+     "valor": 3399428,
+     "celda": "R16!H11",
+     "formula": "=RTRE!N15",
+     "glosa": "IDPC e IPE RLI generada en el ejercicio"
+    },
+    {
+     "codigo": 1305,
+     "valor": 20682124,
+     "celda": "R16!J11",
+     "formula": "=RTRE!O15",
+     "glosa": "IDPC e IPE RLI generada en el ejercicio"
+    },
+    {
+     "codigo": 1316,
+     "valor": 1130242,
+     "celda": "R16!L11",
+     "formula": "=RTRE!P15",
+     "glosa": "IDPC e IPE RLI generada en el ejercicio"
+    },
+    {
+     "codigo": 1306,
+     "valor": 142857,
+     "celda": "R16!J12",
+     "formula": "=RTRE!O16",
+     "glosa": "IDPC e IPE retiros o dividendos percibidos"
+    },
+    {
+     "codigo": 1296,
+     "valor": 3399428,
+     "celda": "R16!H15",
+     "formula": "=-RTRE!N20",
+     "glosa": "Asignado a remesas, retiros o dividendos efectuados en el ejercicio, reajustados"
+    },
+    {
+     "codigo": 1309,
+     "valor": 19685291,
+     "celda": "R16!J15",
+     "formula": "=-RTRE!O20-RTRE!O22",
+     "glosa": "Asignado a remesas, retiros o dividendos efectuados en el ejercicio, reajustados"
+    },
+    {
+     "codigo": 1320,
+     "valor": 1130242,
+     "celda": "R16!L15",
+     "formula": "=-RTRE!P20",
+     "glosa": "Asignado a remesas, retiros o dividendos efectuados en el ejercicio, reajustados"
+    },
+    {
+     "codigo": 1311,
+     "valor": 93012,
+     "celda": "R16!J17",
+     "formula": "=-(RTRE!O25+RTRE!O26)",
+     "glosa": "IDPC e IPE asignado a gastos rechazados del art. 21 inc. 1° no afectos a IU 40% y del inc. 2° LIR"
+    },
+    {
+     "codigo": 1312,
+     "valor": 0,
+     "celda": "R16!H18",
+     "formula": "=H11-H15",
+     "glosa": "Remanente ejercicio siguiente (saldo positivo)"
+    },
+    {
+     "codigo": 1300,
+     "valor": 951068,
+     "celda": "R16!J18",
+     "formula": "=-J7+J11+J12-J15-J17",
+     "glosa": "Remanente ejercicio siguiente (saldo positivo)"
+    },
+    {
+     "codigo": 1323,
+     "valor": 0,
+     "celda": "R16!L18",
+     "formula": "=L11-L15",
+     "glosa": "Remanente ejercicio siguiente (saldo positivo)"
+    }
+   ],
+   "inconsistencia_detectada": {
+    "R14!J25_codigo_645": 139854589,
+    "Razonabilidad CPT!F14": 139653408,
+    "diferencia": 201181,
+    "explicacion": "R14 no descuenta la donación agregada (cód. 1677, 201.181) en el código 1697; la hoja 'Razonabilidad CPT' sí la descuenta y es la que alimenta el RAI (código 1698). Confirmar con contador cuál es el tratamiento correcto."
+   },
+   "linea_55_y_resultado_derivado_no_en_planilla": {
+    "advertencia": "La planilla no llena la línea del IDPC ni la liquidación. Derivado por el analista; el caso no informa PPM.",
+    "codigo_1109_base": {
+     "valor": 89190933,
+     "desde": "RLI!L26 = R12 código 1690"
+    },
+    "idpc_bruto": {
+     "valor": 24081552,
+     "desde": "RLI!L27"
+    },
+    "codigo_1111_rebajas": {
+     "valor": 3399428,
+     "desde": "Crédito IPE!K38"
+    },
+    "codigo_1113_impuesto": {
+     "valor": 20682124,
+     "desde": "coincide con RTRE!O15"
+    },
+    "impuesto_unico_40pct_art21": {
+     "valor": 310918,
+     "desde": "RLI!L30 (base RLI!L29); línea del IU 40% del F22, código por confirmar"
+    },
+    "codigo_305_resultado_sin_ppm": {
+     "valor": 20993042
+    }
+   }
+  },
+  "dj_1926": {
+   "filas": [
+    {
+     "fila": 19,
+     "detalle": null,
+     "columnas": {
+      "B": {
+       "celda": "F1926!B19",
+       "valor": 1
+      },
+      "F": {
+       "celda": "F1926!F19",
+       "valor": "Resultado financiero según balance al 31.12.2025",
+       "formula": "=+RLI!D4"
+      },
+      "G": {
+       "celda": "F1926!G19",
+       "valor": 83400500,
+       "formula": "=+RLI!L4"
+      },
+      "H": {
+       "celda": "F1926!H19",
+       "valor": 9,
+       "formula": "=+RLI!O4"
+      }
+     }
+    },
+    {
+     "fila": 20,
+     "detalle": null,
+     "columnas": {
+      "B": {
+       "celda": "F1926!B20",
+       "valor": 2
+      },
+      "C": {
+       "celda": "F1926!C20",
+       "valor": 1144,
+       "formula": "=+RLI!C6"
+      },
+      "E": {
+       "celda": "F1926!E20",
+       "valor": "5.03.05.13",
+       "formula": "=+RLI!N6"
+      },
+      "F": {
+       "celda": "F1926!F20",
+       "valor": "21.03; Multas fiscales, pagadas, reajustadas ",
+       "formula": "=+RLI!D6"
+      },
+      "G": {
+       "celda": "F1926!G20",
+       "valor": 50296,
+       "formula": "=+RLI!L6"
+      },
+      "H": {
+       "celda": "F1926!H20",
+       "valor": 1,
+       "formula": "=+RLI!O6"
+      }
+     }
+    },
+    {
+     "fila": 21,
+     "detalle": null,
+     "columnas": {
+      "B": {
+       "celda": "F1926!B21",
+       "valor": 3
+      },
+      "C": {
+       "celda": "F1926!C21",
+       "valor": 1677,
+       "formula": "=+RLI!C7"
+      },
+      "E": {
+       "celda": "F1926!E21",
+       "valor": "5.03.05.10",
+       "formula": "=+RLI!N7"
+      },
+      "F": {
+       "celda": "F1926!F21",
+       "valor": "28.03; Donación Club Rayuela, reajustada",
+       "formula": "=+RLI!D7"
+      },
+      "G": {
+       "celda": "F1926!G21",
+       "valor": 201181,
+       "formula": "=+RLI!L7"
+      },
+      "H": {
+       "celda": "F1926!H21",
+       "valor": 1,
+       "formula": "=+RLI!O7"
+      }
+     }
+    },
+    {
+     "fila": 22,
+     "detalle": null,
+     "columnas": {
+      "B": {
+       "celda": "F1926!B22",
+       "valor": 4
+      },
+      "C": {
+       "celda": "F1926!C22",
+       "valor": 1678,
+       "formula": "=+RLI!C8"
+      },
+      "E": {
+       "celda": "F1926!E22",
+       "valor": "5.03.05.02",
+       "formula": "=+RLI!N8"
+      },
+      "F": {
+       "celda": "F1926!F22",
+       "valor": "25.04; Pago que no se ha acreditado la naturaleza ni efectividad, actualizados",
+       "formula": "=+RLI!D8"
+      },
+      "G": {
+       "celda": "F1926!G22",
+       "valor": 777295,
+       "formula": "=+RLI!L8"
+      },
+      "H": {
+       "celda": "F1926!H22",
+       "valor": 1,
+       "formula": "=+RLI!O8"
+      }
+     }
+    },
+    {
+     "fila": 23,
+     "detalle": null,
+     "columnas": {
+      "B": {
+       "celda": "F1926!B23",
+       "valor": 5
+      },
+      "C": {
+       "celda": "F1926!C23",
+       "valor": 1144,
+       "formula": "=+RLI!C9"
+      },
+      "E": {
+       "celda": "F1926!E23",
+       "valor": "5.03.05.14",
+       "formula": "=+RLI!N9"
+      },
+      "F": {
+       "celda": "F1926!F23",
+       "valor": "30.04; Pago IDPC AT 2025, actualizados ",
+       "formula": "=+RLI!D9"
+      },
+      "G": {
+       "celda": "F1926!G23",
+       "valor": 17556480,
+       "formula": "=+RLI!L9"
+      },
+      "H": {
+       "celda": "F1926!H23",
+       "valor": 1,
+       "formula": "=+RLI!O9"
+      }
+     }
+    },
+    {
+     "fila": 24,
+     "detalle": null,
+     "columnas": {
+      "B": {
+       "celda": "F1926!B24",
+       "valor": 6
+      },
+      "C": {
+       "celda": "F1926!C24",
+       "valor": 1678,
+       "formula": "=+RLI!C10"
+      },
+      "E": {
+       "celda": "F1926!E24",
+       "valor": "5.03.04.98",
+       "formula": "=+RLI!N10"
+      },
+      "F": {
+       "celda": "F1926!F24",
+       "valor": "15.12; Colegiatura del hijo de la socia Srta. Arriagada ",
+       "formula": "=+RLI!D10"
+      },
+      "G": {
+       "celda": "F1926!G24",
+       "valor": 3000000,
+       "formula": "=+RLI!L10"
+      },
+      "H": {
+       "celda": "F1926!H24",
+       "valor": 1,
+       "formula": "=+RLI!O10"
+      }
+     }
+    },
+    {
+     "fila": 25,
+     "detalle": null,
+     "columnas": {
+      "B": {
+       "celda": "F1926!B25",
+       "valor": 7
+      },
+      "C": {
+       "celda": "F1926!C25",
+       "valor": 1674,
+       "formula": "=+RLI!C13"
+      },
+      "E": {
+       "celda": "F1926!E25",
+       "valor": "5.01.15.03"
+      },
+      "F": {
+       "celda": "F1926!F25",
+       "valor": "Corrección monetaria disminución de capital (retiros socios)",
+       "formula": "=+RLI!D13"
+      },
+      "G": {
+       "celda": "F1926!G25",
+       "valor": 1284000,
+       "formula": "=+RLI!L13"
+      },
+      "H": {
+       "celda": "F1926!H25",
+       "valor": 1,
+       "formula": "=+RLI!O13"
+      }
+     }
+    },
+    {
+     "fila": 26,
+     "detalle": null,
+     "columnas": {
+      "B": {
+       "celda": "F1926!B26",
+       "valor": 8
+      },
+      "C": {
+       "celda": "F1926!C26",
+       "valor": 1676
+      },
+      "E": {
+       "celda": "F1926!E26",
+       "valor": "5.01.08.11"
+      },
+      "F": {
+       "celda": "F1926!F26",
+       "valor": "Crédito Total Disponible por Impuestos pagados en el exterior "
+      },
+      "G": {
+       "celda": "F1926!G26",
+       "valor": 4529670,
+       "formula": "=RLI!L11"
+      },
+      "H": {
+       "celda": "F1926!H26",
+       "valor": 1
+      }
+     }
+    },
+    {
+     "fila": 27,
+     "detalle": null,
+     "columnas": {
+      "B": {
+       "celda": "F1926!B27",
+       "valor": 9
+      },
+      "C": {
+       "celda": "F1926!C27",
+       "valor": 1686,
+       "formula": "=+RLI!C17"
+      },
+      "E": {
+       "celda": "F1926!E27",
+       "valor": "5.01.01.05",
+       "formula": "=+RLI!N17"
+      },
+      "F": {
+       "celda": "F1926!F27",
+       "valor": "Dividendo percibido de fuente chilena",
+       "formula": "=+RLI!D17"
+      },
+      "G": {
+       "celda": "F1926!G27",
+       "valor": 1000000,
+       "formula": "=+RLI!L17*-1"
+      },
+      "H": {
+       "celda": "F1926!H27",
+       "valor": 2,
+       "formula": "=+RLI!O17"
+      }
+     }
+    },
+    {
+     "fila": 28,
+     "detalle": null,
+     "columnas": {
+      "B": {
+       "celda": "F1926!B28",
+       "valor": 10
+      },
+      "C": {
+       "celda": "F1926!C28",
+       "valor": 1176,
+       "formula": "=+RLI!C18"
+      },
+      "E": {
+       "celda": "F1926!E28",
+       "valor": "5.01.03.03",
+       "formula": "=+RLI!N18"
+      },
+      "F": {
+       "celda": "F1926!F28",
+       "valor": "Factura castigada tributariamente 2025",
+       "formula": "=+RLI!D18"
+      },
+      "G": {
+       "celda": "F1926!G28",
+       "valor": 2800000,
+       "formula": "=+RLI!L18*-1"
+      },
+      "H": {
+       "celda": "F1926!H28",
+       "valor": 2,
+       "formula": "=+RLI!O18"
+      }
+     }
+    },
+    {
+     "fila": 29,
+     "detalle": null,
+     "columnas": {
+      "B": {
+       "celda": "F1926!B29",
+       "valor": 11
+      },
+      "C": {
+       "celda": "F1926!C29",
+       "valor": 1682,
+       "formula": "=+RLI!C19"
+      },
+      "E": {
+       "celda": "F1926!E29",
+       "valor": "5.03.05.02",
+       "formula": "=+RLI!N19"
+      },
+      "F": {
+       "celda": "F1926!F29",
+       "valor": "25.04; Pago que no se ha acreditado la naturaleza ni efectividad, actualizados",
+       "formula": "=+RLI!D19"
+      },
+      "G": {
+       "celda": "F1926!G29",
+       "valor": 777295,
+       "formula": "=+RLI!L19*-1"
+      },
+      "H": {
+       "celda": "F1926!H29",
+       "valor": 2,
+       "formula": "=+RLI!O19"
+      }
+     }
+    },
+    {
+     "fila": 30,
+     "detalle": null,
+     "columnas": {
+      "B": {
+       "celda": "F1926!B30",
+       "valor": 12
+      },
+      "C": {
+       "celda": "F1926!C30",
+       "valor": 1683,
+       "formula": "=+RLI!C20"
+      },
+      "E": {
+       "celda": "F1926!E30",
+       "valor": "5.03.04.99",
+       "formula": "=+RLI!N20"
+      },
+      "F": {
+       "celda": "F1926!F30",
+       "valor": "15.12; Colegiatura del hijo de la socia Srta. Arriagada ",
+       "formula": "=+RLI!D20"
+      },
+      "G": {
+       "celda": "F1926!G30",
+       "valor": 3000000,
+       "formula": "=+RLI!L20*-1"
+      },
+      "H": {
+       "celda": "F1926!H30",
+       "valor": 2,
+       "formula": "=+RLI!O20"
+      }
+     }
+    },
+    {
+     "fila": 31,
+     "detalle": null,
+     "columnas": {
+      "B": {
+       "celda": "F1926!B31",
+       "valor": 13
+      },
+      "C": {
+       "celda": "F1926!C31",
+       "valor": 1673,
+       "formula": "=+RLI!C22"
+      },
+      "E": {
+       "celda": "F1926!E31",
+       "valor": "5.01.15.01"
+      },
+      "F": {
+       "celda": "F1926!F31",
+       "valor": "Corrección monetaria CPT inicial ",
+       "formula": "=+RLI!D22"
+      },
+      "G": {
+       "celda": "F1926!G31",
+       "valor": 3932218,
+       "formula": "=+RLI!L22*-1"
+      },
+      "H": {
+       "celda": "F1926!H31",
+       "valor": 2,
+       "formula": "=+RLI!O22"
+      }
+     }
+    },
+    {
+     "fila": 32,
+     "detalle": null,
+     "columnas": {
+      "B": {
+       "celda": "F1926!B32",
+       "valor": 14
+      },
+      "C": {
+       "celda": "F1926!C32",
+       "valor": 1154,
+       "formula": "=+RLI!C25"
+      },
+      "E": {
+       "celda": "F1926!E32",
+       "valor": "5.03.04.20",
+       "formula": "=+RLI!N25"
+      },
+      "F": {
+       "celda": "F1926!F32",
+       "valor": "Deducción incentivo al ahorro art. 14 letra E) LIR",
+       "formula": "=+RLI!D25"
+      },
+      "G": {
+       "celda": "F1926!G32",
+       "valor": 10098976,
+       "formula": "=+RLI!L25*-1"
+      },
+      "H": {
+       "celda": "F1926!H32",
+       "valor": 4,
+       "formula": "=+RLI!O25"
+      }
+     }
+    }
+   ],
+   "resumen": [
+    {
+     "fila": 46,
+     "detalle": null,
+     "columnas": {
+      "B": {
+       "celda": "F1926!B46",
+       "valor": 83400500,
+       "formula": "=+SUMIF($H$18:$H$32,B47,$G$18:$G$32)"
+      },
+      "D": {
+       "celda": "F1926!D46",
+       "valor": 27398922,
+       "formula": "=+SUMIF($H$18:$H$32,D47,$G$18:$G$32)"
+      },
+      "E": {
+       "celda": "F1926!E46",
+       "valor": 11509513,
+       "formula": "=+SUMIF($H$18:$H$32,E47,$G$18:$G$32)"
+      },
+      "F": {
+       "celda": "F1926!F46",
+       "valor": 10098976,
+       "formula": "=+SUMIF($H$18:$H$32,F47,$G$18:$G$32)"
+      },
+      "G": {
+       "celda": "F1926!G46",
+       "valor": 89190933,
+       "formula": "=B46+D46-E46-F46"
+      },
+      "L": {
+       "celda": "F1926!L46",
+       "valor": 14,
+       "formula": "=+COUNT(B19:B32)"
+      }
+     }
+    }
+   ]
+  },
+  "dj_1948": {
+   "filas": [
+    {
+     "fila": 25,
+     "detalle": "20.03.2025",
+     "columnas": {
+      "B": {
+       "celda": "F1948!B25",
+       "valor": "20.03.2025"
+      },
+      "C": {
+       "celda": "F1948!C25",
+       "valor": "1-9"
+      },
+      "D": {
+       "celda": "F1948!D25",
+       "valor": "Sociedad NSD Ltda."
+      },
+      "F": {
+       "celda": "F1948!F25",
+       "valor": 55188000,
+       "formula": "='Retiros y situacion Trib.'!G7"
+      },
+      "V": {
+       "celda": "F1948!V25",
+       "valor": 3399428,
+       "formula": "='Retiros y situacion Trib.'!H19"
+      },
+      "W": {
+       "celda": "F1948!W25",
+       "valor": 17430606,
+       "formula": "='Retiros y situacion Trib.'!H18"
+      },
+      "Z": {
+       "celda": "F1948!Z25",
+       "valor": 1130242,
+       "formula": "='Retiros y situacion Trib.'!H23"
+      },
+      "AH": {
+       "celda": "F1948!AH25",
+       "valor": 1
+      }
+     }
+    },
+    {
+     "fila": 26,
+     "detalle": "13.04.2026",
+     "columnas": {
+      "B": {
+       "celda": "F1948!B26",
+       "valor": "13.04.2026"
+      },
+      "C": {
+       "celda": "F1948!C26",
+       "valor": "20-5"
+      },
+      "D": {
+       "celda": "F1948!D26",
+       "valor": "Srta. Arriagada"
+      },
+      "F": {
+       "celda": "F1948!F26",
+       "valor": 6096000,
+       "formula": "='Retiros y situacion Trib.'!P5"
+      },
+      "W": {
+       "celda": "F1948!W26",
+       "valor": 2254685,
+       "formula": "='Retiros y situacion Trib.'!P18"
+      },
+      "AH": {
+       "celda": "F1948!AH26",
+       "valor": 2
+      }
+     }
+    }
+   ],
+   "resumen": [
+    {
+     "fila": 46,
+     "detalle": null,
+     "columnas": {
+      "C": {
+       "celda": "F1948!C46",
+       "valor": 61284000,
+       "formula": "=SUM(F25:F26)"
+      },
+      "S": {
+       "celda": "F1948!S46",
+       "valor": 3399428,
+       "formula": "=SUM(V25:V26)"
+      },
+      "T": {
+       "celda": "F1948!T46",
+       "valor": 19685291,
+       "formula": "=SUM(W25:W26)"
+      },
+      "W": {
+       "celda": "F1948!W46",
+       "valor": 1130242,
+       "formula": "=SUM(Z25:Z26)"
+      },
+      "AF": {
+       "celda": "F1948!AF46",
+       "valor": 2,
+       "formula": "=COUNT(AH25:AH26)"
+      }
+     }
+    }
+   ]
+  }
+ },
+ "verificacion_independiente": {
+  "metodo": "Recalculo con Decimal y ROUND_HALF_UP desde las entradas (sin leer celdas intermedias)",
+  "resultados_coinciden": {
+   "14D3": {
+    "total_ingresos_1410": 120050795,
+    "total_egresos_1430": 39286000,
+    "bi_antes_14E_1729": 83204795,
+    "incentivo_14E_1432": 32382398,
+    "base_1440": 50822397,
+    "idpc": 6352800,
+    "ipe_imputable_idpc": 1481232,
+    "cpts_1545": 116732808,
+    "rai_1500": 101972808,
+    "resultado_derivado_305": 4600757
+   },
+   "14D8": {
+    "base_1630": 68454657,
+    "igc_socio_157": 1286149
+   },
+   "14A": {
+    "idpc_bruto": 24081552
+   }
+  }
+ },
+ "parametros_normativos_encontrados": [
+  {
+   "codigo_sugerido": "IDPC_TASA_PROPYME",
+   "valor": "0.125",
+   "vigencia": "AC 2025-2027 (AT 2026-2028)",
+   "celdas": [
+    "14D3 Antecedentes!I64",
+    "BI y art.14 letra E)!J35",
+    "Crédito IPE!K38 (literal 12.5% en fórmula)",
+    "RTRE!J17 (literal)"
+   ],
+   "fuente_declarada": "Ley 21.755 (nota Antecedentes!C81)"
+  },
+  {
+   "codigo_sugerido": "IDPC_FACTOR_CREDITO_PROPYME",
+   "valor": "0.142857",
+   "celdas": [
+    "14D3 Antecedentes!I65",
+    "RTRE!L6"
+   ],
+   "fuente_declarada": "Circular SII N°53 de 2025 (Antecedentes!C83)"
+  },
+  {
+   "codigo_sugerido": "IDPC_TASA_GENERAL_14A",
+   "valor": "0.27",
+   "celdas": [
+    "14A RLI!K27",
+    "Crédito IPE!K38 (literal 27%)"
+   ]
+  },
+  {
+   "codigo_sugerido": "IDPC_FACTOR_CREDITO_14A",
+   "valor": "0.369863",
+   "celdas": [
+    "14A RTRE!O6"
+   ]
+  },
+  {
+   "codigo_sugerido": "IU_GASTOS_RECHAZADOS_ART21_TASA",
+   "valor": "0.40",
+   "celdas": [
+    "14A RLI!K30"
+   ]
+  },
+  {
+   "codigo_sugerido": "INCENTIVO_14E_PORCENTAJE",
+   "valor": "0.5",
+   "celdas": [
+    "14D3 BI!L44",
+    "14A RLI!M40"
+   ]
+  },
+  {
+   "codigo_sugerido": "INCENTIVO_14E_TOPE_UF",
+   "valor": "5000",
+   "celdas": [
+    "14D3 BI!M44 (literal)",
+    "14A RLI!N40 (literal)"
+   ]
+  },
+  {
+   "codigo_sugerido": "UF_31_12_2025",
+   "valor": "39727.96",
+   "celdas": [
+    "14D3 Antecedentes!I62",
+    "14D8 Antecedentes!D57",
+    "14A Antecedentes!M55"
+   ]
+  },
+  {
+   "codigo_sugerido": "IPC_VARIACIONES_2025",
+   "valor": "anual 0.034; sep-dic 0.007; oct-dic 0.003; nov-dic 0.003; mar-dic 0.022; abr-dic 0.016",
+   "celdas": [
+    "Antecedentes de cada planilla"
+   ],
+   "nota": "datos del ejemplo; usar serie oficial INE/SII"
+  },
+  {
+   "codigo_sugerido": "IPE_TOPE_TASA",
+   "valor": "0.35",
+   "celdas": [
+    "Crédito IPE!J22, K24 (literal)"
+   ]
+  },
+  {
+   "codigo_sugerido": "IPE_CREDITO_RETIROS_TASAS",
+   "valor": "divisor 0.65; 22.5% y 25% (14D3); 8% (14A)",
+   "celdas": [
+    "14D3 RTRE!E19, M20",
+    "14A RTRE!P20"
+   ],
+   "nota": "literales en fórmulas; confirmar origen normativo con contador"
+  },
+  {
+   "codigo_sugerido": "CREDITO_33BIS_TASA",
+   "valor": "0.06",
+   "celdas": [
+    "14D8 Base Imponible !K46 (literal)"
+   ]
+  },
+  {
+   "codigo_sugerido": "RESTITUCION_CREDITO_TASA",
+   "valor": "0.35",
+   "celdas": [
+    "14D8 F22 Socio Estrada!M15 (literal)"
+   ]
+  },
+  {
+   "codigo_sugerido": "RETENCION_HONORARIOS_2025",
+   "valor": "0.145",
+   "celdas": [
+    "14D3 Antecedentes!E38,K38",
+    "14D8 Antecedentes!E34,K34"
+   ]
+  },
+  {
+   "codigo_sugerido": "PPM_TASA_EJEMPLO",
+   "valor": "0.0025",
+   "celdas": [
+    "14D3 Antecedentes!E77,E78"
+   ],
+   "nota": "tasa del ejemplo, no generalizable"
+  },
+  {
+   "codigo_sugerido": "IGC_TABLA_AT2026",
+   "valor": "8 tramos (ver 14D8.tabla_igc_AT2026); UTM dic-2025 69542; UTA 834504",
+   "celdas": [
+    "14D8 Tabla IGC!B4:F14"
+   ]
+  },
+  {
+   "codigo_sugerido": "INGRESO_DIFERIDO_CUOTAS_RESTANTES",
+   "valor": "5",
+   "celdas": [
+    "14D8 Base Imponible !K41 (literal /5)"
+   ]
+  }
+ ]
+}

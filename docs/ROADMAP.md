@@ -14,7 +14,7 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | 7 | Inventario (incluye stock real y futuro) | ✅ Hito B cumplido (2026-10-06) — ver abajo |
 | 8 | Finanzas | ✅ Hito C cumplido (2026-10-06) — ver abajo |
 | 9 | COMEX (requiere contador colaborador, D-07) | 🟡 Construido (2026-10-06); falta la firma de los casos golden — ver abajo |
-| 10 | Contabilidad (motor de asientos) | ⏳ |
+| 10 | Impuestos y contabilidad: A) borrador del F29 ✅ · B) sueldo empresarial y remuneraciones ⏳ · C) F22 ⏳ · motor de asientos ⏳ | 🚧 |
 | 11 | Documentación externa e indicadores | ⏳ |
 | 12 | Reportes y dashboard del dueño | ⏳ |
 | 13 | Seguridad | ⏳ |

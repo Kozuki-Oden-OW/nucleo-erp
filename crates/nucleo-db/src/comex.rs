@@ -88,6 +88,7 @@ pub struct ImportRow {
     pub vat_ppm: Option<i64>,
     pub vat_recoverable: bool,
     pub notional_insurance_ppm: Option<i64>,
+    pub transport_freight_minor: Option<i64>,
     pub fob_minor: Option<i64>,
     pub landed_total_clp: Option<i64>,
     pub estimated_landed_clp: Option<i64>,
@@ -101,7 +102,7 @@ const IMPORT_COLS: &str = "i.id, i.uid, i.number, i.supplier_id, s.uid, s.name, 
     i.origin_country, i.origin_port, i.destination_port, i.currency_code, coalesce(c.decimals, 2), i.rate_e6, i.stage,
     i.purchase_date, i.production_eta, i.shipment_date, i.eta, i.arrival_date, i.reception_date, i.allocation_basis,
     i.vat_ppm, i.vat_recoverable, i.fob_minor, i.landed_total_clp, i.estimated_landed_clp, i.estimated_at, i.notes,
-    i.void_reason, i.created_at, i.notional_insurance_ppm
+    i.void_reason, i.created_at, i.notional_insurance_ppm, i.transport_freight_minor
     FROM imports i LEFT JOIN suppliers s ON s.id = i.supplier_id LEFT JOIN currencies c ON c.code = i.currency_code";
 
 fn import_row(r: &Row<'_>) -> rusqlite::Result<ImportRow> {
@@ -139,6 +140,7 @@ fn import_row(r: &Row<'_>) -> rusqlite::Result<ImportRow> {
         void_reason: r.get(30)?,
         created_at: r.get(31)?,
         notional_insurance_ppm: r.get(32)?,
+        transport_freight_minor: r.get(33)?,
     })
 }
 
@@ -181,6 +183,7 @@ pub struct ImportWrite<'a> {
     pub vat_ppm: Option<i64>,
     pub vat_recoverable: bool,
     pub notional_insurance_ppm: Option<i64>,
+    pub transport_freight_minor: Option<i64>,
     pub notes: Option<&'a str>,
 }
 
@@ -196,8 +199,9 @@ pub fn insert_import(
     conn.execute(
         "INSERT INTO imports (uid, number, supplier_id, incoterm, incoterm_version, transport_mode, origin_country, origin_port,
             destination_port, currency_code, rate_e6, purchase_date, production_eta, shipment_date, eta, arrival_date,
-            allocation_basis, vat_ppm, vat_recoverable, notes, created_by, created_at, notional_insurance_ppm)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)",
+            allocation_basis, vat_ppm, vat_recoverable, notes, created_by, created_at, notional_insurance_ppm,
+            transport_freight_minor)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
         rusqlite::params![
             uid,
             number,
@@ -221,7 +225,8 @@ pub fn insert_import(
             w.notes,
             by,
             now,
-            w.notional_insurance_ppm
+            w.notional_insurance_ppm,
+            w.transport_freight_minor
         ],
     )?;
     Ok(conn.last_insert_rowid())
@@ -233,7 +238,8 @@ pub fn update_import(conn: &Connection, id: i64, w: &ImportWrite<'_>, now: &str)
         "UPDATE imports SET supplier_id = ?2, incoterm = ?3, incoterm_version = ?4, transport_mode = ?5, origin_country = ?6,
             origin_port = ?7, destination_port = ?8, currency_code = ?9, rate_e6 = ?10, purchase_date = ?11,
             production_eta = ?12, shipment_date = ?13, arrival_date = ?14, allocation_basis = ?15, vat_ppm = ?16,
-            vat_recoverable = ?17, notes = ?18, updated_at = ?19, notional_insurance_ppm = ?20
+            vat_recoverable = ?17, notes = ?18, updated_at = ?19, notional_insurance_ppm = ?20,
+            transport_freight_minor = ?21
          WHERE id = ?1",
         rusqlite::params![
             id,
@@ -255,7 +261,8 @@ pub fn update_import(conn: &Connection, id: i64, w: &ImportWrite<'_>, now: &str)
             w.vat_recoverable as i64,
             w.notes,
             now,
-            w.notional_insurance_ppm
+            w.notional_insurance_ppm,
+            w.transport_freight_minor
         ],
     )?;
     Ok(())

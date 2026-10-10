@@ -44,6 +44,8 @@ Todo es entero: las sumas y los reportes se hacen en SQL sin perder exactitud y 
 | 15 | `0015_finanzas.sql` | Fase 8: traspasos entre cuentas (`money_transfers`, inmutables), motivo y notas de gastos, fecha de creación de recurrentes, índices de cuentas por cobrar y por pagar |
 | 16 | `0016_comex.sql` | Fase 9: tasa de IVA de importación ingresada, foto del costo estimado, costos anulables con documento y fecha, Incoterms® 2020 (resumen propio), permiso de COMEX para el rol Compras |
 | 17 | `0017_comex_seguro_teorico.sql` | Seguro teórico de la carpeta (`imports.notional_insurance_ppm`): solo valor aduanero, no es costo |
+| 18 | `0018_impuestos_f29.sql` | Registro de compras y ventas del período (`tax_documents`, `tax_import_batches`) y borradores del F29 (`f29_periods`, con lo declarado) |
+| 19 | `0019_comex_flete_documento.sql` | Flete según el documento de transporte (`imports.transport_freight_minor`), solo para el valor aduanero |
 
 Las migraciones son transaccionales y versionadas con `PRAGMA user_version`. **Pre-1.0:** se pueden
 reescribir (en la Fase 2 se reemplazó la tabla mínima de clientes de la Fase 1); desde la primera beta

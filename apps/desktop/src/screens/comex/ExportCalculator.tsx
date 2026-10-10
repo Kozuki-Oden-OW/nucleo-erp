@@ -55,8 +55,9 @@ export function ExportCalculator() {
     <div className="flex flex-col gap-6">
       <Notice tone="info" icon={Info} title="Simulación de rentabilidad">
         Calcula si te conviene exportar con el costo promedio de tus productos. No emite documentos de exportación. Ingresa los costos sin IVA:
-        la venta al exterior no lleva IVA y el IVA de tus compras y servicios se recupera, pero ese tratamiento (y su devolución) está pendiente de revisión
-        con un contador antes de incorporarlo al cálculo.
+        la exportación se documenta con factura de exportación (exenta, código 110) y una declaración de salida (DUS), y como exportador puedes
+        recuperar el IVA de tus compras (art. 36 del DL 825). Hasta cierto monto puedes tramitar el DUS sin agente; sobre eso, con agente.
+        El reintegro simplificado es para productos que fabricas con insumos: en reventa normalmente no aplica. Valida el tipo de cambio de registro con tu contador.
       </Notice>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex min-w-0 flex-col gap-6">

@@ -6,6 +6,7 @@ use nucleo_app::company::BackupDone;
 use nucleo_app::core_ops::{
     BusinessPatch, BusinessSettings, CurrentUser, EntityRef, NewUser, SecuritySettings, UserPatch,
 };
+use nucleo_app::f29_ops::{F29Inputs, F29View, RcvImportReport, TaxDocInput, TaxProfile};
 use nucleo_app::finance_ops::{
     AccountInput, CalendarItem, DashboardData, ExpenseDetail, ExpenseFilter, ExpenseInput,
     ExpenseSummary, MoneyOverview, MoneyTransferInput, RecurringInput,
@@ -1068,4 +1069,97 @@ pub fn void_import(
     reason: String,
 ) -> CmdResult<ImportDetail> {
     with_session(&state, |s| Ok(s.void_import(&uid, &reason)?))
+}
+
+/* ───────────────────────────── Impuestos: F29 ───────────────────────────── */
+
+#[tauri::command]
+pub fn tax_profile(state: State<'_, AppState>) -> CmdResult<TaxProfile> {
+    with_session(&state, |s| Ok(s.tax_profile()?))
+}
+
+#[tauri::command]
+pub fn save_tax_profile(state: State<'_, AppState>, profile: TaxProfile) -> CmdResult<TaxProfile> {
+    with_session(&state, |s| Ok(s.save_tax_profile(&profile)?))
+}
+
+#[tauri::command]
+pub fn f29(state: State<'_, AppState>, period: String) -> CmdResult<F29View> {
+    with_session(&state, |s| Ok(s.f29(&period)?))
+}
+
+#[tauri::command]
+pub fn save_f29_inputs(
+    state: State<'_, AppState>,
+    period: String,
+    inputs: F29Inputs,
+) -> CmdResult<F29View> {
+    with_session(&state, |s| Ok(s.save_f29_inputs(&period, &inputs)?))
+}
+
+#[tauri::command]
+pub fn import_rcv(
+    state: State<'_, AppState>,
+    period: String,
+    direction: String,
+    file_name: Option<String>,
+    text: String,
+) -> CmdResult<RcvImportReport> {
+    with_session(&state, |s| {
+        Ok(s.import_rcv(&period, &direction, file_name.as_deref(), &text)?)
+    })
+}
+
+#[tauri::command]
+pub fn clear_rcv(
+    state: State<'_, AppState>,
+    period: String,
+    direction: String,
+) -> CmdResult<F29View> {
+    with_session(&state, |s| Ok(s.clear_rcv(&period, &direction)?))
+}
+
+#[tauri::command]
+pub fn add_tax_document(
+    state: State<'_, AppState>,
+    period: String,
+    input: TaxDocInput,
+) -> CmdResult<F29View> {
+    with_session(&state, |s| Ok(s.add_tax_document(&period, &input)?))
+}
+
+#[tauri::command]
+pub fn delete_tax_document(state: State<'_, AppState>, id: i64) -> CmdResult<F29View> {
+    with_session(&state, |s| Ok(s.delete_tax_document(id)?))
+}
+
+#[tauri::command]
+pub fn set_tax_document_kind(
+    state: State<'_, AppState>,
+    id: i64,
+    kind: String,
+) -> CmdResult<F29View> {
+    with_session(&state, |s| Ok(s.set_tax_document_kind(id, &kind)?))
+}
+
+#[tauri::command]
+pub fn mark_f29_declared(
+    state: State<'_, AppState>,
+    period: String,
+    declared77: i64,
+    declared91: i64,
+    folio: Option<String>,
+) -> CmdResult<F29View> {
+    with_session(&state, |s| {
+        Ok(s.mark_f29_declared(&period, declared77, declared91, folio)?)
+    })
+}
+
+#[tauri::command]
+pub fn reopen_f29(
+    state: State<'_, AppState>,
+    period: String,
+    reason: String,
+) -> CmdResult<F29View> {
+    with_session(&state, |s| Ok(s.reopen_f29(&period, &reason)?))
 }

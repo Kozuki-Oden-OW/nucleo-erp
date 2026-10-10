@@ -136,6 +136,17 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         commands::receive_import,
         commands::close_import,
         commands::void_import,
+        commands::tax_profile,
+        commands::save_tax_profile,
+        commands::f29,
+        commands::save_f29_inputs,
+        commands::import_rcv,
+        commands::clear_rcv,
+        commands::add_tax_document,
+        commands::delete_tax_document,
+        commands::set_tax_document_kind,
+        commands::mark_f29_declared,
+        commands::reopen_f29,
     ])
 }
 

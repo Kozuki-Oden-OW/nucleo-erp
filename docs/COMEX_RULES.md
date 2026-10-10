@@ -119,3 +119,27 @@ explican la fuente de cada monto. Lo ideal es sumar 2 a 4 importaciones reales c
     sus facturas y los impuestos pagados por cuenta del importador?
 15. Pago al proveedor con crédito (75 días en el caso real): diferencia entre el tipo de cambio de la
     DIN y el del pago, y cómo afecta el costo del producto.
+
+## Respuestas del agente de aduana (octubre 2026)
+
+Respuestas a las preguntas de valoración, impuestos, courier y exportación, revisadas con el agente
+de aduana del usuario sobre la DIN 2850015246. "[Oficial]" = norma citada; "[DIN]" = lo que muestra
+la declaración real; "[Por verificar]" = práctica o fuente secundaria.
+
+| Tema | Respuesta | En NÚCLEO |
+|---|---|---|
+| Seguro teórico | [Oficial] 2 % del FOB en cualquier vía, solo si no se acredita una prima real (Compendio, cap. II, 2.7 a). [DIN] Sobre el FOB **declarado**: 2 % × 10.535,02 = 210,70 | Seguro teórico sobre la mercadería declarada (D-F9-09, D-F9-13) |
+| Flete en facturas CPT/CFR | [Oficial] Se declara el flete del AWB/BL y el FOB = total CPT − ese flete. [DIN] 12.132,50 − 1.597,48 = 10.535,02; Aduanas repartió la diferencia entre los productos (+1,4692 % cada precio) | Campo "Flete según el AWB o BL" en la carpeta (migración 0019, D-F9-13) |
+| Flete no acreditado | [Oficial] Tarifa habitual con certificado del transportista; si no: marítimo 5 % del FOB, aéreo tabla supletoria por zona (China: Asia–Oceanía), terrestre reparto interno/externo; franquicias y equipaje 10 % | Aviso: pedir a DHL el certificado de flete |
+| Gastos en origen (EXW/FCA) | [Oficial] Suman al valor aduanero (todo hasta el lugar de entrada a Chile, cap. II 2.7). No suman: costos en Chile después de la llegada (THC de destino), comisiones de compra, derechos e impuestos chilenos (cap. II 2.8) | Se agregan como flete u "otros" en origen |
+| Tipo de cambio | [Oficial] Equivalencia del Banco Central vigente a la aceptación de la DIN (Ordenanza art. 70; Compendio 2.6); en la práctica, valor mensual publicado por Aduanas (ago-2026 935,57; sep 925,25; oct 969,70). Pagos al proveedor: tipo del banco el día del pago, con diferencia de cambio contable (validar con contador) | Tipo de cambio de la carpeta = el aduanero; pagos al tipo del pago (D-F9-06) |
+| Cálculo del IVA | [DIN] Por línea en dólares y luego a pesos (813,17 + 1.380,70 + 151,34 = US$ 2.345,21 × 935,57 = $2.194.108). [Oficial] Base = CIF + derechos; los impuestos adicionales no entran a la base del IVA | Cálculo en pesos por producto; diferencia de 1–2 pesos aceptada (D-F9-11); el monto de la DIN manda |
+| Mercadería agrupada | [DIN] Repartir por valor es exacto si todas las líneas tienen la misma tasa. Con tasas distintas, usar los montos de cada línea de la DIN | Derechos e IVA ingresados se reparten por valor aduanero (y por arancel si difiere) |
+| Certificado de origen tardío | [Oficial] Se paga el régimen general (6 % + IVA) dejando constancia y luego se pide devolución: 6 a 24 meses según el acuerdo; con China, 1 año (TLC art. 18; Ordenanza art. 131 bis). [DIN] La provisión de $3.741.211 se calculó con 6 %; con TLC eran $2.916.889: **$824.322 a favor del usuario**, revisar la cuenta final del agente | Pendiente: marcar "derechos con devolución pendiente" en la carpeta |
+| Permisos para dataloggers | [Oficial] Sin impuesto adicional ni visto bueno ISP/SAG; la DIN salió sin aforo. [Por verificar] SUBTEL para equipos con WiFi/4G/Bluetooth; SEC para adaptadores de 220 V al comercializar | Nota en la ficha del producto (futuro) |
+| Courier | [Oficial] Hasta US$ 3.000 FOB el courier tramita y paga derechos e IVA a nombre del importador y los cobra en su factura; sobre eso, agente obligatorio con DIN. Carga general sin agente solo hasta US$ 1.000 FOB (DIPS) | Límites en el paquete normativo y avisos en la calculadora |
+| Factura del agente | [DIN] La provisión calculó IVA sobre honorarios, despacho, EDI, almacenaje y terminal. [Por verificar] Lo habitual: IVA sobre los servicios propios del agente; los gastos de terceros se rinden con la factura del tercero (que ya trae IVA) | Gastos de servicios se ingresan netos; revisar la cuenta final |
+| Almacenaje | [DIN] DHL Express fue el almacenista: el courier sí puede cobrar almacenaje. [Oficial] No hay días libres oficiales: cada almacenista publica sus tarifas | Costo informado por el proveedor, no regla fija |
+| Exportación | [Oficial] DUS en dos etapas (aceptación y legalización en 25 días); sin agente hasta US$ 2.000 FOB (DUS o DUSSI), con agente sobre eso (cap. IV). Valor FOB en dólares con factura de exportación electrónica (110), exenta; el exportador recupera el IVA de sus compras (art. 36 DL 825). Reintegro simplificado (Ley 18.480): vigente, 3 % del FOB para exportaciones no tradicionales producidas con insumos; en reventa probablemente no aplica. [Por verificar] Tipo de cambio para contabilizar la venta | Aviso en la calculadora de exportación |
+| Partidas arancelarias | [DIN] 9025.8099 (registradores) y 9025.1990 (termómetros) aceptadas sin aforo; antecedente útil pero no vinculante. Guardar con fuente, versión del arancel (SA 2022) y vencimiento al 31-12-2027 (SA 2028 desde el 1-01-2028). Sensores sueltos podrían ir en 9025.90; modelos con radio, revisar SUBTEL. Para certeza: resolución anticipada de clasificación (vinculante) | Pendiente: partida con metadatos en la ficha del producto |
+

@@ -39,7 +39,7 @@ interface Scenario {
   vat_charged_clp: number | null;
   agent_clp: number; port_clp: number; inland_clp: number; bank_clp: number; other_clp: number;
 }
-interface Limits { platform_cents: number | null; courier_cents: number | null }
+interface Limits { platform_cents: number | null; courier_cents: number | null; cargo_no_agent_cents: number | null }
 let seq = 0;
 
 const decimalsOf = (c: PriceCurrency) => (c === "CLP" ? 0 : 2);
@@ -80,6 +80,8 @@ function limitWarnings(s: Scenario, usdCents: number | null, limits: Limits): { 
     out.push({ tone: "warning", text: `La compra (${usd(usdCents)}) supera ${usd(limits.platform_cents)}: no se trata como compra de bajo valor por plataforma. Pasa por aduana con arancel e IVA; simúlala como Courier o Con agente.` });
   if (s.mode === "courier" && limits.courier_cents !== null && usdCents > limits.courier_cents)
     out.push({ tone: "warning", text: `La compra (${usd(usdCents)}) supera ${usd(limits.courier_cents)}, el máximo del despacho simplificado por courier: necesitas un agente de aduana (DIN).` });
+  if (s.mode === "agente" && s.transport !== "courier" && limits.cargo_no_agent_cents !== null && usdCents <= limits.cargo_no_agent_cents)
+    out.push({ tone: "info", text: `Por ${usd(usdCents)} puedes despachar la carga sin agente con la declaración simplificada (hasta ${usd(limits.cargo_no_agent_cents)}).` });
   if (s.mode === "agente" && limits.courier_cents !== null && usdCents <= limits.courier_cents)
     out.push({ tone: "info", text: `Por ${usd(usdCents)} también puedes traerlo por courier sin agente (hasta ${usd(limits.courier_cents)}). Compara el escenario Courier.` });
   return out;
@@ -95,17 +97,17 @@ export function ImportCalculator() {
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [active, setActive] = useState(0);
   const [hasRules, setHasRules] = useState(false);
-  const [limits, setLimits] = useState<Limits>({ platform_cents: null, courier_cents: null });
+  const [limits, setLimits] = useState<Limits>({ platform_cents: null, courier_cents: null, cargo_no_agent_cents: null });
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     const rule = (code: string) => backend.ruleValue(code).catch(() => null);
     Promise.all([
-      rule("ARANCEL_GENERAL_PPM"), rule("IVA_TASA_GENERAL_PPM"), rule("SEGURO_TEORICO_PPM"), rule("COMEX_PLATAFORMA_MAX_USD_CENTS"), rule("COMEX_COURIER_MAX_USD_CENTS"),
+      rule("ARANCEL_GENERAL_PPM"), rule("IVA_TASA_GENERAL_PPM"), rule("SEGURO_TEORICO_PPM"), rule("COMEX_PLATAFORMA_MAX_USD_CENTS"), rule("COMEX_COURIER_MAX_USD_CENTS"), rule("COMEX_CARGA_SIN_AGENTE_MAX_USD_CENTS"),
       backend.currencies().catch(() => []), backend.searchProducts("taladro").catch(() => []),
-    ]).then(([d, v, nt, lp, lc, cur, prods]) => {
+    ]).then(([d, v, nt, lp, lc, lg, cur, prods]) => {
       setHasRules(!!(d || v));
-      setLimits({ platform_cents: lp?.value ?? null, courier_cents: lc?.value ?? null });
+      setLimits({ platform_cents: lp?.value ?? null, courier_cents: lc?.value ?? null, cargo_no_agent_cents: lg?.value ?? null });
       const usd = cur.find((c) => c.code === "USD")?.last_rate_e6 ?? null;
       const base = { rate_e6: usd, insurance_ppm: 5_000, notional_ppm: nt?.value ?? null, duty_ppm: d?.value ?? null, vat_ppm: v?.value ?? null, vat_recoverable: true, vat_charged_clp: null, bank_clp: 25_000, other_clp: 0 };
       setScenarios([

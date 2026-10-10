@@ -140,6 +140,11 @@ pub struct LandedInput {
     /// del valor de la mercadería. No es un costo pagado. Se ignora si hay costos de seguro.
     #[serde(default)]
     pub notional_insurance_ppm: Option<i64>,
+    /// Flete según el documento de transporte (AWB o BL), en pesos. Cuando la factura viene con
+    /// flete incluido (CPT, CFR), Aduanas declara este flete y la diferencia con el flete de la
+    /// factura pasa a la mercadería (FOB = total − flete del documento de transporte).
+    #[serde(default)]
+    pub customs_freight_clp: Option<i64>,
     pub items: Vec<LandedItem>,
     #[serde(default)]
     pub costs: Vec<LandedCost>,
@@ -178,6 +183,9 @@ pub struct LandedResult {
     pub insurance_clp: i64,
     /// Seguro teórico (solo valor aduanero, no es costo).
     pub notional_insurance_clp: i64,
+    /// Mercadería (FOB) y flete tal como los declara Aduanas.
+    pub customs_fob_clp: i64,
+    pub customs_freight_clp: i64,
     pub customs_value_clp: i64,
     pub duty_clp: i64,
     /// Los derechos vienen de montos ingresados (no de la tasa).
@@ -358,16 +366,37 @@ pub fn landed_cost(input: &LandedInput) -> LandedResult {
             add(&mut insurance, &part);
         }
     }
-    // Seguro teórico: solo si no hay seguro contratado.
+    // Flete del documento de transporte: la diferencia con el de la factura pasa a la mercadería.
+    let customs_freight: Vec<i64> = match input.customs_freight_clp {
+        Some(f) if f >= 0 => {
+            let w: Vec<i128> = if freight.iter().any(|v| *v > 0) {
+                freight.iter().map(|v| *v as i128).collect()
+            } else {
+                fob.iter().map(|v| *v as i128).collect()
+            };
+            let paid: i64 = freight.iter().sum();
+            if paid != f {
+                notes.push(format!(
+                    "Valor aduanero con el flete del documento de transporte (${f}) en vez del de la factura (${paid}): la diferencia se suma a la mercadería, como hace Aduanas."
+                ));
+            }
+            allocate(f, &w)
+        }
+        _ => freight.clone(),
+    };
+    let customs_fob: Vec<i64> = (0..n)
+        .map(|i| fob[i] + freight[i] - customs_freight[i])
+        .collect();
+    // Seguro teórico (solo si no hay seguro contratado), sobre la mercadería declarada.
     let mut notional = vec![0i64; n];
     let has_insurance = input.costs.iter().any(|c| c.kind == CostKind::Seguro);
     if let Some(ppm) = input.notional_insurance_ppm.filter(|p| *p > 0) {
         if has_insurance {
             notes.push("Hay un seguro contratado: no se usó el seguro teórico.".into());
         } else {
-            let fob_total: i64 = fob.iter().sum();
+            let fob_total: i64 = customs_fob.iter().sum();
             let total = div_round(fob_total as i128 * ppm as i128, 1_000_000) as i64;
-            let w: Vec<i128> = fob.iter().map(|v| *v as i128).collect();
+            let w: Vec<i128> = customs_fob.iter().map(|v| *v as i128).collect();
             notional = allocate(total, &w);
         }
     }
@@ -502,6 +531,8 @@ pub fn landed_cost(input: &LandedInput) -> LandedResult {
         freight_clp: sum(|x| x.freight_clp),
         insurance_clp: sum(|x| x.insurance_clp),
         notional_insurance_clp: sum(|x| x.notional_insurance_clp),
+        customs_fob_clp: customs_fob.iter().sum(),
+        customs_freight_clp: customs_freight.iter().sum(),
         customs_value_clp: sum(|x| x.customs_value_clp),
         duty_clp: duty_total,
         duty_entered,
@@ -620,6 +651,7 @@ mod tests {
             vat_ppm: Some(150_000), // tasa de EJEMPLO
             vat_recoverable: true,
             notional_insurance_ppm: None,
+            customs_freight_clp: None,
             items: vec![
                 LandedItem {
                     qty_milli: 100_000,

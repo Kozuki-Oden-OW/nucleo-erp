@@ -91,6 +91,7 @@ fn folder(sup: &str, a: &str, b: &str) -> ImportInput {
         vat_ppm: Some(150_000),
         vat_recoverable: true,
         notional_insurance_ppm: None,
+        transport_freight_minor: None,
         notes: None,
         items: vec![
             ImportItemInput {

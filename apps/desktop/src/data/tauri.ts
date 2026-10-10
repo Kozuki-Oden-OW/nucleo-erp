@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "./backend";
 import type {
+  F29Inputs, F29View, RcvImportReport, TaxDocInput, TaxProfile,
   ImportCostInput, ImportDetail, ImportInput, ImportReceiveLine, ImportStage, ImportSummary, IncotermDef,
   AccountInput, CalendarItem, ExpenseCategory, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow, MoneyAccount,
   MoneyOverview, MoneyTransferInput, Recurring, RecurringInput,
@@ -42,7 +43,7 @@ export class TauriBackend implements Backend {
   readonly kind = "tauri" as const;
   readonly features: ReadonlySet<Feature> = new Set<Feature>([
     "clientes", "respaldos", "negocio", "busqueda", "usuarios", "documentos", "numeracion", "monedas", "auditoria",
-    "productos", "ventas", "compras", "inventario", "dinero", "dashboard",
+    "productos", "ventas", "compras", "inventario", "dinero", "dashboard", "comex", "impuestos",
   ]);
 
   async appInfo(): Promise<AppInfo> {
@@ -183,6 +184,22 @@ export class TauriBackend implements Backend {
   receiveImport(uid: string, lines: ImportReceiveLine[], date: string) { return call<ImportDetail>("receive_import", { uid, lines, date }); }
   closeImport(uid: string) { return call<ImportDetail>("close_import", { uid }); }
   voidImport(uid: string, reason: string) { return call<ImportDetail>("void_import", { uid, reason }); }
+
+  taxProfile() { return call<TaxProfile>("tax_profile"); }
+  saveTaxProfile(profile: TaxProfile) { return call<TaxProfile>("save_tax_profile", { profile }); }
+  f29(period: string) { return call<F29View>("f29", { period }); }
+  saveF29Inputs(period: string, inputs: F29Inputs) { return call<F29View>("save_f29_inputs", { period, inputs }); }
+  importRcv(period: string, direction: "venta" | "compra", fileName: string | null, text: string) {
+    return call<RcvImportReport>("import_rcv", { period, direction, fileName, text });
+  }
+  clearRcv(period: string, direction: "venta" | "compra") { return call<F29View>("clear_rcv", { period, direction }); }
+  addTaxDocument(period: string, input: TaxDocInput) { return call<F29View>("add_tax_document", { period, input }); }
+  deleteTaxDocument(id: number) { return call<F29View>("delete_tax_document", { id }); }
+  setTaxDocumentKind(id: number, kind: string) { return call<F29View>("set_tax_document_kind", { id, kind }); }
+  markF29Declared(period: string, declared77: number, declared91: number, folio: string | null) {
+    return call<F29View>("mark_f29_declared", { period, declared77, declared91, folio });
+  }
+  reopenF29(period: string, reason: string) { return call<F29View>("reopen_f29", { period, reason }); }
 }
 
 /** Selector de archivo del escritorio para adjuntar documentos. */

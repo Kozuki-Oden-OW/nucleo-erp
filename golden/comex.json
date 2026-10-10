@@ -215,9 +215,9 @@
       }
     },
     {
-      "nombre": "Caso real (DIN 2850015246, courier DHL con agente): estimación antes de la declaración, sin seguro contratado → seguro teórico 2 % del FOB, TLC Chile–China (arancel 0), IVA recuperable",
+      "nombre": "Caso real (DIN 2850015246, courier DHL con agente): estimación antes de la declaración, factura CPT con el flete del AWB, sin seguro contratado → seguro teórico 2 % del FOB declarado, TLC Chile–China (arancel 0), IVA recuperable",
       "estado": "caso_real",
-      "fuente": "Datos de una importación real del usuario (factura EB26CHI0529/0617-1, USD 10.382,50 + flete USD 1.750; tipo de cambio aduanero 935,57). El seguro teórico (USD 207,65) coincide con la provisión de fondos del agente; la DIN usa USD 210,70 porque la aduana recalculó el FOB (CPT − flete del AWB), por eso el valor aduanero difiere en $2.852 y el IVA estimado en $544 del real.",
+      "fuente": "Datos de una importación real del usuario (factura EB26CHI0529/0617-1: USD 10.382,50 + flete USD 1.750 = USD 12.132,50 CPT; tipo de cambio aduanero 935,57). Como hace Aduanas, el flete declarado es el del AWB (USD 1.597,48 = $1.494.535) y la diferencia pasa a la mercadería (FOB USD 10.535,02); el seguro teórico es 2 % de ese FOB (USD 210,70). Resultado: valor aduanero $11.547.930 (DIN: $11.547.928) e IVA estimado $2.194.107 (DIN: $2.194.108); las diferencias de 1–2 pesos vienen de que la DIN calcula por línea en dólares (D-F9-11).",
       "input": {
         "currency_decimals": 2,
         "rate_e6": 935570000,
@@ -284,14 +284,15 @@
             "kind": "flete",
             "amount_clp": 1637248
           }
-        ]
+        ],
+        "customs_freight_clp": 1494535
       },
       "esperado": {
-        "customs_value_clp": 11545076,
-        "notional_insurance_clp": 194271,
+        "customs_value_clp": 11547930,
+        "notional_insurance_clp": 197125,
         "duty_clp": 0,
-        "vat_clp": 2193564,
-        "recoverable_clp": 2193564,
+        "vat_clp": 2194107,
+        "recoverable_clp": 2194107,
         "landed_clp": 11350805,
         "items": [
           {

@@ -18,6 +18,8 @@ export interface LandedInput {
   vat_recoverable?: boolean;
   /** Seguro teórico (ppm de la mercadería): solo valor aduanero, no es costo. Se ignora si hay seguro. */
   notional_insurance_ppm?: number | null;
+  /** Flete del documento de transporte (AWB/BL) en pesos: la diferencia con el de la factura pasa a la mercadería. */
+  customs_freight_clp?: number | null;
   items: LandedItem[];
   costs?: LandedCost[];
 }
@@ -26,7 +28,8 @@ export interface ItemBreakdown {
   vat_clp: number; vat_in_cost_clp: number; local_clp: number; landed_clp: number; unit_cost_e4: number;
 }
 export interface LandedResult {
-  fob_minor: number; fob_clp: number; freight_clp: number; insurance_clp: number; notional_insurance_clp: number; customs_value_clp: number;
+  fob_minor: number; fob_clp: number; freight_clp: number; insurance_clp: number; notional_insurance_clp: number;
+  customs_fob_clp: number; customs_freight_clp: number; customs_value_clp: number;
   duty_clp: number; duty_entered: boolean; vat_clp: number; vat_entered: boolean; vat_in_cost_clp: number;
   recoverable_clp: number; local_clp: number; landed_clp: number; items: ItemBreakdown[]; notes: string[];
 }
@@ -117,13 +120,22 @@ export function landedCost(input: LandedInput): LandedResult {
     const basis = c.basis ?? (c.kind === "seguro" ? "valor" : input.basis);
     addTo(c.kind === "flete" ? freight : insurance, allocate(c.amount_clp, weights(basis, COST_TEXT[c.kind])));
   }
+  let customsFreight = freight.slice();
+  const cf = input.customs_freight_clp;
+  if (cf != null && cf >= 0) {
+    const w = freight.some((v) => v > 0) ? freight.map((v) => B(v)) : fob.map((v) => B(v));
+    const paid = freight.reduce((a, b) => a + b, 0);
+    if (paid !== cf) notes.push(`Valor aduanero con el flete del documento de transporte ($${cf}) en vez del de la factura ($${paid}): la diferencia se suma a la mercadería, como hace Aduanas.`);
+    customsFreight = allocate(cf, w);
+  }
+  const customsFob = fob.map((v, i) => v + freight[i]! - customsFreight[i]!);
   let notional = zeros();
   const ni = input.notional_insurance_ppm;
   if (ni != null && ni > 0) {
     if (costs.some((c) => c.kind === "seguro")) notes.push("Hay un seguro contratado: no se usó el seguro teórico.");
     else {
-      const fobTotal = fob.reduce((a, b) => a + b, 0);
-      notional = allocate(Number(divRound(B(fobTotal) * B(ni), 1_000_000n)), fob.map((v) => B(v)));
+      const fobTotal = customsFob.reduce((a, b) => a + b, 0);
+      notional = allocate(Number(divRound(B(fobTotal) * B(ni), 1_000_000n)), customsFob.map((v) => B(v)));
     }
   }
   const cv = fob.map((v, i) => v + freight[i]! + insurance[i]! + notional[i]!);
@@ -174,7 +186,8 @@ export function landedCost(input: LandedInput): LandedResult {
   const sum = (f: (x: ItemBreakdown) => number) => out.reduce((a, x) => a + f(x), 0);
   return {
     fob_minor: fobMinor, fob_clp: sum((x) => x.fob_clp), freight_clp: sum((x) => x.freight_clp), insurance_clp: sum((x) => x.insurance_clp),
-    notional_insurance_clp: sum((x) => x.notional_insurance_clp), customs_value_clp: sum((x) => x.customs_value_clp),
+    notional_insurance_clp: sum((x) => x.notional_insurance_clp),
+    customs_fob_clp: customsFob.reduce((a, b) => a + b, 0), customs_freight_clp: customsFreight.reduce((a, b) => a + b, 0), customs_value_clp: sum((x) => x.customs_value_clp),
     duty_clp: dutyEntered ? dutyLines.reduce((a, c) => a + c.amount_clp, 0) : sum((x) => x.duty_clp), duty_entered: dutyEntered,
     vat_clp: sum((x) => x.vat_clp), vat_entered: vatEntered, vat_in_cost_clp: sum((x) => x.vat_in_cost_clp),
     recoverable_clp: recoverable, local_clp: sum((x) => x.local_clp), landed_clp: sum((x) => x.landed_clp), items: out, notes,
