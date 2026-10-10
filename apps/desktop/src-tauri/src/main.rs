@@ -136,6 +136,7 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         commands::receive_import,
         commands::close_import,
         commands::void_import,
+        commands::set_business_logo,
         commands::tax_profile,
         commands::save_tax_profile,
         commands::f29,

@@ -72,7 +72,7 @@
           <ol class="howto">
             <li>Abre <strong>NucleoERPSetup.exe</strong>.</li>
             <li>Si Windows muestra <em>"Windows protegió su PC"</em>, haz clic en <strong>Más información</strong> y luego en <strong>Ejecutar de todas formas</strong>. Windows advierte con los programas nuevos hasta que acumulan descargas.</li>
-            <li>Sigue el asistente. Se instala solo para tu usuario.</li>
+            <li>Sigue el asistente. Se instala solo para tu usuario: <strong>no pide permisos de administrador</strong>.</li>
             <li>Abre NÚCLEO ERP y crea tu negocio.</li>
           </ol>
         </article>
@@ -82,6 +82,16 @@
           <div class="doc-sample">Get-FileHash .\NucleoERPSetup.exe -Algorithm SHA256</div>
           <p style="margin-top:12px">El resultado debe ser idéntico al SHA-256 publicado en esta página. Si no coincide, no lo instales.</p>
         </article>
+        <article class="card">
+          <h3>Si tu antivirus lo bloquea</h3>
+          <p>Algunos antivirus desconfían de los programas nuevos que todavía no tienen firma digital, aunque sean seguros. Estamos tramitando la firma del instalador (ver la <a href="/firma/">política de firma de código</a>). Mientras tanto:</p>
+          <ol class="howto">
+            <li>Verifica el SHA-256 como se indica arriba: si coincide, el archivo es el oficial.</li>
+            <li>Si Microsoft Defender lo bloquea, entra a <strong>Seguridad de Windows → Protección contra virus y amenazas → Historial de protección</strong>, elige NÚCLEO ERP y pulsa <strong>Permitir en el dispositivo</strong>.</li>
+            <li>En otros antivirus, agrega una excepción para <strong>NucleoERPSetup.exe</strong> y para la carpeta donde se instaló NÚCLEO ERP (dentro de <span class="mono">%LOCALAPPDATA%</span>).</li>
+            <li>Avísanos qué antivirus fue: lo reportamos como falso positivo para que deje de pasar.</li>
+          </ol>
+        </article>
       </div>
     </section>
 
@@ -90,8 +100,8 @@
         <h2>Estado del proyecto</h2>
         <p class="section-lead">Publicamos cada avance. Estas son las partes disponibles hoy y las que vienen.</p>
         <dl class="kv">
-          <dt>Disponible</dt><dd>Crear negocios (perfiles Emprendedor, Negocio y Empresa), clientes con validación de RUT y búsqueda, base cifrada, respaldos cifrados y verificados, auditoría de cambios.</dd>
-          <dt>En construcción</dt><dd>Productos e inventario, cotizaciones y ventas, compras, dinero (cobros, pagos, flujo de caja), importaciones y exportaciones, reportes.</dd>
+          <dt>Disponible</dt><dd>Negocios con perfiles Emprendedor, Negocio y Empresa, clientes y proveedores, productos e inventario con kárdex, cotizaciones y ventas, órdenes de compra y compras, dinero (cobros, pagos, gastos y flujo de caja), importaciones con costo puesto en bodega, borrador del F29, base y respaldos cifrados y auditoría de cambios.</dd>
+          <dt>En construcción</dt><dd>Sueldo empresarial y remuneraciones, renta anual (F22), contabilidad y reportes.</dd>
           <dt>Después</dt><dd>Promociones, planificación de compras, análisis de proveedores, fidelización de clientes, punto de venta.</dd>
         </dl>
       </div>
@@ -104,6 +114,7 @@
       <nav aria-label="Pie de página">
         <a href="/">Inicio</a>
         <a href="/privacidad/">Privacidad</a>
+        <a href="/firma/">Firma de código</a>
         {{REPO_FOOTER_LINK}}
       </nav>
     </div>

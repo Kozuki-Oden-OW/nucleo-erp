@@ -30,9 +30,11 @@
     "active": true,
     "targets": ["nsis"],
     "publisher": "NÚCLEO ERP",
+    "homepage": "https://www.nucleoerp.cl",
     "copyright": "NÚCLEO ERP — software libre bajo AGPL-3.0-or-later",
     "category": "Business",
     "shortDescription": "Todo tu negocio. Un solo núcleo. Privado, local y gratuito.",
+    "longDescription": "NÚCLEO ERP: gestión de ventas, compras, inventario, dinero, importaciones e impuestos para emprendedores y pymes chilenas. Los datos se guardan cifrados en el computador.",
     "license": "AGPL-3.0-or-later",
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
     "windows": {

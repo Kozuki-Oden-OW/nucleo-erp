@@ -32,7 +32,7 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> 
 function businessPatch(p: Partial<BusinessSettings>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(p)) {
-    if (k === "tax_rate_ppm" || k === "tax_rule_source") continue;
+    if (k === "tax_rate_ppm" || k === "tax_rule_source" || k === "logo") continue;
     if (k === "tax_rate_user_ppm") { out[k] = v ?? 0; continue; }
     out[k] = v === null ? "" : v;
   }
@@ -63,6 +63,7 @@ export class TauriBackend implements Backend {
   addCustomer(input: NewCustomer) { return call<Customer>("add_customer", { input }); }
   business() { return call<BusinessSettings>("business"); }
   updateBusiness(patch: Partial<BusinessSettings>) { return call<BusinessSettings>("update_business", { patch: businessPatch(patch) }); }
+  setBusinessLogo(logo: string | null) { return call<BusinessSettings>("set_business_logo", { logo }); }
   security() { return call<SecuritySettings>("security"); }
   updateSecurity(settings: SecuritySettings) { return call<SecuritySettings>("update_security", { settings }); }
   globalSearch(query: string) { return call<SearchHit[]>("global_search", { query }); }

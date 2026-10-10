@@ -237,6 +237,14 @@ pub fn update_business(
 }
 
 #[tauri::command]
+pub fn set_business_logo(
+    state: State<'_, AppState>,
+    logo: Option<String>,
+) -> CmdResult<BusinessSettings> {
+    with_session(&state, |s| Ok(s.set_business_logo(logo.as_deref())?))
+}
+
+#[tauri::command]
 pub fn security(state: State<'_, AppState>) -> CmdResult<SecuritySettings> {
     with_session(&state, |s| Ok(s.security()?))
 }

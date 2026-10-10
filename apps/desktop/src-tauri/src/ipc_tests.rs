@@ -581,3 +581,27 @@ fn f29_por_ipc() {
     assert_eq!(v["sources"][0]["source"], "nucleo");
     assert_eq!(ipc.ok("tax_profile", json!({}))["ppm_rate_ppm"], 2500);
 }
+
+#[test]
+fn logo_del_negocio_por_ipc() {
+    let ipc = Ipc::new();
+    let created = ipc.ok(
+        "create_company",
+        json!({ "name": "Con logo", "profile": "negocio" }),
+    );
+    ipc.ok("open_company", json!({ "uid": created["company"]["uid"] }));
+    // PNG mínimo de 1×1 píxel.
+    let png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    let b = ipc.ok("set_business_logo", json!({ "logo": png }));
+    assert_eq!(b["logo"], png);
+    assert_eq!(ipc.ok("business", json!({}))["logo"], png);
+    let err = ipc
+        .call(
+            "set_business_logo",
+            json!({ "logo": "data:image/png;base64,PHN2Zz4=" }),
+        )
+        .unwrap_err();
+    assert!(err.to_string().contains("PNG"), "{err}");
+    let b = ipc.ok("set_business_logo", json!({ "logo": null }));
+    assert!(b["logo"].is_null());
+}

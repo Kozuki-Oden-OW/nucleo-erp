@@ -49,6 +49,8 @@ export interface Backend {
   business(): Promise<BusinessSettings>;
   /** Campos de texto: cadena vacía = borrar el dato. */
   updateBusiness(patch: Partial<BusinessSettings>): Promise<BusinessSettings>;
+  /** Guarda o quita (null) el logo del negocio. */
+  setBusinessLogo(logo: string | null): Promise<BusinessSettings>;
   globalSearch(query: string): Promise<SearchHit[]>;
   /** Valor normativo vigente (paquete cargado), o null si no hay uno con fuente. */
   ruleValue(code: string): Promise<{ value: number; source: string } | null>;

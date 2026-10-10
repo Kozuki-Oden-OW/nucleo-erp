@@ -10,6 +10,7 @@ import { Button, Card, Field, Notice, PageHeader, Spinner, TextArea } from "../.
 import { Dialog, useToast } from "../../ui/overlay";
 import { AttachmentsPanel } from "../documentos/Documents";
 import { PoStatusBadge } from "./common";
+import { PrintIssuer } from "../ventas/PrintDoc";
 
 export function PoView({ uid }: { uid: string }) {
   const backend = useBackend();
@@ -173,12 +174,7 @@ function PrintPo({ o, biz, preview = false }: { o: PurchaseOrderDetail; biz: Bus
   return (
     <article className={`${preview ? "block" : "hidden print:block"} bg-white p-2 text-[12px] leading-snug text-black`} aria-hidden={!preview}>
       <header className="flex items-start justify-between gap-6 border-b-2 border-black pb-3">
-        <div>
-          <div className="text-[16px] font-bold">{biz?.legal_name || biz?.name || "Mi negocio"}</div>
-          {biz?.rut && <div>RUT {biz.rut}</div>}
-          {biz?.address && <div>{biz.address}</div>}
-          {(biz?.phone || biz?.email) && <div>{[biz?.phone, biz?.email].filter(Boolean).join(" · ")}</div>}
-        </div>
+        <PrintIssuer biz={biz} activity={false} />
         <div className="min-w-[220px] border-2 border-black p-3 text-center">
           <div className="text-[15px] font-bold tracking-wide">ORDEN DE COMPRA</div>
           <div className="mt-1 font-mono text-[14px] font-bold">{o.number}</div>

@@ -42,6 +42,8 @@ pub struct BusinessSettings {
     pub tax_rule_source: Option<String>,
     /// Tasa anotada por el usuario (D-F5-02), aunque un paquete normativo tenga prioridad.
     pub tax_rate_user_ppm: Option<i64>,
+    /// Logo del negocio como imagen `data:` (PNG, JPEG o WebP), para la interfaz y los documentos.
+    pub logo: Option<String>,
 }
 
 /// Cambios a los datos del negocio. `None` = no cambia; texto vacío = borrar el dato.
@@ -111,6 +113,70 @@ pub struct EntityRef {
 }
 
 const MAX_TEXT: usize = 300;
+
+const LOGO_KEY: &str = "negocio.logo";
+const LOGO_MAX_BYTES: usize = 400 * 1024;
+
+fn b64_decode(s: &str) -> Option<Vec<u8>> {
+    let val = |c: u8| -> Option<u32> {
+        Some(match c {
+            b'A'..=b'Z' => c - b'A',
+            b'a'..=b'z' => c - b'a' + 26,
+            b'0'..=b'9' => c - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            _ => return None,
+        } as u32)
+    };
+    let bytes: Vec<u8> = s.bytes().filter(|c| !c.is_ascii_whitespace()).collect();
+    let body = bytes
+        .strip_suffix(b"==")
+        .or_else(|| bytes.strip_suffix(b"="))
+        .unwrap_or(&bytes);
+    let mut out = Vec::with_capacity(body.len() * 3 / 4);
+    for chunk in body.chunks(4) {
+        let mut acc = 0u32;
+        for (i, c) in chunk.iter().enumerate() {
+            acc |= val(*c)? << (18 - 6 * i);
+        }
+        let n = match chunk.len() {
+            4 => 3,
+            3 => 2,
+            2 => 1,
+            _ => return None,
+        };
+        for i in 0..n {
+            out.push((acc >> (16 - 8 * i)) as u8);
+        }
+    }
+    Some(out)
+}
+
+/// Valida que el logo sea una imagen PNG, JPEG o WebP real y de tamaño razonable.
+fn validate_logo(d: &str) -> AppResult<String> {
+    let bad = || AppError::Validation("el logo debe ser una imagen PNG, JPG o WebP".into());
+    let (head, data) = d.split_once(',').ok_or_else(bad)?;
+    let mime = head
+        .strip_prefix("data:")
+        .and_then(|h| h.strip_suffix(";base64"))
+        .ok_or_else(bad)?;
+    let bytes = b64_decode(data).ok_or_else(bad)?;
+    if bytes.len() > LOGO_MAX_BYTES {
+        return Err(AppError::Validation(
+            "el logo es demasiado grande (máximo 400 KB)".into(),
+        ));
+    }
+    let ok = match mime {
+        "image/png" => bytes.starts_with(b"\x89PNG\r\n\x1a\n"),
+        "image/jpeg" => bytes.starts_with(&[0xFF, 0xD8, 0xFF]),
+        "image/webp" => bytes.len() > 12 && &bytes[..4] == b"RIFF" && &bytes[8..12] == b"WEBP",
+        _ => false,
+    };
+    if !ok {
+        return Err(bad());
+    }
+    Ok(format!("data:{mime};base64,{}", data.trim()))
+}
 
 fn clean(v: &Option<String>) -> Option<String> {
     v.as_ref()
@@ -407,7 +473,42 @@ impl CompanySession {
             tax_rate_ppm: rule.as_ref().map(|r| r.0),
             tax_rule_source: rule.map(|r| r.1),
             tax_rate_user_ppm: user_rate,
+            logo: dbcore::get_setting(self.db.conn(), LOGO_KEY)?
+                .and_then(|v| v.as_str().map(String::from)),
         })
+    }
+
+    /// Guarda (o quita, con `None`) el logo del negocio. Acepta una imagen `data:` PNG, JPEG o
+    /// WebP de hasta 400 KB; la interfaz la reduce antes de enviarla.
+    pub fn set_business_logo(&mut self, data_url: Option<&str>) -> AppResult<BusinessSettings> {
+        let user = self.require("config.editar")?.username.clone();
+        let logo = match data_url.map(str::trim).filter(|s| !s.is_empty()) {
+            Some(d) => Some(validate_logo(d)?),
+            None => None,
+        };
+        let tx = self.db.conn_mut().transaction()?;
+        match &logo {
+            Some(d) => dbcore::set_setting(&tx, LOGO_KEY, &serde_json::Value::String(d.clone()))?,
+            None => {
+                tx.execute("DELETE FROM settings WHERE key = ?1", [LOGO_KEY])?;
+            }
+        }
+        audit::append(
+            &tx,
+            &AuditEntry {
+                user_name: &user,
+                action: if logo.is_some() { "negocio.logo" } else { "negocio.logo_quitar" },
+                entity: "negocio",
+                entity_id: Some(&self.uid),
+                after_json: Some(
+                    serde_json::json!({ "texto": if logo.is_some() { "Cambió el logo del negocio" } else { "Quitó el logo del negocio" } })
+                        .to_string(),
+                ),
+                ..Default::default()
+            },
+        )?;
+        tx.commit()?;
+        self.business()
     }
 
     /// Actualiza los datos del negocio. Devuelve los nuevos datos; quien llama actualiza además
@@ -487,8 +588,16 @@ impl CompanySession {
                 action: "negocio.editar",
                 entity: "negocio",
                 entity_id: Some(&self.uid),
-                before_json: serde_json::to_string(&before).ok(),
-                after_json: serde_json::to_string(&b).ok(),
+                before_json: serde_json::to_string(&BusinessSettings {
+                    logo: None,
+                    ..before.clone()
+                })
+                .ok(),
+                after_json: serde_json::to_string(&BusinessSettings {
+                    logo: None,
+                    ..b.clone()
+                })
+                .ok(),
                 ..Default::default()
             },
         )?;

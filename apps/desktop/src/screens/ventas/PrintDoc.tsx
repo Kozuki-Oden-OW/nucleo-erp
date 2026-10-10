@@ -8,6 +8,22 @@ import { Dialog } from "../../ui/overlay";
 import { formatDate, formatMoney, formatPpm, formatQty } from "../../lib/format";
 
 export const INTERNAL_LEGEND = "DOCUMENTO INTERNO — NO TRIBUTARIO";
+
+/** Datos y logo del negocio en el encabezado de los documentos imprimibles. */
+export function PrintIssuer({ biz, activity = true }: { biz: BusinessSettings | null; activity?: boolean }) {
+  return (
+    <div className="flex items-start gap-4">
+      {biz?.logo && <img src={biz.logo} alt="" className="max-h-16 max-w-[160px] object-contain" />}
+      <div>
+        <div className="text-[16px] font-bold">{biz?.legal_name || biz?.name || "Mi negocio"}</div>
+        {biz?.rut && <div>RUT {biz.rut}</div>}
+        {activity && biz?.activity && <div>{biz.activity}</div>}
+        {biz?.address && <div>{biz.address}</div>}
+        {(biz?.phone || biz?.email) && <div>{[biz?.phone, biz?.email].filter(Boolean).join(" · ")}</div>}
+      </div>
+    </div>
+  );
+}
 const PRINT_TITLE = { COT: "COTIZACIÓN", VEN: "COMPROBANTE DE VENTA", FV: "FACTURA INTERNA" } as const;
 
 type Props = { kind: "COT" | "VEN" | "FV"; doc: QuoteDetail | SaleDetail; biz: BusinessSettings | null };
@@ -35,13 +51,7 @@ export function PrintDoc({ kind, doc, biz, preview = false }: Props & { preview?
   return (
     <article className={`${preview ? "block" : "hidden print:block"} bg-white p-2 text-[12px] leading-snug text-black`} aria-hidden={!preview}>
       <header className="flex items-start justify-between gap-6 border-b-2 border-black pb-3">
-        <div>
-          <div className="text-[16px] font-bold">{biz?.legal_name || biz?.name || "Mi negocio"}</div>
-          {biz?.rut && <div>RUT {biz.rut}</div>}
-          {biz?.activity && <div>{biz.activity}</div>}
-          {biz?.address && <div>{biz.address}</div>}
-          {(biz?.phone || biz?.email) && <div>{[biz?.phone, biz?.email].filter(Boolean).join(" · ")}</div>}
-        </div>
+        <PrintIssuer biz={biz} />
         <div className="min-w-[220px] border-2 border-black p-3 text-center">
           <div className="text-[15px] font-bold tracking-wide">{PRINT_TITLE[kind]}</div>
           <div className="mt-1 font-mono text-[14px] font-bold">{doc.number}</div>

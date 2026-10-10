@@ -2,6 +2,18 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [Sin publicar] — Logo del negocio y firma del instalador
+
+### Agregado
+- Logo del negocio en Configuración → Mi negocio: se reduce solo, aparece en el menú y en las
+  cotizaciones, comprobantes de venta y órdenes de compra impresas (y en las liquidaciones cuando
+  existan). Se valida que sea una imagen PNG, JPG o WebP real de hasta 400 KB.
+- Sitio: página "Política de firma de código" (`/firma/`) y ayuda en la descarga para cuando un
+  antivirus bloquea el instalador; estado del proyecto actualizado.
+- Publicación: firma opcional del instalador con SignPath (se activa con una variable y un secreto
+  del repositorio) y verificación de la firma antes de publicar. Guía en `docs/FIRMA_CODIGO.md`.
+- Instalador: sitio web y descripción en sus propiedades.
+
 ## [Sin publicar] — Fase 10, hito A: borrador del F29
 
 ### Agregado

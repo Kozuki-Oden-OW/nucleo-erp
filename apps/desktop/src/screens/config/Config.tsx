@@ -10,6 +10,7 @@ import { useToast } from "../../ui/overlay";
 import { useSession } from "../../lib/session";
 import { CurrenciesSection, NumberingSection, SecuritySection } from "./Catalogs";
 import { UsersSection } from "./Users";
+import { LogoCard } from "./LogoCard";
 
 type Section = "negocio" | "usuarios" | "numeracion" | "monedas" | "respaldos" | "seguridad" | "apariencia";
 const SECTIONS: { id: Section; label: string; icon: typeof Building2; feature?: string }[] = [
@@ -111,6 +112,7 @@ function BusinessSection({ onChanged }: { onChanged: () => void }) {
           <Field label="Correo" optional value={b.email ?? ""} onChange={(e) => set({ email: e.target.value || null })} />
         </div>
       </Card>
+      <LogoCard biz={b} editable={editable} onChange={(nb) => { setB({ ...b, logo: nb.logo }); onChanged(); }} />
       <Card title="Documentación tributaria e impuestos" subtitle="NÚCLEO no es un sistema tributario: no emite ni envía nada. Solo te recuerda y calcula referencias.">
         <div className="flex flex-col gap-4">
           <Checkbox

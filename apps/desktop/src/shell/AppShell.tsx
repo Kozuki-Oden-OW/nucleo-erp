@@ -72,6 +72,15 @@ export function AppShell({
     backend.dashboard().then(setAlerts).catch(() => setAlerts(null));
   }, [backend, route.raw]);
 
+  // Logo del negocio en el menú (se refresca al navegar, por ejemplo después de cambiarlo).
+  const [logo, setLogo] = useState<string | null>(null);
+  useEffect(() => {
+    const load = () => { backend.business().then((b) => setLogo(b.logo ?? null)).catch(() => setLogo(null)); };
+    load();
+    window.addEventListener("nucleo:logo", load);
+    return () => window.removeEventListener("nucleo:logo", load);
+  }, [backend, session.company.uid]);
+
   const alertCount = (alerts?.pending_documentation ?? 0) + (alerts?.low_stock.length ?? 0) + (alerts?.receivable_overdue_minor ? 1 : 0);
 
   const navButton = (n: NavItem) => {
@@ -113,6 +122,7 @@ export function AppShell({
             </div>
             {!collapsed && (
               <>
+                {logo && <img src={logo} alt={`Logo de ${session.company.name}`} className="mt-3 max-h-12 max-w-full object-contain" />}
                 <select
                   aria-label="Negocio activo"
                   className="mt-3 h-9 w-full rounded-lg border border-line bg-surface-2 px-2 text-sm font-medium text-ink"

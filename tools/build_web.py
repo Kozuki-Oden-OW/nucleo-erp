@@ -84,6 +84,7 @@ def main() -> int:
     values["REPO_TEXT"] = (f'<a href="{html.escape(repo)}">Ver el código fuente</a>.' if repo
                            else "El código se publicará junto con la primera versión.")
     values["REPO_FOOTER_LINK"] = f'<a href="{html.escape(repo)}">Código fuente</a>' if repo else ""
+    values["REPO_URL"] = html.escape(repo or "https://github.com/")
     donation = cfg.get("donation_url", "").strip()
     values["DONATION_TEXT"] = (f'<a href="{html.escape(donation)}">apoyar NÚCLEO</a>.' if donation
                                else "muy pronto publicaremos cómo hacerlo.")

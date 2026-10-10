@@ -121,6 +121,8 @@ export interface BusinessSettings {
   tax_rule_source: string | null;
   /** Tasa anotada por el usuario (se usa si no hay paquete normativo). */
   tax_rate_user_ppm: number | null;
+  /** Logo del negocio (imagen data: PNG, JPG o WebP) para la interfaz y los documentos. */
+  logo: string | null;
 }
 
 /* ───── Maestros ───── */

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Política de firma de código — NÚCLEO ERP</title>
+  <meta name="description" content="Cómo se firman los instaladores de NÚCLEO ERP, quiénes aprueban cada versión y cómo verificar que el archivo es auténtico.">
+  <link rel="canonical" href="{{SITE_URL}}/firma/">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="stylesheet" href="/assets/site.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <a class="brand" href="/"><img src="/assets/simbolo-96.png" alt="" width="34" height="34"><span>NÚCLEO <b>ERP</b></span></a>
+      <a class="btn btn-primary btn-sm" style="margin-left:auto" href="/descargar/">Descargar gratis</a>
+    </div>
+  </header>
+  <main class="wrap">
+    <div class="prose">
+      <p class="eyebrow">Code signing policy</p>
+      <h1>Política de firma de código</h1>
+      <p>Última actualización: 10 de octubre de 2026.</p>
+
+      <p>Los instaladores de NÚCLEO ERP para Windows se compilan automáticamente desde el código fuente público del
+        <a href="{{REPO_URL}}">repositorio oficial</a> con GitHub Actions. Ninguna persona compila ni modifica el instalador a mano.</p>
+
+      <h2>Firma</h2>
+      <p>Hemos solicitado firmar los instaladores con un certificado de firma de código gratuito para proyectos de código abierto:
+        el servicio de firma lo provee <a href="https://signpath.io">SignPath.io</a> y el certificado, la <a href="https://signpath.org">SignPath Foundation</a>.
+        Mientras la solicitud se aprueba, las versiones se publican sin firma y con su huella SHA-256 en la <a href="/descargar/">página de descarga</a>.
+        Cuando la firma esté activa, cada versión firmada lo indicará en sus notas de publicación.</p>
+
+      <h2>Equipo y roles</h2>
+      <ul>
+        <li><strong>Autores</strong> (pueden modificar el código): <a href="https://github.com/Kozuki-Oden-OW">Kozuki-Oden-OW</a>.</li>
+        <li><strong>Revisores</strong> (revisan los cambios de personas externas antes de integrarlos): <a href="https://github.com/Kozuki-Oden-OW">Kozuki-Oden-OW</a>.</li>
+        <li><strong>Aprobadores</strong> (aprueban cada solicitud de firma de una versión): <a href="https://github.com/Kozuki-Oden-OW">Kozuki-Oden-OW</a>.</li>
+      </ul>
+      <p>Todas las cuentas del equipo usan autenticación de dos factores. Cada versión se aprueba manualmente antes de firmarse.</p>
+
+      <h2>Qué se firma</h2>
+      <ul>
+        <li>Solo los instaladores de NÚCLEO ERP construidos desde este repositorio, con nombre de producto y versión en sus propiedades.</li>
+        <li>No se firman programas de terceros. Las bibliotecas de código abierto que NÚCLEO usa se incluyen tal como las publican sus autores.</li>
+      </ul>
+
+      <h2>Privacidad</h2>
+      <p>Este programa no transfiere ninguna información a otros sistemas en red a menos que el usuario o la persona que lo instala lo solicite expresamente.
+        Detalles en la <a href="/privacidad/">política de privacidad</a>.</p>
+
+      <h2>Cómo verificar tu descarga</h2>
+      <ol>
+        <li>Descárgalo solo desde <a href="/descargar/">www.nucleoerp.cl/descargar</a> o desde las versiones del repositorio.</li>
+        <li>Compara su SHA-256 con el publicado: en PowerShell, <code>Get-FileHash .\NucleoERPSetup.exe -Algorithm SHA256</code>.</li>
+        <li>Cuando esté firmado: clic derecho en el archivo → Propiedades → Firmas digitales.</li>
+      </ol>
+
+      <h2>Reportar un problema</h2>
+      <p>Si un antivirus marca el instalador oficial o crees que un archivo fue alterado, avísanos en el repositorio (sección Issues). {{CONTACT_TEXT}}</p>
+    </div>
+  </main>
+  <footer>
+    <div class="wrap">
+      <div>© 2026 NÚCLEO ERP · Software libre bajo licencia AGPL-3.0</div>
+      <nav aria-label="Pie de página"><a href="/">Inicio</a><a href="/descargar/">Descargar</a><a href="/privacidad/">Privacidad</a></nav>
+    </div>
+  </footer>
+</body>
+</html>

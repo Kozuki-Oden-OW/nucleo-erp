@@ -135,7 +135,7 @@ export class DemoBackend implements Backend {
     this.biz = {
       name: DEMO_COMPANY, profile: "empresa", rut: "76.543.210-3", legal_name: "Comercial Los Andes SpA (ficticia)",
       activity: "Venta al por menor de artículos de ferretería", address: "Av. Ejemplo 1234, Puerto Ejemplo", phone: "+56 9 5555 0000",
-      email: "contacto@ejemplo.cl", documentation_reminder: true, tax_enabled: true, tax_rate_ppm: TAX_PPM, tax_rule_source: TAX_SOURCE, tax_rate_user_ppm: null,
+      email: "contacto@ejemplo.cl", documentation_reminder: true, tax_enabled: true, tax_rate_ppm: TAX_PPM, tax_rule_source: TAX_SOURCE, tax_rate_user_ppm: null, logo: null,
     };
     this.seed();
     this.seedInventory();
@@ -393,8 +393,16 @@ export class DemoBackend implements Backend {
   async updateBusiness(patch: Partial<BusinessSettings>): Promise<BusinessSettings> {
     this.require("config.editar");
     if (patch.name !== undefined && !patch.name.trim()) throw new AppError("nombre", "El nombre del negocio no puede quedar vacío.");
-    this.biz = { ...this.biz, ...patch };
+    this.biz = { ...this.biz, ...patch, logo: this.biz.logo };
     this.log("negocio.editar", "negocio", null);
+    return wait(this.biz);
+  }
+  async setBusinessLogo(logo: string | null): Promise<BusinessSettings> {
+    this.require("config.editar");
+    if (logo !== null && !/^data:image\/(png|jpeg|webp);base64,/.test(logo)) throw new AppError("validacion", "El logo debe ser una imagen PNG, JPG o WebP.");
+    if (logo !== null && logo.length > 560_000) throw new AppError("validacion", "El logo es demasiado grande (máximo 400 KB).");
+    this.biz = { ...this.biz, logo };
+    this.log(logo ? "negocio.logo" : "negocio.logo_quitar", "negocio", null);
     return wait(this.biz);
   }
   async ruleValue(code: string): Promise<{ value: number; source: string } | null> {

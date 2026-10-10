@@ -2,6 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>{{SITE_URL}}/</loc><lastmod>{{BUILD_DATE}}</lastmod></url>
   <url><loc>{{SITE_URL}}/descargar/</loc><lastmod>{{BUILD_DATE}}</lastmod></url>
+  <url><loc>{{SITE_URL}}/firma/</loc><lastmod>{{BUILD_DATE}}</lastmod></url>
   <url><loc>{{SITE_URL}}/privacidad/</loc><lastmod>{{BUILD_DATE}}</lastmod></url>
   <url><loc>{{SITE_URL}}/demo/</loc><lastmod>{{BUILD_DATE}}</lastmod></url>
 </urlset>

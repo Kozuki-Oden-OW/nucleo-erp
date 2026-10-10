@@ -177,6 +177,8 @@ informativo, sin renta guiada · D-11 promociones no acumulables por defecto · 
 | D-F10-03 | Impuesto único (48), retención de honorarios (151) y otras retenciones se ingresan a mano hasta que existan remuneraciones y boletas de honorarios en NÚCLEO | Alcance del hito A; el sueldo empresarial alimentará el código 48 en el hito de remuneraciones |
 | D-F10-04 | "Ya lo declaré" guarda lo declarado en sii.cl (total, remanente, folio) y bloquea el borrador; el remanente declarado se propone el mes siguiente y se reajusta con la variación de la UTM | El remanente real puede diferir del borrador; reabrir exige motivo y queda en la auditoría |
 | D-F10-05 | Orden de la Fase 10: A) F29; B) sueldo empresarial y remuneraciones (liquidación, cotizaciones, Previred, LRE; impuesto único al F29); C) F22 Pro Pyme general (14 D N°3) y luego transparente y 14 A | Pedido del usuario: Pro Pyme general, solo el dueño con sueldo empresarial, todos los regímenes a futuro |
+| D-F10-06 | Logo del negocio guardado en la base cifrada como imagen `data:` (PNG/JPEG/WebP ≤ 400 KB, verificando la firma del archivo), reducido en el computador antes de guardarse; sin SVG | Identidad del negocio en menú y documentos sin depender de archivos externos; SVG puede contener código |
+| D-REL-01 | Firma del instalador con SignPath Foundation (gratis para código abierto) integrada en `release.yml` y opcional hasta que se apruebe; Azure Artifact Signing no está disponible para Chile y EV ya no evita SmartScreen | Reducir bloqueos de antivirus y SmartScreen sin costo; ver `docs/FIRMA_CODIGO.md` |
 
 ## Dependencias y su justificación
 
