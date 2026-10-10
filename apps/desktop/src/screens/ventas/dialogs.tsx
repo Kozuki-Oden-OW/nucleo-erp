@@ -3,6 +3,8 @@ import { useState } from "react";
 import { BadgeCheck, Ban, CreditCard, HandCoins } from "lucide-react";
 import { useBackend, errorMessage, type SaleDetail } from "../../data";
 import { EXTERNAL_DOC_KINDS, PAYMENT_METHODS } from "../../data/catalogs";
+import { methodLabel, paymentText } from "../../data/saleTerms";
+import { formatDate } from "../../lib/format";
 import { addDays, formatMoney, todayIso } from "../../lib/format";
 import { MoneyField } from "../../ui/doc";
 import { Button, Field, Notice, Segmented, Select, TextArea } from "../../ui/kit";
@@ -14,10 +16,12 @@ type Done = (s: SaleDetail) => void;
 export function EffectDialog({ sale, open, onClose, onDone }: { sale: SaleDetail; open: boolean; onClose: () => void; onDone: Done }) {
   const backend = useBackend();
   const toast = useToast();
-  const [mode, setMode] = useState<"contado" | "credito">("contado");
-  const [method, setMethod] = useState(PAYMENT_METHODS[0]!);
+  // Lo que se anotó en la forma de pago del documento llega ya elegido.
+  const t = sale.terms;
+  const [mode, setMode] = useState<"contado" | "credito">(t?.payment === "credito" ? "credito" : "contado");
+  const [method, setMethod] = useState(methodLabel(t) ?? PAYMENT_METHODS[0]!);
   const [account, setAccount] = useState("");
-  const [due, setDue] = useState(addDays(todayIso(), 30));
+  const [due, setDue] = useState(t?.payment === "credito" && t.due_date ? t.due_date : addDays(todayIso(), 30));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   async function go() {
@@ -43,6 +47,7 @@ export function EffectDialog({ sale, open, onClose, onDone }: { sale: SaleDetail
         <div className="rounded-lg bg-surface-2 px-4 py-3 text-sm">
           <div className="flex justify-between"><span className="text-muted">{sale.number} · {sale.customer_name}</span><span className="num font-semibold text-ink">{formatMoney(sale.total_minor)}</span></div>
         </div>
+        {t?.payment && <p className="text-sm text-muted">Forma de pago anotada en el documento: <strong className="text-ink">{paymentText(t, formatDate)}</strong>. Puedes cambiarla aquí.</p>}
         <div className="flex flex-col gap-1.5">
           <span className="text-[13px] font-medium text-ink">¿Cómo te paga?</span>
           <Segmented label="Forma de pago" value={mode} onChange={setMode} options={[{ value: "contado", label: "Al contado", icon: HandCoins }, { value: "credito", label: "A crédito", icon: CreditCard }]} />

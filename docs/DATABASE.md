@@ -48,6 +48,8 @@ Todo es entero: las sumas y los reportes se hacen en SQL sin perder exactitud y 
 | 19 | `0019_comex_flete_documento.sql` | Flete según el documento de transporte (`imports.transport_freight_minor`), solo para el valor aduanero |
 | 20 | `0020_remuneraciones.sql` | Personas (`workers`, condiciones en `terms_json`), indicadores del mes (`payroll_indicators`), liquidaciones (`payslips`, foto congelada al emitir, una vigente por persona y mes) y permiso `remuneraciones.editar` |
 | 21 | `0021_renta_f22.sql` | Datos del borrador del F22 por año comercial (`f22_years.inputs_json`: tasa, 14 E, saldos del F22 anterior, ajustes por código, factores de reajuste de los PPM) |
+| 22 | `0022_categorias_costo.sql` | `categories.uid` y `created_at`, nombre único entre las activas, conjunto inicial de seis categorías (solo si no hay ninguna) y `products.cost_sheet_json` (hoja del costo avanzado) |
+| 23 | `0023_ficha_cliente_condiciones_venta.sql` | `customers.region`, `contact_name`, `invoice_email` y `sales.terms_json` (forma de pago, referencias y receptor del documento) |
 
 Las migraciones son transaccionales y versionadas con `PRAGMA user_version`. **Pre-1.0:** se pueden
 reescribir (en la Fase 2 se reemplazó la tabla mínima de clientes de la Fase 1); desde la primera beta

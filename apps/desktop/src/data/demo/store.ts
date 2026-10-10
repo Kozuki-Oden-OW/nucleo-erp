@@ -14,7 +14,7 @@ import type {
   BuyLineInput, NewSupplier, PoLine, PoStatus, PurchaseDetail, PurchaseInput, PurchaseLine, PurchaseOrderInput, PurchaseSummary, ReceiveLine, Supplier, SupplierDetail, QuoteDetail,
   QuoteInput, QuoteStatus, QuoteSummary, RateRow, RoleRow, SaleDetail, SaleDocType, SaleInput, SaleSummary, SearchHit,
   SecuritySettings, SequenceRow, SessionInfo, Totals, UserPatch, UserRow,
-  Report, ReportDef, ReportParams,
+  Report, ReportDef, ReportParams, SaleTerms,
   AccountInput, AccountKind, CalendarItem, DueRow, ExpenseCategory, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow,
   MoneyAccount, MoneyOverview, MoneyTransferInput, Recurring, RecurringInput,
   EtaChange, ImportCostInput, ImportDetail, ImportInput, ImportItemRow, ImportReceiveLine, ImportStage, ImportSummary, IncotermDef, StageChange, TransportMode,
@@ -26,7 +26,8 @@ import { DEMO_PERMISSIONS, DEMO_ROLES } from "./roles";
 import { CURRENCY_DIGITS, addDays, daysBetween, todayIso } from "../../lib/format";
 import { computeCostSheet, costSheetUsed, type CostSheet } from "../costing";
 import { REPORT_DEFS, buildReport, reportCatalog, type Facts } from "./reports";
-import { CUSTOMER_NAMES, DEMO_COMPANY, DEMO_PRODUCT_CATEGORIES, PAYMENT_METHODS, PRODUCT_ROWS, SUPPLIER_NAMES, rng, rutDv } from "./seed";
+import { normalizeTerms } from "../saleTerms";
+import { CUSTOMER_NAMES, DEMO_ACTIVITIES, DEMO_COMMUNES, DEMO_COMPANY, DEMO_PRODUCT_CATEGORIES, DEMO_STREETS, EMPTY_PROFILE, PAYMENT_METHODS, PRODUCT_ROWS, SUPPLIER_NAMES, rng, rutDv } from "./seed";
 import reglas from "./reglas-demo.json";
 import { MANUAL_CODES, computeF29, type F29Note, type PurchaseKind } from "../f29";
 import indicadoresDemo from "./indicadores-demo.json";
@@ -50,7 +51,7 @@ interface SaleRec {
   commercial_state: SaleDetail["commercial_state"]; documentation_state: SaleDetail["documentation_state"];
   lines: Line[]; totals: Totals; cost_minor: number; payment_method: string | null; notes: string | null;
   quote_uid: string | null; payments: Payment[]; external_ref: ExternalRef | null; void_reason: string | null;
-  timeline: { at: string; text: string }[];
+  timeline: { at: string; text: string }[]; terms: SaleTerms | null;
 }
 interface PoRec {
   uid: string; number: string; supplier_uid: string; issue_date: string; expected_date: string | null; status: PoStatus;
@@ -197,6 +198,11 @@ export class DemoBackend implements Backend {
         email: r() < 0.6 ? `${norm(name).replace(/[^a-z]+/g, ".").replace(/^\.|\.$/g, "")}@ejemplo.cl` : null,
         phone: r() < 0.7 ? `+56 9 ${Math.floor(1000 + r() * 8999)} ${Math.floor(1000 + r() * 8999)}` : null,
         created_at: "2026-01-10T12:00:00Z",
+        ...EMPTY_PROFILE,
+        ...(company ? {
+          kind: "empresa" as const, business_activity: pick(DEMO_ACTIVITIES), address: `${pick(DEMO_STREETS)} ${100 + Math.floor(r() * 2900)}`,
+          commune: pick(DEMO_COMMUNES), city: "Santiago", region: "Metropolitana", payment_terms_days: r() < 0.5 ? 30 : 0,
+        } : {}),
       });
     });
     for (const [name] of DEMO_PRODUCT_CATEGORIES) this.pcats.push({ uid: uid("cat"), name, product_count: 0 });
@@ -331,7 +337,7 @@ export class DemoBackend implements Backend {
     return {
       uid: uid("ven"), doc_type: doc, number: this.next(doc), customer_uid, issue_date: date, due_date: null, commercial_state: "borrador",
       documentation_state: "no_aplica", lines, totals: computeTotals(input, this.taxPpm()), cost_minor: 0, payment_method: null, notes: null,
-      quote_uid, payments: [], external_ref: null, void_reason: null, timeline: [{ at: `${date}T12:00:00Z`, text: "Creada como borrador" }],
+      quote_uid, payments: [], external_ref: null, void_reason: null, timeline: [{ at: `${date}T12:00:00Z`, text: "Creada como borrador" }], terms: null,
     };
   }
 
@@ -367,7 +373,7 @@ export class DemoBackend implements Backend {
     return {
       ...this.summary(s), customer_uid: s.customer_uid, lines: s.lines, totals: s.totals, cost_minor: s.cost_minor, payment_method: s.payment_method,
       notes: s.notes, quote_uid: s.quote_uid, quote_number: q?.number ?? null, payments: s.payments, external_ref: s.external_ref,
-      void_reason: s.void_reason, chain, timeline: s.timeline,
+      void_reason: s.void_reason, chain, timeline: s.timeline, terms: s.terms,
     };
   }
   private quoteSummary(q: QuoteRec): QuoteSummary {
@@ -707,7 +713,7 @@ export class DemoBackend implements Backend {
       avg_days_between: dates.length > 1 ? Math.round(gaps / (dates.length - 1)) : null, recent: own.slice(0, 8).map((s) => this.summary(s)),
     });
   }
-  private customerFields(input: NewCustomer, selfUid?: string): Pick<Customer, "name" | "rut" | "email" | "phone"> {
+  private customerFields(input: NewCustomer, selfUid?: string): Omit<Customer, "id" | "uid" | "created_at"> {
     if (!input.name.trim()) throw new AppError("nombre", "El nombre del cliente es obligatorio.");
     let rut: string | null = null;
     if (input.rut?.trim()) {
@@ -718,7 +724,16 @@ export class DemoBackend implements Backend {
       if (this.customers.some((c) => c.rut === rut && c.uid !== selfUid)) throw new AppError("rut_duplicado", "Ya existe un cliente con ese RUT.");
     }
     if (input.email?.trim() && !input.email.includes("@")) throw new AppError("correo", "El correo no tiene un formato válido.");
-    return { name: input.name.trim(), rut, email: input.email?.trim() || null, phone: input.phone?.trim() || null };
+    if (input.invoice_email?.trim() && !input.invoice_email.includes("@")) throw new AppError("correo", "El correo para facturas no tiene un formato válido.");
+    const days = input.payment_terms_days ?? 0;
+    if (days < 0 || days > 365) throw new AppError("validacion", "Los días de crédito van de 0 a 365.");
+    const t = (v: string | null | undefined) => (v && v.trim() ? v.trim() : null);
+    return {
+      name: input.name.trim(), rut, email: input.email?.trim() || null, phone: input.phone?.trim() || null,
+      kind: input.kind === "empresa" ? "empresa" : "persona", trade_name: t(input.trade_name), business_activity: t(input.business_activity),
+      address: t(input.address), commune: t(input.commune), city: t(input.city), region: t(input.region), contact_name: t(input.contact_name),
+      invoice_email: t(input.invoice_email), payment_terms_days: days, credit_limit_minor: input.credit_limit_minor ?? null, notes: t(input.notes),
+    };
   }
   async addCustomer(input: NewCustomer): Promise<Customer> {
     this.require("clientes.editar");
@@ -900,12 +915,14 @@ export class DemoBackend implements Backend {
     if (u) {
       const s = this.findSale(u);
       if (!["borrador", "cotizada", "aceptada"].includes(s.commercial_state)) throw new AppError("bloqueada", "Una venta efectuada no se modifica: anúlala o registra una devolución.");
-      Object.assign(s, { customer_uid: input.customer_uid, issue_date: input.issue_date, lines: computeLines(input.lines), totals: computeTotals(input.lines, this.taxPpm()), notes: input.notes ?? null });
+      Object.assign(s, { customer_uid: input.customer_uid, issue_date: input.issue_date, lines: computeLines(input.lines), totals: computeTotals(input.lines, this.taxPpm()), notes: input.notes ?? null, terms: normalizeTerms(input.terms, input.issue_date) });
       this.log("venta.editar", "venta", s.number);
       return wait(this.detail(s));
     }
+    const terms = normalizeTerms(input.terms, input.issue_date);
     const s = this.makeSale(input.doc_type, input.customer_uid, input.issue_date, input.lines, null);
     s.notes = input.notes ?? null;
+    s.terms = terms;
     this.sales.push(s);
     this.log("venta.crear", "venta", s.number);
     return wait(this.detail(s));
@@ -933,7 +950,8 @@ export class DemoBackend implements Backend {
       const acc = this.accountFor(input.account_uid, input.method);
       const pnum = this.next("PAG");
       this.payAcc[pnum] = acc;
-      s.payments.push({ number: pnum, date: this.today, amount_minor: s.totals.total_minor, method: input.method });
+      const payDate = s.terms?.payment === "transferencia" && s.terms.transfer_date && input.method.startsWith("Transferencia") ? s.terms.transfer_date : this.today;
+      s.payments.push({ number: pnum, date: payDate, amount_minor: s.totals.total_minor, method: input.method });
       s.timeline.push({ at: now(), text: `Pago registrado (${input.method})` });
     } else {
       s.timeline.push({ at: now(), text: "Queda en Dinero que te deben" });

@@ -5,7 +5,8 @@ import { Printer } from "lucide-react";
 import { useBackend, type BusinessSettings, type QuoteDetail, type SaleDetail } from "../../data";
 import { Button } from "../../ui/kit";
 import { Dialog } from "../../ui/overlay";
-import { formatDate, formatMoney, formatPpm, formatQty } from "../../lib/format";
+import { formatDate, formatMoney, formatPpm, formatQty, formatRut } from "../../lib/format";
+import { paymentText, referenceLabel } from "../../data/saleTerms";
 
 export const INTERNAL_LEGEND = "DOCUMENTO INTERNO — NO TRIBUTARIO";
 
@@ -48,6 +49,10 @@ export function PrintButton(props: Props) {
 
 export function PrintDoc({ kind, doc, biz, preview = false }: Props & { preview?: boolean }) {
   const tax = doc.totals.tax_minor > 0;
+  const terms = "terms" in doc ? doc.terms : null;
+  const receiver = kind === "FV" ? terms?.receiver ?? null : null;
+  const due = ("due_date" in doc && doc.due_date) || (terms?.payment === "credito" ? terms.due_date : null);
+  const pay = paymentText(terms, formatDate);
   return (
     <article className={`${preview ? "block" : "hidden print:block"} bg-white p-2 text-[12px] leading-snug text-black`} aria-hidden={!preview}>
       <header className="flex items-start justify-between gap-6 border-b-2 border-black pb-3">
@@ -59,12 +64,34 @@ export function PrintDoc({ kind, doc, biz, preview = false }: Props & { preview?
         </div>
       </header>
 
-      <section className="mt-3 grid grid-cols-2 gap-2">
-        <div><strong>Cliente:</strong> {doc.customer_name}</div>
-        <div className="text-right"><strong>Fecha:</strong> {formatDate(doc.issue_date)}</div>
-        {"valid_until" in doc && doc.valid_until && <div><strong>Válida hasta:</strong> {formatDate(doc.valid_until)}</div>}
-        {"due_date" in doc && doc.due_date && <div><strong>Vencimiento:</strong> {formatDate(doc.due_date)}</div>}
-      </section>
+      {receiver ? (
+        <section className="mt-3 grid grid-cols-[1fr_auto] gap-x-6 gap-y-0.5 border border-black p-2">
+          <div><strong>Señor(es):</strong> {receiver.name ?? doc.customer_name}</div>
+          <div className="text-right"><strong>Fecha:</strong> {formatDate(doc.issue_date)}</div>
+          {receiver.rut && <div><strong>RUT:</strong> {formatRut(receiver.rut)}</div>}
+          {due && <div className="text-right"><strong>Vencimiento:</strong> {formatDate(due)}</div>}
+          {receiver.activity && <div className="col-span-2"><strong>Giro:</strong> {receiver.activity}</div>}
+          {(receiver.address || receiver.commune) && <div className="col-span-2"><strong>Dirección:</strong> {[receiver.address, receiver.commune, receiver.city].filter(Boolean).join(", ")}</div>}
+          {(receiver.contact || receiver.phone || receiver.email) && <div className="col-span-2"><strong>Contacto:</strong> {[receiver.contact, receiver.phone, receiver.email].filter(Boolean).join(" · ")}</div>}
+          {pay && <div className="col-span-2"><strong>Forma de pago:</strong> {pay}</div>}
+        </section>
+      ) : (
+        <section className="mt-3 grid grid-cols-2 gap-2">
+          <div><strong>Cliente:</strong> {doc.customer_name}</div>
+          <div className="text-right"><strong>Fecha:</strong> {formatDate(doc.issue_date)}</div>
+          {"valid_until" in doc && doc.valid_until && <div><strong>Válida hasta:</strong> {formatDate(doc.valid_until)}</div>}
+          {due && <div><strong>Vencimiento:</strong> {formatDate(due)}</div>}
+          {pay && <div className="col-span-2"><strong>Forma de pago:</strong> {pay}</div>}
+        </section>
+      )}
+      {terms && terms.references.length > 0 && (
+        <table className="mt-3 w-full border-collapse text-[11px]">
+          <thead><tr className="border-y border-black text-left"><th className="py-0.5">Referencia</th><th className="py-0.5">Folio</th><th className="py-0.5">Fecha</th><th className="py-0.5">Detalle</th></tr></thead>
+          <tbody>{terms.references.map((r, i) => (
+            <tr key={i} className="border-b border-neutral-300"><td className="py-0.5">{referenceLabel(r.kind)}</td><td className="py-0.5">{r.folio}</td><td className="py-0.5">{r.date ? formatDate(r.date) : ""}</td><td className="py-0.5">{r.note ?? ""}</td></tr>
+          ))}</tbody>
+        </table>
+      )}
 
       <table className="mt-4 w-full border-collapse">
         <thead>

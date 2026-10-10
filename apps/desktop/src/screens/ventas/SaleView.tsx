@@ -11,6 +11,32 @@ import { Badge, Button, Card, DefinitionList, Notice, PageHeader, Spinner } from
 import { useToast } from "../../ui/overlay";
 import { DocumentDialog, EffectDialog, PaymentDialog, VoidDialog } from "./dialogs";
 import { PrintButton, PrintDoc } from "./PrintDoc";
+import { paymentText, referenceLabel } from "../../data/saleTerms";
+import type { SaleTerms } from "../../data";
+import { formatRut } from "../../lib/format";
+
+function TermsCard({ terms }: { terms: SaleTerms }) {
+  const r = terms.receiver;
+  return (
+    <Card title="Condiciones del documento">
+      <div className="flex flex-col gap-4">
+        <DefinitionList items={[
+          ...(terms.payment ? [{ label: "Forma de pago", value: paymentText(terms, formatDate) }] : []),
+          ...terms.references.map((x) => ({ label: referenceLabel(x.kind), value: `N.º ${x.folio}${x.date ? ` del ${formatDate(x.date)}` : ""}${x.note ? ` · ${x.note}` : ""}` })),
+        ]} />
+        {r && (
+          <div className="rounded-lg bg-surface-2 px-4 py-3 text-sm">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Receptor</div>
+            <div className="font-medium text-ink">{r.name}{r.rut ? ` · RUT ${formatRut(r.rut)}` : ""}</div>
+            {r.activity && <div className="text-muted">Giro: {r.activity}</div>}
+            {(r.address || r.commune) && <div className="text-muted">{[r.address, r.commune, r.city, r.region].filter(Boolean).join(", ")}</div>}
+            {(r.contact || r.email || r.phone) && <div className="text-muted">{[r.contact, r.email, r.phone].filter(Boolean).join(" · ")}</div>}
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
 
 type Open = null | "effect" | "pay" | "doc" | "void";
 
@@ -120,6 +146,8 @@ export function SaleView({ uid }: { uid: string }) {
               </table>
             </div>
           </Card>
+
+          {s.terms && <TermsCard terms={s.terms} />}
 
           {s.payments.length > 0 && (
             <Card title="Pagos recibidos" padded={false}>

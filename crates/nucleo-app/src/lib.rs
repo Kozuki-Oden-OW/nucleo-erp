@@ -18,6 +18,7 @@ pub mod payroll_ops;
 pub mod purchase_ops;
 pub mod registry;
 pub mod report_ops;
+pub mod sale_terms;
 pub mod sales_ops;
 
 pub use company::{CompanySession, NewCustomer};

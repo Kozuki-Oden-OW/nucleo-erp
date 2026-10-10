@@ -93,3 +93,12 @@ export const DEMO_PRODUCT_CATEGORIES: [string, string[]][] = [
   ["Jardín y gasfitería", ["MAN-JAR", "LLA-JAR", "CAN-PVC", "COD-PVC"]],
   ["Servicios", ["SRV-INS", "SRV-COR"]],
 ];
+
+/** Datos de ficha para los clientes empresa de la demostración. */
+export const DEMO_ACTIVITIES = ["Construcción de edificios", "Actividades inmobiliarias", "Venta al por menor en ferreterías", "Instalaciones eléctricas", "Mantención de edificios", "Enseñanza básica y media"];
+export const DEMO_STREETS = ["Av. Providencia", "Av. Vicuña Mackenna", "Av. Irarrázaval", "Calle Los Carrera", "Av. La Florida", "Av. Pajaritos"];
+export const DEMO_COMMUNES = ["Providencia", "Ñuñoa", "La Florida", "Maipú", "Puente Alto", "Santiago", "Las Condes"];
+export const EMPTY_PROFILE = {
+  kind: "persona" as "persona" | "empresa", trade_name: null, business_activity: null, address: null, commune: null, city: null, region: null,
+  contact_name: null, invoice_email: null, payment_terms_days: 0, credit_limit_minor: null, notes: null,
+};

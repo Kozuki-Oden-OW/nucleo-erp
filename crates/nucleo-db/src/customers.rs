@@ -2,7 +2,7 @@
 
 use crate::{DbError, DbResult};
 use rusqlite::{Connection, Row};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct CustomerRow {
@@ -13,6 +13,31 @@ pub struct CustomerRow {
     pub email: Option<String>,
     pub phone: Option<String>,
     pub created_at: String,
+    #[serde(flatten)]
+    pub profile: CustomerProfile,
+}
+
+/// Datos opcionales de la ficha: los que pide una factura (giro, dirección, comuna…) y de contacto.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct CustomerProfile {
+    /// "persona" o "empresa".
+    pub kind: String,
+    /// Nombre de fantasía.
+    pub trade_name: Option<String>,
+    /// Giro.
+    pub business_activity: Option<String>,
+    pub address: Option<String>,
+    pub commune: Option<String>,
+    pub city: Option<String>,
+    pub region: Option<String>,
+    pub contact_name: Option<String>,
+    /// Correo para recibir facturas.
+    pub invoice_email: Option<String>,
+    /// Días de crédito habituales (0 = contado).
+    pub payment_terms_days: i64,
+    pub credit_limit_minor: Option<i64>,
+    pub notes: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -25,7 +50,8 @@ pub struct NewCustomerRow<'a> {
     pub created_at: &'a str,
 }
 
-const COLS: &str = "id, uid, rut, name, email, phone, created_at";
+const COLS: &str = "id, uid, rut, name, email, phone, created_at, kind, trade_name, business_activity, \
+    address, commune, city, region, contact_name, invoice_email, payment_terms_days, credit_limit_minor, notes";
 
 fn map(r: &Row<'_>) -> rusqlite::Result<CustomerRow> {
     Ok(CustomerRow {
@@ -36,7 +62,46 @@ fn map(r: &Row<'_>) -> rusqlite::Result<CustomerRow> {
         email: r.get(4)?,
         phone: r.get(5)?,
         created_at: r.get(6)?,
+        profile: CustomerProfile {
+            kind: r.get(7)?,
+            trade_name: r.get(8)?,
+            business_activity: r.get(9)?,
+            address: r.get(10)?,
+            commune: r.get(11)?,
+            city: r.get(12)?,
+            region: r.get(13)?,
+            contact_name: r.get(14)?,
+            invoice_email: r.get(15)?,
+            payment_terms_days: r.get(16)?,
+            credit_limit_minor: r.get(17)?,
+            notes: r.get(18)?,
+        },
     })
+}
+
+/// Guarda los datos opcionales de la ficha (los textos ya vienen validados y sin espacios sobrantes).
+pub fn set_profile(conn: &Connection, id: i64, p: &CustomerProfile) -> DbResult<()> {
+    conn.execute(
+        "UPDATE customers SET kind = ?2, trade_name = ?3, business_activity = ?4, address = ?5, commune = ?6,
+            city = ?7, region = ?8, contact_name = ?9, invoice_email = ?10, payment_terms_days = ?11,
+            credit_limit_minor = ?12, notes = ?13 WHERE id = ?1",
+        rusqlite::params![
+            id,
+            if p.kind == "empresa" { "empresa" } else { "persona" },
+            p.trade_name,
+            p.business_activity,
+            p.address,
+            p.commune,
+            p.city,
+            p.region,
+            p.contact_name,
+            p.invoice_email,
+            p.payment_terms_days,
+            p.credit_limit_minor,
+            p.notes
+        ],
+    )?;
+    Ok(())
 }
 
 pub fn insert(conn: &Connection, c: &NewCustomerRow<'_>) -> DbResult<CustomerRow> {

@@ -63,6 +63,7 @@ fn sale(
                     taxable: false,
                 }],
                 notes: None,
+                terms: None,
             },
             None,
         )

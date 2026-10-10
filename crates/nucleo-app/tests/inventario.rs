@@ -56,6 +56,7 @@ fn sell(
                 taxable: true,
             }],
             notes: None,
+            terms: None,
         },
         None,
     )?;

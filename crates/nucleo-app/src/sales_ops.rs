@@ -181,6 +181,8 @@ pub struct SaleDetail {
     pub void_reason: Option<String>,
     pub chain: Vec<DocLink>,
     pub timeline: Vec<TimelineItem>,
+    /// Condiciones guardadas en el documento (forma de pago, referencias, receptor).
+    pub terms: Option<crate::sale_terms::SaleTerms>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -190,6 +192,9 @@ pub struct SaleInput {
     pub issue_date: String,
     pub lines: Vec<LineInput>,
     pub notes: Option<String>,
+    /// Forma de pago, referencias (OC, HES…) y datos del receptor.
+    #[serde(default)]
+    pub terms: Option<crate::sale_terms::SaleTerms>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -702,6 +707,7 @@ impl CompanySession {
         let before = customers::by_uid(self.db.conn(), uid)?
             .ok_or_else(|| AppError::NotFound("el cliente".into()))?;
         let (name, rut, email, phone) = crate::company::validate_customer(input)?;
+        let profile = crate::company::validate_profile(&input.profile)?;
         let user = self.actor_name()?;
         let tx = self.db.conn_mut().transaction()?;
         customers::update(
@@ -712,6 +718,7 @@ impl CompanySession {
             email.as_deref(),
             phone.as_deref(),
         )?;
+        customers::set_profile(&tx, before.id, &profile)?;
         let after =
             customers::by_uid(&tx, uid)?.ok_or_else(|| AppError::NotFound("el cliente".into()))?;
         audit::append(
@@ -1115,6 +1122,7 @@ impl CompanySession {
             void_reason: s.void_reason.clone(),
             chain,
             timeline,
+            terms: db::sale_terms(conn, s.id)?.and_then(|j| serde_json::from_str(&j).ok()),
         })
     }
 
@@ -1128,6 +1136,16 @@ impl CompanySession {
         let customer_id = self.customer_id(&input.customer_uid)?;
         let issue = parse_date("la fecha", &input.issue_date)?;
         let notes = opt_text(&input.notes, 2000, "las notas")?;
+        let terms = match &input.terms {
+            Some(t) => Some(t.validated(&issue)?).filter(|t| !t.is_empty()),
+            None => None,
+        };
+        let terms_json = match &terms {
+            Some(t) => {
+                Some(serde_json::to_string(t).map_err(|e| AppError::Validation(e.to_string()))?)
+            }
+            None => None,
+        };
         let p = self.prepare_lines(&input.lines)?;
         let existing = match uid {
             Some(u) => {
@@ -1176,6 +1194,7 @@ impl CompanySession {
             }
         };
         db::replace_sale_items(&tx, id, &p.lines)?;
+        db::set_sale_terms(&tx, id, terms_json.as_deref())?;
         let (action, text) = match existing {
             Some(_) => ("venta.editar", "Borrador modificado"),
             None => ("venta.crear", "Creada como borrador"),
@@ -1228,6 +1247,10 @@ impl CompanySession {
             method_label(method_code(&input.method)).to_string()
         };
         self.check_stock_for_sale(s.id)?;
+        let terms: crate::sale_terms::SaleTerms = db::sale_terms(self.db.conn(), s.id)?
+            .and_then(|j| serde_json::from_str(&j).ok())
+            .unwrap_or_default();
+        let pay_reference = terms.payment_reference();
         let reminder = self.business()?.documentation_reminder;
         let doc_state = if reminder { "pendiente" } else { "no_aplica" };
         let lines = db::sale_lines(self.db.conn(), s.id)?;
@@ -1306,9 +1329,13 @@ impl CompanySession {
                         number: &pnum,
                         customer_id: s.customer_id,
                         money_account_id: acc,
-                        date: &today,
+                        date: match (&terms.transfer_date, method_code(&input.method)) {
+                            (Some(d), "transferencia") => d,
+                            _ => &today,
+                        },
                         method: method_code(&input.method),
                         amount_minor: total,
+                        reference: pay_reference.as_deref(),
                         created_by: user_id,
                         created_at: &now,
                     },
@@ -1381,6 +1408,7 @@ impl CompanySession {
                 date: &date,
                 method: code,
                 amount_minor,
+                reference: None,
                 created_by: user_id,
                 created_at: &now,
             },

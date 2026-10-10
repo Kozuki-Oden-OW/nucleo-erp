@@ -602,8 +602,27 @@ pub struct PaymentWrite<'a> {
     /// Código del medio: efectivo, transferencia, debito, credito, cheque, otro.
     pub method: &'a str,
     pub amount_minor: i64,
+    /// N.º de operación, banco o cheque (opcional).
+    pub reference: Option<&'a str>,
     pub created_by: Option<i64>,
     pub created_at: &'a str,
+}
+
+/// Condiciones de la venta (JSON validado por la aplicación), o `None` para quitarlas.
+pub fn set_sale_terms(conn: &Connection, sale_id: i64, json: Option<&str>) -> DbResult<()> {
+    conn.execute(
+        "UPDATE sales SET terms_json = ?2 WHERE id = ?1",
+        rusqlite::params![sale_id, json],
+    )?;
+    Ok(())
+}
+
+pub fn sale_terms(conn: &Connection, sale_id: i64) -> DbResult<Option<String>> {
+    Ok(conn.query_row(
+        "SELECT terms_json FROM sales WHERE id = ?1",
+        [sale_id],
+        |r| r.get(0),
+    )?)
 }
 
 /// Registra un cobro (PAG) y lo aplica al vencimiento indicado (el trigger actualiza el saldo).
@@ -614,8 +633,8 @@ pub fn insert_payment(
 ) -> DbResult<i64> {
     conn.execute(
         "INSERT INTO payments (uid, doc_type, number, direction, party_type, party_id, money_account_id, payment_date,
-            method, amount_minor, created_by, created_at)
-         VALUES (?1, 'PAG', ?2, 'entrada', CASE WHEN ?3 IS NULL THEN NULL ELSE 'cliente' END, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            method, amount_minor, created_by, created_at, reference)
+         VALUES (?1, 'PAG', ?2, 'entrada', CASE WHEN ?3 IS NULL THEN NULL ELSE 'cliente' END, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         rusqlite::params![
             p.uid,
             p.number,
@@ -625,7 +644,8 @@ pub fn insert_payment(
             p.method,
             p.amount_minor,
             p.created_by,
-            p.created_at
+            p.created_at,
+            p.reference
         ],
     )?;
     let id = conn.last_insert_rowid();

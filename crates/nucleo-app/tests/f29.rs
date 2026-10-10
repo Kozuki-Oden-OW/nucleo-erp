@@ -39,6 +39,7 @@ fn sale(s: &mut CompanySession, amount: i64, document: Option<&str>) {
                     taxable: true,
                 }],
                 notes: None,
+                terms: None,
             },
             None,
         )

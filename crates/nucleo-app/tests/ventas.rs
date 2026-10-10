@@ -177,7 +177,8 @@ fn ciclo_completo_cotizacion_a_venta_cerrada() {
                 customer_uid: None,
                 issue_date: HOY.into(),
                 lines: vec![line(None, "x", 1, 1, 0)],
-                notes: None
+                notes: None,
+                terms: None,
             },
             Some(&v.summary.uid),
         )
@@ -274,6 +275,7 @@ fn factura_interna_al_contado_y_emprendedor_sin_impuesto() {
                 issue_date: HOY.into(),
                 lines: vec![line(Some(&servicio.uid), "Instalación", 2, 25_000, 0)],
                 notes: Some("Domicilio".into()),
+                terms: None,
             },
             None,
         )
@@ -290,6 +292,7 @@ fn factura_interna_al_contado_y_emprendedor_sin_impuesto() {
                 issue_date: HOY.into(),
                 lines: vec![line(Some(&servicio.uid), "Instalación", 3, 25_000, 0)],
                 notes: None,
+                terms: None,
             },
             Some(&fv.summary.uid),
         )
@@ -348,6 +351,7 @@ fn permisos_de_venta() {
             issue_date: HOY.into(),
             lines: vec![line(None, "Saco", 1, 100, 0)],
             notes: None,
+            terms: None,
         },
         None,
     );
@@ -427,4 +431,132 @@ fn editar_producto_y_cliente() {
     assert_eq!(c.name, "Juan Pérez");
     assert_eq!(c.rut.as_deref(), Some("12345678-5"));
     assert!(s.verify_audit().unwrap().ok);
+}
+
+#[test]
+fn ficha_completa_del_cliente_y_condiciones_de_la_factura_interna() {
+    use nucleo_app::nucleo_db::customers::CustomerProfile;
+    use nucleo_app::sale_terms::{Receiver, SaleReference, SaleTerms};
+    let (_d, _app, mut s) = session(BusinessProfile::Empresa);
+    let c = s
+        .add_customer(&NewCustomer {
+            name: "Clínica Los Lagos SpA".into(),
+            rut: Some("76.086.428-5".into()),
+            profile: CustomerProfile {
+                kind: "empresa".into(),
+                business_activity: Some(" Servicios de salud ".into()),
+                address: Some("Av. Philippi 1020".into()),
+                commune: Some("Frutillar".into()),
+                region: Some("Los Lagos".into()),
+                invoice_email: Some("dte@clinica.cl".into()),
+                payment_terms_days: 30,
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(
+        c.profile.business_activity.as_deref(),
+        Some("Servicios de salud")
+    );
+    assert_eq!(c.profile.payment_terms_days, 30);
+    assert!(
+        s.add_customer(&NewCustomer {
+            name: "X".into(),
+            profile: CustomerProfile {
+                invoice_email: Some("sin-arroba".into()),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .is_err()
+    );
+
+    // Factura interna a crédito 30 días con OC y HES; el receptor queda copiado en el documento.
+    let p = product(&mut s, "Datalogger", 10_000, 6_000, 5);
+    let today: String = rusqlite::Connection::open_in_memory()
+        .unwrap()
+        .query_row("SELECT date('now', 'localtime')", [], |r| r.get(0))
+        .unwrap();
+    let fv = s
+        .save_sale(
+            &SaleInput {
+                doc_type: "FV".into(),
+                customer_uid: Some(c.uid.clone()),
+                issue_date: today.clone(),
+                lines: vec![line(Some(&p), "Datalogger", 2, 10_000, 0)],
+                notes: None,
+                terms: Some(SaleTerms {
+                    payment: "credito".into(),
+                    credit_days: Some(30),
+                    references: vec![
+                        SaleReference {
+                            kind: "801".into(),
+                            folio: "4500012345".into(),
+                            date: Some(today.clone()),
+                            note: None,
+                        },
+                        SaleReference {
+                            kind: "HES".into(),
+                            folio: "1000456".into(),
+                            date: None,
+                            note: None,
+                        },
+                    ],
+                    receiver: Some(Receiver {
+                        rut: c.rut.clone(),
+                        name: Some(c.name.clone()),
+                        activity: c.profile.business_activity.clone(),
+                        address: c.profile.address.clone(),
+                        commune: c.profile.commune.clone(),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+            },
+            None,
+        )
+        .unwrap();
+    let t = fv.terms.clone().unwrap();
+    assert_eq!(t.references.len(), 2);
+    assert!(t.due_date.is_some());
+    assert_eq!(t.receiver.unwrap().commune.as_deref(), Some("Frutillar"));
+
+    // Venta pagada por transferencia: el cobro toma la fecha de la transferencia.
+    let v = s
+        .save_sale(
+            &SaleInput {
+                doc_type: "VEN".into(),
+                customer_uid: Some(c.uid.clone()),
+                issue_date: today.clone(),
+                lines: vec![line(Some(&p), "Datalogger", 1, 10_000, 0)],
+                notes: None,
+                terms: Some(SaleTerms {
+                    payment: "transferencia".into(),
+                    bank: Some("Banco Estado".into()),
+                    transfer_date: Some(today.clone()),
+                    operation: Some("998877".into()),
+                    ..Default::default()
+                }),
+            },
+            None,
+        )
+        .unwrap();
+    let v = s
+        .effect_sale(
+            &v.summary.uid,
+            &EffectInput {
+                mode: "contado".into(),
+                method: "Transferencia".into(),
+                due_date: None,
+                account_uid: None,
+            },
+        )
+        .unwrap();
+    assert_eq!(v.payments.len(), 1);
+    assert_eq!(v.payments[0].date, today);
+    assert_eq!(
+        v.terms.unwrap().payment_reference().as_deref(),
+        Some("Banco Estado · 998877")
+    );
 }

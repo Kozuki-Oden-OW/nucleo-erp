@@ -231,6 +231,19 @@ fn ciclo_de_venta_por_ipc() {
     assert_eq!(r["rows"].as_array().unwrap().len(), 1);
     let r = ipc.ok("report", json!({ "params": { "id": "ventas_periodo", "from": "2026-01-01", "to": "2035-12-31", "group": "dia" } }));
     assert_eq!(r["totals"][1], 1);
+    // Ficha completa del cliente y condiciones de la factura interna, con los nombres de la interfaz.
+    let c2 = ipc.ok("add_customer", json!({ "input": { "name": "Clínica Sur SpA", "kind": "empresa", "business_activity": "Salud",
+        "commune": "Frutillar", "payment_terms_days": 30, "credit_limit_minor": null } }));
+    assert_eq!(c2["business_activity"], "Salud");
+    assert_eq!(c2["payment_terms_days"], 30);
+    let fv2 = ipc.ok("save_sale", json!({ "input": { "doc_type": "FV", "customer_uid": c2["uid"], "issue_date": HOY, "lines": [line],
+        "terms": { "payment": "credito", "credit_days": 30, "due_date": null, "card": null, "bank": null, "transfer_date": null, "operation": null,
+            "references": [{ "kind": "801", "folio": "4500012345", "date": HOY, "note": null }],
+            "receiver": { "name": "Clínica Sur SpA", "activity": "Salud", "commune": "Frutillar", "rut": null, "trade_name": null, "address": null,
+                "city": null, "region": null, "email": null, "phone": null, "contact": null } } }, "uid": null }));
+    assert_eq!(fv2["terms"]["references"][0]["folio"], "4500012345");
+    assert_eq!(fv2["terms"]["due_date"], "2026-11-05");
+
     let dir = tempfile::tempdir().unwrap();
     let dest = dir.path().join("ventas.csv");
     ipc.ok("save_report_file", json!({ "reportId": "ventas_cliente", "path": dest.to_str().unwrap(), "bytes": [65, 59, 66] }));

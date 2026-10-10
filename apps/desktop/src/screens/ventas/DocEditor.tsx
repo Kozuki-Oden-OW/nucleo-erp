@@ -2,7 +2,9 @@
 // buscar producto → Enter → ajustar cantidad → siguiente producto.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Info, Save, Trash2 } from "lucide-react";
-import { useBackend, errorMessage, type BusinessSettings, type Customer, type LineInput, type Product, type QuoteDetail, type SaleDetail } from "../../data";
+import { useBackend, errorMessage, type BusinessSettings, type Customer, type LineInput, type Product, type QuoteDetail, type Receiver, type SaleDetail, type SaleTerms } from "../../data";
+import { EMPTY_TERMS, receiverFromCustomer } from "../../data/saleTerms";
+import { PaymentCard, ReceiverCard, ReferencesCard } from "./terms";
 import { computeTotals, lineAmounts } from "../../data/calc";
 import { addDays, formatMoney, formatPpm, parsePercent, parseQty, todayIso } from "../../lib/format";
 import { useTerm } from "../../lib/glosario";
@@ -11,6 +13,7 @@ import { MoneyField } from "../../ui/doc";
 import { Button, Card, Field, IconButton, Label, Notice, PageHeader, TextArea } from "../../ui/kit";
 import { useToast } from "../../ui/overlay";
 import { NewCustomerDrawer } from "../clientes/Customers";
+import { formatRut } from "../../lib/format";
 import { CustomerPicker, ProductPicker, type ProductPickerHandle } from "./pickers";
 
 type Kind = "COT" | "VEN" | "FV";
@@ -34,6 +37,9 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
   const [validUntil, setValidUntil] = useState<string>((existing as QuoteDetail | undefined)?.valid_until ?? addDays(todayIso(), 15));
   const [rows, setRows] = useState<Row[]>(() => (existing?.lines ?? []).map(toRow));
   const [notes, setNotes] = useState(existing?.notes ?? "");
+  const [terms, setTerms] = useState<SaleTerms>(() => ({ ...EMPTY_TERMS, ...((existing as SaleDetail | undefined)?.terms ?? {}) }));
+  const [saveToCustomer, setSaveToCustomer] = useState(false);
+  const isSale = kind !== "COT";
   const [newCust, setNewCust] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -52,6 +58,34 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
   useEffect(() => {
     if (preset) backend.customer(preset).then((c) => setCustomer(c)).catch(() => {});
   }, [backend, preset]);
+  // Al elegir otro cliente, el receptor se completa desde su ficha y se propone su plazo habitual.
+  const lastCustomer = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    const u = customer?.uid ?? null;
+    if (lastCustomer.current === u) return;
+    // El cliente de un documento guardado todavía se está cargando.
+    if (lastCustomer.current === undefined && existing?.customer_uid && !customer) return;
+    const prev = lastCustomer.current;
+    lastCustomer.current = u;
+    // Al abrir un documento guardado se respetan sus condiciones; solo se completa el receptor si falta.
+    const restoring = !!existing && prev === undefined && u === (existing.customer_uid ?? null);
+    const rec = customer ? { ...receiverFromCustomer(customer), rut: customer.rut ? formatRut(customer.rut) : null } : null;
+    if (!restoring) setSaveToCustomer(false);
+    setTerms((t) => {
+      if (restoring) return t.receiver || !rec ? t : { ...t, receiver: rec };
+      return {
+        ...t,
+        receiver: rec,
+        ...(customer && customer.payment_terms_days > 0 && !t.payment ? { payment: "credito" as const, credit_days: customer.payment_terms_days, due_date: null } : {}),
+        ...(!customer && t.payment === "credito" ? { payment: "" as const } : {}),
+      };
+    });
+  }, [customer, existing]);
+  const receiverChanged = useMemo(() => {
+    if (!customer || !terms.receiver) return false;
+    const base = { ...receiverFromCustomer(customer), rut: customer.rut ? formatRut(customer.rut) : null } as Receiver;
+    return (Object.keys(base) as (keyof Receiver)[]).some((k) => (base[k] ?? "") !== (terms.receiver![k] ?? ""));
+  }, [customer, terms.receiver]);
 
   const taxPpm = biz?.tax_enabled ? biz.tax_rate_ppm : null;
   const totals = useMemo(() => computeTotals(rows, taxPpm), [rows, taxPpm]);
@@ -81,7 +115,15 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
         toast("success", `${q.number} guardada.`);
         navigate(`/cotizaciones/${q.uid}`, { replace: true });
       } else {
-        const s = await backend.saveSale({ doc_type: kind, customer_uid: customer?.uid ?? null, issue_date: date, lines, notes: notes || undefined }, existing?.uid);
+        if (saveToCustomer && customer && terms.receiver) {
+          const r = terms.receiver;
+          await backend.updateCustomer(customer.uid, {
+            ...customer, name: r.name || customer.name, rut: r.rut || undefined, email: customer.email ?? undefined, phone: r.phone || customer.phone || undefined,
+            business_activity: r.activity, address: r.address, commune: r.commune, city: r.city, region: r.region, contact_name: r.contact,
+            invoice_email: r.email && r.email !== customer.email ? r.email : customer.invoice_email, trade_name: customer.trade_name,
+          });
+        }
+        const s = await backend.saveSale({ doc_type: kind, customer_uid: customer?.uid ?? null, issue_date: date, lines, notes: notes || undefined, terms: kind === "FV" ? terms : { ...terms, receiver: null } }, existing?.uid);
         toast("success", `${s.number} guardada como borrador. Ahora puedes marcarla como efectuada.`);
         navigate(`/ventas/${s.uid}`, { replace: true });
       }
@@ -196,6 +238,13 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
               {rows.length === 0 && <p className="mt-2 text-xs text-muted">Consejo: escribe parte del nombre (“tala 18”) y presiona Enter. Luego escribe la cantidad y Enter de nuevo para el siguiente producto.</p>}
             </div>
           </Card>
+
+          {isSale && <PaymentCard terms={terms} onChange={setTerms} issueDate={date} hasCustomer={!!customer} />}
+          {isSale && kind === "FV" && customer && terms.receiver && (
+            <ReceiverCard receiver={terms.receiver} onChange={(r) => setTerms({ ...terms, receiver: r })} saveToCustomer={saveToCustomer}
+              onSaveToCustomer={setSaveToCustomer} canSave={receiverChanged} />
+          )}
+          {isSale && <ReferencesCard refs={terms.references} onChange={(references) => setTerms({ ...terms, references })} />}
 
           <Card>
             <TextArea label="Observaciones" optional value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Condiciones, plazo de entrega, notas para el cliente…" />

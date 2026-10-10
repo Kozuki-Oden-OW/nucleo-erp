@@ -27,6 +27,60 @@ pub struct NewCustomer {
     pub rut: Option<String>,
     pub email: Option<String>,
     pub phone: Option<String>,
+    /// Giro, dirección, comuna, contacto, plazo de pago… todo opcional.
+    #[serde(flatten)]
+    pub profile: nucleo_db::customers::CustomerProfile,
+}
+
+/// Limpia y valida los datos opcionales de la ficha del cliente.
+pub(crate) fn validate_profile(
+    p: &nucleo_db::customers::CustomerProfile,
+) -> AppResult<nucleo_db::customers::CustomerProfile> {
+    fn text(v: &Option<String>, max: usize, label: &str) -> AppResult<Option<String>> {
+        match v.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            None => Ok(None),
+            Some(s) if s.chars().count() > max => Err(AppError::Validation(format!(
+                "{label} admite hasta {max} caracteres"
+            ))),
+            Some(s) => Ok(Some(s.to_string())),
+        }
+    }
+    let invoice_email = text(&p.invoice_email, 254, "el correo para facturas")?;
+    if invoice_email.as_ref().is_some_and(|e| !e.contains('@')) {
+        return Err(AppError::Validation(
+            "el correo para facturas no tiene un formato válido".into(),
+        ));
+    }
+    if !(0..=365).contains(&p.payment_terms_days) {
+        return Err(AppError::Validation(
+            "los días de crédito van de 0 a 365".into(),
+        ));
+    }
+    if p.credit_limit_minor
+        .is_some_and(|v| !(0..=10_000_000_000_000).contains(&v))
+    {
+        return Err(AppError::Validation(
+            "el cupo de crédito no es válido".into(),
+        ));
+    }
+    Ok(nucleo_db::customers::CustomerProfile {
+        kind: if p.kind == "empresa" {
+            "empresa".into()
+        } else {
+            "persona".into()
+        },
+        trade_name: text(&p.trade_name, 200, "el nombre de fantasía")?,
+        business_activity: text(&p.business_activity, 200, "el giro")?,
+        address: text(&p.address, 200, "la dirección")?,
+        commune: text(&p.commune, 80, "la comuna")?,
+        city: text(&p.city, 80, "la ciudad")?,
+        region: text(&p.region, 80, "la región")?,
+        contact_name: text(&p.contact_name, 120, "el contacto")?,
+        invoice_email,
+        payment_terms_days: p.payment_terms_days,
+        credit_limit_minor: p.credit_limit_minor,
+        notes: text(&p.notes, 2000, "las notas")?,
+    })
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -171,6 +225,7 @@ impl CompanySession {
         let user = self.require("clientes.editar")?.username.clone();
         let user = user.as_str();
         let (name, rut, email, phone) = validate_customer(input)?;
+        let profile = validate_profile(&input.profile)?;
         let uid = uuid::Uuid::now_v7().to_string();
         let created_at = now_utc();
         let tx = self.db.conn_mut().transaction()?;
@@ -185,6 +240,8 @@ impl CompanySession {
                 created_at: &created_at,
             },
         )?;
+        customers::set_profile(&tx, row.id, &profile)?;
+        let row = customers::by_uid(&tx, &uid)?.unwrap_or(row);
         audit::append(
             &tx,
             &audit::AuditEntry {

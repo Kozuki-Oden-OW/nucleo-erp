@@ -130,6 +130,7 @@ fn reportes_con_cifras_conocidas() {
                     taxable: false,
                 }],
                 notes: None,
+                terms: None,
             },
             None,
         )

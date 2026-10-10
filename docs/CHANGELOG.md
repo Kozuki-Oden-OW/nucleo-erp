@@ -2,6 +2,21 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [0.3.0] — 2026-10-10
+
+- **Análisis y reportes:** 13 reportes (ventas por período, cliente, producto y categoría; ¿gano o pierdo?;
+  compras por proveedor; gastos por categoría; inventario valorizado y rotación; por cobrar y por pagar con
+  antigüedad; flujo de caja; IVA estimado; importaciones) con indicadores, gráfico y exportación a Excel y CSV.
+- **Productos:** categorías (seis iniciales, crear, renombrar, eliminar y agregar productos en lote, filtro
+  en la lista); precio escrito neto o con IVA, columnas «Precio neto» y «Con IVA», margen sobre el neto;
+  costo avanzado (compra en dólares u otra moneda, transporte, envío, mano de obra, otros y unidades del lote).
+- **Clientes:** ficha completa y opcional (persona o empresa, nombre de fantasía, giro, dirección, comuna,
+  ciudad, región, contacto, correo para facturas, días de crédito, cupo y notas).
+- **Venta y factura interna:** forma de pago (efectivo, tarjeta de débito o crédito, transferencia con
+  banco y fecha, crédito con días y vencimiento, cheque), referencias como en el facturador del SII (OC,
+  HES, HEM, nota de pedido, nota de venta, guía de despacho, contrato, ChileCompra) y datos del receptor
+  que se completan desde la ficha; todo aparece al imprimir y al marcar la venta como efectuada.
+
 ## [0.2.0] — 2026-10-10
 
 Primera versión con impuestos y remuneraciones. Reúne las entradas «Sin publicar» de abajo desde la

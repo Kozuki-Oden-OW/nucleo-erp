@@ -128,7 +128,26 @@ export interface BusinessSettings {
 
 /* ───── Maestros ───── */
 
-export interface Customer {
+/** Datos opcionales de la ficha del cliente (los que pide una factura y de contacto). */
+export interface CustomerProfile {
+  /** "persona" o "empresa". */
+  kind: "persona" | "empresa";
+  trade_name: string | null;
+  /** Giro. */
+  business_activity: string | null;
+  address: string | null;
+  commune: string | null;
+  city: string | null;
+  region: string | null;
+  contact_name: string | null;
+  /** Correo para recibir facturas. */
+  invoice_email: string | null;
+  /** Días de crédito habituales (0 = contado). */
+  payment_terms_days: number;
+  credit_limit_minor: number | null;
+  notes: string | null;
+}
+export interface Customer extends CustomerProfile {
   id: number;
   uid: string;
   rut: string | null;
@@ -137,11 +156,32 @@ export interface Customer {
   phone: string | null;
   created_at: string;
 }
-export interface NewCustomer {
+export interface NewCustomer extends Partial<CustomerProfile> {
   name: string;
   rut?: string;
   email?: string;
   phone?: string;
+}
+
+/* ───── Condiciones de la venta ───── */
+
+export type SalePayment = "" | "efectivo" | "tarjeta" | "transferencia" | "credito" | "cheque" | "otro";
+export interface SaleReference { kind: string; folio: string; date: string | null; note: string | null }
+export interface Receiver {
+  rut: string | null; name: string | null; trade_name: string | null; activity: string | null; address: string | null;
+  commune: string | null; city: string | null; region: string | null; email: string | null; phone: string | null; contact: string | null;
+}
+export interface SaleTerms {
+  payment: SalePayment;
+  card: "debito" | "credito" | null;
+  credit_days: number | null;
+  due_date: string | null;
+  bank: string | null;
+  transfer_date: string | null;
+  /** N.º de operación, voucher o cheque. */
+  operation: string | null;
+  references: SaleReference[];
+  receiver: Receiver | null;
 }
 export interface CustomerDetail extends Customer {
   sales_count: number;
@@ -304,6 +344,7 @@ export interface SaleDetail extends SaleSummary {
   external_ref: ExternalRef | null;
   void_reason: string | null;
   chain: DocLink[];
+  terms: SaleTerms | null;
   timeline: { at: string; text: string }[];
 }
 export interface SaleInput {
@@ -312,6 +353,8 @@ export interface SaleInput {
   issue_date: string;
   lines: LineInput[];
   notes?: string;
+  /** Forma de pago, referencias (OC, HES…) y datos del receptor. */
+  terms?: SaleTerms | null;
 }
 export interface EffectInput {
   mode: "contado" | "credito";

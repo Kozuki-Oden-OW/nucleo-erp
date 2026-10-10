@@ -45,6 +45,7 @@ fn f22_desde_cobros_y_pagos() {
                     taxable: false,
                 }],
                 notes: None,
+                terms: None,
             },
             None,
         )
