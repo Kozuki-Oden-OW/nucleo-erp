@@ -3,6 +3,10 @@ name: Publicar versión
 # Al crear una etiqueta vX.Y.Z (o al ejecutarlo a mano desde Actions → "Publicar versión" →
 # "Run workflow"): compila el instalador en Windows, crea la versión (GitHub Release) con
 # NucleoERPSetup.exe y su SHA-256, y actualiza www.nucleoerp.cl/descargar/.
+#
+# Firma de código (docs/FIRMA_CODIGO.md): si el repositorio tiene configurada la firma con
+# SignPath (variable SIGNPATH_ORGANIZATION_ID y secreto SIGNPATH_API_TOKEN), el instalador se envía
+# a firmar y se publica firmado; si no, se publica sin firma como hasta ahora.
 on:
   push:
     tags: ["v*.*.*"]
@@ -49,12 +53,41 @@ jobs:
       - name: Construir instalador
         working-directory: apps/desktop
         run: pnpm tauri build --bundles nsis
-      - name: Preparar archivos
+      - name: Preparar instalador
         shell: pwsh
         run: |
           $exe = Get-ChildItem target/release/bundle/nsis/*.exe | Select-Object -First 1
-          New-Item -ItemType Directory -Force out | Out-Null
-          Copy-Item $exe.FullName out/NucleoERPSetup.exe
+          New-Item -ItemType Directory -Force unsigned, out | Out-Null
+          Copy-Item $exe.FullName unsigned/NucleoERPSetup.exe
+      - name: Subir instalador sin firma
+        id: unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: instalador-sin-firma
+          path: unsigned/NucleoERPSetup.exe
+      - name: Firmar con SignPath
+        if: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'nucleo-erp' }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG || 'release-signing' }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+      - name: Preparar archivos
+        shell: pwsh
+        run: |
+          if (Test-Path signed/NucleoERPSetup.exe) {
+            Copy-Item signed/NucleoERPSetup.exe out/NucleoERPSetup.exe
+            $sig = Get-AuthenticodeSignature out/NucleoERPSetup.exe
+            if ($sig.Status -ne 'Valid') { throw "La firma del instalador no es válida: $($sig.Status)" }
+            "Instalador firmado por: $($sig.SignerCertificate.Subject)"
+          } else {
+            Copy-Item unsigned/NucleoERPSetup.exe out/NucleoERPSetup.exe
+            "Instalador sin firma (SignPath no está configurado)."
+          }
           $h = (Get-FileHash out/NucleoERPSetup.exe -Algorithm SHA256).Hash.ToLower()
           "$h  NucleoERPSetup.exe" | Out-File -Encoding ascii out/NucleoERPSetup.exe.sha256
       - uses: actions/upload-artifact@v4
