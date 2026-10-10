@@ -6,7 +6,9 @@ import type { F29Note, Severity } from "./f29";
 
 export interface TaxBracket { up_to_utm_e4?: number | null; factor_ppm: number; rebate_utm_e4?: number }
 export type EmployerBase = "pension" | "afc";
-export interface EmployerRate { code: string; label: string; rate_ppm: number; base?: EmployerBase }
+export interface EmployerRate { code: string; label: string; rate_ppm: number; base?: EmployerBase; lre?: number | null; payee?: string | null }
+export interface AllowanceBracket { up_to_income?: number | null; amount: number }
+export interface AllowanceRule { brackets?: AllowanceBracket[]; full_days?: number }
 export type HealthDeduction = "up_to_cap" | "legal_only";
 export interface GratificationRule { rate_ppm: number; cap_imm_e4: number }
 export interface AfcRates { worker_indefinite_ppm?: number; employer_indefinite_ppm?: number; employer_fixed_ppm?: number }
@@ -14,7 +16,10 @@ export interface PayrollParams {
   uf_e2?: number; utm?: number; imm?: number; cap_pension_uf_e4?: number; cap_afc_uf_e4?: number; health_ppm?: number;
   afc?: AfcRates; employer?: EmployerRate[]; accident_ppm?: number; tax_brackets?: TaxBracket[];
   gratification?: GratificationRule | null; overtime_surcharge_ppm?: number; health_deduction?: HealthDeduction;
+  family_allowance?: AllowanceRule | null; apv_b_cap_uf_e4?: number;
 }
+export type ApvRegime = "a" | "b";
+export interface Apv { regime: ApvRegime; amount_clp?: number | null; amount_uf_e4?: number | null; institution?: string | null }
 export type ContractKind = "indefinido" | "plazo_fijo" | "sin_contrato";
 export type Health =
   | { kind: "fonasa" }
@@ -23,7 +28,7 @@ export type Health =
 export interface WorkerTerms {
   contract?: ContractKind; owner_salary?: boolean; afp_ppm?: number | null; afp_name?: string | null;
   health?: Health; health_name?: string | null; afc?: boolean; employer_contrib?: boolean; accident?: boolean;
-  weekly_hours?: number | null;
+  weekly_hours?: number | null; family_loads?: number; invalid_loads?: number; allowance_income?: number | null; apv?: Apv | null;
 }
 export type GratificationMode = "ninguna" | "art50" | "fija";
 export interface EarningItem { label: string; amount: number; taxable?: boolean; lre?: number | null }
@@ -37,7 +42,7 @@ export interface PayLine { key: string; label: string; amount: number; lre: numb
 export interface PayslipResult {
   taxable_earnings: PayLine[]; other_earnings: PayLine[]; legal_deductions: PayLine[]; other_deductions: PayLine[];
   employer: PayLine[]; total_taxable: number; cap_pension: number; cap_afc: number; pension_base: number; afc_base: number;
-  tax_base: number; tax: number; tax_bracket: number; total_earnings: number; total_deductions: number; net: number;
+  tax_base: number; tax: number; tax_bracket: number; allowance_bracket: string | null; total_earnings: number; total_deductions: number; net: number;
   advance: number; to_pay: number; employer_total: number; employer_cost: number; notes: F29Note[]; complete: boolean;
 }
 
@@ -82,7 +87,7 @@ export function computePayslip(input: PayslipInput): PayslipResult {
   const health: Health = w.health ?? { kind: "fonasa" };
   const r: PayslipResult = {
     taxable_earnings: [], other_earnings: [], legal_deductions: [], other_deductions: [], employer: [],
-    total_taxable: 0, cap_pension: 0, cap_afc: 0, pension_base: 0, afc_base: 0, tax_base: 0, tax: 0, tax_bracket: 0,
+    total_taxable: 0, cap_pension: 0, cap_afc: 0, pension_base: 0, afc_base: 0, tax_base: 0, tax: 0, tax_bracket: 0, allowance_bracket: null,
     total_earnings: 0, total_deductions: 0, net: 0, advance: 0, to_pay: 0, employer_total: 0, employer_cost: 0, notes: [], complete: true,
   };
   const note = (severity: Severity, text: string) => {
@@ -195,8 +200,29 @@ export function computePayslip(input: PayslipInput): PayslipResult {
     }
   }
 
+  // 8 bis. APV individual.
+  let apvRebate = 0;
+  if (w.apv) {
+    const a = w.apv;
+    const amount = a.amount_clp != null && a.amount_clp > 0 ? a.amount_clp
+      : a.amount_uf_e4 != null && a.amount_uf_e4 > 0 && uf > 0 ? ufToClp(a.amount_uf_e4, uf) : null;
+    if (amount == null) note("falta", "Falta el monto del APV (en pesos o en UF, con la UF del mes).");
+    else {
+      let detail = a.institution ?? "";
+      if (a.regime === "b") {
+        const capUf = p.apv_b_cap_uf_e4 ?? 0;
+        if (capUf > 0 && uf > 0) {
+          const cap = ufToClp(capUf, uf);
+          apvRebate = Math.min(amount, cap);
+          if (amount > cap) detail = `${detail}${detail ? " · " : ""}rebaja el impuesto hasta ${ufLabel(capUf)} (${money(cap)})`;
+        } else note("falta", "Para el APV régimen B falta su tope mensual en UF (indicadores del mes).");
+      }
+      r.legal_deductions.push(line("apv", a.regime === "a" ? "APV régimen A" : "APV régimen B", amount, a.regime === "a" ? 3155 : 3156, detail || null));
+    }
+  }
+
   // 9. Impuesto único.
-  r.tax_base = Math.max(r.total_taxable - afp - healthDeduction - afcWorker, 0);
+  r.tax_base = Math.max(r.total_taxable - afp - healthDeduction - afcWorker - apvRebate, 0);
   const brackets = p.tax_brackets ?? [];
   if (utm <= 0 || brackets.length === 0) note("falta", "Faltan la UTM del mes y la tabla del impuesto único (indicadores del mes).");
   else {
@@ -211,6 +237,35 @@ export function computePayslip(input: PayslipInput): PayslipResult {
       ? `Base ${money(r.tax_base)}: tramo exento (hasta ${b.up_to_utm_e4 != null ? utmTxt(b.up_to_utm_e4) : ""})`
       : `${money(r.tax_base)} × ${pct(b.factor_ppm)} − ${utmTxt(b.rebate_utm_e4 ?? 0)} × ${money(utm)}`;
     r.legal_deductions.push(line("impuesto", "Impuesto único", r.tax, 3161, detail));
+  }
+
+  // 9 bis. Asignación familiar.
+  const loads = Math.max(w.family_loads ?? 0, 0) + 2 * Math.max(w.invalid_loads ?? 0, 0);
+  if (loads > 0) {
+    const rule = p.family_allowance;
+    if (!rule || !(rule.brackets ?? []).length) note("falta", "Para la asignación familiar faltan sus tramos en los indicadores del mes.");
+    else {
+      const bs = rule.brackets!;
+      let income: number;
+      if (w.allowance_income != null) income = w.allowance_income;
+      else {
+        note("aviso", "El tramo de asignación familiar se calculó con lo imponible del mes: la ley usa el promedio del semestre enero-junio anterior. Ingrésalo en la ficha.");
+        income = r.total_taxable;
+      }
+      let idx = bs.findIndex((b) => b.up_to_income == null || income <= b.up_to_income);
+      if (idx < 0) idx = bs.length - 1;
+      const letter = String.fromCharCode(65 + Math.min(idx, 25));
+      const perLoad = bs[idx]!.amount;
+      r.allowance_bracket = letter;
+      if (perLoad > 0) {
+        const full = perLoad * loads;
+        const fullDays = rule.full_days ?? 0;
+        const amount = fullDays > 0 && days < fullDays ? Number(divRound(B(full) * B(days), 30n)) : full;
+        let detail = `Tramo ${letter}: ${money(perLoad)} × ${loads} carga(s)${(w.invalid_loads ?? 0) > 0 ? " (invalidez cuenta doble)" : ""}`;
+        if (amount !== full) detail += ` × ${days}/30 días`;
+        r.other_earnings.push(line("asignacion_familiar", "Asignación familiar", amount, 2311, detail));
+      } else note("info", `Con un ingreso de ${money(income)} corresponde el tramo ${letter}, que no recibe asignación familiar.`);
+    }
   }
 
   // 10–11. No imponibles y descuentos voluntarios.
@@ -228,7 +283,7 @@ export function computePayslip(input: PayslipInput): PayslipResult {
   if (w.employer_contrib ?? true) {
     for (const e of (p.employer ?? []).filter((e) => e.rate_ppm > 0)) {
       const base = (e.base ?? "pension") === "afc" ? r.afc_base : r.pension_base;
-      r.employer.push(line(e.code, e.label, mulPpm(base, e.rate_ppm), null, `${money(base)} × ${pct(e.rate_ppm)}`));
+      r.employer.push(line(e.code, e.label, mulPpm(base, e.rate_ppm), e.lre ?? null, `${money(base)} × ${pct(e.rate_ppm)}`));
     }
   }
   if (w.afc) {

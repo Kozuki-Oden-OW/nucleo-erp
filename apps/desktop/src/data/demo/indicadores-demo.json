@@ -1,7 +1,7 @@
 {
   "_nota": "Indicadores de remuneraciones de DEMOSTRACIÓN (septiembre 2026). No se usan en el escritorio: allí la persona los copia cada mes desde Previred y el SII. Pendientes de verificación por un contador (D-07).",
   "period": "2026-09",
-  "source": "Ilustrativo: Previred, indicadores de septiembre 2026 (UF 30-09-2026, topes 90 y 135,2 UF, renta mínima, tasas AFP, SIS ago-oct 2026); SII, tabla del impuesto único de septiembre 2026; Ley 21.735 (cotización del empleador desde ago-2026). Verificar antes de usar.",
+  "source": "Ilustrativo: Previred, indicadores de septiembre 2026 (UF 30-09-2026, topes 90 y 135,2 UF, renta mínima, tasas AFP, SIS ago-oct 2026); SII, tabla del impuesto único de septiembre 2026; Ley 21.735 (cotización del empleador desde ago-2026). Asignación familiar: tramos y montos de Previred sept-2026; finiquito: topes 90 UF y 11 años (art. 172 y 163 CdT), 15 días hábiles (art. 67), feriados 2026 por verificar. Verificar antes de usar.",
   "indicators": {
     "params": {
       "uf_e2": 4105720,
@@ -20,25 +20,30 @@
           "code": "sis",
           "label": "Seguro de invalidez y sobrevivencia (SIS)",
           "rate_ppm": 17800,
-          "base": "pension"
+          "base": "pension",
+          "lre": 4155,
+          "payee": "seguro_social"
         },
         {
           "code": "cuenta_individual",
           "label": "Cotización del empleador a la cuenta individual (Ley 21.735)",
           "rate_ppm": 1000,
-          "base": "pension"
+          "base": "pension",
+          "payee": "afp"
         },
         {
           "code": "rentabilidad_protegida",
           "label": "Cotización con rentabilidad protegida (Ley 21.735)",
           "rate_ppm": 9000,
-          "base": "pension"
+          "base": "pension",
+          "payee": "seguro_social"
         },
         {
           "code": "expectativa_vida",
           "label": "Compensación por expectativa de vida (Ley 21.735)",
           "rate_ppm": 7200,
-          "base": "pension"
+          "base": "pension",
+          "payee": "seguro_social"
         }
       ],
       "accident_ppm": 9300,
@@ -89,7 +94,29 @@
         "cap_imm_e4": 47500
       },
       "overtime_surcharge_ppm": 500000,
-      "health_deduction": "up_to_cap"
+      "health_deduction": "up_to_cap",
+      "family_allowance": {
+        "brackets": [
+          {
+            "up_to_income": 649039,
+            "amount": 22601
+          },
+          {
+            "up_to_income": 947990,
+            "amount": 13870
+          },
+          {
+            "up_to_income": 1478539,
+            "amount": 4382
+          },
+          {
+            "up_to_income": null,
+            "amount": 0
+          }
+        ],
+        "full_days": 25
+      },
+      "apv_b_cap_uf_e4": 500000
     },
     "afp": [
       {
@@ -120,6 +147,31 @@
         "name": "Uno",
         "rate_ppm": 104600
       }
-    ]
+    ],
+    "previred_due_day": 13,
+    "severance": {
+      "cap_uf_e4": 900000,
+      "cap_years": 11,
+      "vacation_days_per_year": 15,
+      "obra_days_per_month_e2": 250,
+      "holidays": [
+        "2026-01-01",
+        "2026-04-03",
+        "2026-04-04",
+        "2026-05-01",
+        "2026-05-21",
+        "2026-06-21",
+        "2026-06-29",
+        "2026-07-16",
+        "2026-08-15",
+        "2026-09-18",
+        "2026-09-19",
+        "2026-10-12",
+        "2026-10-31",
+        "2026-11-01",
+        "2026-12-08",
+        "2026-12-25"
+      ]
+    }
   }
 }

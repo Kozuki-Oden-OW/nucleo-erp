@@ -43,6 +43,8 @@ fn indicators() -> Indicators {
                 label: "SIS".into(),
                 rate_ppm: 17_800,
                 base: Default::default(),
+                lre: None,
+                payee: None,
             }],
             accident_ppm: 9_300,
             tax_brackets: vec![
@@ -54,11 +56,15 @@ fn indicators() -> Indicators {
             gratification: None,
             overtime_surcharge_ppm: 500_000,
             health_deduction: HealthDeduction::UpToCap,
+            family_allowance: None,
+            apv_b_cap_uf_e4: 0,
         },
         afp: vec![AfpRate {
             name: "Uno".into(),
             rate_ppm: 104_600,
         }],
+        previred_due_day: None,
+        severance: Default::default(),
     }
 }
 
@@ -211,4 +217,126 @@ fn dias_por_ingreso_y_validaciones() {
         )
         .is_err()
     );
+}
+
+#[test]
+fn previred_lre_y_finiquito() {
+    use nucleo_app::core_ops::BusinessPatch;
+    use nucleo_app::payroll_ops::{PayrollSettings, SeveranceForm};
+    use nucleo_domain::payroll::{AllowanceBracket, AllowanceRule};
+    use nucleo_domain::severance::Cause;
+
+    let (_d, _app, mut s) = session();
+    let mut t = owner();
+    t.is_owner = false;
+    t.rut = "11.111.111-1".into();
+    t.start_date = "2020-03-01".into();
+    t.terms.contract = "indefinido".into();
+    t.terms.base_salary = 600_000;
+    t.terms.afc = true;
+    t.terms.family_loads = 2;
+    t.terms.allowance_income = Some(500_000);
+    let w = s.save_worker(None, &t).unwrap();
+    let o = s.save_worker(None, &owner()).unwrap();
+    let mut ind = indicators();
+    ind.params.family_allowance = Some(AllowanceRule {
+        brackets: vec![
+            AllowanceBracket {
+                up_to_income: Some(400_000),
+                amount: 20_000,
+            },
+            AllowanceBracket {
+                up_to_income: Some(900_000),
+                amount: 12_000,
+            },
+            AllowanceBracket {
+                up_to_income: None,
+                amount: 0,
+            },
+        ],
+        full_days: 25,
+    });
+    ind.params.employer[0].lre = Some(4155);
+    ind.params.employer[0].payee = Some("seguro_social".into());
+    ind.previred_due_day = Some(13);
+    ind.severance.cap_uf_e4 = 900_000;
+    ind.severance.cap_years = 11;
+    ind.severance.vacation_days_per_year = 15;
+    s.save_payroll_indicators("2026-08", &ind, None).unwrap();
+    s.save_payroll_indicators("2026-09", &ind, None).unwrap();
+
+    let v = s.payslip(w.id, "2026-09").unwrap();
+    assert_eq!(v.result.allowance_bracket.as_deref(), Some("B"));
+    s.emit_payslip(w.id, "2026-09", "2026-09-30").unwrap();
+    s.emit_payslip(o.id, "2026-09", "2026-09-30").unwrap();
+
+    // Previred: cada institución y la asignación familiar descontada.
+    s.save_payroll_settings(&PayrollSettings {
+        ccaf: 0,
+        mutual: Some(1),
+        region: Some(10),
+        comuna: Some(10105),
+    })
+    .unwrap();
+    let p = s.previred("2026-09").unwrap();
+    assert_eq!(p.payslips, 2);
+    assert_eq!(p.due_date.as_deref(), Some("2026-10-13"));
+    let row = |k: &str| {
+        p.rows
+            .iter()
+            .find(|r| r.institution.contains(k))
+            .map(|r| r.total)
+    };
+    assert_eq!(row("Asignación familiar"), Some(-24_000));
+    assert!(row("AFP uno").unwrap() > 0);
+    assert!(row("Seguro Social").unwrap() > 0);
+    assert!(row("ACHS").unwrap() > 0);
+    assert_eq!(p.total, p.rows.iter().map(|r| r.total).sum::<i64>());
+
+    // LRE: exige el RUT del negocio; una fila por persona, totales que cuadran.
+    assert!(s.lre("2026-09").is_err());
+    s.update_business(&BusinessPatch {
+        rut: Some("76.543.210-3".into()),
+        ..Default::default()
+    })
+    .unwrap();
+    let l = s.lre("2026-09").unwrap();
+    assert_eq!(l.file_name, "765432103_202609.csv");
+    assert_eq!(l.rows, 2);
+    assert_eq!(l.content.lines().count(), 3);
+    assert!(l.content.contains("Sueldo empresarial(2161)"));
+    assert!(
+        l.warnings.iter().all(|w| !w.contains("no cuadra")),
+        "{:?}",
+        l.warnings
+    );
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join(&l.file_name);
+    s.export_lre("2026-09", &path).unwrap();
+    let bytes = std::fs::read(&path).unwrap();
+    assert!(bytes.contains(&0xF3), "Windows-1252: «ó» en un byte");
+
+    // Finiquito por necesidades de la empresa, sin aviso: aviso previo + 7 años.
+    let f = s
+        .severance(
+            w.id,
+            &SeveranceForm {
+                end_date: "2026-09-30".into(),
+                cause: Some(Cause::NecesidadesEmpresa),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(f.indicators_period, "2026-08");
+    assert!(f.result.complete, "{:?}", f.result.notes);
+    assert_eq!(f.result.ias_years, 7);
+    assert_eq!(f.suggested_base, 600_000);
+    let ias: i64 = f
+        .result
+        .earnings
+        .iter()
+        .filter(|l| l.key == "anios_servicio")
+        .map(|l| l.amount)
+        .sum();
+    assert_eq!(ias, 600_000 * 7);
 }

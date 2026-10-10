@@ -3,7 +3,7 @@ import golden from "../../../../golden/remuneraciones.json";
 import { computePayslip, pct, type PayslipInput, type PayslipResult } from "./payroll";
 
 const line = (r: PayslipResult, key: string) =>
-  [...r.taxable_earnings, ...r.legal_deductions, ...r.employer].filter((l) => l.key === key).reduce((a, l) => a + l.amount, 0);
+  [...r.taxable_earnings, ...r.legal_deductions, ...r.other_earnings, ...r.employer].filter((l) => l.key === key).reduce((a, l) => a + l.amount, 0);
 
 describe("Liquidación: mismo cálculo que Rust (golden/remuneraciones.json)", () => {
   for (const c of golden.casos) {
@@ -13,12 +13,13 @@ describe("Liquidación: mismo cálculo que Rust (golden/remuneraciones.json)", (
       expect(r.complete).toBe(true);
       const got: Record<string, number> = {
         total_taxable: r.total_taxable, pension_base: r.pension_base, afc_base: r.afc_base,
-        afp: line(r, "afp"), salud: line(r, "salud"), salud_adicional: line(r, "salud_adicional"), afc: line(r, "afc"),
+        afp: line(r, "afp"), salud: line(r, "salud"), salud_adicional: line(r, "salud_adicional"), afc: line(r, "afc"), apv: line(r, "apv"), asignacion_familiar: line(r, "asignacion_familiar"),
         horas_extra: line(r, "horas_extra"), gratificacion: line(r, "gratificacion"), tax_base: r.tax_base, tax: r.tax,
         tax_bracket: r.tax_bracket, total_earnings: r.total_earnings, total_deductions: r.total_deductions, net: r.net,
         to_pay: r.to_pay, employer_total: r.employer_total, employer_cost: r.employer_cost,
       };
       for (const [k, v] of Object.entries(got)) expect([k, v]).toEqual([k, e[k]]);
+      expect(r.allowance_bracket).toBe((c.esperado as { allowance_bracket: string | null }).allowance_bracket);
       for (const [k, v] of Object.entries(e.employer_lines)) expect([k, line(r, k)]).toEqual([k, v]);
     });
   }

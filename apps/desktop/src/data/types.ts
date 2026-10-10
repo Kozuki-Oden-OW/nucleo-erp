@@ -867,7 +867,12 @@ export interface RcvImportReport { rows: number; skipped: string[]; other_period
 
 export interface AfpRate { name: string; rate_ppm: number }
 /** Indicadores del mes (Previred y SII): parámetros de la liquidación y tasas de las AFP. */
-export interface PayrollIndicators { params: import("./payroll").PayrollParams; afp: AfpRate[] }
+export interface PayrollIndicators {
+  params: import("./payroll").PayrollParams;
+  afp: AfpRate[];
+  previred_due_day?: number | null;
+  severance?: import("./severance").SeveranceRules;
+}
 export interface IndicatorsView {
   period: string;
   indicators: PayrollIndicators;
@@ -894,6 +899,18 @@ export interface PayTerms {
   accident: boolean;
   items: import("./payroll").EarningItem[];
   deductions: import("./payroll").DeductionItem[];
+  family_loads: number;
+  invalid_loads: number;
+  allowance_income: number | null;
+  apv: import("./payroll").Apv | null;
+  region: number | null;
+  comuna: number | null;
+  jornada: number | null;
+  disability: number;
+  pensioner: boolean;
+  young_subsidy: boolean;
+  health_lre_code: number | null;
+  end_cause: import("./severance").Cause | null;
 }
 export interface Worker {
   id: number;
@@ -952,4 +969,41 @@ export interface PayrollView {
   total_to_pay: number;
   total_tax: number;
   total_employer_cost: number;
+}
+
+export interface PayrollSettings { ccaf: number; mutual: number | null; region: number | null; comuna: number | null }
+export interface PreviredRow { institution: string; kind: "afp" | "apv" | "salud" | "afc" | "seguro_social" | "mutual" | "asignacion" | "otro"; worker: number; employer: number; total: number }
+export interface PreviredView {
+  period: string; rows: PreviredRow[]; total: number; due_date: string | null; payslips: number; pending: string[];
+  notes: import("./f29").F29Note[];
+}
+export interface LreExport { file_name: string; content: string; rows: number; format: string; warnings: string[] }
+export interface SeveranceForm {
+  end_date: string; cause: import("./severance").Cause | null; notice_given: boolean; base_172: number | null; vacation_base: number | null;
+  pending_vacation_days_e2: number; vacation_taken_days_e2: number; afc_offset: number; deductions: import("./payroll").DeductionItem[];
+}
+export interface SeveranceView {
+  worker: Worker; form: SeveranceForm; input: import("./severance").SeveranceInput; result: import("./severance").SeveranceResult;
+  suggested_base: number; indicators_period: string; indicators_saved: boolean;
+}
+
+/* ───────────────────────────── Renta anual: F22 (Fase 10, hito C) ───────────────────────────── */
+
+export interface F22Inputs {
+  params: import("./f22").F22Params;
+  incentive: boolean;
+  art21: number;
+  rebates: number;
+  registers: import("./f22").Registers;
+  overrides: Record<string, number>;
+  extra: import("./f22").F22Line[];
+  ppm_factors: Record<string, number>;
+  ppm_overrides: Record<string, number>;
+}
+export interface F22DerivedLine { code: number; label: string; amount: number; count: number; source: string; used: number; overridden: boolean }
+export interface F22PpmRow { period: string; amount: number | null; source: "declarado" | "manual" | "sin_dato"; factor_e6: number | null }
+export interface F22View {
+  year: number; tax_year: number; regime: string; in_progress: boolean; inputs: F22Inputs; derived: F22DerivedLine[]; ppm: F22PpmRow[];
+  input: import("./f22").F22Input; result: import("./f22").F22Result; without_incentive: import("./f22").F22Result | null;
+  checks: import("./f29").F29Note[]; status: string;
 }

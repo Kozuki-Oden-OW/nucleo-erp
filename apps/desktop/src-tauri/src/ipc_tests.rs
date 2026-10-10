@@ -659,3 +659,25 @@ fn remuneraciones_por_ipc() {
         "2026-09"
     );
 }
+
+#[test]
+fn f22_por_ipc() {
+    let ipc = Ipc::new();
+    let created = ipc.ok(
+        "create_company",
+        json!({ "name": "Renta", "profile": "negocio" }),
+    );
+    ipc.ok("open_company", json!({ "uid": created["company"]["uid"] }));
+    let v = ipc.ok("f22", json!({ "year": 2025 }));
+    assert_eq!(v["tax_year"], 2026);
+    let v = ipc.ok("save_f22_inputs", json!({ "year": 2025, "inputs": {
+        "params": { "idpc_rate_ppm": 125000 }, "extra": [ { "code": 1400, "amount": 1000000 } ] } }));
+    assert_eq!(v["result"]["codes"]["20"], 125000);
+    assert!(
+        ipc.call(
+            "save_f22_inputs",
+            json!({ "year": 2025, "inputs": { "extra": [ { "code": 20, "amount": 1 } ] } })
+        )
+        .is_err()
+    );
+}

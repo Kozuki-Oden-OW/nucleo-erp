@@ -8,6 +8,7 @@ pub mod audit;
 pub mod comex;
 pub mod core;
 pub mod customers;
+pub mod f22;
 pub mod finance;
 pub mod inventory;
 pub mod maintenance;

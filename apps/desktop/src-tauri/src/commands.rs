@@ -6,6 +6,7 @@ use nucleo_app::company::BackupDone;
 use nucleo_app::core_ops::{
     BusinessPatch, BusinessSettings, CurrentUser, EntityRef, NewUser, SecuritySettings, UserPatch,
 };
+use nucleo_app::f22_ops::{F22Inputs, F22View};
 use nucleo_app::f29_ops::{F29Inputs, F29View, RcvImportReport, TaxDocInput, TaxProfile};
 use nucleo_app::finance_ops::{
     AccountInput, CalendarItem, DashboardData, ExpenseDetail, ExpenseFilter, ExpenseInput,
@@ -26,7 +27,8 @@ use nucleo_app::nucleo_db::purchases::PriceHistoryRow;
 use nucleo_app::nucleo_db::suppliers::SupplierRow;
 use nucleo_app::nucleo_db::users::{PermissionRow, RoleRow, UserRow};
 use nucleo_app::payroll_ops::{
-    Indicators, IndicatorsView, PayrollView, PayslipMonth, PayslipView, Worker, WorkerInput,
+    Indicators, IndicatorsView, LreExport, PayrollSettings, PayrollView, PayslipMonth, PayslipView,
+    PreviredView, SeveranceForm, SeveranceView, Worker, WorkerInput,
 };
 use nucleo_app::purchase_ops::{
     NewSupplier, PoDetail, PoInput, PoSummary, PurchaseDetail, PurchaseFilter, PurchaseInput,
@@ -1261,4 +1263,63 @@ pub fn discard_payslip(
     period: String,
 ) -> CmdResult<PayslipView> {
     with_session(&state, |s| Ok(s.discard_payslip(worker_id, &period)?))
+}
+
+#[tauri::command]
+pub fn payroll_settings(state: State<'_, AppState>) -> CmdResult<PayrollSettings> {
+    with_session(&state, |s| Ok(s.payroll_settings()?))
+}
+
+#[tauri::command]
+pub fn save_payroll_settings(
+    state: State<'_, AppState>,
+    settings: PayrollSettings,
+) -> CmdResult<PayrollSettings> {
+    with_session(&state, |s| Ok(s.save_payroll_settings(&settings)?))
+}
+
+#[tauri::command]
+pub fn previred(state: State<'_, AppState>, period: String) -> CmdResult<PreviredView> {
+    with_session(&state, |s| Ok(s.previred(&period)?))
+}
+
+#[tauri::command]
+pub fn lre(state: State<'_, AppState>, period: String) -> CmdResult<LreExport> {
+    with_session(&state, |s| Ok(s.lre(&period)?))
+}
+
+#[tauri::command]
+pub fn export_lre(
+    state: State<'_, AppState>,
+    period: String,
+    path: String,
+) -> CmdResult<LreExport> {
+    with_session(&state, |s| {
+        Ok(s.export_lre(&period, std::path::Path::new(&path))?)
+    })
+}
+
+#[tauri::command]
+pub fn severance(
+    state: State<'_, AppState>,
+    worker_id: i64,
+    form: SeveranceForm,
+) -> CmdResult<SeveranceView> {
+    with_session(&state, |s| Ok(s.severance(worker_id, &form)?))
+}
+
+/* ───────────── Renta anual: F22 (Fase 10, hito C) ───────────── */
+
+#[tauri::command]
+pub fn f22(state: State<'_, AppState>, year: i32) -> CmdResult<F22View> {
+    with_session(&state, |s| Ok(s.f22(year)?))
+}
+
+#[tauri::command]
+pub fn save_f22_inputs(
+    state: State<'_, AppState>,
+    year: i32,
+    inputs: F22Inputs,
+) -> CmdResult<F22View> {
+    with_session(&state, |s| Ok(s.save_f22_inputs(year, &inputs)?))
 }

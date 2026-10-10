@@ -20,6 +20,7 @@ import { Comex } from "./screens/comex/Comex";
 import { Impuestos } from "./screens/impuestos/Impuestos";
 import { Remuneraciones } from "./screens/remuneraciones/Remuneraciones";
 import { LiquidacionRoute } from "./screens/remuneraciones/Liquidacion";
+import { FiniquitoRoute } from "./screens/remuneraciones/Finiquito";
 import { ImportEditLoader, ImportEditor } from "./screens/comex/ImportEditor";
 import { ImportView } from "./screens/comex/ImportView";
 import { Purchases } from "./screens/compras/Purchases";
@@ -174,6 +175,7 @@ function Screen({ route, info, session, reload }: { route: Route; info: AppInfo;
       return has.has("impuestos") ? <Impuestos route={route} /> : <Proximamente id="contabilidad" />;
     case "remuneraciones":
       if (!has.has("remuneraciones")) return <Proximamente id="remuneraciones" />;
+      if (a === "finiquito" && b) return <FiniquitoRoute key={b} id={b} />;
       if (a === "liquidacion" && b) return <LiquidacionRoute key={route.raw} id={b} period={route.query.get("periodo")} />;
       return <Remuneraciones route={route} />;
     case "config":

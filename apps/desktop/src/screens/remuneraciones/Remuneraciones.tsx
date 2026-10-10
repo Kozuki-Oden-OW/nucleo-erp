@@ -11,8 +11,9 @@ import { Badge, Button, Card, EmptyState, Notice, PageHeader, Spinner, Tabs } fr
 import { MonthPicker, SlipBadge, periodLabel } from "./common";
 import { PersonasTab } from "./Personas";
 import { IndicadoresTab } from "./Indicadores";
+import { PreviredTab } from "./Previred";
 
-type Tab = "liquidaciones" | "personas" | "indicadores";
+type Tab = "liquidaciones" | "previred" | "personas" | "indicadores";
 
 export function Remuneraciones({ route }: { route: Route }) {
   const tab = (route.query.get("tab") as Tab) || "liquidaciones";
@@ -22,15 +23,17 @@ export function Remuneraciones({ route }: { route: Route }) {
     <div className="anim-in">
       <PageHeader title="Remuneraciones"
         subtitle="Prepara la liquidación de tu sueldo empresarial y la de tus trabajadores, con sus cotizaciones e impuesto único. NÚCLEO no envía nada: te deja todo listo para pagar en Previred y declarar en el F29." />
-      {tab !== "personas" && <MonthPicker period={period} onChange={(p) => go(tab, p)} label={tab === "indicadores" ? "Indicadores de" : "Remuneraciones de"} />}
+      {tab !== "personas" && <MonthPicker period={period} onChange={(p) => go(tab, p)} label={tab === "indicadores" ? "Indicadores de" : tab === "previred" ? "Cotizaciones de" : "Remuneraciones de"} />}
       <Tabs value={tab} onChange={(t) => go(t)} tabs={[
         { value: "liquidaciones", label: "Liquidaciones del mes" },
+        { value: "previred", label: "Previred y libro" },
         { value: "personas", label: "Personas" },
         { value: "indicadores", label: "Indicadores del mes" },
       ]} />
       <div className="mt-5">
         {tab === "personas" ? <PersonasTab openNew={route.query.get("nueva") === "1"} />
           : tab === "indicadores" ? <IndicadoresTab period={period} />
+          : tab === "previred" ? <PreviredTab period={period} />
           : <LiquidacionesTab period={period} onGo={(t, extra) => go(t, period, extra)} />}
       </div>
     </div>
@@ -115,7 +118,8 @@ function LiquidacionesTab({ period, onGo }: { period: string; onGo: (t: Tab, ext
       </Card>
       <Notice tone="info" title="Qué pasa después">
         Al emitir una liquidación eliges la fecha de pago: su impuesto único pasa solo al código 48 del F29 de ese mes.
-        Las cotizaciones (AFP, salud, cesantía y los aportes del empleador) se pagan en Previred hasta el día 13 del mes siguiente.{" "}
+        Las cotizaciones (AFP, salud, cesantía y los aportes del empleador) se pagan en Previred el mes siguiente: el detalle por institución está en{" "}
+        <button type="button" className="font-medium text-accent hover:underline" onClick={() => onGo("previred")}>Previred y libro</button>.{" "}
         {can("contabilidad.ver") && <button type="button" className="inline-flex items-center gap-1 font-medium text-accent hover:underline" onClick={() => navigate("/contabilidad?tab=f29")}><Landmark size={14} /> Ver el F29</button>}
       </Notice>
     </div>

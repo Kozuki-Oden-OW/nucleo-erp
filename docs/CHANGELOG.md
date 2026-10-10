@@ -2,6 +2,23 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [Sin publicar] — Fase 10: Previred, LRE, finiquito y F22
+
+### Agregado
+- Remuneraciones → «Previred y libro»: cuánto pagar en Previred a cada institución (AFP, salud,
+  seguro de cesantía, Seguro Social, mutual) con la asignación familiar descontada y el vencimiento;
+  archivo del Libro de Remuneraciones Electrónico para la DT (incluye el sueldo empresarial) con
+  avisos de lo que falta; datos del empleador (caja, mutual, región y comuna).
+- Liquidaciones con asignación familiar por tramo (cargas simples e invalidez, proporcional a los días)
+  y APV régimen A o B (el B rebaja el impuesto hasta su tope).
+- Calculadora de finiquito imprimible: feriado pendiente y proporcional en días corridos, aviso previo,
+  años de servicio con topes, obra o faena y descuento del aporte al seguro de cesantía.
+- Impuestos → «Renta anual (F22)» del régimen Pro Pyme general: recuadro 17 desde lo cobrado y lo
+  pagado en el año (con explicación y ajuste por código), remuneraciones, PPM de los F29 declarados
+  con su reajuste, incentivo al ahorro 14 E con comparación, impuesto, saldo a favor y recuadros 18 a
+  20. El cálculo reproduce al peso la planilla oficial del SII.
+- Diseño de la sincronización y la app móvil (`docs/SINCRONIZACION.md`).
+
 ## [Sin publicar] — Fase 10, hito B: sueldo empresarial y liquidaciones
 
 ### Agregado

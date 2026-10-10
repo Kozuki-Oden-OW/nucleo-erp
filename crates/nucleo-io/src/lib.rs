@@ -4,5 +4,6 @@
 //! de documentos adjuntos (§10.1).
 
 pub mod erpbackup;
+pub mod lre;
 pub mod rcv;
 pub mod vault;

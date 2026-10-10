@@ -1,0 +1,198 @@
+{
+  "_nota": "Casos golden del finiquito (nucleo-domain::severance y apps/desktop/src/data/severance.ts). Datos ilustrativos; reglas de docs/REMUNERACIONES.md §2 (topes 90 UF y 11 años, 15 días hábiles, 2,5 días por mes en obra o faena desde 2022, feriados 2026) pendientes de revisión por un contador (D-07). 'esperado' lo calcula un modelo de referencia independiente con el calendario de Python.",
+  "casos": [
+    {
+      "nombre": "Necesidades de la empresa sin aviso, 6 años y 7 meses, feriado pendiente (ilustrativo)",
+      "estado": "pendiente_revision",
+      "input": {
+        "rules": {
+          "uf_e2": 4105720,
+          "cap_uf_e4": 900000,
+          "cap_years": 11,
+          "vacation_days_per_year": 15,
+          "obra_days_per_month_e2": 250,
+          "holidays": [
+            "2026-09-18",
+            "2026-09-19",
+            "2026-10-12",
+            "2026-10-31",
+            "2026-11-01",
+            "2026-12-08",
+            "2026-12-25"
+          ]
+        },
+        "start_date": "2020-03-01",
+        "end_date": "2026-09-30",
+        "cause": "necesidades_empresa",
+        "notice_given": false,
+        "base_172": 900000,
+        "vacation_base": 800000,
+        "pending_vacation_days_e2": 500,
+        "afc_offset": 350000
+      },
+      "esperado": {
+        "lines": {
+          "feriado": 553333,
+          "aviso_previo": 900000,
+          "anios_servicio": 6300000,
+          "aporte_afc": 350000
+        },
+        "total_earnings": 7753333,
+        "total_deductions": 350000,
+        "to_pay": 7403333,
+        "service": [
+          6,
+          7,
+          0
+        ],
+        "ias_years": 7,
+        "capped_base": 900000,
+        "vacation_business_days_e2": 1375,
+        "vacation_calendar_days_e2": 2075
+      }
+    },
+    {
+      "nombre": "Renuncia con 1 año y 2 meses: solo feriado proporcional (ilustrativo)",
+      "estado": "pendiente_revision",
+      "input": {
+        "rules": {
+          "uf_e2": 4105720,
+          "cap_uf_e4": 900000,
+          "cap_years": 11,
+          "vacation_days_per_year": 15,
+          "obra_days_per_month_e2": 250,
+          "holidays": [
+            "2026-09-18",
+            "2026-09-19",
+            "2026-10-12",
+            "2026-10-31",
+            "2026-11-01",
+            "2026-12-08",
+            "2026-12-25"
+          ]
+        },
+        "start_date": "2025-08-04",
+        "end_date": "2026-10-09",
+        "cause": "renuncia",
+        "base_172": 700000,
+        "vacation_base": 700000,
+        "vacation_taken_days_e2": 100
+      },
+      "esperado": {
+        "lines": {
+          "feriado": 110833
+        },
+        "total_earnings": 110833,
+        "total_deductions": 0,
+        "to_pay": 110833,
+        "service": [
+          1,
+          2,
+          6
+        ],
+        "ias_years": 0,
+        "capped_base": 700000,
+        "vacation_business_days_e2": 175,
+        "vacation_calendar_days_e2": 475
+      }
+    },
+    {
+      "nombre": "Despido con remuneración sobre el tope de 90 UF y 12 años (tope de 11 años) (ilustrativo)",
+      "estado": "pendiente_revision",
+      "input": {
+        "rules": {
+          "uf_e2": 4105720,
+          "cap_uf_e4": 900000,
+          "cap_years": 11,
+          "vacation_days_per_year": 15,
+          "obra_days_per_month_e2": 250,
+          "holidays": [
+            "2026-09-18",
+            "2026-09-19",
+            "2026-10-12",
+            "2026-10-31",
+            "2026-11-01",
+            "2026-12-08",
+            "2026-12-25"
+          ]
+        },
+        "start_date": "2014-05-12",
+        "end_date": "2026-09-15",
+        "cause": "necesidades_empresa",
+        "notice_given": true,
+        "base_172": 4500000,
+        "vacation_base": 4500000
+      },
+      "esperado": {
+        "lines": {
+          "feriado": 1225500,
+          "anios_servicio": 40646628
+        },
+        "total_earnings": 41872128,
+        "total_deductions": 0,
+        "to_pay": 41872128,
+        "service": [
+          12,
+          4,
+          4
+        ],
+        "ias_years": 11,
+        "capped_base": 3695148,
+        "vacation_business_days_e2": 517,
+        "vacation_calendar_days_e2": 817
+      }
+    },
+    {
+      "nombre": "Conclusión de obra o faena, 8 meses y 20 días (ilustrativo)",
+      "estado": "pendiente_revision",
+      "input": {
+        "rules": {
+          "uf_e2": 4105720,
+          "cap_uf_e4": 900000,
+          "cap_years": 11,
+          "vacation_days_per_year": 15,
+          "obra_days_per_month_e2": 250,
+          "holidays": [
+            "2026-09-18",
+            "2026-09-19",
+            "2026-10-12",
+            "2026-10-31",
+            "2026-11-01",
+            "2026-12-08",
+            "2026-12-25"
+          ]
+        },
+        "start_date": "2026-01-12",
+        "end_date": "2026-10-01",
+        "cause": "conclusion_obra",
+        "base_172": 650000,
+        "vacation_base": 650000,
+        "deductions": [
+          {
+            "label": "Préstamo",
+            "amount": 50000
+          }
+        ]
+      },
+      "esperado": {
+        "lines": {
+          "feriado": 386317,
+          "obra_faena": 487500,
+          "descuento": 50000
+        },
+        "total_earnings": 873817,
+        "total_deductions": 50000,
+        "to_pay": 823817,
+        "service": [
+          0,
+          8,
+          20
+        ],
+        "ias_years": 0,
+        "capped_base": 650000,
+        "vacation_business_days_e2": 1083,
+        "vacation_calendar_days_e2": 1783
+      }
+    }
+  ]
+}

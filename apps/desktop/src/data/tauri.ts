@@ -4,7 +4,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "./backend";
 import type {
-  IndicatorsView, PayrollIndicators, PayrollView, PayslipMonth, PayslipView, Worker, WorkerInput,
+  F22Inputs, F22View,
+  IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
+  SeveranceForm, SeveranceView, Worker, WorkerInput,
   F29Inputs, F29View, RcvImportReport, TaxDocInput, TaxProfile,
   ImportCostInput, ImportDetail, ImportInput, ImportReceiveLine, ImportStage, ImportSummary, IncotermDef,
   AccountInput, CalendarItem, ExpenseCategory, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow, MoneyAccount,
@@ -216,6 +218,19 @@ export class TauriBackend implements Backend {
   emitPayslip(workerId: number, period: string, payDate: string) { return call<PayslipView>("emit_payslip", { workerId, period, payDate }); }
   voidPayslip(id: number, reason: string) { return call<PayslipView>("void_payslip", { id, reason }); }
   discardPayslip(workerId: number, period: string) { return call<PayslipView>("discard_payslip", { workerId, period }); }
+  payrollSettings() { return call<PayrollSettings>("payroll_settings"); }
+  savePayrollSettings(settings: PayrollSettings) { return call<PayrollSettings>("save_payroll_settings", { settings }); }
+  previred(period: string) { return call<PreviredView>("previred", { period }); }
+  lre(period: string) { return call<LreExport>("lre", { period }); }
+  async exportLre(period: string): Promise<LreExport | null> {
+    const preview = await call<LreExport>("lre", { period });
+    const path = await save({ defaultPath: preview.file_name, title: "Guardar el Libro de Remuneraciones", filters: [{ name: "CSV", extensions: ["csv"] }] });
+    if (!path) return null;
+    return call<LreExport>("export_lre", { period, path });
+  }
+  severance(workerId: number, form: SeveranceForm) { return call<SeveranceView>("severance", { workerId, form }); }
+  f22(year: number) { return call<F22View>("f22", { year }); }
+  saveF22Inputs(year: number, inputs: F22Inputs) { return call<F22View>("save_f22_inputs", { year, inputs }); }
 }
 
 /** Selector de archivo del escritorio para adjuntar documentos. */

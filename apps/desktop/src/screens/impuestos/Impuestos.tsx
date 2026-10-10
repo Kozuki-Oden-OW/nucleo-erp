@@ -10,8 +10,9 @@ import { IconButton, Notice, PageHeader, Spinner, Tabs } from "../../ui/kit";
 import { F29Tab } from "./F29Tab";
 import { RegistroTab } from "./Registro";
 import { PerfilTab } from "./Perfil";
+import { F22Tab, defaultF22Year } from "./F22Tab";
 
-type Tab = "f29" | "registro" | "configuracion";
+type Tab = "f29" | "registro" | "f22" | "configuracion";
 
 const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 export const periodLabel = (p: string) => `${MONTHS[Number(p.slice(5, 7)) - 1]} ${p.slice(0, 4)}`;
@@ -27,6 +28,7 @@ export function Impuestos({ route }: { route: Route }) {
   const tab = (route.query.get("tab") as Tab) || "f29";
   const period = /^\d{4}-\d{2}$/.test(route.query.get("periodo") ?? "") ? route.query.get("periodo")! : defaultPeriod();
   const go = (t: Tab, p = period) => navigate(`/contabilidad?tab=${t}&periodo=${p}`, { replace: true });
+  const f22Year = /^\d{4}$/.test(route.query.get("anio") ?? "") ? Number(route.query.get("anio")) : defaultF22Year();
   const [view, setView] = useState<F29View | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const load = useCallback(() => {
@@ -38,23 +40,25 @@ export function Impuestos({ route }: { route: Route }) {
   return (
     <div className="anim-in">
       <PageHeader title="Impuestos"
-        subtitle="Prepara tu declaración mensual (F29) con tus ventas, compras e importaciones. NÚCLEO no declara: te deja cada código listo para copiar en sii.cl y te explica de dónde sale." />
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+        subtitle="Prepara tu declaración mensual (F29) y tu renta anual (F22) con tus ventas, compras, importaciones y remuneraciones. NÚCLEO no declara: te deja cada código listo para copiar en sii.cl y te explica de dónde sale." />
+      {tab !== "f22" && <div className="mb-4 flex flex-wrap items-center gap-2">
         <IconButton icon={ChevronLeft} label="Mes anterior" onClick={() => go(tab, shiftPeriod(period, -1))} />
         <label className="sr-only" htmlFor="periodo">Período</label>
         <input id="periodo" type="month" value={period} max={todayIso().slice(0, 7)} onChange={(e) => e.target.value && go(tab, e.target.value)}
           className="h-9 rounded-md border border-line bg-surface px-3 text-sm text-ink focus:border-accent focus:outline-none" />
         <IconButton icon={ChevronRight} label="Mes siguiente" onClick={() => go(tab, shiftPeriod(period, 1))} disabled={period >= todayIso().slice(0, 7)} />
         <span className="ml-1 text-sm text-muted">F29 de <strong className="font-medium capitalize text-ink">{periodLabel(period)}</strong></span>
-      </div>
+      </div>}
       <Tabs value={tab} onChange={(t) => go(t)} tabs={[
         { value: "f29", label: "Formulario 29" },
         { value: "registro", label: "Compras y ventas del mes", count: view?.docs.length },
+        { value: "f22", label: "Renta anual (F22)" },
         { value: "configuracion", label: "Configuración tributaria" },
       ]} />
       <div className="mt-5">
         {err && <Notice tone="danger">{err}</Notice>}
         {tab === "configuracion" ? <PerfilTab onSaved={load} />
+          : tab === "f22" ? <F22Tab year={f22Year} onYear={(y) => navigate(`/contabilidad?tab=f22&periodo=${period}&anio=${y}`, { replace: true })} />
           : !view ? (!err && <Spinner />)
           : tab === "registro" ? <RegistroTab view={view} onView={setView} />
           : <F29Tab view={view} onView={setView} onGoRegistro={() => go("registro")} onGoConfig={() => go("configuracion")} />}

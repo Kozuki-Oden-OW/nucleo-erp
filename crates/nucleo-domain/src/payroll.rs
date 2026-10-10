@@ -50,6 +50,32 @@ pub struct EmployerRate {
     pub rate_ppm: i64,
     #[serde(default)]
     pub base: EmployerBase,
+    /// Código del Libro de Remuneraciones Electrónico (4155 para el SIS), si tiene uno.
+    #[serde(default)]
+    pub lre: Option<u32>,
+    /// A quién se entera en Previred: "afp" (la AFP de la persona) o "seguro_social".
+    #[serde(default)]
+    pub payee: Option<String>,
+}
+
+/// Un tramo de la asignación familiar: ingreso de referencia hasta el que aplica y monto por carga.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AllowanceBracket {
+    /// Ingreso mensual de referencia hasta el que aplica (`None` = "más de").
+    #[serde(default)]
+    pub up_to_income: Option<i64>,
+    /// Monto mensual por carga (0 en el último tramo).
+    pub amount: i64,
+}
+
+/// Asignación familiar (DFL 150): tramos y días con remuneración para pagarla completa.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct AllowanceRule {
+    #[serde(default)]
+    pub brackets: Vec<AllowanceBracket>,
+    /// Días con remuneración desde los cuales se paga completa (bajo eso, proporcional).
+    #[serde(default)]
+    pub full_days: i64,
 }
 
 /// Cómo se rebaja la cotización de salud de la base del impuesto único.
@@ -121,6 +147,11 @@ pub struct PayrollParams {
     pub overtime_surcharge_ppm: i64,
     #[serde(default)]
     pub health_deduction: HealthDeduction,
+    #[serde(default)]
+    pub family_allowance: Option<AllowanceRule>,
+    /// Tope mensual de la rebaja del APV régimen B en la base del impuesto, en UF × 10.000.
+    #[serde(default)]
+    pub apv_b_cap_uf_e4: i64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -176,6 +207,40 @@ pub struct WorkerTerms {
     /// Jornada semanal pactada (para las horas extra).
     #[serde(default)]
     pub weekly_hours: Option<i64>,
+    /// Cargas familiares simples y maternales acreditadas.
+    #[serde(default)]
+    pub family_loads: i64,
+    /// Cargas por invalidez (reciben el doble).
+    #[serde(default)]
+    pub invalid_loads: i64,
+    /// Ingreso de referencia para el tramo de asignación familiar (promedio del semestre
+    /// enero-junio anterior); `None` = lo imponible del mes, con aviso.
+    #[serde(default)]
+    pub allowance_income: Option<i64>,
+    #[serde(default)]
+    pub apv: Option<Apv>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ApvRegime {
+    /// Régimen A: bonificación fiscal, sin efecto en el impuesto del mes.
+    A,
+    /// Régimen B: se rebaja de la base del impuesto único hasta el tope mensual.
+    B,
+}
+
+/// Ahorro previsional voluntario individual descontado por planilla.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Apv {
+    pub regime: ApvRegime,
+    /// Monto mensual en pesos o en UF × 10.000.
+    #[serde(default)]
+    pub amount_clp: Option<i64>,
+    #[serde(default)]
+    pub amount_uf_e4: Option<i64>,
+    #[serde(default)]
+    pub institution: Option<String>,
 }
 
 fn yes() -> bool {
@@ -281,6 +346,9 @@ pub struct PayslipResult {
     pub tax: i64,
     /// Tramo aplicado (1 = exento).
     pub tax_bracket: usize,
+    /// Tramo de asignación familiar ("A", "B"…), si tiene cargas.
+    #[serde(default)]
+    pub allowance_bracket: Option<String>,
     pub total_earnings: i64,
     pub total_deductions: i64,
     /// Total haberes − total descuentos.
@@ -690,8 +758,61 @@ pub fn compute(input: &PayslipInput) -> PayslipResult {
         }
     }
 
+    // 8 bis. APV individual descontado por planilla.
+    let mut apv_tax_rebate = 0;
+    if let Some(apv) = &w.apv {
+        let amount = match (apv.amount_clp, apv.amount_uf_e4) {
+            (Some(c), _) if c > 0 => Some(c),
+            (_, Some(uf)) if uf > 0 && p.uf_e2 > 0 => Some(uf_to_clp(uf, p.uf_e2)),
+            _ => None,
+        };
+        match amount {
+            None => note(
+                &mut r.notes,
+                &mut r.complete,
+                Severity::Falta,
+                "Falta el monto del APV (en pesos o en UF, con la UF del mes).".into(),
+            ),
+            Some(amount) => {
+                let (lre, label) = match apv.regime {
+                    ApvRegime::A => (3155, "APV régimen A"),
+                    ApvRegime::B => (3156, "APV régimen B"),
+                };
+                let mut detail = apv.institution.clone().unwrap_or_default();
+                if apv.regime == ApvRegime::B {
+                    if p.apv_b_cap_uf_e4 > 0 && p.uf_e2 > 0 {
+                        let cap = uf_to_clp(p.apv_b_cap_uf_e4, p.uf_e2);
+                        apv_tax_rebate = amount.min(cap);
+                        if amount > cap {
+                            detail = format!(
+                                "{detail}{}rebaja el impuesto hasta {} ({})",
+                                if detail.is_empty() { "" } else { " · " },
+                                uf_label(p.apv_b_cap_uf_e4),
+                                money(cap)
+                            );
+                        }
+                    } else {
+                        note(
+                            &mut r.notes,
+                            &mut r.complete,
+                            Severity::Falta,
+                            "Para el APV régimen B falta su tope mensual en UF (indicadores del mes).".into(),
+                        );
+                    }
+                }
+                r.legal_deductions.push(line(
+                    "apv",
+                    label,
+                    amount,
+                    Some(lre),
+                    (!detail.is_empty()).then_some(detail),
+                ));
+            }
+        }
+    }
+
     // 9. Impuesto único de segunda categoría.
-    r.tax_base = (r.total_taxable - afp - health_deduction - afc_worker).max(0);
+    r.tax_base = (r.total_taxable - afp - health_deduction - afc_worker - apv_tax_rebate).max(0);
     if p.utm <= 0 || p.tax_brackets.is_empty() {
         note(
             &mut r.notes,
@@ -738,6 +859,82 @@ pub fn compute(input: &PayslipInput) -> PayslipResult {
         ));
     }
 
+    // 9 bis. Asignación familiar (la paga el empleador y la descuenta de lo que entera en Previred).
+    let loads = w.family_loads.max(0) + 2 * w.invalid_loads.max(0);
+    if loads > 0 {
+        match p
+            .family_allowance
+            .as_ref()
+            .filter(|a| !a.brackets.is_empty())
+        {
+            None => note(
+                &mut r.notes,
+                &mut r.complete,
+                Severity::Falta,
+                "Para la asignación familiar faltan sus tramos en los indicadores del mes.".into(),
+            ),
+            Some(rule) => {
+                let income = match w.allowance_income {
+                    Some(v) => v,
+                    None => {
+                        note(
+                            &mut r.notes,
+                            &mut r.complete,
+                            Severity::Aviso,
+                            "El tramo de asignación familiar se calculó con lo imponible del mes: la ley usa el promedio del semestre enero-junio anterior. Ingrésalo en la ficha.".into(),
+                        );
+                        r.total_taxable
+                    }
+                };
+                let idx = rule
+                    .brackets
+                    .iter()
+                    .position(|b| b.up_to_income.is_none_or(|u| income <= u))
+                    .unwrap_or(rule.brackets.len() - 1);
+                let letter = char::from(b'A' + idx.min(25) as u8).to_string();
+                let per_load = rule.brackets[idx].amount;
+                r.allowance_bracket = Some(letter.clone());
+                if per_load > 0 {
+                    let full = per_load * loads;
+                    let amount = if rule.full_days > 0 && days < rule.full_days {
+                        div_round(full as i128 * days as i128, 30) as i64
+                    } else {
+                        full
+                    };
+                    let mut detail = format!(
+                        "Tramo {letter}: {} × {loads} carga(s){}",
+                        money(per_load),
+                        if w.invalid_loads > 0 {
+                            " (invalidez cuenta doble)"
+                        } else {
+                            ""
+                        }
+                    );
+                    if amount != full {
+                        detail.push_str(&format!(" × {days}/30 días"));
+                    }
+                    r.other_earnings.push(line(
+                        "asignacion_familiar",
+                        "Asignación familiar",
+                        amount,
+                        Some(2311),
+                        Some(detail),
+                    ));
+                } else {
+                    note(
+                        &mut r.notes,
+                        &mut r.complete,
+                        Severity::Info,
+                        format!(
+                            "Con un ingreso de {} corresponde el tramo {letter}, que no recibe asignación familiar.",
+                            money(income)
+                        ),
+                    );
+                }
+            }
+        }
+    }
+
     // 10. Haberes no imponibles.
     for it in input.items.iter().filter(|i| !i.taxable && i.amount != 0) {
         r.other_earnings
@@ -774,7 +971,7 @@ pub fn compute(input: &PayslipInput) -> PayslipResult {
                 &e.code,
                 e.label.clone(),
                 mul_ppm(base, e.rate_ppm),
-                None,
+                e.lre,
                 Some(format!("{} × {}", money(base), pct(e.rate_ppm))),
             ));
         }

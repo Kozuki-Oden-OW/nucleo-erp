@@ -47,6 +47,7 @@ Todo es entero: las sumas y los reportes se hacen en SQL sin perder exactitud y 
 | 18 | `0018_impuestos_f29.sql` | Registro de compras y ventas del período (`tax_documents`, `tax_import_batches`) y borradores del F29 (`f29_periods`, con lo declarado) |
 | 19 | `0019_comex_flete_documento.sql` | Flete según el documento de transporte (`imports.transport_freight_minor`), solo para el valor aduanero |
 | 20 | `0020_remuneraciones.sql` | Personas (`workers`, condiciones en `terms_json`), indicadores del mes (`payroll_indicators`), liquidaciones (`payslips`, foto congelada al emitir, una vigente por persona y mes) y permiso `remuneraciones.editar` |
+| 21 | `0021_renta_f22.sql` | Datos del borrador del F22 por año comercial (`f22_years.inputs_json`: tasa, 14 E, saldos del F22 anterior, ajustes por código, factores de reajuste de los PPM) |
 
 Las migraciones son transaccionales y versionadas con `PRAGMA user_version`. **Pre-1.0:** se pueden
 reescribir (en la Fase 2 se reemplazó la tabla mínima de clientes de la Fase 1); desde la primera beta

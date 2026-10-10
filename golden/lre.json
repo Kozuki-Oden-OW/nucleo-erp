@@ -1,0 +1,65 @@
+{
+  "_nota": "Casos golden del archivo del Libro de Remuneraciones Electrónico (nucleo-io::lre y apps/desktop/src/data/lre.ts). Datos ficticios. 'esperado' es el texto exacto del archivo (CRLF); ambos lados deben generarlo igual.",
+  "casos": [
+    {
+      "esperado": "Rut trabajador(1101);Fecha inicio contrato(1102);Fecha de término de contrato(1103);Causal de término del contrato(1104);Región de prestación de los servicios(1105);Comuna de prestación de los servicios(1106);Tipo de impuesto a la renta(1170);Técnico extranjero exención de cotizaciones previsionales (ley 18.156)(1146);Código tipo de jornada(1107);Persona con discapacidad/pensionado por invalidez(1108);Pensionado por vejez(1109);AFP(1141);IPS (ExINP)(1142);FONASA / ISAPRE(1143);AFC(1151);CCAF(1110);Org. administrador ley 16.744(1152);Número cargas familiares legales autorizadas(1111);Número de cargas familiares maternales(1112);Número de cargas familiares invalidez(1113);Tramo asignación familiar(1114);Rut organización sindical 1(1171);Rut organización sindical 2(1172);Rut organización sindical 3(1173);Rut organización sindical 4(1174);Rut organización sindical 5(1175);Rut organización sindical 6(1176);Rut organización sindical 7(1177);Rut organización sindical 8(1178);Rut organización sindical 9(1179);Rut organización sindical 10(1180);Número días trabajados en el mes(1115);Número días de licencia médica en el mes(1116);Número días de vacaciones en el mes(1117);Subsidio trabajador joven(1118);Puesto trabajo pesado(1154);Ahorro previsional voluntario individual(1155);Ahorro previsional voluntario colectivo(1157);Indemnización a todo evento (Art. 164)(1131);Tasa indemnización a todo evento (Art. 164)(1132);Sueldo(2101);Sobresueldo(2102);Comisiones (mensual)(2103);Semana corrida mensual (Art. 45)(2104);Participación (mensual)(2105);Gratificación (mensual)(2106);Recargo 30% día domingo (Art. 38)(2107);Remuneración variable pagada en vacaciones (Art. 71)(2108);Remuneración variable pagada en clausura (Art. 38 DFL 2)(2109);Aguinaldo(2110);Bonos u otras remuneraciones fijas mensuales(2111);Tratos (mensual)(2112);Bonos u otras remuneraciones variables mensuales o superiores a un mes(2113);Ejercicio opción no pactada en contrato (Art. 17 N°8 LIR)(2114);Beneficios en especie constitutivos de remuneración(2115);Remuneraciones bimestrales (devengo en dos meses)(2116);Remuneraciones trimestrales (devengo en tres meses)(2117);Remuneraciones cuatrimestral (devengo en cuatro meses)(2118);Remuneraciones semestrales (devengo en seis meses)(2119);Remuneraciones anuales (devengo en doce meses)(2120);Participación anual (devengo en doce meses)(2121);Gratificación anual (devengo en doce meses)(2122);Otras remuneraciones superiores a un mes(2123);Pago por horas de trabajo sindical(2124);Sueldo empresarial(2161);Subsidio por incapacidad laboral por licencia médica - total mensual(2201);Beca de estudio (Art. 17 N°18 LIR)(2202);Gratificaciones de zona (Art. 17 N°27)(2203);Otros ingresos no constitutivos de renta (Art. 17 N°29 LIR)(2204);Colación total mensual (Art. 41)(2301);Movilización total mensual (Art. 41)(2302);Viáticos total mensual (Art. 41)(2303);Asignación de pérdida de caja total mensual (Art. 41)(2304);Asignación de desgaste herramienta total mensual (Art. 41)(2305);Asignación familiar legal total mensual (Art. 41)(2311);Gastos por causa del trabajo (Art. 41)(2306);Gastos por cambio de residencia (Art. 53)(2307);Sala cuna (Art. 203)(2308);Asignación trabajo a distancia o teletrabajo(2309);Depósito convenido hasta UF 900(2347);Alojamiento por razones de trabajo (Art. 17 N°14 LIR)(2310);Asignación de traslación (Art. 17 N°15 LIR)(2312);Indemnización por feriado legal(2313);Indemnización años de servicio(2314);Indemnización sustitutiva del aviso previo(2315);Indemnización fuero maternal (Art. 163 bis)(2316);Indemnización a todo evento (Art. 164)(2331);Indemnizaciones voluntarias tributables(2417);Indemnizaciones contractuales tributables(2418);Cotización obligatoria previsional (AFP o IPS)(3141);Cotización obligatoria salud 7%(3143);Cotización voluntaria para salud(3144);Cotización AFC - trabajador(3151);Cotizaciones técnico extranjero para seguridad social fuera de Chile(3146);Descuento depósito convenido hasta UF 900 anual(3147);Cotización ahorro previsional voluntario individual modalidad A(3155);Cotización ahorro previsional voluntario individual modalidad B hasta UF 50(3156);Cotización ahorro previsional voluntario colectivo modalidad A(3157);Cotización ahorro previsional voluntario colectivo modalidad B hasta UF 50(3158);Impuesto retenido por remuneraciones(3161);Impuesto retenido por indemnizaciones(3162);Mayor retención de impuestos solicitada por el trabajador(3163);Impuesto retenido por reliquidación remuneraciones devengadas en otros períodos(3164);Diferencia de impuesto por reliquidación remuneraciones devengadas en este período(3165);Retención préstamo clase media 2020 (Ley 21.252)(3166);Rebaja zona extrema DL 889(3167);Cuota sindical 1(3171);Cuota sindical 2(3172);Cuota sindical 3(3173);Cuota sindical 4(3174);Cuota sindical 5(3175);Cuota sindical 6(3176);Cuota sindical 7(3177);Cuota sindical 8(3178);Cuota sindical 9(3179);Cuota sindical 10(3180);Crédito social CCAF(3110);Cuota vivienda o educación (Art. 58)(3181);Crédito cooperativas de ahorro (Art 54. Ley Coop.)(3182);Otros descuentos autorizados y solicitados por el trabajador(3183);Cotización adicional trabajo pesado - trabajador(3154);Donaciones culturales y de reconstrucción(3184);Otros descuentos (Art. 58)(3185);Pensiones de alimentos(3186);Descuento mujer casada (Art. 59)(3187);Descuentos por anticipos y préstamos(3188);Aporte AFC - empleador(4151);Aporte empleador seguro accidentes del trabajo y Ley SANNA (Ley 16.744)(4152);Aporte empleador indemnización a todo evento (Art. 164)(4131);Aporte adicional trabajo pesado - empleador(4154);Aporte empleador seguro invalidez y sobrevivencia(4155);Aporte empleador ahorro previsional voluntario colectivo(4157);Total haberes(5201);Total haberes imponibles y tributables(5210);Total haberes imponibles no tributables(5220);Total haberes no imponibles y no tributables(5230);Total haberes no imponibles y tributables(5240);Total descuentos(5301);Total descuentos impuestos a las remuneraciones(5361);Total descuentos impuestos por indemnizaciones(5362);Total descuentos por cotizaciones del trabajador(5341);Total otros descuentos(5302);Total aportes empleador(5410);Total líquido(5501);Total indemnizaciones(5502);Total indemnizaciones tributables(5564);Total indemnizaciones no tributables(5565)\r\n15482337-9;01/03/2025;;;10;10105;1;0;101;0;0;103;0;102;0;0;1;0;0;0;S;;;;;;;;;;;30;0;0;0;;0;0;0;;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;1800000;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;190440;126000;0;0;0;0;0;0;0;0;20613;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;16740;0;0;32040;0;1800000;1800000;0;0;0;337053;20613;0;316440;0;48780;1462947;0;0;0\r\n19874210-4;06/04/2026;30/09/2026;4;10;10105;1;0;101;0;0;19;0;102;1;0;1;2;0;0;B;;;;;;;;;;;30;0;0;0;;1;0;0;;650000;0;0;0;0;162500;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;40000;30000;0;0;0;27740;0;0;0;0;0;0;0;0;0;0;0;0;0;0;84988;56875;0;4875;0;0;20000;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;50000;19500;7556;0;0;14463;0;910240;812500;0;97740;0;216738;0;0;166738;50000;41519;693502;0;0;0\r\n",
+      "nombre": "Sueldo empresarial y trabajador con asignación familiar, término en el mes",
+      "rows": [
+        {
+          "afc": false,
+          "afp": 103,
+          "amounts": {
+            "2161": 1800000,
+            "3141": 190440,
+            "3143": 126000,
+            "3161": 20613,
+            "4152": 16740,
+            "4155": 32040
+          },
+          "ccaf": 0,
+          "comuna": 10105,
+          "days": 30,
+          "health": 102,
+          "jornada": 101,
+          "mutual": 1,
+          "region": 10,
+          "rut": "15482337-9",
+          "start_date": "2025-03-01"
+        },
+        {
+          "afc": true,
+          "afp": 19,
+          "allowance_bracket": "B",
+          "amounts": {
+            "2101": 650000,
+            "2106": 162500,
+            "2301": 40000,
+            "2302": 30000,
+            "2311": 27740,
+            "3141": 84988,
+            "3143": 56875,
+            "3151": 4875,
+            "3155": 20000,
+            "3188": 50000,
+            "4151": 19500,
+            "4152": 7556,
+            "4155": 14463
+          },
+          "apvi": true,
+          "ccaf": 0,
+          "comuna": 10105,
+          "days": 30,
+          "end_cause": 4,
+          "end_date": "2026-09-30",
+          "family_loads": 2,
+          "health": 102,
+          "jornada": 101,
+          "mutual": 1,
+          "region": 10,
+          "rut": "19874210-4",
+          "start_date": "2026-04-06"
+        }
+      ]
+    }
+  ]
+}

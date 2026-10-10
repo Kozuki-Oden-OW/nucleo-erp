@@ -14,7 +14,7 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | 7 | Inventario (incluye stock real y futuro) | ✅ Hito B cumplido (2026-10-06) — ver abajo |
 | 8 | Finanzas | ✅ Hito C cumplido (2026-10-06) — ver abajo |
 | 9 | COMEX (requiere contador colaborador, D-07) | 🟡 Construido (2026-10-06); falta la firma de los casos golden — ver abajo |
-| 10 | Impuestos y contabilidad: A) borrador del F29 ✅ · B) sueldo empresarial y liquidaciones ✅ (Previred y LRE ⏳) · C) F22 ⏳ · motor de asientos ⏳ | 🚧 |
+| 10 | Impuestos y contabilidad: A) borrador del F29 ✅ · B) sueldo empresarial, liquidaciones, Previred, LRE y finiquito ✅ · C) F22 Pro Pyme general ✅ (14 D N°8 y 14 A ⏳) · motor de asientos ⏳ | 🚧 |
 | 11 | Documentación externa e indicadores | ⏳ |
 | 12 | Reportes y dashboard del dueño | ⏳ |
 | 13 | Seguridad | ⏳ |
@@ -22,6 +22,7 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | 15 | Instalador → **MVP** | ⏳ |
 | 16 | Inteligencia comercial (V1.1) | ⏳ |
 | 17 | Fidelidad (V1.2) | ⏳ |
+| S | Botón «Conectar», sincronización cifrada y app móvil de pago ($1.000/mes) — diseño en `SINCRONIZACION.md` | 📐 Diseñado (2026-10-10) |
 
 ## Fase 1 — criterio de salida
 

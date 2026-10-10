@@ -6,6 +6,7 @@ fn line(r: &PayslipResult, key: &str) -> i64 {
     r.taxable_earnings
         .iter()
         .chain(&r.legal_deductions)
+        .chain(&r.other_earnings)
         .chain(&r.employer)
         .filter(|l| l.key == key)
         .map(|l| l.amount)
@@ -31,6 +32,8 @@ fn remuneraciones_golden() {
             ("salud", line(&r, "salud")),
             ("salud_adicional", line(&r, "salud_adicional")),
             ("afc", line(&r, "afc")),
+            ("apv", line(&r, "apv")),
+            ("asignacion_familiar", line(&r, "asignacion_familiar")),
             ("horas_extra", line(&r, "horas_extra")),
             ("gratificacion", line(&r, "gratificacion")),
             ("tax_base", r.tax_base),
@@ -46,6 +49,11 @@ fn remuneraciones_golden() {
         for (k, x) in got {
             assert_eq!(x, v(k), "{name}: {k}");
         }
+        assert_eq!(
+            r.allowance_bracket.as_deref(),
+            e["allowance_bracket"].as_str(),
+            "{name}: tramo de asignación familiar"
+        );
         for (k, x) in e["employer_lines"].as_object().unwrap() {
             assert_eq!(line(&r, k), x.as_i64().unwrap(), "{name}: aporte {k}");
         }

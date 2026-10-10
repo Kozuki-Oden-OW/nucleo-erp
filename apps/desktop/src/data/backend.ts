@@ -4,7 +4,9 @@
 // Las pantallas solo conocen esta interfaz; así un prototipo de la Fase 3 se convierte en pantalla
 // real cuando el comando Rust correspondiente existe.
 import type {
-  IndicatorsView, PayrollIndicators, PayrollView, PayslipMonth, PayslipView, Worker, WorkerInput,
+  F22Inputs, F22View,
+  IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
+  SeveranceForm, SeveranceView, Worker, WorkerInput,
   F29Inputs, F29View, RcvImportReport, TaxDocInput, TaxProfile,
   ImportCostInput, ImportDetail, ImportInput, ImportReceiveLine, ImportStage, ImportSummary, IncotermDef,
   AccountInput, CalendarItem, ExpenseCategory, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow, MoneyAccount,
@@ -207,6 +209,19 @@ export interface Backend {
   emitPayslip(workerId: number, period: string, payDate: string): Promise<PayslipView>;
   voidPayslip(id: number, reason: string): Promise<PayslipView>;
   discardPayslip(workerId: number, period: string): Promise<PayslipView>;
+  payrollSettings(): Promise<PayrollSettings>;
+  savePayrollSettings(settings: PayrollSettings): Promise<PayrollSettings>;
+  /** Lo que se paga en Previred por las liquidaciones emitidas del mes, por institución. */
+  previred(period: string): Promise<PreviredView>;
+  /** Vista previa del archivo del Libro de Remuneraciones Electrónico. */
+  lre(period: string): Promise<LreExport>;
+  /** Guarda el archivo del LRE (en el escritorio pregunta dónde). `null` si se canceló. */
+  exportLre(period: string): Promise<LreExport | null>;
+  severance(workerId: number, form: SeveranceForm): Promise<SeveranceView>;
+
+  // Renta anual: borrador del F22 Pro Pyme general (Fase 10, hito C).
+  f22(year: number): Promise<F22View>;
+  saveF22Inputs(year: number, inputs: F22Inputs): Promise<F22View>;
 }
 
 export type ImportView = "en_curso" | "cotizaciones" | "cerradas" | "anuladas" | "todas";

@@ -49,8 +49,8 @@ export function PerfilTab({ onSaved }: { onSaved: () => void }) {
         </fieldset>
       </Card>
       <Notice tone="info" title="Qué viene">
-        Con tu régimen, NÚCLEO preparará la renta anual (Formulario 22) desde lo cobrado y lo pagado en el año. La liquidación del sueldo empresarial ya está en
-        Remuneraciones: su impuesto único pasa directo al código 48 del F29.
+        La renta anual (F22) del régimen Pro Pyme general ya está en la pestaña “Renta anual”, armada desde lo cobrado y lo pagado en el año; los regímenes
+        transparente y general vienen después. La liquidación del sueldo empresarial está en Remuneraciones: su impuesto único pasa directo al código 48 del F29.
       </Notice>
     </div>
   );

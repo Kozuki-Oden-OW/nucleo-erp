@@ -4,7 +4,8 @@
 import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "../backend";
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
-  IndicatorsView, PayrollIndicators, PayrollRow, PayrollView, PayslipMonth, PayslipView, Worker, WorkerInput,
+  F22Inputs, F22View,
+  IndicatorsView, LreExport, PayrollIndicators, PayrollRow, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView, SeveranceForm, SeveranceView, Worker, WorkerInput,
   F29Inputs, F29Source, F29View, RcvImportReport, TaxDocInput, TaxDocLine, TaxProfile,
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
   Customer, CustomerDetail, Dashboard, DocLink, EffectInput, EntityRef, ExternalRef, ExternalRefInput, Line, LineInput,
@@ -26,7 +27,11 @@ import { CUSTOMER_NAMES, DEMO_COMPANY, PAYMENT_METHODS, PRODUCT_ROWS, SUPPLIER_N
 import reglas from "./reglas-demo.json";
 import { MANUAL_CODES, computeF29, type F29Note, type PurchaseKind } from "../f29";
 import indicadoresDemo from "./indicadores-demo.json";
-import { EMPTY_MONTH, buildPayslipInput, computeFor, inPeriod, indicatorsNote, periodRange, suggestedDays } from "../payrollApp";
+import { EMPTY_MONTH, buildPayslipInput, computeFor, inPeriod, indicatorsNote, lreRows, periodRange, previredRows, suggestedDays } from "../payrollApp";
+import { buildLre, lreFileName, LRE_FORMAT } from "../lre";
+import { computeSeverance } from "../severance";
+import { EMPTY_F22_INPUTS, assembleF22, expenseCode, type F22Acc } from "../f22App";
+import { r17Kind } from "../f22";
 import type { PayslipInput, PayslipResult } from "../payroll";
 import { parseRcv, rcvPurchaseKind, rcvSaleNotOfBusiness, siiTypeFromText } from "../rcv";
 
@@ -2309,13 +2314,14 @@ export class DemoBackend implements Backend {
     {
       id: 1, rut: `${15_482_337}-${rutDv(15_482_337)}`, name: "Camila Rojas Soto", is_owner: true, position: "Gerenta general", start_date: "2025-03-01", end_date: null, active: true,
       terms: { contract: "sin_contrato", base_salary: 1_800_000, weekly_hours: null, gratification: "ninguna", gratification_amount: 0, overtime_surcharge_ppm: null,
-        afp: "Modelo", health: "fonasa", health_name: null, isapre_plan_uf_e4: null, isapre_plan_clp: null, afc: false, employer_contrib: true, accident: true, items: [], deductions: [] },
+        afp: "Modelo", health: "fonasa", health_name: null, isapre_plan_uf_e4: null, isapre_plan_clp: null, afc: false, employer_contrib: true, accident: true, items: [], deductions: [], family_loads: 0, invalid_loads: 0, allowance_income: null, apv: null, region: null, comuna: null, jornada: null, disability: 0, pensioner: false, young_subsidy: false, health_lre_code: null, end_cause: null },
     },
     {
       id: 2, rut: `${19_874_210}-${rutDv(19_874_210)}`, name: "Diego Fuentes Lagos", is_owner: false, position: "Vendedor", start_date: "2026-04-06", end_date: null, active: true,
       terms: { contract: "indefinido", base_salary: 650_000, weekly_hours: 42, gratification: "art50", gratification_amount: 0, overtime_surcharge_ppm: null,
         afp: "Uno", health: "fonasa", health_name: null, isapre_plan_uf_e4: null, isapre_plan_clp: null, afc: true, employer_contrib: true, accident: true,
-        items: [{ label: "Colación", amount: 40_000, taxable: false, lre: 2301 }, { label: "Movilización", amount: 30_000, taxable: false, lre: 2302 }], deductions: [] },
+        items: [{ label: "Colación", amount: 40_000, taxable: false, lre: 2301 }, { label: "Movilización", amount: 30_000, taxable: false, lre: 2302 }], deductions: [],
+        family_loads: 1, invalid_loads: 0, allowance_income: 640_000, apv: null, region: null, comuna: null, jornada: 101, disability: 0, pensioner: false, young_subsidy: false, health_lre_code: null, end_cause: null },
     },
   ];
   private indicatorsByPeriod: Record<string, { indicators: PayrollIndicators; source: string | null; at: string }> = {
@@ -2475,6 +2481,124 @@ export class DemoBackend implements Backend {
     this.log("remuneraciones.liquidacion.anular", "liquidacion", String(id), reason.trim());
     return wait(this.slipView(this.worker(s.worker_id), s.period, s));
   }
+  private paySettings: PayrollSettings = { ccaf: 0, mutual: 1, region: 10, comuna: 10105 };
+  async payrollSettings(): Promise<PayrollSettings> { this.require("remuneraciones.ver"); return wait(this.paySettings); }
+  async savePayrollSettings(settings: PayrollSettings): Promise<PayrollSettings> {
+    this.require("remuneraciones.editar");
+    if (settings.region != null && (settings.region < 1 || settings.region > 16)) throw new AppError("validacion", "Revisa la caja de compensación, la mutual y la región.");
+    this.paySettings = { ...settings };
+    this.log("remuneraciones.empleador", "remuneraciones", "empleador");
+    return wait(this.paySettings);
+  }
+  private emittedSnaps(period: string) {
+    this.seedPayroll();
+    return this.slips.filter((x) => x.period === period && x.status === "emitida" && x.snap).map((x) => x.snap!);
+  }
+  async previred(period: string): Promise<PreviredView> {
+    this.require("remuneraciones.ver");
+    const p = this.checkPeriod(period);
+    const snaps = this.emittedSnaps(p);
+    const rows = previredRows(snaps, this.paySettings);
+    const notes: PreviredView["notes"] = [];
+    if (this.paySettings.mutual == null && rows.some((r) => r.kind === "mutual")) notes.push({ code: null, severity: "aviso", text: "Indica tu mutual (o ISL) en los datos del empleador." });
+    const pending = this.workersList.filter((w) => w.active && inPeriod(w, p) && !this.slips.some((x) => x.worker_id === w.id && x.period === p && x.status === "emitida")).map((w) => w.name);
+    if (pending.length) notes.push({ code: null, severity: "aviso", text: `Faltan por emitir: ${pending.join(", ")}. El resumen solo suma las liquidaciones emitidas.` });
+    const due = this.indicatorsView(p).indicators.previred_due_day;
+    return wait({ period: p, rows, total: rows.reduce((a, r) => a + r.total, 0), due_date: due ? `${this.shiftPeriod(p, 1)}-${String(due).padStart(2, "0")}` : null,
+      payslips: snaps.length, pending, notes });
+  }
+  async lre(period: string): Promise<LreExport> {
+    this.require("remuneraciones.ver");
+    const p = this.checkPeriod(period);
+    if (!this.biz.rut) throw new AppError("validacion", "Para el Libro de Remuneraciones falta el RUT del negocio (Mi negocio).");
+    const snaps = this.emittedSnaps(p);
+    if (!snaps.length) throw new AppError("validacion", "No hay liquidaciones emitidas en este mes.");
+    const { rows, warnings } = lreRows(snaps, this.paySettings, p);
+    return wait({ file_name: lreFileName(this.biz.rut, p), content: buildLre(rows), rows: rows.length, format: LRE_FORMAT, warnings });
+  }
+  async exportLre(period: string): Promise<LreExport | null> {
+    const e = await this.lre(period);
+    const bytes = new Uint8Array([...e.content].map((c) => (c.charCodeAt(0) < 256 ? c.charCodeAt(0) : 63)));
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([bytes], { type: "text/csv" }));
+    a.download = e.file_name;
+    a.click();
+    this.log("remuneraciones.lre", "lre", period);
+    return e;
+  }
+  async severance(workerId: number, form: SeveranceForm): Promise<SeveranceView> {
+    this.require("remuneraciones.ver");
+    const w = this.worker(workerId);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(form.end_date)) throw new AppError("validacion", "La fecha de término no es una fecha válida.");
+    if (!form.cause) throw new AppError("validacion", "Elige la causal de término.");
+    const endP = form.end_date.slice(0, 7), prevP = this.shiftPeriod(endP, -1);
+    const prev = this.indicatorsView(prevP), cur = this.indicatorsView(endP);
+    const [ind, used, saved] = prev.saved ? [prev.indicators, prevP, true] : [cur.indicators, endP, cur.saved];
+    const t = w.terms;
+    const suggested = t.base_salary + t.items.filter((i) => i.taxable ?? true).reduce((a, i) => a + i.amount, 0);
+    const input = {
+      rules: { ...(ind.severance ?? {}), uf_e2: ind.params.uf_e2 ?? 0 }, start_date: w.start_date, end_date: form.end_date, cause: form.cause,
+      notice_given: form.notice_given, base_172: form.base_172 ?? suggested, vacation_base: form.vacation_base ?? t.base_salary,
+      pending_vacation_days_e2: Math.max(form.pending_vacation_days_e2, 0), vacation_taken_days_e2: Math.max(form.vacation_taken_days_e2, 0),
+      afc_offset: Math.max(form.afc_offset, 0), deductions: form.deductions,
+    };
+    const result = computeSeverance(input);
+    if (w.is_owner) result.notes.unshift({ code: null, severity: "aviso", text: "El sueldo empresarial no nace de un contrato de trabajo: normalmente no hay finiquito ni indemnizaciones. Confírmalo con tu contador." });
+    if (!saved) { result.complete = false; result.notes.unshift({ code: null, severity: "falta", text: "Faltan los indicadores del mes anterior al término (UF y reglas del finiquito)." }); }
+    return wait({ worker: structuredClone(w), form: structuredClone(form), input, result, suggested_base: suggested, indicators_period: used, indicators_saved: saved });
+  }
+  /* ───────────────────────────── Renta anual: F22 ───────────────────────────── */
+
+  private f22Inputs: Record<number, F22Inputs> = {};
+  private buildF22(year: number): F22View {
+    const from = `${year}-01-01`, to = `${year}-12-31`;
+    const acc = new Map<number, F22Acc>();
+    const add = (code: number, v: number, src: string) => {
+      const a = acc.get(code) ?? { amount: 0, count: 0, source: [] };
+      a.amount += v; a.count += 1; if (!a.source.includes(src)) a.source.push(src);
+      acc.set(code, a);
+    };
+    const part = (paid: number, net: number, total: number) => (total > 0 ? Math.round((paid * net) / total) : 0);
+    const inYear = (d: string) => d >= from && d <= to;
+    for (const s of this.sales) {
+      const paid = s.payments.filter((p) => inYear(p.date)).reduce((a, p) => a + p.amount_minor, 0);
+      if (!paid) continue;
+      add(s.issue_date < from ? 1817 : 1400, part(paid, s.totals.net_minor + s.totals.exempt_minor, s.totals.total_minor), "cobros de ventas");
+    }
+    for (const c of this.purchases.filter((x) => x.status === "registrada")) {
+      const paid = c.payments.filter((p) => inYear(p.date)).reduce((a, p) => a + p.amount_minor, 0);
+      if (paid) add(c.issue_date < from ? 1818 : 1409, part(paid, c.totals.net_minor + c.totals.exempt_minor, c.totals.total_minor), "pagos de compras");
+    }
+    for (const g of this.gastos.filter((x) => x.status === "registrado")) {
+      const paid = g.payments.filter((p) => inYear(p.date)).reduce((a, p) => a + p.amount_minor, 0);
+      if (paid) add(expenseCode(this.cats.find((c) => c.id === g.category_id)?.name), g.tax > 0 ? part(paid, g.net, g.total) : paid, "pagos de gastos");
+    }
+    this.seedPayroll();
+    const checks: F22View["checks"] = [];
+    const emitted = this.slips.filter((x) => x.status === "emitida" && x.snap);
+    for (const e of emitted) {
+      const legal = e.snap!.result.legal_deductions.reduce((a, l) => a + l.amount, 0);
+      if (inYear(e.pay_date!)) add(1411, e.snap!.result.total_earnings - legal, "liquidaciones pagadas");
+      if (e.period >= `${year - 1}-12` && e.period <= `${year}-11`) add(1411, legal + e.snap!.result.employer_total, "cotizaciones e impuesto enterados");
+    }
+    if (emitted.length) checks.push({ code: null, severity: "info", text: "Remuneraciones (1411): líquidos pagados en el año más cotizaciones e impuesto único enterados en el año (los de diciembre se pagan en enero y cuentan para el año siguiente)." });
+    const declared: Record<string, number> = {};
+    for (const [period, rec] of Object.entries(this.f29s)) {
+      if (rec.status === "declarado" && period.startsWith(String(year))) declared[period] = this.buildF29(period).result.codes["62"] ?? 0;
+    }
+    return assembleF22(year, this.taxProf.regime, this.today, this.f22Inputs[year] ?? structuredClone(EMPTY_F22_INPUTS), acc, declared, checks);
+  }
+  async f22(year: number): Promise<F22View> { this.require("contabilidad.ver"); return wait(this.buildF22(year), 120); }
+  async saveF22Inputs(year: number, inputs: F22Inputs): Promise<F22View> {
+    this.require("contabilidad.editar");
+    for (const k of Object.keys(inputs.overrides)) if (r17Kind(Number(k)) == null) throw new AppError("validacion", `El código ${k} no es del recuadro 17.`);
+    if (inputs.extra.some((l) => r17Kind(l.code) == null)) throw new AppError("validacion", "Cada partida agregada debe tener un código del recuadro 17.");
+    if (Object.values(inputs.ppm_factors).some((f) => f < 500_000 || f > 2_000_000)) throw new AppError("validacion", "Los factores de reajuste de los PPM deben estar entre 0,5 y 2.");
+    this.f22Inputs[year] = structuredClone(inputs);
+    this.log("impuestos.f22", "f22", String(year));
+    return wait(this.buildF22(year));
+  }
+
   async discardPayslip(workerId: number, period: string): Promise<PayslipView> {
     this.require("remuneraciones.editar");
     const p = this.checkPeriod(period);

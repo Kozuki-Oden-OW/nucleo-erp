@@ -1,0 +1,433 @@
+{
+  "_nota": "Casos golden del borrador del F22 Pro Pyme general (nucleo-domain::f22 y apps/desktop/src/data/f22.ts). El primer caso reproduce la planilla oficial del SII (golden/f22_casos_sii.json, régimen 14D3): sus valores esperados se contrastan con las celdas del SII. Los demás son ilustrativos con un modelo de referencia independiente. Tasa 12,5 % (Ley 21.755, AC 2025-2027), 14 E 50 % con tope 5.000 UF: parámetros, no código. Pendientes de revisión por un contador (D-07).",
+  "casos": [
+    {
+      "nombre": "Caso SII «EC & GET Ltda.» (planilla Pro Pyme 14 D N°3, AT 2026), con incentivo 14 E y crédito IPE",
+      "estado": "pendiente_revision",
+      "input": {
+        "params": {
+          "idpc_rate_ppm": 125000,
+          "incentive_rate_ppm": 500000,
+          "incentive_cap_uf_e4": 50000000,
+          "uf_e2": 3972796
+        },
+        "lines": [
+          {
+            "code": 1400,
+            "amount": 95000000
+          },
+          {
+            "code": 1587,
+            "amount": 5000000
+          },
+          {
+            "code": 1817,
+            "amount": 8000000
+          },
+          {
+            "code": 1401,
+            "amount": 7586640,
+            "label": "Dividendo extranjero (renta neta)"
+          },
+          {
+            "code": 1401,
+            "amount": 4263219,
+            "label": "Crédito total disponible por impuestos pagados en el exterior"
+          },
+          {
+            "code": 1588,
+            "amount": 200125,
+            "label": "Venta de computador"
+          },
+          {
+            "code": 1409,
+            "amount": 22000000
+          },
+          {
+            "code": 1818,
+            "amount": 2000000
+          },
+          {
+            "code": 1413,
+            "amount": 2000000
+          },
+          {
+            "code": 1411,
+            "amount": 8505000
+          },
+          {
+            "code": 1412,
+            "amount": 1000000
+          },
+          {
+            "code": 1415,
+            "amount": 860000
+          },
+          {
+            "code": 1419,
+            "amount": 280000
+          },
+          {
+            "code": 1424,
+            "amount": 201000
+          }
+        ],
+        "art21": 2440000,
+        "incentive": true,
+        "rebates": 1481232,
+        "ppm": [
+          {
+            "amount": 237500,
+            "factor_e6": 1003000
+          },
+          {
+            "amount": 32500,
+            "factor_e6": 1003000
+          }
+        ],
+        "registers": {
+          "cpts_initial": 54030000,
+          "dividends_received": 720000,
+          "withdrawals": 16000000,
+          "foreign_tax_credit_final": 2781987,
+          "capital_historic": 30600000,
+          "rex_final": 160000,
+          "rai_initial": 23350000,
+          "rex_initial": 80000,
+          "rex_increase": 80000
+        }
+      },
+      "esperado": {
+        "codes": {
+          "18": 50822397,
+          "19": 1481232,
+          "20": 4871568,
+          "36": 270811,
+          "90": 4600757,
+          "305": 4600757,
+          "1379": 2781987,
+          "1400": 95000000,
+          "1401": 11849859,
+          "1409": 22000000,
+          "1410": 120050795,
+          "1411": 8505000,
+          "1412": 1000000,
+          "1413": 2000000,
+          "1415": 860000,
+          "1419": 280000,
+          "1422": 2440000,
+          "1424": 201000,
+          "1430": 39286000,
+          "1431": 2440000,
+          "1432": 32382398,
+          "1440": 50822397,
+          "1445": 54030000,
+          "1451": 23350000,
+          "1454": 80000,
+          "1459": 23350000,
+          "1463": 101972808,
+          "1470": 80000,
+          "1475": 16000000,
+          "1479": 16000000,
+          "1484": 85972808,
+          "1487": 160000,
+          "1493": 160000,
+          "1494": 30600000,
+          "1500": 101972808,
+          "1545": 116732808,
+          "1587": 5000000,
+          "1588": 200936,
+          "1703": 116732808,
+          "1704": 16000000,
+          "1705": 50822397,
+          "1708": 2440000,
+          "1710": 32382398,
+          "1720": 132732808,
+          "1726": 720000,
+          "1729": 83204795,
+          "1817": 8000000,
+          "1818": 2000000
+        },
+        "idpc_gross": 6352800
+      }
+    },
+    {
+      "nombre": "Pyme con sueldo empresarial y PPM de 12 meses sin incentivo (ilustrativo)",
+      "estado": "pendiente_revision",
+      "input": {
+        "params": {
+          "idpc_rate_ppm": 125000,
+          "incentive_rate_ppm": 500000,
+          "incentive_cap_uf_e4": 50000000,
+          "uf_e2": 4000000
+        },
+        "lines": [
+          {
+            "code": 1400,
+            "amount": 60000000
+          },
+          {
+            "code": 1409,
+            "amount": 30000000
+          },
+          {
+            "code": 1411,
+            "amount": 21000000
+          },
+          {
+            "code": 1415,
+            "amount": 4800000
+          },
+          {
+            "code": 1424,
+            "amount": 1500000
+          }
+        ],
+        "art21": 350000,
+        "incentive": false,
+        "rebates": 0,
+        "ppm": [
+          {
+            "period": "2026-01",
+            "amount": 150000,
+            "factor_e6": 1027500
+          },
+          {
+            "period": "2026-02",
+            "amount": 150000,
+            "factor_e6": 1025000
+          },
+          {
+            "period": "2026-03",
+            "amount": 150000,
+            "factor_e6": 1022500
+          },
+          {
+            "period": "2026-04",
+            "amount": 150000,
+            "factor_e6": 1020000
+          },
+          {
+            "period": "2026-05",
+            "amount": 150000,
+            "factor_e6": 1017500
+          },
+          {
+            "period": "2026-06",
+            "amount": 150000,
+            "factor_e6": 1015000
+          },
+          {
+            "period": "2026-07",
+            "amount": 150000,
+            "factor_e6": 1012500
+          },
+          {
+            "period": "2026-08",
+            "amount": 150000,
+            "factor_e6": 1010000
+          },
+          {
+            "period": "2026-09",
+            "amount": 150000,
+            "factor_e6": 1007500
+          },
+          {
+            "period": "2026-10",
+            "amount": 150000,
+            "factor_e6": 1005000
+          },
+          {
+            "period": "2026-11",
+            "amount": 150000,
+            "factor_e6": 1002500
+          },
+          {
+            "period": "2026-12",
+            "amount": 150000,
+            "factor_e6": 1000000
+          }
+        ],
+        "registers": {
+          "cpts_initial": 10000000,
+          "withdrawals": 1000000,
+          "capital_historic": 5000000
+        }
+      },
+      "esperado": {
+        "codes": {
+          "18": 2724750,
+          "20": 340594,
+          "36": 1824750,
+          "85": 1484156,
+          "305": -1484156,
+          "1400": 60000000,
+          "1409": 30000000,
+          "1410": 60024750,
+          "1411": 21000000,
+          "1415": 4800000,
+          "1422": 350000,
+          "1424": 1500000,
+          "1430": 57650000,
+          "1431": 350000,
+          "1440": 2724750,
+          "1445": 10000000,
+          "1463": 7374750,
+          "1475": 1000000,
+          "1479": 1000000,
+          "1484": 6374750,
+          "1494": 5000000,
+          "1500": 7374750,
+          "1545": 11374750,
+          "1588": 24750,
+          "1703": 11374750,
+          "1704": 1000000,
+          "1705": 2724750,
+          "1708": 350000,
+          "1720": 12374750,
+          "1729": 2724750
+        },
+        "idpc_gross": 340594
+      }
+    },
+    {
+      "nombre": "Año con pérdida tributaria y saldo a favor por PPM (ilustrativo)",
+      "estado": "pendiente_revision",
+      "input": {
+        "params": {
+          "idpc_rate_ppm": 125000,
+          "incentive_rate_ppm": 500000,
+          "incentive_cap_uf_e4": 50000000,
+          "uf_e2": 4000000
+        },
+        "lines": [
+          {
+            "code": 1400,
+            "amount": 50000000
+          },
+          {
+            "code": 1409,
+            "amount": 30000000
+          },
+          {
+            "code": 1411,
+            "amount": 21000000
+          },
+          {
+            "code": 1415,
+            "amount": 4800000
+          },
+          {
+            "code": 1424,
+            "amount": 1500000
+          }
+        ],
+        "art21": 350000,
+        "incentive": true,
+        "rebates": 0,
+        "ppm": [
+          {
+            "period": "2026-01",
+            "amount": 150000,
+            "factor_e6": 1027500
+          },
+          {
+            "period": "2026-02",
+            "amount": 150000,
+            "factor_e6": 1025000
+          },
+          {
+            "period": "2026-03",
+            "amount": 150000,
+            "factor_e6": 1022500
+          },
+          {
+            "period": "2026-04",
+            "amount": 150000,
+            "factor_e6": 1020000
+          },
+          {
+            "period": "2026-05",
+            "amount": 150000,
+            "factor_e6": 1017500
+          },
+          {
+            "period": "2026-06",
+            "amount": 150000,
+            "factor_e6": 1015000
+          },
+          {
+            "period": "2026-07",
+            "amount": 150000,
+            "factor_e6": 1012500
+          },
+          {
+            "period": "2026-08",
+            "amount": 150000,
+            "factor_e6": 1010000
+          },
+          {
+            "period": "2026-09",
+            "amount": 150000,
+            "factor_e6": 1007500
+          },
+          {
+            "period": "2026-10",
+            "amount": 150000,
+            "factor_e6": 1005000
+          },
+          {
+            "period": "2026-11",
+            "amount": 150000,
+            "factor_e6": 1002500
+          },
+          {
+            "period": "2026-12",
+            "amount": 150000,
+            "factor_e6": 1000000
+          }
+        ],
+        "registers": {
+          "cpts_initial": 10000000,
+          "withdrawals": 1000000,
+          "capital_historic": 5000000
+        }
+      },
+      "esperado": {
+        "codes": {
+          "18": 0,
+          "20": 0,
+          "36": 1824750,
+          "85": 1824750,
+          "305": -1824750,
+          "1400": 50000000,
+          "1409": 30000000,
+          "1410": 50024750,
+          "1411": 21000000,
+          "1415": 4800000,
+          "1422": 350000,
+          "1424": 1500000,
+          "1430": 57650000,
+          "1431": 350000,
+          "1432": 0,
+          "1440": -7275250,
+          "1445": 10000000,
+          "1463": 4650000,
+          "1475": 1000000,
+          "1479": 1000000,
+          "1484": 3650000,
+          "1494": 5000000,
+          "1500": 4650000,
+          "1545": 8650000,
+          "1588": 24750,
+          "1703": 8650000,
+          "1704": 1000000,
+          "1708": 350000,
+          "1720": 9650000,
+          "1729": -7275250
+        },
+        "idpc_gross": 0
+      }
+    }
+  ]
+}

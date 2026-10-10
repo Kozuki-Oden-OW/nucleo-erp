@@ -159,6 +159,14 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         commands::emit_payslip,
         commands::void_payslip,
         commands::discard_payslip,
+        commands::payroll_settings,
+        commands::save_payroll_settings,
+        commands::previred,
+        commands::lre,
+        commands::export_lre,
+        commands::severance,
+        commands::f22,
+        commands::save_f22_inputs,
     ])
 }
 

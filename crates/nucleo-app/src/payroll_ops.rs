@@ -16,9 +16,11 @@ use nucleo_db::payroll::{self as db, WorkerRow, WorkerWrite};
 use nucleo_domain::Rut;
 use nucleo_domain::f29::{Note, Severity};
 use nucleo_domain::payroll::{
-    ContractKind, DeductionItem, EarningItem, GratificationMode, Health, PayrollParams,
+    Apv, ContractKind, DeductionItem, EarningItem, GratificationMode, Health, PayrollParams,
     PayslipInput, PayslipResult, WorkerTerms, compute,
 };
+use nucleo_domain::severance::{self, Cause, SeveranceInput, SeveranceResult, SeveranceRules};
+use nucleo_io::lre;
 use serde::{Deserialize, Serialize};
 
 /* ───────────────────────────── tipos ───────────────────────────── */
@@ -37,6 +39,12 @@ pub struct Indicators {
     pub params: PayrollParams,
     #[serde(default)]
     pub afp: Vec<AfpRate>,
+    /// Día del mes siguiente en que vence el pago en Previred.
+    #[serde(default)]
+    pub previred_due_day: Option<u32>,
+    /// Reglas del finiquito (la UF se toma de los indicadores del mes anterior al pago).
+    #[serde(default)]
+    pub severance: SeveranceRules,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -90,6 +98,35 @@ pub struct Terms {
     /// Descuentos de todos los meses (cuota sindical, préstamo en cuotas).
     #[serde(default)]
     pub deductions: Vec<DeductionItem>,
+    /// Cargas familiares simples y maternales acreditadas.
+    #[serde(default)]
+    pub family_loads: i64,
+    #[serde(default)]
+    pub invalid_loads: i64,
+    /// Ingreso promedio del semestre enero-junio anterior (tramo de asignación familiar).
+    #[serde(default)]
+    pub allowance_income: Option<i64>,
+    #[serde(default)]
+    pub apv: Option<Apv>,
+    /// Datos para el Libro de Remuneraciones Electrónico.
+    #[serde(default)]
+    pub region: Option<u32>,
+    #[serde(default)]
+    pub comuna: Option<u32>,
+    #[serde(default)]
+    pub jornada: Option<u32>,
+    #[serde(default)]
+    pub disability: u32,
+    #[serde(default)]
+    pub pensioner: bool,
+    #[serde(default)]
+    pub young_subsidy: bool,
+    /// Código de salud del LRE cuando la Isapre no está en la tabla de NÚCLEO.
+    #[serde(default)]
+    pub health_lre_code: Option<u32>,
+    /// Causal de término, si la relación terminó (snake_case de `severance::Cause`).
+    #[serde(default)]
+    pub end_cause: Option<Cause>,
 }
 
 fn ninguna() -> String {
@@ -121,6 +158,18 @@ impl Default for Terms {
             accident: true,
             items: Vec::new(),
             deductions: Vec::new(),
+            family_loads: 0,
+            invalid_loads: 0,
+            allowance_income: None,
+            apv: None,
+            region: None,
+            comuna: None,
+            jornada: None,
+            disability: 0,
+            pensioner: false,
+            young_subsidy: false,
+            health_lre_code: None,
+            end_cause: None,
         }
     }
 }
@@ -325,6 +374,29 @@ fn check_terms(t: &Terms, is_owner: bool) -> AppResult<Terms> {
             "ingresa el valor del plan de Isapre (en UF o en pesos)".into(),
         ));
     }
+    if t.family_loads < 0 || t.invalid_loads < 0 || t.family_loads + t.invalid_loads > 30 {
+        return Err(AppError::Validation(
+            "revisa el número de cargas familiares".into(),
+        ));
+    }
+    if t.allowance_income.is_some_and(|v| v < 0) {
+        return Err(AppError::Validation(
+            "el ingreso para la asignación familiar no puede ser negativo".into(),
+        ));
+    }
+    if let Some(a) = &t.apv
+        && a.amount_clp.is_none_or(|v| v <= 0)
+        && a.amount_uf_e4.is_none_or(|v| v <= 0)
+    {
+        return Err(AppError::Validation(
+            "ingresa el monto del APV (en pesos o en UF)".into(),
+        ));
+    }
+    if t.region.is_some_and(|r| !(1..=16).contains(&r)) || t.disability > 3 {
+        return Err(AppError::Validation(
+            "revisa la región (1 a 16) y el código de discapacidad (0 a 3)".into(),
+        ));
+    }
     t.afp = opt_text(&t.afp, 40, "el nombre de la AFP")?;
     t.health_name = opt_text(&t.health_name, 40, "el nombre de la Isapre")?;
     check_items(&t.items, &t.deductions)?;
@@ -404,6 +476,14 @@ fn in_period(w: &Worker, period: &str) -> bool {
     w.start_date.as_str() <= to.as_str() && w.end_date.as_deref().is_none_or(|e| e >= from.as_str())
 }
 
+fn with_code(i: &EarningItem, taxable_default: u32) -> EarningItem {
+    let mut i = i.clone();
+    if i.lre.is_none() && i.taxable {
+        i.lre = Some(taxable_default);
+    }
+    i
+}
+
 fn build_input(w: &Worker, ind: &Indicators, month: &PayslipMonth, days: i64) -> PayslipInput {
     let t = &w.terms;
     let afp_ppm = t.afp.as_ref().and_then(|name| {
@@ -436,6 +516,10 @@ fn build_input(w: &Worker, ind: &Indicators, month: &PayslipMonth, days: i64) ->
             employer_contrib: t.employer_contrib,
             accident: t.accident,
             weekly_hours: t.weekly_hours,
+            family_loads: t.family_loads,
+            invalid_loads: t.invalid_loads,
+            allowance_income: t.allowance_income,
+            apv: t.apv.clone(),
         },
         base_salary: t.base_salary,
         days,
@@ -447,7 +531,13 @@ fn build_input(w: &Worker, ind: &Indicators, month: &PayslipMonth, days: i64) ->
             _ => GratificationMode::Ninguna,
         },
         gratification_amount: t.gratification_amount,
-        items: t.items.iter().chain(&month.items).cloned().collect(),
+        // Haberes imponibles sin código: los de la ficha son fijos (2111), los del mes variables (2113).
+        items: t
+            .items
+            .iter()
+            .map(|i| with_code(i, 2111))
+            .chain(month.items.iter().map(|i| with_code(i, 2113)))
+            .collect(),
         deductions: t
             .deductions
             .iter()
@@ -979,5 +1069,613 @@ impl CompanySession {
     pub(crate) fn payroll_tax_paid(&self, period: &str) -> AppResult<(i64, i64)> {
         let (from, to) = range(period);
         Ok(db::tax_paid_between(self.db.conn(), &from, &to)?)
+    }
+}
+
+/* ───────────── Empleador, Previred, Libro de Remuneraciones y finiquito ───────────── */
+
+const SETTINGS_KEY: &str = "remuneraciones.empleador";
+
+/// Datos del empleador para Previred y el Libro de Remuneraciones Electrónico.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct PayrollSettings {
+    /// Caja de compensación (código LRE 1110; 0 = sin caja).
+    #[serde(default)]
+    pub ccaf: u32,
+    /// Mutual o ISL (código LRE 1152: 0 ISL, 1 ACHS, 2 Mutual CChC, 3 IST).
+    #[serde(default)]
+    pub mutual: Option<u32>,
+    /// Región y comuna donde se prestan los servicios, si la persona no tiene otras.
+    #[serde(default)]
+    pub region: Option<u32>,
+    #[serde(default)]
+    pub comuna: Option<u32>,
+}
+
+pub const CCAF_NAMES: [&str; 5] = [
+    "Sin caja de compensación",
+    "Los Andes",
+    "La Araucana",
+    "Los Héroes",
+    "18 de Septiembre",
+];
+pub const MUTUAL_NAMES: [&str; 4] = ["ISL", "ACHS", "Mutual de Seguridad CChC", "IST"];
+
+/// Monto a enterar en Previred a una institución.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct PreviredRow {
+    pub institution: String,
+    /// "afp", "apv", "salud", "afc", "seguro_social", "mutual", "asignacion" u "otro".
+    pub kind: String,
+    pub worker: i64,
+    pub employer: i64,
+    pub total: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct PreviredView {
+    pub period: String,
+    pub rows: Vec<PreviredRow>,
+    pub total: i64,
+    pub due_date: Option<String>,
+    pub payslips: usize,
+    /// Personas con liquidación del mes aún no emitida.
+    pub pending: Vec<String>,
+    pub notes: Vec<Note>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct LreExport {
+    pub file_name: String,
+    pub content: String,
+    pub rows: usize,
+    pub format: String,
+    pub warnings: Vec<String>,
+}
+
+/// Lo que la persona ingresa para calcular un finiquito.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct SeveranceForm {
+    pub end_date: String,
+    pub cause: Option<Cause>,
+    #[serde(default)]
+    pub notice_given: bool,
+    #[serde(default)]
+    pub base_172: Option<i64>,
+    #[serde(default)]
+    pub vacation_base: Option<i64>,
+    #[serde(default)]
+    pub pending_vacation_days_e2: i64,
+    #[serde(default)]
+    pub vacation_taken_days_e2: i64,
+    #[serde(default)]
+    pub afc_offset: i64,
+    #[serde(default)]
+    pub deductions: Vec<DeductionItem>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SeveranceView {
+    pub worker: Worker,
+    pub form: SeveranceForm,
+    pub input: SeveranceInput,
+    pub result: SeveranceResult,
+    /// Última remuneración que propone NÚCLEO (sueldo + haberes imponibles fijos).
+    pub suggested_base: i64,
+    /// Mes de los indicadores usados (el anterior al de término) y si estaban guardados.
+    pub indicators_period: String,
+    pub indicators_saved: bool,
+}
+
+fn add_row(
+    rows: &mut Vec<PreviredRow>,
+    institution: String,
+    kind: &str,
+    worker: i64,
+    employer: i64,
+) {
+    if worker == 0 && employer == 0 {
+        return;
+    }
+    match rows.iter_mut().find(|r| r.institution == institution) {
+        Some(r) => {
+            r.worker += worker;
+            r.employer += employer;
+            r.total = r.worker + r.employer;
+        }
+        None => rows.push(PreviredRow {
+            institution,
+            kind: kind.into(),
+            worker,
+            employer,
+            total: worker + employer,
+        }),
+    }
+}
+
+impl CompanySession {
+    pub fn payroll_settings(&self) -> AppResult<PayrollSettings> {
+        self.require("remuneraciones.ver")?;
+        self.load_payroll_settings()
+    }
+
+    fn load_payroll_settings(&self) -> AppResult<PayrollSettings> {
+        Ok(nucleo_db::core::get_setting(self.db.conn(), SETTINGS_KEY)?
+            .and_then(|v| serde_json::from_value(v).ok())
+            .unwrap_or_default())
+    }
+
+    pub fn save_payroll_settings(&mut self, s: &PayrollSettings) -> AppResult<PayrollSettings> {
+        self.require("remuneraciones.editar")?;
+        if s.ccaf as usize >= CCAF_NAMES.len()
+            || s.mutual.is_some_and(|m| m as usize >= MUTUAL_NAMES.len())
+            || s.region.is_some_and(|r| !(1..=16).contains(&r))
+        {
+            return Err(AppError::Validation(
+                "revisa la caja de compensación, la mutual y la región".into(),
+            ));
+        }
+        let user = self.actor_name()?;
+        let tx = self.db.conn_mut().transaction()?;
+        nucleo_db::core::set_setting(
+            &tx,
+            SETTINGS_KEY,
+            &serde_json::to_value(s).unwrap_or_default(),
+        )?;
+        log(
+            &tx,
+            &user,
+            "remuneraciones.empleador",
+            "remuneraciones",
+            "empleador",
+            "Actualizó los datos del empleador para Previred y el LRE",
+            None,
+        )?;
+        tx.commit()?;
+        self.load_payroll_settings()
+    }
+
+    /// Liquidaciones emitidas del mes con su foto.
+    fn emitted_snapshots(&self, period: &str) -> AppResult<Vec<Snapshot>> {
+        Ok(db::payslips_of_period(self.db.conn(), period)?
+            .into_iter()
+            .filter(|s| s.status == "emitida")
+            .filter_map(|s| s.snapshot_json.and_then(|j| serde_json::from_str(&j).ok()))
+            .collect())
+    }
+
+    /// Resumen de lo que se paga en Previred por las remuneraciones del mes, por institución.
+    pub fn previred(&self, period: &str) -> AppResult<PreviredView> {
+        self.require("remuneraciones.ver")?;
+        let period = check_period(period)?;
+        let settings = self.load_payroll_settings()?;
+        let snaps = self.emitted_snapshots(&period)?;
+        let mut rows: Vec<PreviredRow> = Vec::new();
+        let mut notes = Vec::new();
+        let mutual = settings
+            .mutual
+            .and_then(|m| MUTUAL_NAMES.get(m as usize))
+            .map(|n| format!("Seguro de accidentes: {n}"))
+            .unwrap_or_else(|| "Seguro de accidentes (mutual o ISL)".into());
+        for s in &snaps {
+            let t = &s.worker.terms;
+            let r = &s.result;
+            let afp_name = format!("AFP {}", t.afp.clone().unwrap_or_else(|| "—".into()));
+            let health = if t.health == "isapre" {
+                format!("Isapre {}", t.health_name.clone().unwrap_or_default())
+                    .trim()
+                    .to_string()
+            } else {
+                "Fonasa".to_string()
+            };
+            for l in &r.legal_deductions {
+                match l.key.as_str() {
+                    "afp" => add_row(&mut rows, afp_name.clone(), "afp", l.amount, 0),
+                    "apv" => {
+                        let inst = t
+                            .apv
+                            .as_ref()
+                            .and_then(|a| a.institution.clone())
+                            .unwrap_or_else(|| afp_name.clone());
+                        add_row(
+                            &mut rows,
+                            format!("APV {inst}").replace("APV AFP", "APV en AFP"),
+                            "apv",
+                            l.amount,
+                            0,
+                        )
+                    }
+                    "salud" | "salud_adicional" => {
+                        add_row(&mut rows, health.clone(), "salud", l.amount, 0)
+                    }
+                    "afc" => add_row(
+                        &mut rows,
+                        "Seguro de cesantía (AFC)".into(),
+                        "afc",
+                        l.amount,
+                        0,
+                    ),
+                    _ => {}
+                }
+            }
+            for l in &r.employer {
+                match l.key.as_str() {
+                    "afc_empleador" => add_row(
+                        &mut rows,
+                        "Seguro de cesantía (AFC)".into(),
+                        "afc",
+                        0,
+                        l.amount,
+                    ),
+                    "ley16744" => add_row(&mut rows, mutual.clone(), "mutual", 0, l.amount),
+                    code => {
+                        let payee = s
+                            .input
+                            .params
+                            .employer
+                            .iter()
+                            .find(|e| e.code == code)
+                            .and_then(|e| e.payee.clone());
+                        match payee.as_deref() {
+                            Some("seguro_social") => add_row(
+                                &mut rows,
+                                "Seguro Social Previsional".into(),
+                                "seguro_social",
+                                0,
+                                l.amount,
+                            ),
+                            Some("afp") | None => {
+                                add_row(&mut rows, afp_name.clone(), "afp", 0, l.amount)
+                            }
+                            Some(_) => add_row(&mut rows, l.label.clone(), "otro", 0, l.amount),
+                        }
+                    }
+                }
+            }
+            let allowance: i64 = r
+                .other_earnings
+                .iter()
+                .filter(|l| l.key == "asignacion_familiar")
+                .map(|l| l.amount)
+                .sum();
+            if allowance > 0 {
+                let who = if settings.ccaf > 0 {
+                    format!("caja {}", CCAF_NAMES[settings.ccaf as usize])
+                } else {
+                    "IPS".into()
+                };
+                add_row(
+                    &mut rows,
+                    format!("Asignación familiar pagada (la compensa la {who})"),
+                    "asignacion",
+                    0,
+                    -allowance,
+                );
+            }
+        }
+        let order = [
+            "afp",
+            "apv",
+            "salud",
+            "afc",
+            "seguro_social",
+            "mutual",
+            "otro",
+            "asignacion",
+        ];
+        rows.sort_by_key(|r| {
+            (
+                order.iter().position(|k| *k == r.kind).unwrap_or(9),
+                r.institution.clone(),
+            )
+        });
+        if settings.mutual.is_none() && rows.iter().any(|r| r.kind == "mutual") {
+            notes.push(Note {
+                code: None,
+                severity: Severity::Aviso,
+                text: "Indica tu mutual (o ISL) en los datos del empleador.".into(),
+            });
+        }
+        let ind = self.load_indicators(&period)?;
+        let due_date = ind
+            .indicators
+            .previred_due_day
+            .map(|d| format!("{}-{d:02}", crate::f29_ops::shift(&period, 1)));
+        let conn = self.db.conn();
+        let slips = db::payslips_of_period(conn, &period)?;
+        let mut pending = Vec::new();
+        for w in db::workers(conn)?.into_iter().map(worker_from_row) {
+            let emitted = slips
+                .iter()
+                .any(|s| s.worker_id == w.id && s.status == "emitida");
+            if !emitted && w.active && in_period(&w, &period) {
+                pending.push(w.name);
+            }
+        }
+        if !pending.is_empty() {
+            notes.push(Note {
+                code: None,
+                severity: Severity::Aviso,
+                text: format!(
+                    "Faltan por emitir: {}. El resumen solo suma las liquidaciones emitidas.",
+                    pending.join(", ")
+                ),
+            });
+        }
+        Ok(PreviredView {
+            total: rows.iter().map(|r| r.total).sum(),
+            period,
+            rows,
+            due_date,
+            payslips: snaps.len(),
+            pending,
+            notes,
+        })
+    }
+
+    /// Archivo del Libro de Remuneraciones Electrónico del mes (liquidaciones emitidas).
+    pub fn lre(&self, period: &str) -> AppResult<LreExport> {
+        self.require("remuneraciones.ver")?;
+        let period = check_period(period)?;
+        let biz = self.business()?;
+        let Some(employer_rut) = biz.rut.clone().filter(|r| !r.trim().is_empty()) else {
+            return Err(AppError::Validation(
+                "para el Libro de Remuneraciones falta el RUT del negocio (Mi negocio)".into(),
+            ));
+        };
+        let settings = self.load_payroll_settings()?;
+        let snaps = self.emitted_snapshots(&period)?;
+        if snaps.is_empty() {
+            return Err(AppError::Validation(
+                "no hay liquidaciones emitidas en este mes".into(),
+            ));
+        }
+        let mut warnings = Vec::new();
+        let mut rows = Vec::new();
+        let (from, to) = range(&period);
+        for s in &snaps {
+            let w = &s.worker;
+            let t = &w.terms;
+            let name = &w.name;
+            let mut amounts = std::collections::BTreeMap::new();
+            let r = &s.result;
+            for l in r
+                .taxable_earnings
+                .iter()
+                .chain(&r.other_earnings)
+                .chain(&r.legal_deductions)
+                .chain(&r.other_deductions)
+                .chain(&r.employer)
+            {
+                let code = match l.lre {
+                    Some(c) => c,
+                    None if r.other_earnings.iter().any(|x| std::ptr::eq(x, l)) => {
+                        warnings.push(format!(
+                            "{name}: «{}» no tiene código del LRE; se informó como gastos por causa del trabajo (2306).",
+                            l.label
+                        ));
+                        2306
+                    }
+                    None if r.other_deductions.iter().any(|x| std::ptr::eq(x, l)) => 3183,
+                    None if r.employer.iter().any(|x| std::ptr::eq(x, l)) => {
+                        let msg = format!(
+                            "«{}» no tiene código en el LRE vigente: no se informa (sí se paga en Previred).",
+                            l.label
+                        );
+                        if !warnings.contains(&msg) {
+                            warnings.push(msg);
+                        }
+                        continue;
+                    }
+                    None => continue,
+                };
+                *amounts.entry(code).or_insert(0) += l.amount;
+            }
+            if r.advance > 0 {
+                *amounts.entry(3188).or_insert(0) += r.advance;
+            }
+            let afp = lre::afp_code(t.afp.as_deref()).unwrap_or_else(|| {
+                warnings.push(format!(
+                    "{name}: AFP sin código del LRE; se informó como «no está en AFP» (100)."
+                ));
+                100
+            });
+            let health = t
+                .health_lre_code
+                .or_else(|| lre::health_code(&t.health, t.health_name.as_deref()))
+                .unwrap_or_else(|| {
+                    warnings.push(format!(
+                        "{name}: falta el código del LRE de la Isapre (ingrésalo en la ficha)."
+                    ));
+                    0
+                });
+            let region = t.region.or(settings.region).unwrap_or_else(|| {
+                warnings.push(format!("{name}: falta la región donde presta servicios."));
+                0
+            });
+            let comuna = t.comuna.or(settings.comuna).unwrap_or_else(|| {
+                warnings.push(format!(
+                    "{name}: falta la comuna (código territorial) donde presta servicios."
+                ));
+                0
+            });
+            let mutual = settings.mutual.unwrap_or_else(|| {
+                let msg = "Falta la mutual o ISL del empleador (datos del empleador).".to_string();
+                if !warnings.contains(&msg) {
+                    warnings.push(msg);
+                }
+                0
+            });
+            let end = w.end_date.clone().filter(|e| *e >= from && *e <= to);
+            let end_cause = end
+                .as_ref()
+                .and_then(|_| t.end_cause.and_then(|c| c.lre_code()));
+            if end.is_some() && end_cause.is_none() {
+                warnings.push(format!(
+                    "{name}: terminó este mes; falta la causal de término."
+                ));
+            }
+            rows.push(lre::LreRow {
+                rut: w.rut.clone(),
+                start_date: w.start_date.clone(),
+                end_date: end,
+                end_cause,
+                region,
+                comuna,
+                jornada: t.jornada.unwrap_or(101),
+                disability: t.disability,
+                pensioner: t.pensioner,
+                afp,
+                health,
+                afc: t.afc,
+                ccaf: settings.ccaf,
+                mutual,
+                family_loads: t.family_loads.max(0) as u32,
+                invalid_loads: t.invalid_loads.max(0) as u32,
+                allowance_bracket: r.allowance_bracket.clone(),
+                days: s.input.days.clamp(0, 30) as u32,
+                young_subsidy: t.young_subsidy,
+                apvi: t.apv.is_some(),
+                amounts,
+            });
+        }
+        // Cuadratura: el líquido del libro debe ser el de cada liquidación.
+        for (row, s) in rows.iter().zip(&snaps) {
+            let tot = lre::totals(&row.amounts);
+            if tot.get(&5501).copied().unwrap_or(0) != s.result.to_pay {
+                warnings.push(format!(
+                    "{}: el total líquido del libro no cuadra con la liquidación; revísala.",
+                    s.worker.name
+                ));
+            }
+        }
+        Ok(LreExport {
+            file_name: lre::file_name(&employer_rut, &period),
+            content: lre::build(&rows),
+            rows: rows.len(),
+            format: lre::FORMAT_VERSION.into(),
+            warnings,
+        })
+    }
+
+    /// Escribe el archivo del LRE en Windows-1252 donde la persona eligió.
+    pub fn export_lre(&self, period: &str, dest: &std::path::Path) -> AppResult<LreExport> {
+        let e = self.lre(period)?;
+        std::fs::write(dest, lre::to_cp1252(&e.content))
+            .map_err(|err| AppError::Validation(format!("no se pudo guardar el archivo: {err}")))?;
+        Ok(e)
+    }
+
+    /// Calcula un finiquito (no se guarda: la persona lo imprime y lo firma ante ministro de fe).
+    pub fn severance(&self, worker_id: i64, form: &SeveranceForm) -> AppResult<SeveranceView> {
+        self.require("remuneraciones.ver")?;
+        let w = self.worker_or_404(worker_id)?;
+        let end = parse_date("La fecha de término", &form.end_date)?;
+        let cause = form
+            .cause
+            .ok_or_else(|| AppError::Validation("elige la causal de término".into()))?;
+        let end_period = end[..7].to_string();
+        let prev_period = crate::f29_ops::shift(&end_period, -1);
+        let prev = self.load_indicators(&prev_period)?;
+        let cur = self.load_indicators(&end_period)?;
+        let (ind, used, saved) = if prev.saved {
+            (prev.indicators, prev_period, true)
+        } else {
+            (cur.indicators.clone(), end_period, cur.saved)
+        };
+        let t = &w.terms;
+        let suggested_base = t.base_salary
+            + t.items
+                .iter()
+                .filter(|i| i.taxable)
+                .map(|i| i.amount)
+                .sum::<i64>();
+        let mut rules = ind.severance.clone();
+        rules.uf_e2 = ind.params.uf_e2;
+        let input = SeveranceInput {
+            rules,
+            start_date: w.start_date.clone(),
+            end_date: end,
+            cause,
+            notice_given: form.notice_given,
+            base_172: form.base_172.unwrap_or(suggested_base),
+            vacation_base: form.vacation_base.unwrap_or(t.base_salary),
+            pending_vacation_days_e2: form.pending_vacation_days_e2.max(0),
+            vacation_taken_days_e2: form.vacation_taken_days_e2.max(0),
+            afc_offset: form.afc_offset.max(0),
+            deductions: form.deductions.clone(),
+        };
+        let mut result = severance::compute(&input);
+        if w.is_owner {
+            result.notes.insert(
+                0,
+                Note {
+                    code: None,
+                    severity: Severity::Aviso,
+                    text: "El sueldo empresarial no nace de un contrato de trabajo: normalmente no hay finiquito ni indemnizaciones. Confírmalo con tu contador.".into(),
+                },
+            );
+        }
+        if !saved {
+            result.complete = false;
+            result.notes.insert(
+                0,
+                Note {
+                    code: None,
+                    severity: Severity::Falta,
+                    text: "Faltan los indicadores del mes anterior al término (UF y reglas del finiquito).".into(),
+                },
+            );
+        }
+        Ok(SeveranceView {
+            worker: w,
+            form: form.clone(),
+            input,
+            result,
+            suggested_base,
+            indicators_period: used,
+            indicators_saved: saved,
+        })
+    }
+}
+
+/// Una liquidación emitida, resumida para la renta anual (F22).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PayrollEmitted {
+    pub period: String,
+    pub pay_date: String,
+    /// Lo pagado a la persona (haberes menos cotizaciones e impuesto).
+    pub net_paid: i64,
+    /// Cotizaciones e impuesto retenidos más aportes del empleador (se enteran el mes siguiente).
+    pub withheld_and_employer: i64,
+}
+
+impl CompanySession {
+    pub(crate) fn payroll_emitted(&self) -> AppResult<Vec<PayrollEmitted>> {
+        let mut st = self.db.conn().prepare(
+            "SELECT period, pay_date, snapshot_json FROM payslips WHERE status = 'emitida' ORDER BY period",
+        )?;
+        let rows = st.query_map([], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+            ))
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            let (period, pay_date, json) = row?;
+            let Ok(s) = serde_json::from_str::<Snapshot>(&json) else {
+                continue;
+            };
+            let legal: i64 = s.result.legal_deductions.iter().map(|l| l.amount).sum();
+            out.push(PayrollEmitted {
+                period,
+                pay_date,
+                net_paid: s.result.total_earnings - legal,
+                withheld_and_employer: legal + s.result.employer_total,
+            });
+        }
+        Ok(out)
     }
 }

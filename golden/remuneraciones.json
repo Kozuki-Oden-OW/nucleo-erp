@@ -157,7 +157,10 @@
           "afc_empleador": 20660
         },
         "horas_extra": 0,
-        "gratificacion": 101927
+        "gratificacion": 101927,
+        "apv": 0,
+        "asignacion_familiar": 0,
+        "allowance_bracket": null
       },
       "guia": {
         "total_taxable": 860815,
@@ -329,7 +332,10 @@
           "afc_empleador": 20660
         },
         "horas_extra": 0,
-        "gratificacion": 101927
+        "gratificacion": 101927,
+        "apv": 0,
+        "asignacion_familiar": 0,
+        "allowance_bracket": null
       },
       "guia": {
         "tax_base": 679002,
@@ -488,7 +494,10 @@
           "afc_empleador": 21014
         },
         "horas_extra": 88667,
-        "gratificacion": 101927
+        "gratificacion": 101927,
+        "apv": 0,
+        "asignacion_familiar": 0,
+        "allowance_bracket": null
       },
       "guia": {}
     },
@@ -597,7 +606,10 @@
           "sis": 27567
         },
         "horas_extra": 0,
-        "gratificacion": 0
+        "gratificacion": 0,
+        "apv": 0,
+        "asignacion_familiar": 0,
+        "allowance_bracket": null
       },
       "guia": {
         "pension_base": 1955095,
@@ -730,7 +742,10 @@
           "ley16744": 23250
         },
         "horas_extra": 0,
-        "gratificacion": 0
+        "gratificacion": 0,
+        "apv": 0,
+        "asignacion_familiar": 0,
+        "allowance_bracket": null
       },
       "guia": {
         "tax": 43811
@@ -872,7 +887,10 @@
           "ley16744": 34365
         },
         "horas_extra": 0,
-        "gratificacion": 0
+        "gratificacion": 0,
+        "apv": 0,
+        "asignacion_familiar": 0,
+        "allowance_bracket": null
       },
       "guia": {}
     },
@@ -1012,9 +1030,565 @@
           "ley16744": 4970
         },
         "horas_extra": 27500,
-        "gratificacion": 106875
+        "gratificacion": 106875,
+        "apv": 0,
+        "asignacion_familiar": 0,
+        "allowance_bracket": null
       },
       "guia": {}
+    },
+    {
+      "nombre": "G-3e: asignación familiar tramo B con 3 cargas (MINEDUC p. 32, tramo por imponible del mes)",
+      "estado": "pendiente_revision",
+      "input": {
+        "params": {
+          "uf_e2": 2605689,
+          "utm": 46091,
+          "imm": 257500,
+          "cap_pension_uf_e4": 743000,
+          "cap_afc_uf_e4": 1114000,
+          "health_ppm": 70000,
+          "afc": {
+            "worker_indefinite_ppm": 6000,
+            "employer_indefinite_ppm": 24000,
+            "employer_fixed_ppm": 30000
+          },
+          "employer": [
+            {
+              "code": "sis",
+              "label": "Seguro de invalidez y sobrevivencia (SIS)",
+              "rate_ppm": 14100
+            }
+          ],
+          "accident_ppm": 0,
+          "tax_brackets": [
+            {
+              "up_to_utm_e4": 135000,
+              "factor_ppm": 0,
+              "rebate_utm_e4": 0
+            },
+            {
+              "up_to_utm_e4": 300000,
+              "factor_ppm": 40000,
+              "rebate_utm_e4": 5400
+            },
+            {
+              "up_to_utm_e4": 500000,
+              "factor_ppm": 80000,
+              "rebate_utm_e4": 17400
+            },
+            {
+              "up_to_utm_e4": 700000,
+              "factor_ppm": 135000,
+              "rebate_utm_e4": 44900
+            },
+            {
+              "up_to_utm_e4": 900000,
+              "factor_ppm": 230000,
+              "rebate_utm_e4": 111400
+            },
+            {
+              "up_to_utm_e4": 1200000,
+              "factor_ppm": 304000,
+              "rebate_utm_e4": 178000
+            },
+            {
+              "up_to_utm_e4": 1500000,
+              "factor_ppm": 355000,
+              "rebate_utm_e4": 239200
+            },
+            {
+              "up_to_utm_e4": null,
+              "factor_ppm": 400000,
+              "rebate_utm_e4": 306700
+            }
+          ],
+          "gratification": {
+            "rate_ppm": 250000,
+            "cap_imm_e4": 47500
+          },
+          "overtime_surcharge_ppm": 500000,
+          "health_deduction": "legal_only",
+          "family_allowance": {
+            "brackets": [
+              {
+                "up_to_income": 270196,
+                "amount": 10577
+              },
+              {
+                "up_to_income": 394651,
+                "amount": 6491
+              },
+              {
+                "up_to_income": 615521,
+                "amount": 2052
+              },
+              {
+                "up_to_income": null,
+                "amount": 0
+              }
+            ],
+            "full_days": 25
+          }
+        },
+        "worker": {
+          "contract": "indefinido",
+          "afp_ppm": 107700,
+          "afp_name": "Modelo",
+          "health": {
+            "kind": "fonasa"
+          },
+          "afc": true,
+          "family_loads": 3
+        },
+        "base_salary": 313000
+      },
+      "esperado": {
+        "total_taxable": 313000,
+        "pension_base": 313000,
+        "afc_base": 313000,
+        "afp": 33710,
+        "salud": 21910,
+        "salud_adicional": 0,
+        "afc": 1878,
+        "tax_base": 255502,
+        "tax": 0,
+        "tax_bracket": 1,
+        "total_earnings": 332473,
+        "total_deductions": 57498,
+        "net": 274975,
+        "to_pay": 274975,
+        "employer_total": 11925,
+        "employer_cost": 344398,
+        "employer_lines": {
+          "sis": 4413,
+          "afc_empleador": 7512
+        },
+        "horas_extra": 0,
+        "gratificacion": 0,
+        "apv": 0,
+        "asignacion_familiar": 19473,
+        "allowance_bracket": "B"
+      },
+      "guia": {
+        "asignacion_familiar": 19473,
+        "allowance_bracket": "B"
+      }
+    },
+    {
+      "nombre": "Asignación familiar: tramo C por ingreso del semestre, una carga por invalidez y 20 días (proporcional)",
+      "estado": "pendiente_revision",
+      "input": {
+        "params": {
+          "uf_e2": 2605689,
+          "utm": 46091,
+          "imm": 257500,
+          "cap_pension_uf_e4": 743000,
+          "cap_afc_uf_e4": 1114000,
+          "health_ppm": 70000,
+          "afc": {
+            "worker_indefinite_ppm": 6000,
+            "employer_indefinite_ppm": 24000,
+            "employer_fixed_ppm": 30000
+          },
+          "employer": [
+            {
+              "code": "sis",
+              "label": "Seguro de invalidez y sobrevivencia (SIS)",
+              "rate_ppm": 14100
+            }
+          ],
+          "accident_ppm": 0,
+          "tax_brackets": [
+            {
+              "up_to_utm_e4": 135000,
+              "factor_ppm": 0,
+              "rebate_utm_e4": 0
+            },
+            {
+              "up_to_utm_e4": 300000,
+              "factor_ppm": 40000,
+              "rebate_utm_e4": 5400
+            },
+            {
+              "up_to_utm_e4": 500000,
+              "factor_ppm": 80000,
+              "rebate_utm_e4": 17400
+            },
+            {
+              "up_to_utm_e4": 700000,
+              "factor_ppm": 135000,
+              "rebate_utm_e4": 44900
+            },
+            {
+              "up_to_utm_e4": 900000,
+              "factor_ppm": 230000,
+              "rebate_utm_e4": 111400
+            },
+            {
+              "up_to_utm_e4": 1200000,
+              "factor_ppm": 304000,
+              "rebate_utm_e4": 178000
+            },
+            {
+              "up_to_utm_e4": 1500000,
+              "factor_ppm": 355000,
+              "rebate_utm_e4": 239200
+            },
+            {
+              "up_to_utm_e4": null,
+              "factor_ppm": 400000,
+              "rebate_utm_e4": 306700
+            }
+          ],
+          "gratification": {
+            "rate_ppm": 250000,
+            "cap_imm_e4": 47500
+          },
+          "overtime_surcharge_ppm": 500000,
+          "health_deduction": "legal_only",
+          "family_allowance": {
+            "brackets": [
+              {
+                "up_to_income": 270196,
+                "amount": 10577
+              },
+              {
+                "up_to_income": 394651,
+                "amount": 6491
+              },
+              {
+                "up_to_income": 615521,
+                "amount": 2052
+              },
+              {
+                "up_to_income": null,
+                "amount": 0
+              }
+            ],
+            "full_days": 25
+          }
+        },
+        "worker": {
+          "contract": "indefinido",
+          "afp_ppm": 107700,
+          "afp_name": "Modelo",
+          "health": {
+            "kind": "fonasa"
+          },
+          "afc": true,
+          "family_loads": 2,
+          "allowance_income": 600000,
+          "invalid_loads": 1
+        },
+        "base_salary": 313000,
+        "days": 20
+      },
+      "esperado": {
+        "total_taxable": 208667,
+        "pension_base": 208667,
+        "afc_base": 208667,
+        "afp": 22473,
+        "salud": 14607,
+        "salud_adicional": 0,
+        "afc": 1252,
+        "tax_base": 170335,
+        "tax": 0,
+        "tax_bracket": 1,
+        "total_earnings": 214139,
+        "total_deductions": 38332,
+        "net": 175807,
+        "to_pay": 175807,
+        "employer_total": 7950,
+        "employer_cost": 222089,
+        "employer_lines": {
+          "sis": 2942,
+          "afc_empleador": 5008
+        },
+        "horas_extra": 0,
+        "gratificacion": 0,
+        "apv": 0,
+        "asignacion_familiar": 5472,
+        "allowance_bracket": "C"
+      },
+      "guia": {
+        "allowance_bracket": "C"
+      }
+    },
+    {
+      "nombre": "Sueldo empresarial con APV régimen B que rebaja el impuesto (ilustrativo)",
+      "estado": "pendiente_revision",
+      "input": {
+        "params": {
+          "uf_e2": 4105720,
+          "utm": 71721,
+          "imm": 553553,
+          "cap_pension_uf_e4": 900000,
+          "cap_afc_uf_e4": 1352000,
+          "health_ppm": 70000,
+          "afc": {
+            "worker_indefinite_ppm": 6000,
+            "employer_indefinite_ppm": 24000,
+            "employer_fixed_ppm": 30000
+          },
+          "employer": [
+            {
+              "code": "sis",
+              "label": "SIS",
+              "rate_ppm": 17800
+            },
+            {
+              "code": "cuenta_individual",
+              "label": "Cuenta individual (Ley 21.735)",
+              "rate_ppm": 1000
+            },
+            {
+              "code": "rentabilidad_protegida",
+              "label": "Rentabilidad protegida (Ley 21.735)",
+              "rate_ppm": 9000
+            },
+            {
+              "code": "expectativa_vida",
+              "label": "Expectativa de vida (Ley 21.735)",
+              "rate_ppm": 7200
+            }
+          ],
+          "accident_ppm": 9300,
+          "tax_brackets": [
+            {
+              "up_to_utm_e4": 135000,
+              "factor_ppm": 0,
+              "rebate_utm_e4": 0
+            },
+            {
+              "up_to_utm_e4": 300000,
+              "factor_ppm": 40000,
+              "rebate_utm_e4": 5400
+            },
+            {
+              "up_to_utm_e4": 500000,
+              "factor_ppm": 80000,
+              "rebate_utm_e4": 17400
+            },
+            {
+              "up_to_utm_e4": 700000,
+              "factor_ppm": 135000,
+              "rebate_utm_e4": 44900
+            },
+            {
+              "up_to_utm_e4": 900000,
+              "factor_ppm": 230000,
+              "rebate_utm_e4": 111400
+            },
+            {
+              "up_to_utm_e4": 1200000,
+              "factor_ppm": 304000,
+              "rebate_utm_e4": 178000
+            },
+            {
+              "up_to_utm_e4": 3100000,
+              "factor_ppm": 350000,
+              "rebate_utm_e4": 233200
+            },
+            {
+              "up_to_utm_e4": null,
+              "factor_ppm": 400000,
+              "rebate_utm_e4": 388200
+            }
+          ],
+          "gratification": {
+            "rate_ppm": 250000,
+            "cap_imm_e4": 47500
+          },
+          "overtime_surcharge_ppm": 500000,
+          "health_deduction": "up_to_cap",
+          "apv_b_cap_uf_e4": 500000
+        },
+        "worker": {
+          "contract": "sin_contrato",
+          "owner_salary": true,
+          "afp_ppm": 104600,
+          "afp_name": "Uno",
+          "health": {
+            "kind": "fonasa"
+          },
+          "apv": {
+            "regime": "b",
+            "amount_clp": 300000,
+            "institution": "AFP Uno"
+          }
+        },
+        "base_salary": 2500000
+      },
+      "esperado": {
+        "total_taxable": 2500000,
+        "pension_base": 2500000,
+        "afc_base": 2500000,
+        "afp": 261500,
+        "salud": 175000,
+        "salud_adicional": 0,
+        "afc": 0,
+        "tax_base": 1763500,
+        "tax": 31811,
+        "tax_bracket": 2,
+        "total_earnings": 2500000,
+        "total_deductions": 768311,
+        "net": 1731689,
+        "to_pay": 1731689,
+        "employer_total": 110750,
+        "employer_cost": 2610750,
+        "employer_lines": {
+          "sis": 44500,
+          "cuenta_individual": 2500,
+          "rentabilidad_protegida": 22500,
+          "expectativa_vida": 18000,
+          "ley16744": 23250
+        },
+        "horas_extra": 0,
+        "gratificacion": 0,
+        "apv": 300000,
+        "asignacion_familiar": 0,
+        "allowance_bracket": null
+      },
+      "guia": {}
+    },
+    {
+      "nombre": "APV régimen A en UF: se descuenta pero no rebaja el impuesto (ilustrativo)",
+      "estado": "pendiente_revision",
+      "input": {
+        "params": {
+          "uf_e2": 4105720,
+          "utm": 71721,
+          "imm": 553553,
+          "cap_pension_uf_e4": 900000,
+          "cap_afc_uf_e4": 1352000,
+          "health_ppm": 70000,
+          "afc": {
+            "worker_indefinite_ppm": 6000,
+            "employer_indefinite_ppm": 24000,
+            "employer_fixed_ppm": 30000
+          },
+          "employer": [
+            {
+              "code": "sis",
+              "label": "SIS",
+              "rate_ppm": 17800
+            },
+            {
+              "code": "cuenta_individual",
+              "label": "Cuenta individual (Ley 21.735)",
+              "rate_ppm": 1000
+            },
+            {
+              "code": "rentabilidad_protegida",
+              "label": "Rentabilidad protegida (Ley 21.735)",
+              "rate_ppm": 9000
+            },
+            {
+              "code": "expectativa_vida",
+              "label": "Expectativa de vida (Ley 21.735)",
+              "rate_ppm": 7200
+            }
+          ],
+          "accident_ppm": 9300,
+          "tax_brackets": [
+            {
+              "up_to_utm_e4": 135000,
+              "factor_ppm": 0,
+              "rebate_utm_e4": 0
+            },
+            {
+              "up_to_utm_e4": 300000,
+              "factor_ppm": 40000,
+              "rebate_utm_e4": 5400
+            },
+            {
+              "up_to_utm_e4": 500000,
+              "factor_ppm": 80000,
+              "rebate_utm_e4": 17400
+            },
+            {
+              "up_to_utm_e4": 700000,
+              "factor_ppm": 135000,
+              "rebate_utm_e4": 44900
+            },
+            {
+              "up_to_utm_e4": 900000,
+              "factor_ppm": 230000,
+              "rebate_utm_e4": 111400
+            },
+            {
+              "up_to_utm_e4": 1200000,
+              "factor_ppm": 304000,
+              "rebate_utm_e4": 178000
+            },
+            {
+              "up_to_utm_e4": 3100000,
+              "factor_ppm": 350000,
+              "rebate_utm_e4": 233200
+            },
+            {
+              "up_to_utm_e4": null,
+              "factor_ppm": 400000,
+              "rebate_utm_e4": 388200
+            }
+          ],
+          "gratification": {
+            "rate_ppm": 250000,
+            "cap_imm_e4": 47500
+          },
+          "overtime_surcharge_ppm": 500000,
+          "health_deduction": "up_to_cap",
+          "apv_b_cap_uf_e4": 500000
+        },
+        "worker": {
+          "contract": "sin_contrato",
+          "owner_salary": true,
+          "afp_ppm": 104600,
+          "afp_name": "Uno",
+          "health": {
+            "kind": "fonasa"
+          },
+          "apv": {
+            "regime": "a",
+            "amount_uf_e4": 20000
+          }
+        },
+        "base_salary": 2500000
+      },
+      "esperado": {
+        "total_taxable": 2500000,
+        "pension_base": 2500000,
+        "afc_base": 2500000,
+        "afp": 261500,
+        "salud": 175000,
+        "salud_adicional": 0,
+        "afc": 0,
+        "tax_base": 2063500,
+        "tax": 43811,
+        "tax_bracket": 2,
+        "total_earnings": 2500000,
+        "total_deductions": 562425,
+        "net": 1937575,
+        "to_pay": 1937575,
+        "employer_total": 110750,
+        "employer_cost": 2610750,
+        "employer_lines": {
+          "sis": 44500,
+          "cuenta_individual": 2500,
+          "rentabilidad_protegida": 22500,
+          "expectativa_vida": 18000,
+          "ley16744": 23250
+        },
+        "horas_extra": 0,
+        "gratificacion": 0,
+        "apv": 82114,
+        "asignacion_familiar": 0,
+        "allowance_bracket": null
+      },
+      "guia": {
+        "tax": 43811
+      }
     }
   ]
 }

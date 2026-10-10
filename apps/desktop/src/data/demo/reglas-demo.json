@@ -37,6 +37,21 @@
       "code": "COMEX_EXPORT_SIN_AGENTE_MAX_USD_CENTS",
       "value": 200000,
       "source": "Exportación: hasta USD 2.000 FOB se puede tramitar sin agente (DUS o DUSSI); sobre ese monto, con agente (Compendio de Normas Aduaneras, cap. IV). Confirmado por el agente de aduana, oct-2026."
+    },
+    {
+      "code": "IDPC_PROPYME_TASA_PPM",
+      "value": 125000,
+      "source": "Impuesto de primera categoría Pro Pyme 14 D N°3: 12,5 % transitorio para los años comerciales 2025 a 2027 (Ley 21.755; planilla SII AT 2026). Verificar el año comercial."
+    },
+    {
+      "code": "INCENTIVO_14E_TASA_PPM",
+      "value": 500000,
+      "source": "Incentivo al ahorro art. 14 letra E) LIR: 50 % de la renta líquida imponible que se mantiene invertida (planilla SII Pro Pyme AT 2026)."
+    },
+    {
+      "code": "INCENTIVO_14E_TOPE_UF_E4",
+      "value": 50000000,
+      "source": "Tope del incentivo al ahorro art. 14 letra E) LIR: 5.000 UF (planilla SII Pro Pyme AT 2026)."
     }
   ]
 }

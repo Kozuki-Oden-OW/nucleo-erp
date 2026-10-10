@@ -9,6 +9,7 @@
 
 pub mod comex;
 pub mod customers;
+pub mod f22;
 pub mod f29;
 pub mod inventory;
 pub mod money;
@@ -17,6 +18,7 @@ pub mod payroll;
 pub mod pricing;
 pub mod rut;
 pub mod sales_state;
+pub mod severance;
 
 pub use money::{CurrencyCode, Money, MoneyError, RoundingMode};
 pub use rut::{Rut, RutError};
