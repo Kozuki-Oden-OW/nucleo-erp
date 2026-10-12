@@ -78,3 +78,10 @@ export function computeCostSheet(s: CostSheet, taxPpm: number | null): CostSheet
 export function costSheetUsed(s: CostSheet | null | undefined): boolean {
   return !!s && (s.purchase_minor > 0 || s.freight_minor > 0 || s.shipping_minor > 0 || s.labor_minor > 0 || s.other_minor > 0);
 }
+
+/** Ganancia sobre el costo: (precio neto − costo) ÷ costo. Ej.: neto $32.773 y costo $17.575 → 0,8647 (86,47 %). */
+export function gainOverCost(netMinor: number, costMinor: number): number | null {
+  return costMinor > 0 ? (netMinor - costMinor) / costMinor : null;
+}
+/** Porcentaje con coma decimal ("86,47 %"). */
+export const pctText = (fraction: number, digits = 1) => `${(fraction * 100).toFixed(digits).replace(".", ",")} %`;

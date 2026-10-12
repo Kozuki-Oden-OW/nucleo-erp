@@ -2,6 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [0.5.1] — 2026-10-12
+
+- **Precio de venta:** dos campos enlazados, «Precio de venta (Con IVA)» y «Precio neto (sin IVA)». Al escribir uno, el otro se calcula con la tasa de IVA del negocio (19 % sobre el neto). Ejemplo: $39.000 con IVA son $32.773 netos.
+- **Ganancia sobre el costo:** el margen se calcula como (precio neto − costo) ÷ costo en la ficha, en la lista de productos, en la venta y en los reportes («Ganancia s/costo %»). Ejemplo: neto $32.773 y costo $17.575 dan 86,48 %.
+
 ## [0.5.0] — 2026-10-12
 
 - **Descuentos y promociones (nuevo módulo):**

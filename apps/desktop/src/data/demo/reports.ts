@@ -88,15 +88,15 @@ export function buildReport(id: string, f: Facts, from: string, to: string, grou
       if (g === "mes") for (const m of months(from, to)) by.set(m, [0, 0, 0, 0, 0]);
       for (const s of sales) { const k = periodKey(s.date, g); const e = by.get(k) ?? [0, 0, 0, 0, 0]; e[0]! += 1; e[1]! += s.net; e[2]! += s.tax; e[3]! += s.total; e[4]! += s.cost; by.set(k, e); }
       r.columns = [col("periodo", g === "dia" ? "Día" : g === "semana" ? "Semana del" : "Mes", g === "mes" ? "month" : "date"), col("docs", "Ventas", "int"), col("neto", "Neto", "money"), col("iva", "IVA", "money"), col("total", "Total", "money")];
-      if (costs) r.columns.push(col("costo", "Costo", "money"), col("margen", "Margen", "money"), col("margen_pct", "Margen %", "pct"));
+      if (costs) r.columns.push(col("costo", "Costo", "money"), col("margen", "Margen", "money"), col("margen_pct", "Ganancia s/costo %", "pct"));
       const keys = [...by.keys()].sort();
-      for (const k of keys) { const v = by.get(k)!; const row: ReportCell[] = [k, v[0]!, v[1]!, v[2]!, v[3]!]; if (costs) row.push(v[4]!, v[1]! - v[4]!, ppm(v[1]! - v[4]!, v[1]!)); r.rows.push(row); }
+      for (const k of keys) { const v = by.get(k)!; const row: ReportCell[] = [k, v[0]!, v[1]!, v[2]!, v[3]!]; if (costs) row.push(v[4]!, v[1]! - v[4]!, ppm(v[1]! - v[4]!, v[4]!)); r.rows.push(row); }
       const n = sales.reduce((a, s) => a + s.net, 0), c = sales.reduce((a, s) => a + s.cost, 0);
       const tot: ReportCell[] = ["Total", sales.length, n, sales.reduce((a, s) => a + s.tax, 0), sales.reduce((a, s) => a + s.total, 0)];
-      if (costs) tot.push(c, n - c, ppm(n - c, n));
+      if (costs) tot.push(c, n - c, ppm(n - c, c));
       r.totals = tot;
       r.kpis.push(kpi("Ventas netas", n, "money"), kpi("Documentos", sales.length, "int"));
-      if (costs) r.kpis.push(kpi("Margen", n - c, "money"), kpi("Margen %", num(ppm(n - c, n)), "pct"));
+      if (costs) r.kpis.push(kpi("Margen", n - c, "money"), kpi("Ganancia sobre costo", num(ppm(n - c, c)), "pct"));
       r.chart = { label: 0, series: [2] };
       break;
     }
@@ -106,10 +106,10 @@ export function buildReport(id: string, f: Facts, from: string, to: string, grou
       const data = [...by.values()].sort((a, b) => b.net - a.net);
       const total = data.reduce((a, x) => a + x.net, 0), c = data.reduce((a, x) => a + x.cost, 0);
       r.columns = [col("cliente", "Cliente", "text"), col("rut", "RUT", "rut"), col("docs", "Ventas", "int"), col("neto", "Neto", "money")];
-      if (costs) r.columns.push(col("margen", "Margen", "money"), col("margen_pct", "Margen %", "pct"));
+      if (costs) r.columns.push(col("margen", "Margen", "money"), col("margen_pct", "Ganancia s/costo %", "pct"));
       r.columns.push(col("part", "Participación", "pct"));
-      for (const x of data) { const row: ReportCell[] = [x.name, x.rut, x.docs, x.net]; if (costs) row.push(x.net - x.cost, ppm(x.net - x.cost, x.net)); row.push(ppm(x.net, total)); r.rows.push(row); }
-      const tot: ReportCell[] = [`${data.length} clientes`, null, sales.length, total]; if (costs) tot.push(total - c, ppm(total - c, total)); tot.push(ppm(total, total));
+      for (const x of data) { const row: ReportCell[] = [x.name, x.rut, x.docs, x.net]; if (costs) row.push(x.net - x.cost, ppm(x.net - x.cost, x.cost)); row.push(ppm(x.net, total)); r.rows.push(row); }
+      const tot: ReportCell[] = [`${data.length} clientes`, null, sales.length, total]; if (costs) tot.push(total - c, ppm(total - c, c)); tot.push(ppm(total, total));
       r.totals = tot;
       if (data[0]) {
         r.kpis.push(kpi("Clientes con compras", data.length, "int"), kpi(`Principal: ${data[0].name}`, num(ppm(data[0].net, total)), "pct"),
@@ -134,20 +134,20 @@ export function buildReport(id: string, f: Facts, from: string, to: string, grou
       r.columns = byProduct
         ? [col("codigo", "Código", "text"), col("producto", "Producto", "text"), col("categoria", "Categoría", "text"), col("cantidad", "Cantidad", "qty"), col("unidad", "Unidad", "text"), col("neto", "Neto", "money")]
         : [col("categoria", "Categoría", "text"), col("productos", "Productos distintos", "int"), col("ventas", "Ventas", "int"), col("neto", "Neto", "money")];
-      if (costs) r.columns.push(col("costo", "Costo", "money"), col("margen", "Margen", "money"), col("margen_pct", "Margen %", "pct"));
+      if (costs) r.columns.push(col("costo", "Costo", "money"), col("margen", "Margen", "money"), col("margen_pct", "Ganancia s/costo %", "pct"));
       r.columns.push(col("part", "Participación", "pct"));
       for (const x of data) {
         const row: ReportCell[] = byProduct ? [...x.cells, x.net] : [x.cells[0]!, x.prods.size, x.sales.size, x.net];
-        if (costs) row.push(x.cost, x.net - x.cost, ppm(x.net - x.cost, x.net));
+        if (costs) row.push(x.cost, x.net - x.cost, ppm(x.net - x.cost, x.cost));
         row.push(ppm(x.net, total));
         r.rows.push(row);
       }
       const tot: ReportCell[] = ["Total", ...Array(byProduct ? 4 : 2).fill(null), total];
-      if (costs) tot.push(c, total - c, ppm(total - c, total));
+      if (costs) tot.push(c, total - c, ppm(total - c, c));
       tot.push(ppm(total, total));
       r.totals = tot;
       r.kpis.push(kpi("Ventas netas", total, "money"));
-      if (costs) r.kpis.push(kpi("Margen", total - c, "money"), kpi("Margen %", num(ppm(total - c, total)), "pct"));
+      if (costs) r.kpis.push(kpi("Margen", total - c, "money"), kpi("Ganancia sobre costo", num(ppm(total - c, c)), "pct"));
       if (byProduct) {
         r.kpis.push(kpi("Productos vendidos", data.length, "int"));
         if (data.some((x) => x.cells[2] === null)) r.notes.push("Hay productos sin categoría: asígnalas en Productos → Categorías para verlos agrupados.");

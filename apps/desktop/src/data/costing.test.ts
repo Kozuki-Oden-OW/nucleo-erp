@@ -18,3 +18,15 @@ describe("hoja de costo (golden/costo.json)", () => {
     }
   });
 });
+
+describe("ganancia sobre el costo", () => {
+  it("ejemplo del usuario: con IVA $39.000, neto $32.773, costo $17.575 → 86,475 % (86,48 % redondeado)", async () => {
+    const { gainOverCost, pctText, netFromGross, grossFromNet } = await import("./costing");
+    const net = netFromGross(39_000, 190_000);
+    expect(net).toBe(32_773);
+    expect(grossFromNet(net, 190_000)).toBe(39_000);
+    expect(pctText(gainOverCost(net, 17_575)!, 2)).toBe("86,48 %");
+    expect(pctText(gainOverCost(net, 17_575)!, 3)).toBe("86,475 %");
+    expect(gainOverCost(1000, 0)).toBeNull();
+  });
+});

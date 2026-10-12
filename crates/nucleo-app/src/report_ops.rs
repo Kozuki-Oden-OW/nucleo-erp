@@ -419,14 +419,14 @@ impl CompanySession {
                     r.columns.extend([
                         col("costo", "Costo", "money"),
                         col("margen", "Margen", "money"),
-                        col("margen_pct", "Margen %", "pct"),
+                        col("margen_pct", "Ganancia s/costo %", "pct"),
                     ]);
                 }
                 for row in &data {
                     let (net, cost) = (row[2].int(), row[5].int());
                     let mut out = row[..5].to_vec();
                     if costs {
-                        out.extend([cost.into(), (net - cost).into(), ppm(net - cost, net)]);
+                        out.extend([cost.into(), (net - cost).into(), ppm(net - cost, cost)]);
                     }
                     r.rows.push(out);
                 }
@@ -439,13 +439,14 @@ impl CompanySession {
                     sum_col(&data, 4).into(),
                 ];
                 if costs {
-                    tot.extend([c.into(), (n - c).into(), ppm(n - c, n)]);
+                    tot.extend([c.into(), (n - c).into(), ppm(n - c, c)]);
                 }
                 r.kpis.push(kpi("Ventas netas", n, "money"));
                 r.kpis.push(kpi("Documentos", sum_col(&data, 1), "int"));
                 if costs {
                     r.kpis.push(kpi("Margen", n - c, "money"));
-                    r.kpis.push(kpi("Margen %", ppm(n - c, n).int(), "pct"));
+                    r.kpis
+                        .push(kpi("Ganancia sobre costo", ppm(n - c, c).int(), "pct"));
                 }
                 r.totals = Some(tot);
                 r.chart = Some(ReportChart {
@@ -465,7 +466,7 @@ impl CompanySession {
                 if costs {
                     r.columns.extend([
                         col("margen", "Margen", "money"),
-                        col("margen_pct", "Margen %", "pct"),
+                        col("margen_pct", "Ganancia s/costo %", "pct"),
                     ]);
                 }
                 r.columns.push(col("part", "Participación", "pct"));
@@ -473,7 +474,7 @@ impl CompanySession {
                     let (net, cost) = (row[3].int(), row[4].int());
                     let mut out = row[..4].to_vec();
                     if costs {
-                        out.extend([(net - cost).into(), ppm(net - cost, net)]);
+                        out.extend([(net - cost).into(), ppm(net - cost, cost)]);
                     }
                     out.push(ppm(net, total));
                     r.rows.push(out);
@@ -486,7 +487,7 @@ impl CompanySession {
                     total.into(),
                 ];
                 if costs {
-                    tot.extend([(total - c).into(), ppm(total - c, total)]);
+                    tot.extend([(total - c).into(), ppm(total - c, c)]);
                 }
                 tot.push(ppm(total, total));
                 r.totals = Some(tot);
@@ -533,7 +534,7 @@ impl CompanySession {
                     r.columns.extend([
                         col("costo", "Costo", "money"),
                         col("margen", "Margen", "money"),
-                        col("margen_pct", "Margen %", "pct"),
+                        col("margen_pct", "Ganancia s/costo %", "pct"),
                     ]);
                 }
                 r.columns.push(col("part", "Participación", "pct"));
@@ -541,7 +542,7 @@ impl CompanySession {
                     let (net, cost) = (row[net_i].int(), row[cost_i].int());
                     let mut out = row[..=net_i].to_vec();
                     if costs {
-                        out.extend([cost.into(), (net - cost).into(), ppm(net - cost, net)]);
+                        out.extend([cost.into(), (net - cost).into(), ppm(net - cost, cost)]);
                     }
                     out.push(ppm(net, total));
                     r.rows.push(out);
@@ -551,7 +552,7 @@ impl CompanySession {
                 tot.resize(net_i, Cell::Null);
                 tot.push(total.into());
                 if costs {
-                    tot.extend([c.into(), (total - c).into(), ppm(total - c, total)]);
+                    tot.extend([c.into(), (total - c).into(), ppm(total - c, c)]);
                 }
                 tot.push(ppm(total, total));
                 r.totals = Some(tot);
@@ -559,7 +560,7 @@ impl CompanySession {
                 if costs {
                     r.kpis.push(kpi("Margen", total - c, "money"));
                     r.kpis
-                        .push(kpi("Margen %", ppm(total - c, total).int(), "pct"));
+                        .push(kpi("Ganancia sobre costo", ppm(total - c, c).int(), "pct"));
                 }
                 if by_product {
                     r.kpis

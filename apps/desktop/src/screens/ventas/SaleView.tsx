@@ -247,7 +247,7 @@ export function SaleView({ uid }: { uid: string }) {
                 items={[
                   { label: t("costo_venta"), value: <span className="num">{formatMoney(s.cost_minor)}</span> },
                   { label: t("margen"), value: <span className={`num font-semibold ${profit < 0 ? "text-danger" : "text-success"}`}>{formatMoney(profit)}</span> },
-                  { label: "Margen %", value: <span className="num">{s.totals.net_minor + s.totals.exempt_minor > 0 ? `${((profit / (s.totals.net_minor + s.totals.exempt_minor)) * 100).toFixed(1).replace(".", ",")} %` : "—"}</span> },
+                  { label: "Ganancia sobre costo", value: <span className="num">{s.cost_minor > 0 ? `${((profit / s.cost_minor) * 100).toFixed(1).replace(".", ",")} %` : "—"}</span> },
                 ]}
               />
             </Card>

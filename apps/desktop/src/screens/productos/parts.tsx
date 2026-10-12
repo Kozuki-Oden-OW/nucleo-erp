@@ -4,9 +4,8 @@ import { Calculator, ChevronDown, ChevronRight, FolderPlus, Pencil, Plus, Tags, 
 import { useBackend, errorMessage, type BusinessSettings, type CurrencyRow, type Product, type ProductCategory, type StockPolicy } from "../../data";
 import { computeCostSheet, costSheetUsed, EMPTY_COST_SHEET, grossFromNet, netFromGross, type CostSheet } from "../../data/costing";
 import { CURRENCY_DIGITS, formatMoney, formatPpm, formatQty, parseQty } from "../../lib/format";
-import { usePrefs } from "../../lib/prefs";
 import { MoneyField } from "../../ui/doc";
-import { Button, Checkbox, EmptyState, Field, Notice, Segmented, Select, cx } from "../../ui/kit";
+import { Button, Checkbox, EmptyState, Field, Notice, Select, cx } from "../../ui/kit";
 import { Dialog, Drawer, useToast } from "../../ui/overlay";
 
 /** Tasa de IVA vigente del negocio (null si no calcula impuesto). */
@@ -20,44 +19,26 @@ export function useTaxPpm(): { taxPpm: number | null; biz: BusinessSettings | nu
 /* ───────────── Precio neto o con IVA ───────────── */
 
 /**
- * Precio de venta: la persona elige si lo escribe neto o con IVA; siempre se entrega neto.
- * Muestra el desglose (neto, IVA y precio con IVA).
+ * Precio de venta: dos campos enlazados, «con IVA» y «neto». Al escribir uno, el otro se calcula con la
+ * tasa de IVA del negocio (en Chile, 19 % sobre el neto). Siempre se guarda el neto.
  */
 export function PriceInput({ net, onNet, taxPpm, taxable, label = "Precio de venta" }: {
   net: number | null; onNet: (v: number | null) => void; taxPpm: number | null; taxable: boolean; label?: string;
 }) {
-  const { prefs, set } = usePrefs();
   const withTax = taxPpm !== null && taxable;
-  const mode = withTax ? prefs.priceEntry : "neto";
-  const [typed, setTyped] = useState<number | null>(() => (net === null ? null : mode === "con_iva" ? grossFromNet(net, taxPpm) : net));
-  // Si cambia el modo o la tasa, el campo muestra el mismo precio en el nuevo modo.
-  useEffect(() => { setTyped(net === null ? null : mode === "con_iva" ? grossFromNet(net, taxPpm) : net); // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, taxPpm]);
-  function change(v: number | null) {
-    setTyped(v);
-    onNet(v === null ? null : mode === "con_iva" ? netFromGross(v, taxPpm) : v);
-  }
   const gross = net !== null && withTax ? grossFromNet(net, taxPpm) : null;
+  if (!withTax) {
+    return <MoneyField label={taxPpm !== null ? `${label} (exento de IVA)` : label} value={net} onValue={onNet} />;
+  }
   return (
     <div className="flex flex-col gap-2">
-      {withTax && (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-[13px] font-medium text-ink">{label}</span>
-          <Segmented label="Cómo escribes el precio" value={mode} onChange={(v) => set({ priceEntry: v })}
-            options={[{ value: "neto", label: "Neto" }, { value: "con_iva", label: "Con IVA" }]} />
-        </div>
-      )}
-      <MoneyField label={withTax ? undefined : label} aria-label={label} value={typed} onValue={change}
-        hint={mode === "con_iva" ? "Escribe el precio final que paga el cliente; NÚCLEO guarda el neto." : withTax ? "Precio sin IVA." : undefined} />
-      {net !== null && net > 0 && withTax && gross !== null && (
-        <div className="grid grid-cols-3 gap-2 rounded-lg bg-surface-2 px-3 py-2 text-xs">
-          <div><div className="text-muted">Neto</div><div className="num font-medium text-ink">{formatMoney(net)}</div></div>
-          <div><div className="text-muted">IVA ({formatPpm(taxPpm!, 0)})</div><div className="num text-ink">{formatMoney(gross - net)}</div></div>
-          <div><div className="text-muted">Con IVA</div><div className="num font-medium text-ink">{formatMoney(gross)}</div></div>
-        </div>
-      )}
-      {mode === "con_iva" && typed !== null && gross !== null && gross !== typed && (
-        <p className="text-xs text-warning">Con el redondeo del neto a peso, el precio con IVA queda en {formatMoney(gross)}.</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <MoneyField label={`${label} (Con IVA)`} value={gross} onValue={(v) => onNet(v === null ? null : netFromGross(v, taxPpm))}
+          hint="Lo que paga el cliente." />
+        <MoneyField label="Precio neto (sin IVA)" value={net} onValue={onNet} hint="Se calcula solo; también puedes escribirlo." />
+      </div>
+      {net !== null && net > 0 && gross !== null && (
+        <p className="num text-xs text-muted">Neto {formatMoney(net)} + IVA {formatPpm(taxPpm!, 0)} {formatMoney(gross - net)} = <strong className="text-ink">{formatMoney(gross)}</strong></p>
       )}
     </div>
   );

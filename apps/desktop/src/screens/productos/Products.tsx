@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Boxes, Package, PackagePlus, Pencil, Search, Tags } from "lucide-react";
 import { useBackend, errorMessage, type PriceHistoryRow, type Product, type ProductCategory, type StockPolicy } from "../../data";
-import { EMPTY_COST_SHEET, grossFromNet, type CostSheet } from "../../data/costing";
+import { EMPTY_COST_SHEET, gainOverCost, grossFromNet, pctText, type CostSheet } from "../../data/costing";
 import { CategoriesDrawer, CategorySelect, CostInput, PriceInput, StockPolicySelect, stockPolicyLabel, useTaxPpm } from "./parts";
 import { useSession } from "../../lib/session";
 import { formatDate, formatMoney, formatQty, parseQty } from "../../lib/format";
@@ -63,11 +63,10 @@ export function Products({ route }: { route: Route }) {
       <span className="num text-muted">{p.taxable ? formatMoney(grossFromNet(p.price_minor, taxPpm)) : <span title="Exento de IVA">{formatMoney(p.price_minor)} ·&nbsp;ex.</span>}</span>
     ) }] : []),
     { key: "c", header: "Costo", width: "8rem", align: "right", render: (p) => <span className="num text-muted">{p.cost_e4 ? formatMoney(Math.round(p.cost_e4 / 10_000)) : "—"}</span> },
-    { key: "m", header: <span title="Margen sobre el precio neto, sin IVA: (precio neto − costo) ÷ precio neto">Margen</span>, width: "6rem", align: "right", render: (p) => {
-      const cost = p.cost_e4 / 10_000;
-      if (!cost || !p.price_minor) return <span className="text-faint">—</span>;
-      const m = (p.price_minor - cost) / p.price_minor;
-      return <span className={m < 0.15 ? "num text-warning" : "num text-success"}>{(m * 100).toFixed(0)} %</span>;
+    { key: "m", header: <span title="Ganancia sobre el costo, sin IVA: (precio neto − costo) ÷ costo">Ganancia</span>, width: "6.5rem", align: "right", render: (p) => {
+      const g = p.price_minor ? gainOverCost(p.price_minor, p.cost_e4 / 10_000) : null;
+      if (g === null) return <span className="text-faint">—</span>;
+      return <span className={g < 0.2 ? "num text-warning" : "num text-success"}>{pctText(g, 0)}</span>;
     } },
     ...(can("productos.editar") ? [{ key: "e", header: <span className="sr-only">Editar</span>, width: "3rem", align: "right" as const, render: (p: Product) => (
       <IconButton icon={Pencil} size={15} label={`Editar ${p.name}`} className="h-7 w-7 hover:text-accent"
@@ -80,7 +79,7 @@ export function Products({ route }: { route: Route }) {
     <div className="anim-in">
       <PageHeader
         title="Productos y servicios"
-        subtitle="Precio, costo promedio, margen y stock en un solo lugar."
+        subtitle="Precio, costo promedio, ganancia y stock en un solo lugar."
         actions={<>
           <Button variant="secondary" icon={Tags} onClick={() => go({ categorias: "1" })}>Categorías</Button>
           <Button icon={PackagePlus} onClick={() => navigate(`/productos?nuevo=1`)}>Nuevo producto</Button>
@@ -95,7 +94,7 @@ export function Products({ route }: { route: Route }) {
         <Field aria-label="Buscar productos" leading={<Search size={15} />} placeholder="Nombre, código o categoría (ej. taladro 18v)" value={query} onChange={(e) => setQuery(e.target.value)} className="w-full max-w-md" />
         <Select aria-label="Filtrar por categoría" className="w-56" value={catFilter} onChange={(e) => go({ cat: e.target.value || null, ver: null })}
           options={[{ value: "", label: "Todas las categorías" }, ...cats.map((c) => ({ value: c.uid, label: `${c.name} (${c.product_count})` })), { value: "sin", label: "Sin categoría" }]} />
-        {taxPpm !== null && <span className="pb-2 text-xs text-muted">El margen se calcula sobre el precio neto (sin IVA).</span>}
+        <span className="pb-2 text-xs text-muted">Ganancia = (precio neto − costo) ÷ costo, sin IVA.</span>
       </div>
       {err && <Notice tone="danger">{err}</Notice>}
       <DataTable label="Productos" columns={cols} rows={shown} rowKey={(p) => p.uid} onOpen={(p) => go({ ver: p.uid })} empty={<EmptyState icon={Package} title="Sin productos en esta vista" />} />
@@ -118,7 +117,7 @@ export function Products({ route }: { route: Route }) {
               { label: taxPpm !== null ? "Precio de venta neto" : "Precio de venta", value: <span className="num">{formatMoney(product.price_minor)}</span> },
               ...(taxPpm !== null ? [{ label: "Precio con IVA", value: <span className="num">{product.taxable ? formatMoney(grossFromNet(product.price_minor, taxPpm)) : `${formatMoney(product.price_minor)} (exento)`}</span> }] : []),
               { label: "Costo promedio", value: <span className="num">{formatMoney(Math.round(product.cost_e4 / 10_000))}</span> },
-              ...(product.cost_e4 > 0 && product.price_minor > 0 ? [{ label: "Margen (sobre el neto)", value: <span className="num">{(((product.price_minor - product.cost_e4 / 10_000) / product.price_minor) * 100).toFixed(1).replace(".", ",")} % · {formatMoney(Math.round(product.price_minor - product.cost_e4 / 10_000))} por {product.unit}</span> }] : []),
+              ...(product.cost_e4 > 0 && product.price_minor > 0 ? [{ label: "Ganancia sobre el costo", value: <span className="num">{pctText(gainOverCost(product.price_minor, product.cost_e4 / 10_000)!, 2)} · {formatMoney(Math.round(product.price_minor - product.cost_e4 / 10_000))} por {product.unit}</span> }] : []),
               ...(product.kind === "producto" ? [
                 { label: "Stock disponible", value: <span className="num">{formatQty(product.on_hand_milli)} {product.unit}</span> },
                 { label: "Stock mínimo", value: <span className="num">{formatQty(product.min_milli)} {product.unit}</span> },
@@ -139,8 +138,12 @@ export function Products({ route }: { route: Route }) {
 
 function marginNotice(price: number | null, cost: number | null) {
   if (!price || !cost) return null;
-  const m = (price - cost) / price;
-  return <Notice tone={m < 0 ? "danger" : "info"}>Margen estimado sobre el precio neto: <strong>{(m * 100).toFixed(1).replace(".", ",")} %</strong> ({formatMoney(price - cost)} por unidad, sin IVA).</Notice>;
+  const g = gainOverCost(price, cost)!;
+  return (
+    <Notice tone={g < 0 ? "danger" : "info"}>
+      Ganancia sobre el costo: <strong>{pctText(g, 2)}</strong> ({formatMoney(price - cost)} por unidad sobre un costo de {formatMoney(cost)}, sin IVA).
+    </Notice>
+  );
 }
 
 function NewProductDrawer({ open, onClose, onCreated, cats, taxPpm, defaultCat, onManage }: {
