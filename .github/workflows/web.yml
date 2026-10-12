@@ -67,3 +67,26 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # Avisa a Bing, Yandex, Seznam y otros buscadores (IndexNow) que el sitio cambió. Google se informa
+  # por el sitemap registrado en Search Console. Si falla, no bloquea la publicación.
+  indexnow:
+    needs: deploy
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enviar las páginas a IndexNow
+        run: |
+          read -r SITE KEY < <(python3 -c "import json;c=json.load(open('apps/web/site.config.json'));print(c['site_url'].rstrip('/'), c.get('indexnow_key',''))")
+          if [ -z "$KEY" ]; then echo "Sin clave de IndexNow"; exit 0; fi
+          HOST=$(python3 -c "import sys,urllib.parse;print(urllib.parse.urlparse(sys.argv[1]).netloc)" "$SITE")
+          sleep 45
+          curl -fsSL "$SITE/sitemap.xml" -o sitemap.xml
+          python3 - "$SITE" "$HOST" "$KEY" > body.json <<'PY'
+          import json, re, sys
+          site, host, key = sys.argv[1:4]
+          urls = re.findall(r"<loc>([^<]+)</loc>", open("sitemap.xml", encoding="utf-8").read())
+          print(json.dumps({"host": host, "key": key, "keyLocation": f"{site}/{key}.txt", "urlList": urls}))
+          PY
+          curl -sS -X POST https://api.indexnow.org/indexnow -H "Content-Type: application/json; charset=utf-8" --data @body.json -w "IndexNow respondió %{http_code}\n"
