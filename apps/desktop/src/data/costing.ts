@@ -83,5 +83,9 @@ export function costSheetUsed(s: CostSheet | null | undefined): boolean {
 export function gainOverCost(netMinor: number, costMinor: number): number | null {
   return costMinor > 0 ? (netMinor - costMinor) / costMinor : null;
 }
+/** Margen sobre la venta: (precio neto − costo) ÷ precio neto. Ej.: neto $32.773 y costo $17.575 → 0,4637 (46,37 %). */
+export function marginOnSale(netMinor: number, costMinor: number): number | null {
+  return netMinor > 0 && costMinor > 0 ? (netMinor - costMinor) / netMinor : null;
+}
 /** Porcentaje con coma decimal ("86,47 %"). */
 export const pctText = (fraction: number, digits = 1) => `${(fraction * 100).toFixed(digits).replace(".", ",")} %`;

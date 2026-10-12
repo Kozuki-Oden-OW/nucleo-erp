@@ -20,7 +20,7 @@ export function useTaxPpm(): { taxPpm: number | null; biz: BusinessSettings | nu
 
 /**
  * Precio de venta: dos campos enlazados, «con IVA» y «neto». Al escribir uno, el otro se calcula con la
- * tasa de IVA del negocio (en Chile, 19 % sobre el neto). Siempre se guarda el neto.
+ * tasa de IVA del negocio. Siempre se guarda el neto.
  */
 export function PriceInput({ net, onNet, taxPpm, taxable, label = "Precio de venta" }: {
   net: number | null; onNet: (v: number | null) => void; taxPpm: number | null; taxable: boolean; label?: string;

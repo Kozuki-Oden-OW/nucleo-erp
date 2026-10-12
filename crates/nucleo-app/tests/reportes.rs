@@ -165,14 +165,16 @@ fn reportes_con_cifras_conocidas() {
     })
     .unwrap();
 
-    // Ventas por producto: 3 unidades, $30.000 netos, costo $18.000: ganancia sobre costo 66,7 %.
+    // Ventas por producto: 3 unidades, $30.000 netos, costo $18.000: margen sobre la venta 40 % y
+    // ganancia sobre el costo 66,7 %.
     let r = report(&s, "ventas_producto");
     assert_eq!(r.rows.len(), 1);
     let row = &r.rows[0];
     assert_eq!(row[col(&r, "cantidad")], Cell::Int(3_000));
     assert_eq!(row[col(&r, "neto")], Cell::Int(30_000));
     assert_eq!(row[col(&r, "costo")], Cell::Int(18_000));
-    assert_eq!(row[col(&r, "margen_pct")], Cell::Int(666_667));
+    assert_eq!(row[col(&r, "margen_pct")], Cell::Int(400_000));
+    assert_eq!(row[col(&r, "ganancia_costo_pct")], Cell::Int(666_667));
     assert_eq!(row[col(&r, "categoria")], Cell::Text("Sensores".into()));
 
     let r = report(&s, "ventas_categoria");

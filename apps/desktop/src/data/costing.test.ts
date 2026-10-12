@@ -28,5 +28,7 @@ describe("ganancia sobre el costo", () => {
     expect(pctText(gainOverCost(net, 17_575)!, 2)).toBe("86,48 %");
     expect(pctText(gainOverCost(net, 17_575)!, 3)).toBe("86,475 %");
     expect(gainOverCost(1000, 0)).toBeNull();
+    const { marginOnSale } = await import("./costing");
+    expect(pctText(marginOnSale(net, 17_575)!, 2)).toBe("46,37 %");
   });
 });
