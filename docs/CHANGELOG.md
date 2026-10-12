@@ -2,6 +2,20 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [0.4.0] — 2026-10-12
+
+- **Crédito a clientes:** opción «Habilitar crédito» en la ficha con días, monto (cupo) y condiciones.
+  Documentos de respaldo opcionales (situación tributaria en el SII, carpeta tributaria, certificado de
+  vigencia, inscripción con anotaciones marginales, inscripción de poderes, informe comercial Dicom/Equifax
+  y otros): estado, fechas, archivo adjunto cifrado, guía de dónde obtenerlo, cómo verificarlo y qué mirar,
+  aviso de documentos antiguos y consejos. «Exportar carpeta del cliente» crea una carpeta con su nombre y
+  RUT y los documentos ordenados.
+- **Venta a crédito:** aviso (sin bloquear) si el cliente no tiene crédito habilitado, tiene saldos
+  vencidos o la venta supera su cupo.
+- **Productos:** lápiz al final de cada fila para editar; en la ficha, «Editar producto» destacado sobre
+  «Ver kárdex».
+- **Inventario:** el botón «Ajuste o conteo» ahora se llama «Realizar inventario».
+
 ## [0.3.0] — 2026-10-10
 
 - **Análisis y reportes:** 13 reportes (ventas por período, cliente, producto y categoría; ¿gano o pierdo?;

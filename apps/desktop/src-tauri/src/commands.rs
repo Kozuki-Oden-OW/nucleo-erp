@@ -6,6 +6,7 @@ use nucleo_app::company::BackupDone;
 use nucleo_app::core_ops::{
     BusinessPatch, BusinessSettings, CurrentUser, EntityRef, NewUser, SecuritySettings, UserPatch,
 };
+use nucleo_app::credit_ops::{CreditDocInput, CustomerCredit};
 use nucleo_app::f22_ops::{F22Inputs, F22View};
 use nucleo_app::f29_ops::{F29Inputs, F29View, RcvImportReport, TaxDocInput, TaxProfile};
 use nucleo_app::finance_ops::{
@@ -1380,5 +1381,40 @@ pub fn save_report_file(
 ) -> CmdResult<()> {
     with_session(&state, |s| {
         Ok(s.save_report_file(&report_id, std::path::Path::new(&path), &bytes)?)
+    })
+}
+
+/* ───────────────────────────── Crédito a clientes ───────────────────────────── */
+
+#[tauri::command]
+pub fn customer_credit(state: State<'_, AppState>, uid: String) -> CmdResult<CustomerCredit> {
+    with_session(&state, |s| Ok(s.customer_credit(&uid)?))
+}
+
+#[tauri::command]
+pub fn save_credit_doc(
+    state: State<'_, AppState>,
+    uid: String,
+    kind: String,
+    input: CreditDocInput,
+) -> CmdResult<CustomerCredit> {
+    with_session(&state, |s| Ok(s.save_credit_doc(&uid, &kind, &input)?))
+}
+
+#[derive(serde::Serialize)]
+pub struct FolderExport {
+    folder: String,
+    files: usize,
+}
+
+#[tauri::command]
+pub fn export_customer_folder(
+    state: State<'_, AppState>,
+    uid: String,
+    path: String,
+) -> CmdResult<FolderExport> {
+    with_session(&state, |s| {
+        let (folder, files) = s.export_customer_folder(&uid, std::path::Path::new(&path))?;
+        Ok(FolderExport { folder, files })
     })
 }

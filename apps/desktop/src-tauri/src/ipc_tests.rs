@@ -244,6 +244,30 @@ fn ciclo_de_venta_por_ipc() {
     assert_eq!(fv2["terms"]["references"][0]["folio"], "4500012345");
     assert_eq!(fv2["terms"]["due_date"], "2026-11-05");
 
+    // Crédito: se habilita en la ficha y se respalda con documentos opcionales.
+    ipc.ok("update_customer", json!({ "uid": c2["uid"], "input": { "name": "Clínica Sur SpA", "kind": "empresa",
+        "credit_enabled": true, "payment_terms_days": 30, "credit_limit_minor": 1000000, "credit_conditions": "Pagaré firmado" } }));
+    let cr = ipc.ok("customer_credit", json!({ "uid": c2["uid"] }));
+    assert_eq!(cr["enabled"], true);
+    assert_eq!(cr["docs"].as_array().unwrap().len(), 7);
+    let cr = ipc.ok(
+        "save_credit_doc",
+        json!({ "uid": c2["uid"], "kind": "carpeta_tributaria",
+        "input": { "status": "verificado", "issued_on": HOY, "verified_on": HOY, "note": "OK" } }),
+    );
+    assert_eq!(cr["docs_ready"], 1);
+    let out = tempfile::tempdir().unwrap();
+    let ex = ipc.ok(
+        "export_customer_folder",
+        json!({ "uid": c2["uid"], "path": out.path().to_str().unwrap() }),
+    );
+    assert_eq!(ex["files"], 0);
+    assert!(
+        std::path::Path::new(ex["folder"].as_str().unwrap())
+            .join("Crédito")
+            .is_dir()
+    );
+
     let dir = tempfile::tempdir().unwrap();
     let dest = dir.path().join("ventas.csv");
     ipc.ok("save_report_file", json!({ "reportId": "ventas_cliente", "path": dest.to_str().unwrap(), "bytes": [65, 59, 66] }));

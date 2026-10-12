@@ -146,6 +146,10 @@ export interface CustomerProfile {
   payment_terms_days: number;
   credit_limit_minor: number | null;
   notes: string | null;
+  /** Crédito habilitado para este cliente. */
+  credit_enabled: boolean;
+  /** Condiciones del crédito (pagaré, garantía, forma de pago…). */
+  credit_conditions: string | null;
 }
 export interface Customer extends CustomerProfile {
   id: number;
@@ -1101,3 +1105,47 @@ export interface ReportDef {
   available: boolean;
 }
 export interface ReportParams { id: string; from?: string | null; to?: string | null; group?: string | null }
+
+/* ───── Crédito a clientes ───── */
+
+export type CreditDocStatus = "pendiente" | "recibido" | "verificado" | "no_aplica";
+export interface CreditDoc {
+  kind: string;
+  label: string;
+  /** Dónde se obtiene o quién lo entrega. */
+  source: string;
+  /** Cómo verificarlo. */
+  verify: string;
+  /** Qué mirar. */
+  look_for: string;
+  company_only: boolean;
+  fresh_days: number;
+  status: CreditDocStatus;
+  attachment_uid: string | null;
+  file_name: string | null;
+  issued_on: string | null;
+  verified_on: string | null;
+  note: string | null;
+  /** La fecha del documento supera la vigencia sugerida. */
+  stale: boolean;
+}
+export interface CustomerCredit {
+  enabled: boolean;
+  days: number;
+  limit_minor: number | null;
+  conditions: string | null;
+  debt_minor: number;
+  overdue_minor: number;
+  available_minor: number | null;
+  docs: CreditDoc[];
+  docs_ready: number;
+  docs_applicable: number;
+  advice: string[];
+}
+export interface CreditDocInput {
+  status: CreditDocStatus;
+  attachment_uid?: string | null;
+  issued_on?: string | null;
+  verified_on?: string | null;
+  note?: string | null;
+}

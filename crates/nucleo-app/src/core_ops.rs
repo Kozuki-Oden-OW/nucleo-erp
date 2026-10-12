@@ -930,7 +930,7 @@ impl CompanySession {
 
     /* ───────────── Documentos adjuntos ───────────── */
 
-    fn documents_dir(&self) -> std::path::PathBuf {
+    pub(crate) fn documents_dir(&self) -> std::path::PathBuf {
         self.dir.join("documents")
     }
 

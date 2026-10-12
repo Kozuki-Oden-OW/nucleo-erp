@@ -101,4 +101,5 @@ export const DEMO_COMMUNES = ["Providencia", "Ñuñoa", "La Florida", "Maipú", 
 export const EMPTY_PROFILE = {
   kind: "persona" as "persona" | "empresa", trade_name: null, business_activity: null, address: null, commune: null, city: null, region: null,
   contact_name: null, invoice_email: null, payment_terms_days: 0, credit_limit_minor: null, notes: null,
+  credit_enabled: false, credit_conditions: null as string | null,
 };

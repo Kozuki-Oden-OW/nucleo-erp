@@ -8,6 +8,7 @@ pub mod catalog_ops;
 pub mod comex_ops;
 pub mod company;
 pub mod core_ops;
+pub mod credit_ops;
 pub mod error;
 pub mod f22_ops;
 pub mod f29_ops;

@@ -4,6 +4,7 @@
 // Las pantallas solo conocen esta interfaz; así un prototipo de la Fase 3 se convierte en pantalla
 // real cuando el comando Rust correspondiente existe.
 import type {
+  CreditDocInput, CustomerCredit,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
@@ -100,6 +101,11 @@ export interface Backend {
   addProduct(input: NewProduct): Promise<Product>;
   updateProduct(uid: string, patch: ProductPatch): Promise<Product>;
   updateCustomer(uid: string, input: NewCustomer): Promise<Customer>;
+  /** Ficha de crédito: cupo, deuda, documentos de respaldo y consejos. */
+  customerCredit(uid: string): Promise<CustomerCredit>;
+  saveCreditDoc(uid: string, kind: string, input: CreditDocInput): Promise<CustomerCredit>;
+  /** Copia los documentos del cliente en una carpeta elegida (escritorio). null si se canceló. */
+  exportCustomerFolder(uid: string): Promise<{ folder: string; files: number } | null>;
   productCategories(): Promise<ProductCategory[]>;
   /** Crea (sin uid) o renombra una categoría. */
   saveCategory(uid: string | null, name: string): Promise<ProductCategory[]>;

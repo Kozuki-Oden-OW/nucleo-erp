@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "./backend";
 import type {
+  CreditDocInput, CustomerCredit,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
@@ -108,6 +109,13 @@ export class TauriBackend implements Backend {
   addProduct(input: NewProduct) { return call<Product>("add_product", { input }); }
   updateProduct(uid: string, patch: ProductPatch) { return call<Product>("update_product", { uid, patch }); }
   updateCustomer(uid: string, input: NewCustomer) { return call<Customer>("update_customer", { uid, input }); }
+  customerCredit(uid: string) { return call<CustomerCredit>("customer_credit", { uid }); }
+  saveCreditDoc(uid: string, kind: string, input: CreditDocInput) { return call<CustomerCredit>("save_credit_doc", { uid, kind, input }); }
+  async exportCustomerFolder(uid: string): Promise<{ folder: string; files: number } | null> {
+    const dir = await open({ directory: true, title: "Elige dónde crear la carpeta del cliente" });
+    if (!dir || Array.isArray(dir)) return null;
+    return call<{ folder: string; files: number }>("export_customer_folder", { uid, path: dir });
+  }
   productCategories() { return call<ProductCategory[]>("product_categories"); }
   saveCategory(uid: string | null, name: string) { return call<ProductCategory[]>("save_category", { uid, name }); }
   deleteCategory(uid: string) { return call<ProductCategory[]>("delete_category", { uid }); }

@@ -1,4 +1,4 @@
-// Ajuste o conteo de inventario y transferencia entre bodegas. Buscar producto → Enter → cantidad.
+// Realizar inventario (ajuste o conteo) y transferencia entre bodegas. Buscar producto → Enter → cantidad.
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowLeftRight, ClipboardCheck, Trash2 } from "lucide-react";
 import { useBackend, errorMessage, type Product, type Warehouse } from "../../data";
@@ -82,7 +82,7 @@ export function StockDocEditor({ mode }: { mode: "ajuste" | "transferencia" }) {
     <div className="anim-in">
       <PageHeader
         back={<button onClick={() => goBack("/inventario")} className="mb-2 inline-flex items-center gap-1 text-sm text-muted hover:text-ink"><ArrowLeft size={15} /> Inventario</button>}
-        title={transfer ? "Transferir entre bodegas" : "Ajuste o conteo de inventario"}
+        title={transfer ? "Transferir entre bodegas" : "Realizar inventario"}
         subtitle={transfer ? "Mueve stock de una bodega a otra al costo promedio de origen." : "Corrige el stock con un motivo: queda en el kárdex y en la auditoría. Nada se borra."}
         actions={<Button icon={transfer ? ArrowLeftRight : ClipboardCheck} onClick={save} disabled={busy || rows.length === 0 || (!transfer && !reason.trim())}>{busy ? "Guardando…" : transfer ? "Transferir" : "Registrar ajuste"}</Button>}
       />

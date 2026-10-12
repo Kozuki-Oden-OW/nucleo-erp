@@ -10,6 +10,7 @@ import { MoneyField } from "../../ui/doc";
 import { Button, Field, Notice, Segmented, Select, TextArea } from "../../ui/kit";
 import { Dialog, useToast } from "../../ui/overlay";
 import { AccountSelect } from "../dinero/common";
+import { useCreditWarning } from "../clientes/credit";
 
 type Done = (s: SaleDetail) => void;
 
@@ -24,6 +25,7 @@ export function EffectDialog({ sale, open, onClose, onDone }: { sale: SaleDetail
   const [due, setDue] = useState(t?.payment === "credito" && t.due_date ? t.due_date : addDays(todayIso(), 30));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const creditWarn = useCreditWarning(sale.customer_uid, sale.total_minor, open && mode === "credito");
   async function go() {
     setBusy(true); setErr(null);
     try {
@@ -60,6 +62,7 @@ export function EffectDialog({ sale, open, onClose, onDone }: { sale: SaleDetail
         ) : (
           <Field label="Fecha en que te pagará" type="date" value={due} onChange={(e) => setDue(e.target.value)} hint="Aparecerá en “Dinero que te deben” y en el calendario de cobros." />
         )}
+        {mode === "credito" && creditWarn && <Notice tone="warning">{creditWarn}</Notice>}
         {err && <Notice tone="danger">{err}</Notice>}
       </div>
     </Dialog>

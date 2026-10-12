@@ -12,8 +12,8 @@ const PAYMENTS: { value: Exclude<SalePayment, "">; label: string }[] = [
   { value: "credito", label: "Crédito" }, { value: "cheque", label: "Cheque" },
 ];
 
-export function PaymentCard({ terms, onChange, issueDate, hasCustomer }: {
-  terms: SaleTerms; onChange: (t: SaleTerms) => void; issueDate: string; hasCustomer: boolean;
+export function PaymentCard({ terms, onChange, issueDate, hasCustomer, creditWarning }: {
+  terms: SaleTerms; onChange: (t: SaleTerms) => void; issueDate: string; hasCustomer: boolean; creditWarning?: string | null;
 }) {
   const set = (patch: Partial<SaleTerms>) => onChange({ ...terms, ...patch });
   const days = terms.credit_days ?? 30;
@@ -72,6 +72,7 @@ export function PaymentCard({ terms, onChange, issueDate, hasCustomer }: {
               <span className="pb-2 text-sm text-muted">{days} días desde el {formatDate(issueDate)}</span>
             </div>
             {!hasCustomer && <Notice tone="warning">Para vender a crédito elige un cliente: necesitamos saber quién te debe.</Notice>}
+            {hasCustomer && creditWarning && <Notice tone="warning">{creditWarning}</Notice>}
           </div>
         )}
       </div>

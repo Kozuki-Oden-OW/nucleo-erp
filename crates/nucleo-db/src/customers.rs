@@ -38,6 +38,10 @@ pub struct CustomerProfile {
     pub payment_terms_days: i64,
     pub credit_limit_minor: Option<i64>,
     pub notes: Option<String>,
+    /// Crédito habilitado para este cliente.
+    pub credit_enabled: bool,
+    /// Condiciones del crédito (garantías, pagaré, forma de pago…).
+    pub credit_conditions: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -51,7 +55,8 @@ pub struct NewCustomerRow<'a> {
 }
 
 const COLS: &str = "id, uid, rut, name, email, phone, created_at, kind, trade_name, business_activity, \
-    address, commune, city, region, contact_name, invoice_email, payment_terms_days, credit_limit_minor, notes";
+    address, commune, city, region, contact_name, invoice_email, payment_terms_days, credit_limit_minor, notes, \
+    credit_enabled, credit_conditions";
 
 fn map(r: &Row<'_>) -> rusqlite::Result<CustomerRow> {
     Ok(CustomerRow {
@@ -75,6 +80,8 @@ fn map(r: &Row<'_>) -> rusqlite::Result<CustomerRow> {
             payment_terms_days: r.get(16)?,
             credit_limit_minor: r.get(17)?,
             notes: r.get(18)?,
+            credit_enabled: r.get::<_, i64>(19)? == 1,
+            credit_conditions: r.get(20)?,
         },
     })
 }
@@ -84,7 +91,7 @@ pub fn set_profile(conn: &Connection, id: i64, p: &CustomerProfile) -> DbResult<
     conn.execute(
         "UPDATE customers SET kind = ?2, trade_name = ?3, business_activity = ?4, address = ?5, commune = ?6,
             city = ?7, region = ?8, contact_name = ?9, invoice_email = ?10, payment_terms_days = ?11,
-            credit_limit_minor = ?12, notes = ?13 WHERE id = ?1",
+            credit_limit_minor = ?12, notes = ?13, credit_enabled = ?14, credit_conditions = ?15 WHERE id = ?1",
         rusqlite::params![
             id,
             if p.kind == "empresa" { "empresa" } else { "persona" },
@@ -98,7 +105,9 @@ pub fn set_profile(conn: &Connection, id: i64, p: &CustomerProfile) -> DbResult<
             p.invoice_email,
             p.payment_terms_days,
             p.credit_limit_minor,
-            p.notes
+            p.notes,
+            p.credit_enabled as i64,
+            p.credit_conditions
         ],
     )?;
     Ok(())
@@ -291,4 +300,86 @@ mod tests {
         assert_eq!(p1.len(), 10);
         assert_eq!(p2[0].id, p1.last().unwrap().id + 1);
     }
+}
+
+/// Documento de respaldo del crédito de un cliente.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CreditDocRow {
+    pub kind: String,
+    pub status: String,
+    pub attachment_uid: Option<String>,
+    pub file_name: Option<String>,
+    pub issued_on: Option<String>,
+    pub verified_on: Option<String>,
+    pub note: Option<String>,
+    pub updated_at: String,
+}
+
+pub fn credit_docs(conn: &Connection, customer_id: i64) -> DbResult<Vec<CreditDocRow>> {
+    let mut stmt = conn.prepare(
+        "SELECT d.kind, d.status, a.uid, a.file_name, d.issued_on, d.verified_on, d.note, d.updated_at
+         FROM customer_credit_docs d LEFT JOIN attachments a ON a.id = d.attachment_id
+         WHERE d.customer_id = ?1",
+    )?;
+    let rows = stmt
+        .query_map([customer_id], |r| {
+            Ok(CreditDocRow {
+                kind: r.get(0)?,
+                status: r.get(1)?,
+                attachment_uid: r.get(2)?,
+                file_name: r.get(3)?,
+                issued_on: r.get(4)?,
+                verified_on: r.get(5)?,
+                note: r.get(6)?,
+                updated_at: r.get(7)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+pub struct CreditDocWrite<'a> {
+    pub kind: &'a str,
+    pub status: &'a str,
+    pub attachment_id: Option<i64>,
+    pub issued_on: Option<&'a str>,
+    pub verified_on: Option<&'a str>,
+    pub note: Option<&'a str>,
+    pub updated_at: &'a str,
+}
+
+pub fn save_credit_doc(
+    conn: &Connection,
+    customer_id: i64,
+    d: &CreditDocWrite<'_>,
+) -> DbResult<()> {
+    conn.execute(
+        "INSERT INTO customer_credit_docs (customer_id, kind, status, attachment_id, issued_on, verified_on, note, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+         ON CONFLICT (customer_id, kind) DO UPDATE SET status = excluded.status, attachment_id = excluded.attachment_id,
+            issued_on = excluded.issued_on, verified_on = excluded.verified_on, note = excluded.note,
+            updated_at = excluded.updated_at",
+        rusqlite::params![
+            customer_id,
+            d.kind,
+            d.status,
+            d.attachment_id,
+            d.issued_on,
+            d.verified_on,
+            d.note,
+            d.updated_at
+        ],
+    )?;
+    Ok(())
+}
+
+/// Saldo por cobrar abierto del cliente y la parte vencida a la fecha indicada.
+pub fn open_balance(conn: &Connection, customer_id: i64, today: &str) -> DbResult<(i64, i64)> {
+    Ok(conn.query_row(
+        "SELECT coalesce(sum(amount_minor - paid_minor), 0),
+                coalesce(sum(CASE WHEN due_date < ?2 THEN amount_minor - paid_minor ELSE 0 END), 0)
+         FROM receivables WHERE customer_id = ?1 AND status = 'abierta'",
+        rusqlite::params![customer_id, today],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?)
 }

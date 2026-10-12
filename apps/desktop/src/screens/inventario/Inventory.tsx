@@ -38,7 +38,7 @@ export function Inventory({ route }: { route: Route }) {
         actions={can("inventario.ajustar") && (
           <>
             <Button variant="secondary" icon={ArrowLeftRight} onClick={() => navigate("/inventario/transferencia")}>Transferir</Button>
-            <Button icon={ClipboardCheck} onClick={() => navigate("/inventario/ajuste")}>Ajuste o conteo</Button>
+            <Button icon={ClipboardCheck} onClick={() => navigate("/inventario/ajuste")}>Realizar inventario</Button>
           </>
         )}
       />

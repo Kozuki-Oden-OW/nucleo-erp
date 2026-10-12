@@ -13,6 +13,7 @@ import { MoneyField } from "../../ui/doc";
 import { Button, Card, Field, IconButton, Label, Notice, PageHeader, TextArea } from "../../ui/kit";
 import { useToast } from "../../ui/overlay";
 import { NewCustomerDrawer } from "../clientes/Customers";
+import { useCreditWarning } from "../clientes/credit";
 import { formatRut } from "../../lib/format";
 import { CustomerPicker, ProductPicker, type ProductPickerHandle } from "./pickers";
 
@@ -76,7 +77,7 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
       return {
         ...t,
         receiver: rec,
-        ...(customer && customer.payment_terms_days > 0 && !t.payment ? { payment: "credito" as const, credit_days: customer.payment_terms_days, due_date: null } : {}),
+        ...(customer && customer.credit_enabled && customer.payment_terms_days > 0 && !t.payment ? { payment: "credito" as const, credit_days: customer.payment_terms_days, due_date: null } : {}),
         ...(!customer && t.payment === "credito" ? { payment: "" as const } : {}),
       };
     });
@@ -89,6 +90,7 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
 
   const taxPpm = biz?.tax_enabled ? biz.tax_rate_ppm : null;
   const totals = useMemo(() => computeTotals(rows, taxPpm), [rows, taxPpm]);
+  const creditWarn = useCreditWarning(customer?.uid, totals.total_minor, isSale && terms.payment === "credito");
 
   function addProduct(p: Product | null, text: string) {
     const row = toRow({ product_uid: p?.uid ?? null, description: p?.name ?? text, qty_milli: 1000, unit_price_minor: p?.price_minor ?? 0, discount_ppm: 0, taxable: p?.taxable ?? true });
@@ -239,7 +241,7 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
             </div>
           </Card>
 
-          {isSale && <PaymentCard terms={terms} onChange={setTerms} issueDate={date} hasCustomer={!!customer} />}
+          {isSale && <PaymentCard terms={terms} onChange={setTerms} issueDate={date} hasCustomer={!!customer} creditWarning={creditWarn} />}
           {isSale && kind === "FV" && customer && terms.receiver && (
             <ReceiverCard receiver={terms.receiver} onChange={(r) => setTerms({ ...terms, receiver: r })} saveToCustomer={saveToCustomer}
               onSaveToCustomer={setSaveToCustomer} canSave={receiverChanged} />

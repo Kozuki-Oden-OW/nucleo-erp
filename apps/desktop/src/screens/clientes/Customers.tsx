@@ -6,11 +6,12 @@ import { formatDate, formatMoney, formatRut } from "../../lib/format";
 import { useTerm } from "../../lib/glosario";
 import { navigate, type Route } from "../../lib/router";
 import { MoneyField, SaleStatus } from "../../ui/doc";
-import { Button, DefinitionList, EmptyState, Field, Kpi, Notice, PageHeader, Segmented, Select, Spinner, TextArea } from "../../ui/kit";
+import { Button, Checkbox, DefinitionList, EmptyState, Field, Kpi, Notice, PageHeader, Segmented, Select, Spinner, TextArea } from "../../ui/kit";
 import { Drawer, useToast } from "../../ui/overlay";
 import { DataTable, type Column } from "../../ui/table";
 import { AttachmentsPanel } from "../documentos/Documents";
 import { useSession } from "../../lib/session";
+import { CreditPanel } from "./credit";
 
 export function Customers({ route }: { route: Route }) {
   const backend = useBackend();
@@ -64,7 +65,7 @@ export function Customers({ route }: { route: Route }) {
 type Form = {
   kind: "persona" | "empresa"; name: string; rut: string; trade_name: string; business_activity: string; email: string; phone: string;
   invoice_email: string; contact_name: string; address: string; commune: string; city: string; region: string; days: string;
-  credit_limit: number | null; notes: string;
+  credit_limit: number | null; notes: string; credit_enabled: boolean; credit_conditions: string;
 };
 
 function toForm(c: Customer | undefined, initialName: string): Form {
@@ -73,6 +74,7 @@ function toForm(c: Customer | undefined, initialName: string): Form {
     business_activity: c?.business_activity ?? "", email: c?.email ?? "", phone: c?.phone ?? "", invoice_email: c?.invoice_email ?? "",
     contact_name: c?.contact_name ?? "", address: c?.address ?? "", commune: c?.commune ?? "", city: c?.city ?? "", region: c?.region ?? "",
     days: c?.payment_terms_days ? String(c.payment_terms_days) : "", credit_limit: c?.credit_limit_minor ?? null, notes: c?.notes ?? "",
+    credit_enabled: c?.credit_enabled ?? false, credit_conditions: c?.credit_conditions ?? "",
   };
 }
 
@@ -82,8 +84,9 @@ export function customerInput(f: Form): NewCustomer {
   return {
     name: f.name, rut: f.rut || undefined, email: f.email || undefined, phone: f.phone || undefined, kind: f.kind,
     trade_name: t(f.trade_name), business_activity: t(f.business_activity), invoice_email: t(f.invoice_email), contact_name: t(f.contact_name),
-    address: t(f.address), commune: t(f.commune), city: t(f.city), region: t(f.region), payment_terms_days: Number(f.days) || 0,
-    credit_limit_minor: f.credit_limit, notes: t(f.notes),
+    address: t(f.address), commune: t(f.commune), city: t(f.city), region: t(f.region),
+    payment_terms_days: f.credit_enabled ? Number(f.days) || 0 : 0, credit_limit_minor: f.credit_enabled ? f.credit_limit : null, notes: t(f.notes),
+    credit_enabled: f.credit_enabled, credit_conditions: f.credit_enabled ? t(f.credit_conditions) : null,
   };
 }
 
@@ -108,7 +111,7 @@ export function NewCustomerDrawer({ open, onClose, onCreated, initialName = "", 
 
   async function save(e?: React.FormEvent) {
     e?.preventDefault();
-    if (form.days && !/^\d{1,3}$/.test(form.days.trim())) { setErr("Los días de crédito deben ser un número entre 0 y 365."); return; }
+    if (form.credit_enabled && form.days && !/^\d{1,3}$/.test(form.days.trim())) { setErr("Los días de crédito deben ser un número entre 0 y 365."); return; }
     setBusy(true); setErr(null);
     try {
       const input = customerInput(form);
@@ -156,11 +159,20 @@ export function NewCustomerDrawer({ open, onClose, onCreated, initialName = "", 
           </div>
         </Section>
         <Section title="Condiciones comerciales">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Días de crédito habituales" optional inputMode="numeric" value={form.days} onChange={(e) => set({ days: e.target.value })} suffix="días"
-              placeholder="0" hint="0 = contado. Se propone al venderle a crédito." inputClassName="text-right num" />
-            <MoneyField label="Cupo de crédito" value={form.credit_limit} onValue={(v) => set({ credit_limit: v })} hint="Opcional, como referencia." />
-          </div>
+          <Checkbox label="Habilitar crédito para este cliente" checked={form.credit_enabled}
+            onChange={(v) => set({ credit_enabled: v, days: v && !form.days ? "30" : form.days })}
+            hint="Todo es opcional: puedes darle crédito a un familiar o amigo sin documentos. Los respaldos se suben en la ficha del cliente." />
+          {form.credit_enabled && (
+            <div className="flex flex-col gap-3 rounded-lg border border-line p-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Días de crédito" optional inputMode="numeric" value={form.days} onChange={(e) => set({ days: e.target.value })} suffix="días"
+                  placeholder="30" hint="Se propone al venderle a crédito." inputClassName="text-right num" />
+                <MoneyField label="Monto de crédito (cupo)" value={form.credit_limit} onValue={(v) => set({ credit_limit: v })} hint="Te avisamos si una venta lo supera." />
+              </div>
+              <TextArea label="Condiciones" optional value={form.credit_conditions} onChange={(e) => set({ credit_conditions: e.target.value })}
+                placeholder="Ej. paga con transferencia los días 5; firma pagaré; cheque en garantía; tope por compra…" />
+            </div>
+          )}
           <TextArea label="Notas" optional value={form.notes} onChange={(e) => set({ notes: e.target.value })} placeholder="Horario de recepción, condiciones especiales…" />
         </Section>
         {err && <Notice tone="danger">{err}</Notice>}
@@ -178,6 +190,7 @@ function CustomerDrawer({ uid, onClose, onChanged }: { uid: string; onClose: () 
   const [err, setErr] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [version, setVersion] = useState(0);
+  const [files, setFiles] = useState(0);
   useEffect(() => { backend.customer(uid).then(setC).catch((e) => setErr(errorMessage(e))); }, [backend, uid, version]);
   if (editing && c) {
     return <NewCustomerDrawer open editing={c} onClose={() => setEditing(false)} onCreated={() => { setEditing(false); setVersion((v) => v + 1); onChanged(); }} />;
@@ -215,11 +228,11 @@ function CustomerDrawer({ uid, onClose, onChanged }: { uid: string; onClose: () 
             { label: "Correo", value: c.email ?? "—" },
             ...(c.invoice_email ? [{ label: "Correo para facturas", value: c.invoice_email }] : []),
             ...(c.contact_name ? [{ label: "Contacto", value: c.contact_name }] : []),
-            { label: "Condición de pago", value: c.payment_terms_days ? `Crédito ${c.payment_terms_days} días` : "Contado" },
-            ...(c.credit_limit_minor ? [{ label: "Cupo de crédito", value: formatMoney(c.credit_limit_minor) }] : []),
+            { label: "Condición de pago", value: c.credit_enabled ? `Crédito${c.payment_terms_days ? ` ${c.payment_terms_days} días` : ""}` : "Contado" },
             ...(c.notes ? [{ label: "Notas", value: c.notes }] : []),
           ]} />
-          <AttachmentsPanel link={{ entity: "cliente", uid: c.uid }} />
+          <CreditPanel key={`cr${version}`} uid={c.uid} company={c.kind === "empresa"} onFilesChanged={() => setFiles((v) => v + 1)} />
+          <AttachmentsPanel key={`f${files}`} link={{ entity: "cliente", uid: c.uid }} />
           <div>
             <h3 className="mb-2 text-sm font-semibold text-ink">Últimas ventas</h3>
             {c.recent.length === 0 ? <p className="text-sm text-muted">Sin ventas todavía.</p> : (

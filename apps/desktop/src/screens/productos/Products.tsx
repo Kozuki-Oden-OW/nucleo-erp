@@ -7,7 +7,7 @@ import { useSession } from "../../lib/session";
 import { formatDate, formatMoney, formatQty, parseQty } from "../../lib/format";
 import { UNITS } from "../../data/catalogs";
 import { navigate, type Route } from "../../lib/router";
-import { Badge, Button, Checkbox, DefinitionList, EmptyState, Field, Notice, PageHeader, Segmented, Select, Tabs } from "../../ui/kit";
+import { Badge, Button, Checkbox, DefinitionList, EmptyState, Field, IconButton, Notice, PageHeader, Segmented, Select, Tabs } from "../../ui/kit";
 import { Drawer, useToast } from "../../ui/overlay";
 import { DataTable, type Column } from "../../ui/table";
 
@@ -69,7 +69,12 @@ export function Products({ route }: { route: Route }) {
       const m = (p.price_minor - cost) / p.price_minor;
       return <span className={m < 0.15 ? "num text-warning" : "num text-success"}>{(m * 100).toFixed(0)} %</span>;
     } },
+    ...(can("productos.editar") ? [{ key: "e", header: <span className="sr-only">Editar</span>, width: "3rem", align: "right" as const, render: (p: Product) => (
+      <IconButton icon={Pencil} size={15} label={`Editar ${p.name}`} className="h-7 w-7 hover:text-accent"
+        onClick={(e) => { e.stopPropagation(); go({ ver: p.uid, editar: "1", lista: "1" }); }} />
+    ) }] : []),
   ];
+  const fromList = route.query.get("lista") === "1";
 
   return (
     <div className="anim-in">
@@ -98,13 +103,12 @@ export function Products({ route }: { route: Route }) {
       <NewProductDrawer open={creating} cats={cats} taxPpm={taxPpm} defaultCat={catFilter && catFilter !== "sin" ? catFilter : null}
         onManage={() => go({ categorias: "1" })} onClose={() => go({ nuevo: null })} onCreated={() => { setVersion((v) => v + 1); go({ nuevo: null }); }} />
       {product && editing && (
-        <EditProductDrawer product={product} cats={cats} taxPpm={taxPpm} onClose={() => go({ editar: null })}
-          onSaved={() => { setVersion((v) => v + 1); go({ editar: null }); }} />
+        <EditProductDrawer product={product} cats={cats} taxPpm={taxPpm} onClose={() => go({ editar: null, lista: null, ...(fromList ? { ver: null } : {}) })}
+          onSaved={() => { setVersion((v) => v + 1); go({ editar: null, lista: null, ...(fromList ? { ver: null } : {}) }); }} />
       )}
       <CategoriesDrawer open={managing} onClose={() => go({ categorias: null })} categories={cats} products={rows}
         onChanged={(c) => { setCats(c); setVersion((v) => v + 1); }} />
-      <Drawer open={!!product && !editing} onClose={() => go({ ver: null })} title={product?.name ?? ""} subtitle={product?.sku}
-        footer={product && can("productos.editar") ? <Button variant="secondary" icon={Pencil} onClick={() => go({ editar: "1" })}>Editar</Button> : undefined}>
+      <Drawer open={!!product && !editing} onClose={() => go({ ver: null })} title={product?.name ?? ""} subtitle={product?.sku}>
         {product && (
           <div className="flex flex-col gap-6">
             <DefinitionList items={[
@@ -121,6 +125,7 @@ export function Products({ route }: { route: Route }) {
               ] : []),
             ]} />
             {can("compras.ver") && <PriceHistory productUid={product.uid} />}
+            {can("productos.editar") && <Button icon={Pencil} onClick={() => go({ editar: "1" })}>Editar producto</Button>}
             {product.kind === "producto" && backend.features.has("inventario") && can("inventario.ver") && (
               <Button variant="secondary" icon={Boxes} onClick={() => navigate(`/inventario/producto/${product.uid}`)}>Ver kárdex, bodegas y reposición</Button>
             )}

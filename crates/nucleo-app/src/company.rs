@@ -80,6 +80,8 @@ pub(crate) fn validate_profile(
         payment_terms_days: p.payment_terms_days,
         credit_limit_minor: p.credit_limit_minor,
         notes: text(&p.notes, 2000, "las notas")?,
+        credit_enabled: p.credit_enabled,
+        credit_conditions: text(&p.credit_conditions, 2000, "las condiciones del crédito")?,
     })
 }
 

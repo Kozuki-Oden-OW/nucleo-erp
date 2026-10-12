@@ -7,7 +7,7 @@ import type {
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollRow, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView, SeveranceForm, SeveranceView, Worker, WorkerInput,
   F29Inputs, F29Source, F29View, RcvImportReport, TaxDocInput, TaxDocLine, TaxProfile,
-  AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
+  AppInfo, AttachmentRow, CreditDocInput, CustomerCredit, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
   Customer, CustomerDetail, Dashboard, DocLink, EffectInput, EntityRef, ExternalRef, ExternalRefInput, Line, LineInput,
   NewCustomer, NewProduct, NewUser, Payment, PermissionRow,
   AdjustmentInput, InventoryOverview, InventorySettings, KardexRow, ProductInventory, ReorderInput, ReorderSettings, StockAnalysis, StockDocDone, StockDocRow, TransferInput, Warehouse, PriceHistoryRow, Product, ProductCategory, ProductPatch, PurchaseOrderDetail, PurchaseOrderSummary,
@@ -27,6 +27,7 @@ import { CURRENCY_DIGITS, addDays, daysBetween, todayIso } from "../../lib/forma
 import { computeCostSheet, costSheetUsed, type CostSheet } from "../costing";
 import { REPORT_DEFS, buildReport, reportCatalog, type Facts } from "./reports";
 import { normalizeTerms } from "../saleTerms";
+import { DOC_KINDS, buildCredit, type CreditDocRowLike } from "../credit";
 import { CUSTOMER_NAMES, DEMO_ACTIVITIES, DEMO_COMMUNES, DEMO_COMPANY, DEMO_PRODUCT_CATEGORIES, DEMO_STREETS, EMPTY_PROFILE, PAYMENT_METHODS, PRODUCT_ROWS, SUPPLIER_NAMES, rng, rutDv } from "./seed";
 import reglas from "./reglas-demo.json";
 import { MANUAL_CODES, computeF29, type F29Note, type PurchaseKind } from "../f29";
@@ -146,6 +147,7 @@ export class DemoBackend implements Backend {
   };
   private rateRows: RateRow[] = [];
   private files: (AttachmentRow & { dataUrl: string; archived: boolean })[] = [];
+  private creditDocs = new Map<string, CreditDocRowLike[]>();
 
   constructor() {
     this.biz = {
@@ -204,6 +206,8 @@ export class DemoBackend implements Backend {
           commune: pick(DEMO_COMMUNES), city: "Santiago", region: "Metropolitana", payment_terms_days: r() < 0.5 ? 30 : 0,
         } : {}),
       });
+      const last = this.customers[this.customers.length - 1]!;
+      last.credit_enabled = last.payment_terms_days > 0;
     });
     for (const [name] of DEMO_PRODUCT_CATEGORIES) this.pcats.push({ uid: uid("cat"), name, product_count: 0 });
     for (const [sku, name, unit, price, cost, stock, min, service] of PRODUCT_ROWS) {
@@ -727,12 +731,15 @@ export class DemoBackend implements Backend {
     if (input.invoice_email?.trim() && !input.invoice_email.includes("@")) throw new AppError("correo", "El correo para facturas no tiene un formato válido.");
     const days = input.payment_terms_days ?? 0;
     if (days < 0 || days > 365) throw new AppError("validacion", "Los días de crédito van de 0 a 365.");
+    if ((input.credit_limit_minor ?? 0) < 0) throw new AppError("validacion", "El cupo de crédito no puede ser negativo.");
+    if ((input.credit_conditions ?? "").trim().length > 2000) throw new AppError("validacion", "Las condiciones del crédito admiten hasta 2.000 caracteres.");
     const t = (v: string | null | undefined) => (v && v.trim() ? v.trim() : null);
     return {
       name: input.name.trim(), rut, email: input.email?.trim() || null, phone: input.phone?.trim() || null,
       kind: input.kind === "empresa" ? "empresa" : "persona", trade_name: t(input.trade_name), business_activity: t(input.business_activity),
       address: t(input.address), commune: t(input.commune), city: t(input.city), region: t(input.region), contact_name: t(input.contact_name),
       invoice_email: t(input.invoice_email), payment_terms_days: days, credit_limit_minor: input.credit_limit_minor ?? null, notes: t(input.notes),
+      credit_enabled: !!input.credit_enabled, credit_conditions: t(input.credit_conditions),
     };
   }
   async addCustomer(input: NewCustomer): Promise<Customer> {
@@ -749,6 +756,34 @@ export class DemoBackend implements Backend {
     Object.assign(c, this.customerFields(input, u));
     this.log("cliente.editar", "cliente", c.uid);
     return wait({ ...c });
+  }
+  async customerCredit(u: string): Promise<CustomerCredit> {
+    const c = this.customers.find((x) => x.uid === u);
+    if (!c) throw new AppError("no_encontrado", "No encontramos ese cliente.");
+    const t = this.today;
+    const own = this.dues().rec.filter((d) => this.sales.find((s) => `/ventas/${s.uid}` === d.link)?.customer_uid === u);
+    const debt = own.reduce((a, d) => a + d.pending_minor, 0);
+    const overdue = own.filter((d) => d.due_date < t).reduce((a, d) => a + d.pending_minor, 0);
+    const rows = (this.creditDocs.get(u) ?? []).map((r) => ({ ...r, file_name: r.attachment_uid ? this.files.find((f) => f.uid === r.attachment_uid)?.file_name ?? null : null }));
+    return wait(buildCredit(c, rows, debt, overdue, t));
+  }
+  async saveCreditDoc(u: string, kind: string, input: CreditDocInput): Promise<CustomerCredit> {
+    this.require("clientes.editar");
+    if (!this.customers.some((x) => x.uid === u)) throw new AppError("no_encontrado", "No encontramos ese cliente.");
+    if (!DOC_KINDS.some((k) => k.code === kind)) throw new AppError("validacion", "Tipo de documento no válido.");
+    const att = input.attachment_uid || null;
+    const f = att ? this.files.find((x) => x.uid === att && !x.archived) : null;
+    if (att && !f) throw new AppError("no_encontrado", "No encontramos el documento adjunto.");
+    if ((input.note ?? "").trim().length > 1000) throw new AppError("validacion", "La nota admite hasta 1.000 caracteres.");
+    if (f && !f.links.includes(`cliente:${u}`)) f.links.push(`cliente:${u}`);
+    const list = (this.creditDocs.get(u) ?? []).filter((r) => r.kind !== kind);
+    list.push({ kind, status: input.status || "pendiente", attachment_uid: att, file_name: null, issued_on: input.issued_on || null, verified_on: input.verified_on || null, note: input.note?.trim() || null });
+    this.creditDocs.set(u, list);
+    this.log("cliente.credito_documento", "cliente", u, kind);
+    return this.customerCredit(u);
+  }
+  async exportCustomerFolder(_u: string): Promise<{ folder: string; files: number } | null> {
+    throw new AppError("demo", "En la demostración no se crean carpetas. En el programa instalado se crea una carpeta por cliente con sus documentos.");
   }
   async searchProducts(query: string): Promise<Product[]> {
     const q = norm(query.trim());
