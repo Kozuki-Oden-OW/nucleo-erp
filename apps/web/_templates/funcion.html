@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+  <meta charset="utf-8">
+  <title>{{M_TITULO}} | NÚCLEO ERP</title>
+  <meta name="description" content="{{M_META}}">
+  <link rel="canonical" href="{{SITE_URL}}/funciones/{{M_SLUG}}/">
+<!--#include head-->
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="{{M_NOMBRE}} — NÚCLEO ERP">
+  <meta property="og:description" content="{{M_META}}">
+  <meta property="og:url" content="{{SITE_URL}}/funciones/{{M_SLUG}}/">
+  <meta property="og:image" content="{{SITE_URL}}/assets/capturas/{{M_CAPTURA}}-dark-1440.webp">
+  <script type="application/ld+json">{{M_JSONLD}}</script>
+</head>
+<body>
+<!--#include header-->
+  <main id="contenido">
+    <section class="hero page-hero">
+      <div class="wrap">
+        <div class="hero-text">
+          <nav class="crumbs" aria-label="Ruta"><a href="/">Inicio</a> / <a href="/funciones/">Funciones</a> / <span aria-current="page">{{M_NOMBRE}}</span></nav>
+          {{M_TAG}}
+          <h1>{{M_NOMBRE}}</h1>
+          <p class="lead">{{M_INTRO}}</p>
+          <div class="cta">
+            <a class="btn btn-primary" href="/descargar/">Descargar gratis</a>
+            <a class="btn btn-ghost-ink" href="/demo/">Probar en la demo</a>
+          </div>
+        </div>
+        <div class="device">
+          <div class="device-bar"><i></i><i></i><i></i><span>NÚCLEO ERP — {{M_NOMBRE}}</span></div>
+          <!--SHOT:{{M_CAPTURA}}|{{M_ALT}}|eager-->
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="head">
+          <span class="eyebrow">Qué puedes hacer</span>
+          <h2>{{M_CORTO}}</h2>
+        </div>
+        <div class="grid grid-3">{{M_PUNTOS}}</div>
+      </div>
+    </section>
+
+    {{M_FAQ}}
+
+    <section class="alt">
+      <div class="wrap">
+        <div class="head"><span class="eyebrow">Todo conectado</span><h2>Sigue explorando NÚCLEO</h2></div>
+        <div class="related">{{M_RELATED}}</div>
+      </div>
+    </section>
+
+    <section class="final">
+      <div class="wrap">
+        <div class="card">
+          <h2>Gratis, local y privado</h2>
+          <p>NÚCLEO ERP funciona en tu computador con tus datos cifrados. Sin mensualidades ni cuentas en línea.</p>
+          <div class="cta"><a class="btn btn-primary" href="/descargar/">Descargar NÚCLEO ERP</a><a class="btn btn-secondary" href="/funciones/">Ver todas las funciones</a></div>
+        </div>
+      </div>
+    </section>
+  </main>
+<!--#include footer-->
+</body>
+</html>

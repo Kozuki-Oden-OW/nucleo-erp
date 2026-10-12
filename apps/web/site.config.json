@@ -4,6 +4,9 @@
   "repo_url": "https://github.com/Kozuki-Oden-OW/nucleo-erp",
   "donation_url": "",
   "contact_email": "",
-  "stage_label": "vista previa técnica",
-  "stage_note": "Incluye ventas y cotizaciones, compras, inventario con kárdex, dinero (cuentas, gastos y flujo de caja) e importaciones, con tus datos cifrados en tu computador. Es una versión de prueba: aún faltan la contabilidad, los reportes y la revisión de los cálculos por un contador. Úsala para conocer NÚCLEO y haz respaldos; espera la versión 1.0 para operar tu negocio solo con ella."
+  "stage_label": "vista previa",
+  "stage_note": "Incluye ventas, clientes con crédito, productos, promociones, inventario con reservas y despachos, envíos, compras, dinero, borradores del F29 y F22, remuneraciones, comercio exterior, reportes y varias empresas, con tus datos cifrados en tu computador. Es una versión de prueba: los cálculos tributarios y de sueldos aún están en revisión por un contador. Haz respaldos y espera la versión 1.0 para operar tu negocio solo con NÚCLEO.",
+  "google_site_verification": "",
+  "bing_site_verification": "",
+  "indexnow_key": "1324e174cc77b2dc4ca07e4ad8a31fdf"
 }

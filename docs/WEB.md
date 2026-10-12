@@ -4,7 +4,7 @@
 
 | Pieza | Dónde |
 |---|---|
-| Páginas del sitio | `apps/web/` (HTML + CSS, sin dependencias externas) |
+| Páginas del sitio | `apps/web/` (HTML + CSS, sin dependencias externas; partes comunes y páginas por módulo generadas, ver `apps/web/README.md`) |
 | Construcción | `tools/build_web.py` → completa versión, tamaño y SHA-256 |
 | Alojamiento | GitHub Pages, gratis, con HTTPS y dominio propio |
 | Instalador | Lo compila `release.yml` en Windows y se publica en **www.nucleoerp.cl/descargas/NucleoERPSetup.exe** |
@@ -48,6 +48,33 @@ pueden tardar algunas horas en propagarse; GitHub emite el certificado HTTPS aut
 `python3 tools/build_web.py --out dist-web --installer NucleoERPSetup.exe` genera una carpeta lista
 para subir a cualquier hosting estático (cPanel, Netlify, Cloudflare Pages). La descarga sigue saliendo
 de www.nucleoerp.cl.
+
+## SEO, buscadores e IA (sin plugins)
+
+El sitio no usa un CMS: lo que haría un plugin de SEO está en el código y lo genera `tools/build_web.py`.
+
+| Pieza | Qué hace |
+|---|---|
+| Páginas por módulo (`/funciones/…`) | Una página indexable por función (ventas, inventario, promociones, envíos, F29…) con título, descripción y preguntas propias |
+| JSON-LD | Organization, WebSite, SoftwareApplication (con `featureList`), FAQPage, BreadcrumbList, HowTo e ItemList |
+| `sitemap.xml` | Automático con todas las páginas, fecha y prioridad |
+| `robots.txt` | Todo permitido, incluidos asistentes de IA; apunta al sitemap y a `llms.txt` |
+| `llms.txt` y `llms-full.txt` | Resumen del producto para ChatGPT, Claude, Perplexity y Gemini ([llmstxt.org](https://llmstxt.org)) |
+| Open Graph | Título, descripción e imagen por página (`assets/og-image.png`, 1200×630) |
+| `manifest.webmanifest`, `.well-known/security.txt` | Manifiesto web y contacto de seguridad (RFC 9116) |
+| Rendimiento | Capturas WebP con `srcset`, tema claro/oscuro con `<picture>`, fuente precargada, `speculationrules` (prerender al pasar el mouse) y transiciones entre páginas (`@view-transition`) |
+| IndexNow | `web.yml` avisa a Bing, Yandex y otros cada vez que se publica; la clave está en `site.config.json` (`indexnow_key`) y se publica en `/<clave>.txt` |
+
+### Google Search Console (una vez, la hace el titular con su cuenta de Google)
+
+1. Entrar a <https://search.google.com/search-console> → *Agregar propiedad* → **Prefijo de URL**:
+   `https://www.nucleoerp.cl/`.
+2. Método **Etiqueta HTML**: copiar solo el valor de `content="…"` y ponerlo en
+   `apps/web/site.config.json` → `google_site_verification`. Publicar (push a `main`) y pulsar *Verificar*.
+   (Alternativa: propiedad de **Dominio** con un registro TXT en el DNS de nucleoerp.cl.)
+3. En *Sitemaps*, enviar `sitemap.xml`. En *Inspección de URLs*, pedir la indexación de la portada y de
+   `/funciones/`.
+4. Bing Webmaster Tools: *Importar desde Google Search Console* (o etiqueta en `bing_site_verification`).
 
 ## Reglas del sitio
 

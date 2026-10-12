@@ -1,0 +1,15 @@
+{
+  "name": "NÚCLEO ERP",
+  "short_name": "NÚCLEO",
+  "description": "ERP gratuito, local y de código abierto para emprendedores y pymes chilenas.",
+  "lang": "es-CL",
+  "start_url": "/",
+  "scope": "/",
+  "display": "minimal-ui",
+  "background_color": "#001a3c",
+  "theme_color": "#001a3c",
+  "icons": [
+    { "src": "/assets/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/assets/logo-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

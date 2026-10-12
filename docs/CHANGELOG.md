@@ -25,6 +25,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
   - Cada empresa puede tener su color (Mi negocio → Color de la empresa).
   - Cualquier empresa se puede abrir en otra ventana; la ventana lleva el nombre de la empresa.
 - **Clientes:** marca de «cliente preferencial».
+- **Sitio web:** rediseño, una página por módulo (`/funciones/`), capturas reales de la 0.5.0 en tema claro y oscuro, JSON-LD, `llms.txt`, sitemap automático, IndexNow y verificación de Search Console lista.
 
 ## [0.4.0] — 2026-10-12
 

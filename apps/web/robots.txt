@@ -1,3 +1,6 @@
+# NÚCLEO ERP — www.nucleoerp.cl
+# Todo el sitio es público: buscadores y asistentes de IA son bienvenidos.
+# Resumen para modelos de lenguaje: {{SITE_URL}}/llms.txt
 User-agent: *
 Allow: /
 

@@ -1,0 +1,524 @@
+{
+  "modulos": [
+    {
+      "slug": "ventas",
+      "nombre": "Ventas y cotizaciones",
+      "corto": "Cotiza, vende y emite facturas internas con forma de pago y referencias como en el facturador del SII.",
+      "titulo": "Ventas, cotizaciones y factura interna gratis",
+      "meta": "Cotizaciones, ventas y factura interna con forma de pago, crédito, OC y HES, y datos del cliente automáticos. Gratis y con tus datos cifrados en tu PC.",
+      "intro": "De la cotización a la venta sin volver a escribir. Cada venta lleva su estado comercial, de pago y de documentación, y la factura interna replica las opciones del facturador gratuito del SII para que llegues con todo listo.",
+      "icono": "<path d=\"M4 7h16M4 12h10M4 17h7\"/>",
+      "captura": "venta",
+      "puntos": [
+        {
+          "t": "Cotización → venta en un clic",
+          "d": "La cotización aceptada se convierte en venta sin digitar de nuevo y queda enlazada en la cadena del documento."
+        },
+        {
+          "t": "Forma de pago completa",
+          "d": "Efectivo, tarjeta de débito o crédito, transferencia con banco y fecha, cheque o crédito con días y vencimiento."
+        },
+        {
+          "t": "Factura interna como la del SII",
+          "d": "Referencias de orden de compra, HES, HEM, nota de pedido, nota de venta, guía de despacho, contrato y ChileCompra."
+        },
+        {
+          "t": "Datos del cliente automáticos",
+          "d": "Al elegir el cliente se completan RUT, razón social, giro, dirección, comuna y correo para facturas."
+        },
+        {
+          "t": "Promociones al vender",
+          "d": "NÚCLEO detecta los packs, descuentos por cantidad o de cliente que calzan y los aplica con un clic."
+        },
+        {
+          "t": "Pendiente de documentación",
+          "d": "Cada venta efectuada te recuerda emitir el documento tributario en el sistema oficial y anotar su número."
+        }
+      ],
+      "preguntas": [
+        {
+          "q": "¿NÚCLEO emite facturas electrónicas?",
+          "a": "No. NÚCLEO prepara una factura interna con los mismos datos y referencias; el documento tributario lo emites tú en el sistema oficial del SII y luego marcas la venta como documentada."
+        },
+        {
+          "q": "¿Puedo vender a crédito?",
+          "a": "Sí. Eliges los días de crédito, NÚCLEO calcula el vencimiento y la venta queda en «Dinero que te deben». Si el cliente supera su cupo o tiene saldos vencidos, te avisa sin bloquear."
+        }
+      ]
+    },
+    {
+      "slug": "clientes",
+      "nombre": "Clientes y crédito",
+      "corto": "Ficha completa, cliente preferencial y crédito con cupo, condiciones y documentos de respaldo.",
+      "titulo": "Clientes y crédito a clientes para pymes",
+      "meta": "Ficha de clientes, crédito con cupo y días, y documentos de respaldo: carpeta tributaria, vigencia, poderes y Dicom. Gratis y local.",
+      "intro": "Sabe quién te compra, cada cuánto y cuánto te debe. Habilita crédito con cupo y condiciones y ordena los respaldos que pidas, con consejos de qué revisar en cada uno.",
+      "icono": "<path d=\"M16 19v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><path d=\"M22 19v-1a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75\"/>",
+      "captura": "clientes",
+      "nuevo": true,
+      "puntos": [
+        {
+          "t": "Ficha completa y opcional",
+          "d": "Persona o empresa, RUT validado, giro, dirección, comuna, región, contacto y correo para facturas."
+        },
+        {
+          "t": "Crédito con cupo",
+          "d": "Días de crédito, monto máximo y condiciones (pagaré, garantía). Ves deuda, vencido y disponible."
+        },
+        {
+          "t": "Documentos de respaldo",
+          "d": "Situación tributaria, carpeta tributaria, vigencia, anotaciones marginales, poderes e informe comercial, cifrados y con su fecha."
+        },
+        {
+          "t": "Consejos de verificación",
+          "d": "Dónde se obtiene cada documento, cómo verificarlo, qué mirar y cuándo pedir uno actualizado."
+        },
+        {
+          "t": "Carpeta del cliente",
+          "d": "Exporta una carpeta con el nombre y RUT del cliente y sus documentos ordenados."
+        },
+        {
+          "t": "Cliente preferencial",
+          "d": "Márcalo y recibe automáticamente las promociones para preferenciales."
+        }
+      ],
+      "preguntas": [
+        {
+          "q": "¿Es obligatorio pedir documentos para dar crédito?",
+          "a": "No. Todo es opcional: puedes dar crédito a alguien de confianza sin respaldos. NÚCLEO solo te sugiere qué pedir y te avisa si un documento está antiguo."
+        },
+        {
+          "q": "¿NÚCLEO consulta Dicom o el SII por mí?",
+          "a": "No. NÚCLEO no se conecta a terceros. Te indica dónde consultar y guarda lo que tú obtengas, siempre con autorización del cliente."
+        }
+      ]
+    },
+    {
+      "slug": "productos",
+      "nombre": "Productos, precios y costos",
+      "corto": "Categorías, precio neto o con IVA, costo avanzado en dólares y margen real sobre el neto.",
+      "titulo": "Productos, precios, costos y márgenes",
+      "meta": "Productos con categorías, precio neto o con IVA, costo avanzado (dólar, transporte, mano de obra) y margen real. Programa gratis y local.",
+      "intro": "Conoce el costo verdadero de cada producto y el margen que te deja, sin planillas. Escribe precios como te acomode: neto o con IVA.",
+      "icono": "<path d=\"M21 8 12 3 3 8v8l9 5 9-5V8z\"/><path d=\"m3 8 9 5 9-5M12 13v8\"/>",
+      "captura": "productos",
+      "puntos": [
+        {
+          "t": "Precio neto o con IVA",
+          "d": "Escribe el precio como prefieras; NÚCLEO guarda el neto y muestra ambos."
+        },
+        {
+          "t": "Costo avanzado",
+          "d": "Compra en dólares u otra moneda, tipo de cambio, transporte, envío, mano de obra y otros costos repartidos en el lote."
+        },
+        {
+          "t": "Margen sobre el neto",
+          "d": "Margen en % y en pesos por unidad, con aviso cuando es bajo."
+        },
+        {
+          "t": "Categorías",
+          "d": "Crea, renombra y asigna productos en lote; filtra la lista por categoría."
+        },
+        {
+          "t": "Si no hay stock",
+          "d": "Por producto: seguir la regla del negocio, no vender sin stock, vender igual o tomar reservas."
+        },
+        {
+          "t": "Edición rápida",
+          "d": "Lápiz en cada fila y ficha con precios de compra históricos y acceso al kárdex."
+        }
+      ],
+      "preguntas": [
+        {
+          "q": "¿Cómo calcula NÚCLEO el costo de un producto?",
+          "a": "Con costo promedio ponderado: cada compra o recepción actualiza el costo. Antes de tener movimientos puedes usar la hoja de costo avanzado."
+        }
+      ]
+    },
+    {
+      "slug": "promociones",
+      "nombre": "Descuentos y promociones",
+      "corto": "Packs, descuentos por cantidad, lleva X paga Y y precios por cliente, con aviso si vendes bajo el costo.",
+      "titulo": "Promociones y descuentos: packs, 3x2 y más",
+      "meta": "Packs a precio fijo o con %, descuentos por cantidad, lleva 3 paga 2, por cliente y cliente preferencial. Se aplican al vender. Gratis.",
+      "intro": "Promociones que se aplican solas al vender y que no te hacen perder plata: NÚCLEO te avisa si un pack queda bajo el costo.",
+      "icono": "<path d=\"M12 2 3 7v6c0 5 3.8 8.7 9 9 5.2-.3 9-4 9-9V7l-9-5z\"/><path d=\"m9 15 6-6\"/><circle cx=\"9.5\" cy=\"9.5\" r=\".5\"/><circle cx=\"14.5\" cy=\"14.5\" r=\".5\"/>",
+      "captura": "promociones",
+      "nuevo": true,
+      "puntos": [
+        {
+          "t": "Packs",
+          "d": "Dos o más productos a un precio fijo o con un % de descuento, con vista previa del ahorro y del margen."
+        },
+        {
+          "t": "Por cantidad",
+          "d": "Tramos como 5 % desde 20 unidades y 10 % desde 50, sumando distintos productos si quieres."
+        },
+        {
+          "t": "Lleva X paga Y",
+          "d": "3x2, 2x1 o la combinación que definas, por producto, categoría o todo el catálogo."
+        },
+        {
+          "t": "Por cliente y preferenciales",
+          "d": "Un % para clientes elegidos o para todos los marcados como preferenciales."
+        },
+        {
+          "t": "Vigencia y pausa",
+          "d": "Fechas de inicio y término, promociones programadas y pausa con un clic."
+        },
+        {
+          "t": "Nunca se suman a ciegas",
+          "d": "Si varias tocan el mismo producto, se usa la de mayor ahorro y se muestra el detalle."
+        }
+      ],
+      "preguntas": [
+        {
+          "q": "¿Las promociones se aplican solas?",
+          "a": "Al vender, NÚCLEO muestra las promociones que calzan y el ahorro; con «Aplicar promociones» quedan como descuento en cada línea."
+        },
+        {
+          "q": "¿Puedo hacer un 3x2?",
+          "a": "Sí, con el tipo «Lleva X paga Y»: lleva 3 y paga 2 regala una unidad por cada tres del mismo producto."
+        }
+      ]
+    },
+    {
+      "slug": "inventario",
+      "nombre": "Inventario y despachos",
+      "corto": "Kárdex, bodegas, inventario físico con un clic, reservas y productos por despachar.",
+      "titulo": "Inventario gratis: kárdex, bodegas y reservas",
+      "meta": "Kárdex, varias bodegas, inventario físico con todos los productos, reservas y productos por despachar. Gratis y sin Internet.",
+      "intro": "Cuánto tienes, dónde está, cuánto vendes por día y cuándo se te acaba. Haz el inventario físico en una sola pantalla y despacha lo vendido cuando llegue.",
+      "icono": "<path d=\"M3 7l9-4 9 4-9 4-9-4z\"/><path d=\"M3 12l9 4 9-4M3 17l9 4 9-4\"/>",
+      "captura": "inventario",
+      "nuevo": true,
+      "puntos": [
+        {
+          "t": "Realizar inventario",
+          "d": "Todos los productos de la bodega en pantalla, «Copiar stock actual», «Actualizar stock» por fila o el inventario completo."
+        },
+        {
+          "t": "Kárdex y costo promedio",
+          "d": "Cada entrada y salida queda registrada con su costo; nada se borra."
+        },
+        {
+          "t": "Varias bodegas",
+          "d": "Transferencias entre bodegas al costo de origen y stock por bodega."
+        },
+        {
+          "t": "Reservas",
+          "d": "La venta aparta lo que hay y deja pendiente lo que falta, en orden de llegada."
+        },
+        {
+          "t": "Por despachar",
+          "d": "Lista de pedidos listos o esperando stock; el stock se descuenta al despachar."
+        },
+        {
+          "t": "Riesgo de quiebre",
+          "d": "Velocidad de venta, días de cobertura, bajo el mínimo y sugerencia de compra explicada."
+        }
+      ],
+      "preguntas": [
+        {
+          "q": "¿Puedo vender productos que no tengo en stock?",
+          "a": "Sí, por producto: puedes bloquearlo, permitir stock negativo o tomar reservas para entregar cuando llegue."
+        }
+      ]
+    },
+    {
+      "slug": "envios",
+      "nombre": "Envíos",
+      "corto": "Agencia, número de seguimiento, destinatario y estado: no despachado, en camino, entregado o con problemas.",
+      "titulo": "Control de envíos y seguimiento por agencia",
+      "meta": "Envíos con agencia (Starken, Chilexpress, Correos de Chile, Blue Express), seguimiento, destinatario y estado con colores. Gratis.",
+      "intro": "Cada despacho con su agencia, su número de seguimiento y su estado a la vista. Rojo lo pendiente o con problemas, amarillo lo que va en camino y verde lo entregado.",
+      "icono": "<path d=\"M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2\"/><path d=\"M15 18H9M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14\"/><circle cx=\"17\" cy=\"18\" r=\"2\"/><circle cx=\"7\" cy=\"18\" r=\"2\"/>",
+      "captura": "envios",
+      "nuevo": true,
+      "puntos": [
+        {
+          "t": "Datos del envío",
+          "d": "Agencia, orden de transporte o seguimiento, nombre, apellido, celular, dirección, comuna y región."
+        },
+        {
+          "t": "Estados con color",
+          "d": "No despachado, en camino, entregado y no entregado (problemas)."
+        },
+        {
+          "t": "Fechas automáticas",
+          "d": "Al marcar en camino o entregado sin fecha, se usa la de hoy."
+        },
+        {
+          "t": "Desde la venta",
+          "d": "«Crear envío» completa el destinatario desde la ficha del cliente."
+        },
+        {
+          "t": "Historial",
+          "d": "Cada cambio queda en la auditoría y en la línea de tiempo de la venta."
+        },
+        {
+          "t": "Búsqueda",
+          "d": "Por número, seguimiento, agencia, nombre o comuna."
+        }
+      ],
+      "preguntas": [
+        {
+          "q": "¿NÚCLEO se conecta con las agencias de envío?",
+          "a": "No. Es local y privado: anotas el número de seguimiento y lo copias con un clic para revisarlo en el sitio de la agencia."
+        }
+      ]
+    },
+    {
+      "slug": "compras",
+      "nombre": "Compras y proveedores",
+      "corto": "Órdenes de compra, recepción en bodega, facturas de proveedor y precios históricos.",
+      "titulo": "Órdenes de compra y proveedores para pymes",
+      "meta": "Órdenes de compra, recepciones parciales, facturas de proveedor, cuentas por pagar y precios históricos por proveedor. Gratis y local.",
+      "intro": "Compra con orden, recibe lo que llegó y registra la factura del proveedor. NÚCLEO actualiza el stock y el costo promedio solo.",
+      "icono": "<circle cx=\"9\" cy=\"21\" r=\"1\"/><circle cx=\"20\" cy=\"21\" r=\"1\"/><path d=\"M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6\"/>",
+      "captura": "compras",
+      "puntos": [
+        {
+          "t": "Órdenes de compra",
+          "d": "Emitidas, despachadas, parciales y recibidas, con su numeración."
+        },
+        {
+          "t": "Recepción en bodega",
+          "d": "Parcial o total; el stock entra con su costo."
+        },
+        {
+          "t": "Documentos de proveedor",
+          "d": "Facturas y boletas con vencimiento y pagos."
+        },
+        {
+          "t": "Precios históricos",
+          "d": "Cuánto te cobró cada proveedor por cada producto."
+        }
+      ],
+      "preguntas": []
+    },
+    {
+      "slug": "dinero",
+      "nombre": "Dinero y flujo de caja",
+      "corto": "Cuentas, cobros, pagos, gastos recurrentes y proyección de caja a 13 semanas.",
+      "titulo": "Flujo de caja, cobros y pagos para pymes",
+      "meta": "Dinero que te deben, dinero que debes, gastos recurrentes, caja y bancos, y proyección de caja semanal. Gratis para pymes chilenas.",
+      "intro": "Dinero disponible, lo que te deben, lo que debes y en qué semana se te podría acabar la caja, explicado sin términos contables.",
+      "icono": "<rect x=\"2\" y=\"6\" width=\"20\" height=\"12\" rx=\"2\"/><circle cx=\"12\" cy=\"12\" r=\"2.5\"/><path d=\"M6 12h.01M18 12h.01\"/>",
+      "captura": "dinero",
+      "puntos": [
+        {
+          "t": "Cuentas",
+          "d": "Caja, bancos y billeteras con saldos y movimientos."
+        },
+        {
+          "t": "Por cobrar y por pagar",
+          "d": "Antigüedad de saldos, atrasos y calendario de cobros y pagos."
+        },
+        {
+          "t": "Gastos",
+          "d": "Por categoría, fijos o variables, y gastos recurrentes."
+        },
+        {
+          "t": "Proyección de caja",
+          "d": "13 semanas hacia adelante con aviso si la caja queda en negativo."
+        }
+      ],
+      "preguntas": []
+    },
+    {
+      "slug": "impuestos",
+      "nombre": "Impuestos: F29 y F22",
+      "corto": "Borrador del F29 mensual y de la renta anual (F22) Pro Pyme, código por código y explicado.",
+      "titulo": "Borrador del F29 y F22 para pymes",
+      "meta": "Borrador del Formulario 29 (IVA y PPM) y del F22 Pro Pyme código por código, con el Registro de Compras y Ventas. No declara por ti.",
+      "intro": "Llega al SII con los números listos y entendidos. NÚCLEO calcula, valida, prepara y explica; tú declaras en el sistema oficial.",
+      "icono": "<path d=\"M3 21h18M5 21V10l7-5 7 5v11\"/><path d=\"M9 21v-6h6v6\"/>",
+      "captura": "impuestos",
+      "puntos": [
+        {
+          "t": "Borrador del F29",
+          "d": "IVA débito y crédito, remanente reajustado, PPM, impuesto único y retenciones, código por código."
+        },
+        {
+          "t": "Registro de Compras y Ventas",
+          "d": "Importa el archivo descargado del SII y clasifica las compras."
+        },
+        {
+          "t": "Renta anual (F22)",
+          "d": "Régimen Pro Pyme: recuadro 17, PPM reajustados, incentivo al ahorro 14 E y saldo a favor."
+        },
+        {
+          "t": "Nunca pide tu clave",
+          "d": "NÚCLEO no se conecta al SII ni guarda credenciales tributarias."
+        }
+      ],
+      "preguntas": [
+        {
+          "q": "¿NÚCLEO declara mis impuestos?",
+          "a": "No. Prepara un borrador explicado para que lo revises y lo declares tú (o tu contador) en sii.cl."
+        }
+      ]
+    },
+    {
+      "slug": "remuneraciones",
+      "nombre": "Remuneraciones",
+      "corto": "Liquidaciones, sueldo empresarial, Previred, Libro de Remuneraciones Electrónico y finiquito.",
+      "titulo": "Liquidaciones de sueldo, Previred y LRE gratis",
+      "meta": "Liquidaciones con AFP, salud, cesantía e impuesto único, sueldo empresarial, pagos de Previred, archivo LRE y finiquito. Gratis.",
+      "intro": "Sueldos correctos y explicados, con los indicadores del mes que tú confirmas. Cada monto muestra de dónde sale.",
+      "icono": "<path d=\"M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2\"/><circle cx=\"12\" cy=\"7\" r=\"4\"/>",
+      "captura": "remuneraciones",
+      "puntos": [
+        {
+          "t": "Liquidaciones",
+          "d": "Haberes, gratificación, horas extra, AFP, salud, cesantía, impuesto único, anticipos y líquido a pagar."
+        },
+        {
+          "t": "Sueldo empresarial",
+          "d": "Para el dueño, con su efecto en el F29."
+        },
+        {
+          "t": "Previred y LRE",
+          "d": "Cuánto pagar a cada institución y archivo del Libro de Remuneraciones Electrónico."
+        },
+        {
+          "t": "Finiquito",
+          "d": "Feriado, aviso previo y años de servicio con sus topes, imprimible."
+        }
+      ],
+      "preguntas": []
+    },
+    {
+      "slug": "comex",
+      "nombre": "Comercio exterior (COMEX)",
+      "corto": "Costo real de importar: FOB, CIF, flete, seguro, derechos, IVA, agente y costo puesto en bodega.",
+      "titulo": "Calculadora de importación y costo en bodega",
+      "meta": "Importaciones con agente, courier o plataforma: FOB, CIF, flete, seguro, derechos, IVA y costo puesto en bodega por producto. Gratis.",
+      "intro": "Conoce el costo verdadero de un producto importado antes de comprarlo y sigue cada importación hasta tu bodega.",
+      "icono": "<path d=\"M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1s1.2 1 2.5 1c2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1\"/><path d=\"M19.4 17.4 21 12H3l1.8 5.4M12 12V4h-2v3M12 4l5 3H12\"/>",
+      "captura": "comex",
+      "puntos": [
+        {
+          "t": "Calculadora de importación",
+          "d": "Con agente de aduana, courier o plataforma, en dólares o pesos, con escenarios."
+        },
+        {
+          "t": "Carpetas de importación",
+          "d": "12 etapas, ETA con historial y costos estimados y reales."
+        },
+        {
+          "t": "Costo puesto en bodega",
+          "d": "Reparto de flete, seguro, derechos y gastos por producto."
+        },
+        {
+          "t": "Exportación",
+          "d": "Utilidad, margen y punto de equilibrio según el Incoterm de venta."
+        }
+      ],
+      "preguntas": []
+    },
+    {
+      "slug": "reportes",
+      "nombre": "Análisis y reportes",
+      "corto": "13 reportes con gráfico y exportación a Excel: ventas, utilidad, inventario, cobranza, caja e IVA.",
+      "titulo": "Reportes de ventas, utilidad e inventario",
+      "meta": "Ventas por período, cliente y producto, ¿gano o pierdo?, inventario y rotación, cobranza, caja e IVA. Exporta a Excel y CSV. Gratis.",
+      "intro": "Respuestas simples a preguntas reales: qué se vende, qué deja plata y qué se quedó quieto.",
+      "icono": "<path d=\"M4 19V9m6 10V5m6 14v-7m4 7H2\"/>",
+      "captura": "reportes",
+      "puntos": [
+        {
+          "t": "Ventas",
+          "d": "Por período, cliente, producto y categoría, con margen."
+        },
+        {
+          "t": "¿Gano o pierdo?",
+          "d": "Ventas, costo y gastos del período."
+        },
+        {
+          "t": "Inventario",
+          "d": "Valorizado, rotación y días de inventario."
+        },
+        {
+          "t": "Excel y CSV",
+          "d": "Exporta cualquier reporte con un clic."
+        }
+      ],
+      "preguntas": []
+    },
+    {
+      "slug": "empresas",
+      "nombre": "Varias empresas y seguridad",
+      "corto": "Todas tus empresas en un programa, cada una con su color, en ventanas separadas, con usuarios y respaldos cifrados.",
+      "titulo": "ERP multiempresa gratis con datos cifrados",
+      "meta": "Varias empresas en un computador, cada una con su color y en su ventana. Usuarios y roles, auditoría y respaldos cifrados.",
+      "intro": "Si tienes más de un negocio, ábrelos lado a lado y reconócelos por su color. Cada empresa guarda sus datos por separado y cifrados.",
+      "icono": "<rect x=\"3\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/>",
+      "captura": "empresas",
+      "nuevo": true,
+      "puntos": [
+        {
+          "t": "Selector de empresas",
+          "d": "Todas tus empresas en el menú, con «Agregar empresa»."
+        },
+        {
+          "t": "Un color por empresa",
+          "d": "Ocho tonos para reconocer en cuál estás trabajando."
+        },
+        {
+          "t": "Otra ventana",
+          "d": "Abre dos empresas al mismo tiempo, cada una en su ventana."
+        },
+        {
+          "t": "Usuarios y roles",
+          "d": "Permisos por función, bloqueo por inactividad y auditoría encadenada."
+        },
+        {
+          "t": "Cifrado y respaldos",
+          "d": "Base cifrada, respaldos verificados y clave de recuperación."
+        },
+        {
+          "t": "Documentos adjuntos",
+          "d": "Facturas, contratos y fotos guardados cifrados junto a cada registro."
+        }
+      ],
+      "preguntas": []
+    }
+  ],
+  "novedades": {
+    "version": "0.5.0",
+    "items": [
+      {
+        "slug": "promociones",
+        "t": "Descuentos y promociones",
+        "d": "Packs, por cantidad, 3x2, por cliente y preferenciales."
+      },
+      {
+        "slug": "envios",
+        "t": "Envíos",
+        "d": "Agencia, seguimiento y estado con colores."
+      },
+      {
+        "slug": "inventario",
+        "t": "Reservas y por despachar",
+        "d": "Vende sin stock con reserva y despacha cuando llegue."
+      },
+      {
+        "slug": "inventario",
+        "t": "Inventario en un clic",
+        "d": "Todos los productos, actualizar por fila o completo."
+      },
+      {
+        "slug": "empresas",
+        "t": "Varias empresas a la vez",
+        "d": "Un color por empresa y ventanas separadas."
+      },
+      {
+        "slug": "clientes",
+        "t": "Crédito a clientes",
+        "d": "Cupo, condiciones y documentos de respaldo."
+      }
+    ]
+  }
+}
