@@ -44,7 +44,21 @@ pub struct BusinessSettings {
     pub tax_rate_user_ppm: Option<i64>,
     /// Logo del negocio como imagen `data:` (PNG, JPEG o WebP), para la interfaz y los documentos.
     pub logo: Option<String>,
+    /// Color de la interfaz para este negocio (ayuda a distinguir empresas). `None` = el de NÚCLEO.
+    pub accent: Option<String>,
 }
+
+/// Colores disponibles para la interfaz de cada negocio.
+pub const ACCENTS: &[&str] = &[
+    "turquesa",
+    "azul",
+    "verde",
+    "morado",
+    "naranjo",
+    "frambuesa",
+    "grafito",
+    "dorado",
+];
 
 /// Cambios a los datos del negocio. `None` = no cambia; texto vacío = borrar el dato.
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -61,6 +75,8 @@ pub struct BusinessPatch {
     pub tax_enabled: Option<bool>,
     /// Tasa anotada por el usuario en ppm; 0 = borrarla.
     pub tax_rate_user_ppm: Option<i64>,
+    /// Color de la interfaz; texto vacío = el de NÚCLEO.
+    pub accent: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -475,6 +491,7 @@ impl CompanySession {
             tax_rate_user_ppm: user_rate,
             logo: dbcore::get_setting(self.db.conn(), LOGO_KEY)?
                 .and_then(|v| v.as_str().map(String::from)),
+            accent: s("accent").filter(|a| ACCENTS.contains(&a.as_str())),
         })
     }
 
@@ -565,7 +582,15 @@ impl CompanySession {
             }
             b.tax_rate_user_ppm = (v > 0).then_some(v);
         }
+        if let Some(a) = &patch.accent {
+            let a = a.trim();
+            if !a.is_empty() && !ACCENTS.contains(&a) {
+                return Err(AppError::Validation("color no válido".into()));
+            }
+            b.accent = (!a.is_empty() && a != "turquesa").then(|| a.to_string());
+        }
         let stored = serde_json::json!({
+            "accent": b.accent,
             "rut": b.rut, "legal_name": b.legal_name, "activity": b.activity, "address": b.address,
             "phone": b.phone, "email": b.email, "documentation_reminder": b.documentation_reminder,
             "tax_enabled": b.tax_enabled, "tax_rate_user_ppm": b.tax_rate_user_ppm,

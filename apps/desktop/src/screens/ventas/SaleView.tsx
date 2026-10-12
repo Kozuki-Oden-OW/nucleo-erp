@@ -1,7 +1,9 @@
 // Ficha de una venta: estado en tres ejes, cadena documental, acciones del ciclo y línea de tiempo.
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, BadgeCheck, Ban, BellOff, FileWarning, HandCoins, Pencil } from "lucide-react";
-import { useBackend, errorMessage, type BusinessSettings, type SaleDetail } from "../../data";
+import { ArrowLeft, BadgeCheck, Ban, BellOff, FileWarning, HandCoins, Pencil, Truck } from "lucide-react";
+import { useBackend, errorMessage, type BusinessSettings, type PendingDispatch, type SaleDetail, type Shipment, type ShipmentInput } from "../../data";
+import { ShipmentDrawer, ShipStatusBadge, recipientFromCustomer } from "../envios/Shipments";
+import { DispatchDialog, DispatchStatus } from "../inventario/Dispatches";
 import { formatDate, formatMoney, formatPpm, formatQty } from "../../lib/format";
 import { useTerm } from "../../lib/glosario";
 import { usePrefs } from "../../lib/prefs";
@@ -50,8 +52,14 @@ export function SaleView({ uid }: { uid: string }) {
   const [err, setErr] = useState<string | null>(null);
   const [open, setOpen] = useState<Open>(null);
   const [snoozed, setSnoozed] = useState(false);
+  const [dispatching, setDispatching] = useState<PendingDispatch | null>(null);
+  const [ships, setShips] = useState<Shipment[]>([]);
+  const [shipping, setShipping] = useState<(ShipmentInput & { sale_number?: string | null }) | null>(null);
 
-  const load = useCallback(() => { backend.sale(uid).then(setS).catch((e) => setErr(errorMessage(e))); }, [backend, uid]);
+  const load = useCallback(() => {
+    backend.sale(uid).then(setS).catch((e) => setErr(errorMessage(e)));
+    backend.shipments(uid).then(setShips).catch(() => setShips([]));
+  }, [backend, uid]);
   useEffect(load, [load]);
   useEffect(() => { backend.business().then(setBiz).catch(() => {}); }, [backend]);
 
@@ -148,6 +156,44 @@ export function SaleView({ uid }: { uid: string }) {
           </Card>
 
           {s.terms && <TermsCard terms={s.terms} />}
+
+          {s.dispatch.length > 0 && (
+            <Card title="Por despachar" subtitle="Productos que toman reservas: se descuentan del stock al despachar." padded={false}>
+              <ul className="divide-y divide-line">
+                {s.dispatch.map((d) => (
+                  <li key={d.id} className="flex flex-wrap items-center gap-3 px-5 py-3 text-sm">
+                    <span className="min-w-0 flex-1 font-medium text-ink">{d.product_name}</span>
+                    <span className="num text-muted">Faltan {formatQty(d.pending_milli)} de {formatQty(d.ordered_milli)} {d.unit}</span>
+                    <DispatchStatus d={d} />
+                    <Button size="sm" icon={Truck} disabled={d.reserved_milli === 0} onClick={() => setDispatching(d)}>Despachar</Button>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+          {effected && (
+            <Card title="Envíos" subtitle="Agencia, seguimiento y estado del despacho al cliente." padded={false}
+              actions={<Button size="sm" variant="secondary" icon={Truck} onClick={async () => {
+                const c = s.customer_uid ? await backend.customer(s.customer_uid).catch(() => null) : null;
+                setShipping({ status: "no_despachado", sale_uid: s.uid, sale_number: s.number, ...recipientFromCustomer(c) });
+              }}>Crear envío</Button>}>
+              {ships.length === 0 ? <p className="px-5 py-4 text-sm text-muted">Sin envíos registrados.</p> : (
+                <ul className="divide-y divide-line">
+                  {ships.map((e) => (
+                    <li key={e.uid}>
+                      <button type="button" onClick={() => navigate(`/envios?ver=${e.uid}`)} className="flex w-full flex-wrap items-center gap-3 px-5 py-3 text-left text-sm hover:bg-surface-2">
+                        <span className="font-mono text-[13px]">{e.number}</span>
+                        <span className="min-w-0 flex-1 text-muted">{[e.carrier, e.tracking && `N.º ${e.tracking}`].filter(Boolean).join(" · ") || "Sin agencia"}</span>
+                        <ShipStatusBadge status={e.status} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          )}
+          {shipping && <ShipmentDrawer shipment={null} preset={shipping} onClose={() => setShipping(null)} onSaved={() => { setShipping(null); load(); }} />}
+          {dispatching && <DispatchDialog d={dispatching} onClose={() => setDispatching(null)} onDone={() => { setDispatching(null); load(); }} />}
 
           {s.payments.length > 0 && (
             <Card title="Pagos recibidos" padded={false}>

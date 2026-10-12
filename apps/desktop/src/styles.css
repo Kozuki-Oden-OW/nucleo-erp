@@ -173,3 +173,28 @@ body {
   body { background: #fff; color: #000; }
   .no-print { display: none !important; }
 }
+
+/* Color por empresa (Mi negocio → Color de la empresa). Turquesa es el de NÚCLEO. */
+:root[data-accent="azul"] { --accent: #1d5fd1; --accent-hover: #174fb0; --accent-soft: #e3ecfb; --accent-contrast: #ffffff; }
+:root[data-accent="verde"] { --accent: #12805c; --accent-hover: #0e6a4c; --accent-soft: #e0f3ec; --accent-contrast: #ffffff; }
+:root[data-accent="morado"] { --accent: #6d3fd1; --accent-hover: #5a32b0; --accent-soft: #ede6fb; --accent-contrast: #ffffff; }
+:root[data-accent="naranjo"] { --accent: #b0510c; --accent-hover: #93430a; --accent-soft: #fbeadc; --accent-contrast: #ffffff; }
+:root[data-accent="frambuesa"] { --accent: #c0284f; --accent-hover: #a32043; --accent-soft: #fae3e9; --accent-contrast: #ffffff; }
+:root[data-accent="grafito"] { --accent: #3e4c5e; --accent-hover: #2f3a48; --accent-soft: #e6eaef; --accent-contrast: #ffffff; }
+:root[data-accent="dorado"] { --accent: #8a6000; --accent-hover: #714f00; --accent-soft: #f7eed6; --accent-contrast: #ffffff; }
+@media (prefers-color-scheme: dark) {
+  :root[data-accent="azul"]:not([data-theme="light"]) { --accent: #6ea4ff; --accent-hover: #93bbff; --accent-soft: #16294a; --accent-contrast: #001a3c; }
+  :root[data-accent="verde"]:not([data-theme="light"]) { --accent: #4fd1a1; --accent-hover: #79dfb9; --accent-soft: #103b2e; --accent-contrast: #00170f; }
+  :root[data-accent="morado"]:not([data-theme="light"]) { --accent: #b39cff; --accent-hover: #c9b8ff; --accent-soft: #2a1f4a; --accent-contrast: #14082e; }
+  :root[data-accent="naranjo"]:not([data-theme="light"]) { --accent: #ffa35c; --accent-hover: #ffbb85; --accent-soft: #43260f; --accent-contrast: #2a1300; }
+  :root[data-accent="frambuesa"]:not([data-theme="light"]) { --accent: #ff7a9a; --accent-hover: #ff9db5; --accent-soft: #4a1624; --accent-contrast: #2e0612; }
+  :root[data-accent="grafito"]:not([data-theme="light"]) { --accent: #a9b8cc; --accent-hover: #c3cfde; --accent-soft: #26303d; --accent-contrast: #0b1220; }
+  :root[data-accent="dorado"]:not([data-theme="light"]) { --accent: #f1c24f; --accent-hover: #f6d27a; --accent-soft: #3d3010; --accent-contrast: #241a00; }
+}
+:root[data-accent="azul"][data-theme="dark"] { --accent: #6ea4ff; --accent-hover: #93bbff; --accent-soft: #16294a; --accent-contrast: #001a3c; }
+:root[data-accent="verde"][data-theme="dark"] { --accent: #4fd1a1; --accent-hover: #79dfb9; --accent-soft: #103b2e; --accent-contrast: #00170f; }
+:root[data-accent="morado"][data-theme="dark"] { --accent: #b39cff; --accent-hover: #c9b8ff; --accent-soft: #2a1f4a; --accent-contrast: #14082e; }
+:root[data-accent="naranjo"][data-theme="dark"] { --accent: #ffa35c; --accent-hover: #ffbb85; --accent-soft: #43260f; --accent-contrast: #2a1300; }
+:root[data-accent="frambuesa"][data-theme="dark"] { --accent: #ff7a9a; --accent-hover: #ff9db5; --accent-soft: #4a1624; --accent-contrast: #2e0612; }
+:root[data-accent="grafito"][data-theme="dark"] { --accent: #a9b8cc; --accent-hover: #c3cfde; --accent-soft: #26303d; --accent-contrast: #0b1220; }
+:root[data-accent="dorado"][data-theme="dark"] { --accent: #f1c24f; --accent-hover: #f6d27a; --accent-soft: #3d3010; --accent-contrast: #241a00; }

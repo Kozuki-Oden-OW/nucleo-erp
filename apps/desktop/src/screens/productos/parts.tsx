@@ -1,7 +1,7 @@
 // Piezas de la ficha de producto: precio neto o con IVA, costo avanzado y categorías.
 import { useEffect, useMemo, useState } from "react";
 import { Calculator, ChevronDown, ChevronRight, FolderPlus, Pencil, Plus, Tags, Trash2 } from "lucide-react";
-import { useBackend, errorMessage, type BusinessSettings, type CurrencyRow, type Product, type ProductCategory } from "../../data";
+import { useBackend, errorMessage, type BusinessSettings, type CurrencyRow, type Product, type ProductCategory, type StockPolicy } from "../../data";
 import { computeCostSheet, costSheetUsed, EMPTY_COST_SHEET, grossFromNet, netFromGross, type CostSheet } from "../../data/costing";
 import { CURRENCY_DIGITS, formatMoney, formatPpm, formatQty, parseQty } from "../../lib/format";
 import { usePrefs } from "../../lib/prefs";
@@ -293,5 +293,22 @@ function AssignProducts({ category, products, onClose, onSave }: {
         </ul>
       </div>
     </Dialog>
+  );
+}
+
+export const STOCK_POLICY_OPTIONS: { value: StockPolicy; label: string; hint: string }[] = [
+  { value: "general", label: "Usar la regla del negocio", hint: "Sigue lo que elegiste en Inventario: permitir o no vender sin stock." },
+  { value: "bloquear", label: "No vender sin stock", hint: "Solo se vende lo que hay en bodega." },
+  { value: "vender", label: "Vender igual (sin stock)", hint: "Se vende aunque no haya; el stock queda en negativo hasta que compres." },
+  { value: "reservar", label: "Tomar reservas", hint: "La venta aparta lo que hay y deja pendiente lo que falta. El stock se descuenta al despachar (Inventario → Por despachar)." },
+];
+export const stockPolicyLabel = (p: StockPolicy) => STOCK_POLICY_OPTIONS.find((o) => o.value === p)?.label ?? p;
+
+/** Qué hacer cuando el producto no tiene stock. */
+export function StockPolicySelect({ value, onChange }: { value: StockPolicy; onChange: (v: StockPolicy) => void }) {
+  return (
+    <Select label="Si no hay stock" value={value} onChange={(e) => onChange(e.target.value as StockPolicy)}
+      options={STOCK_POLICY_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+      hint={STOCK_POLICY_OPTIONS.find((o) => o.value === value)?.hint} />
   );
 }

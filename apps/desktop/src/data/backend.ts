@@ -4,7 +4,7 @@
 // Las pantallas solo conocen esta interfaz; así un prototipo de la Fase 3 se convierte en pantalla
 // real cuando el comando Rust correspondiente existe.
 import type {
-  CreditDocInput, CustomerCredit,
+  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, Shipment, ShipmentInput, WarehouseStockRow,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
@@ -38,7 +38,7 @@ export interface SaleFilter {
 export type Feature =
   | "dashboard" | "clientes" | "productos" | "ventas" | "compras" | "comex" | "negocio" | "respaldos" | "busqueda"
   | "usuarios" | "documentos" | "numeracion" | "monedas" | "auditoria" | "inventario" | "dinero" | "impuestos" | "remuneraciones"
-  | "reportes";
+  | "reportes" | "promociones" | "envios";
 
 export interface Backend {
   readonly kind: "tauri" | "demo";
@@ -48,6 +48,11 @@ export interface Backend {
   appInfo(): Promise<AppInfo>;
   createCompany(name: string, profile: BusinessProfile): Promise<CreatedCompany>;
   openCompany(uid: string): Promise<SessionInfo>;
+  /** Empresa con que se abrió esta ventana (otra ventana abierta desde el selector). */
+  launchCompany(): Promise<string | null>;
+  /** Abre otra ventana con la empresa indicada. */
+  openNewWindow(uid: string): Promise<void>;
+  setWindowTitle(title: string): Promise<void>;
   recoverKey(uid: string, recovery: string): Promise<void>;
   sessionInfo(): Promise<SessionInfo>;
   login(username: string, password: string): Promise<SessionInfo>;
@@ -102,6 +107,15 @@ export interface Backend {
   updateProduct(uid: string, patch: ProductPatch): Promise<Product>;
   updateCustomer(uid: string, input: NewCustomer): Promise<Customer>;
   /** Ficha de crédito: cupo, deuda, documentos de respaldo y consejos. */
+  promotions(): Promise<Promotion[]>;
+  savePromotion(uid: string | null, input: PromotionInput): Promise<Promotion[]>;
+  setPromotionActive(uid: string, active: boolean): Promise<Promotion[]>;
+  deletePromotion(uid: string): Promise<Promotion[]>;
+  shipments(saleUid?: string | null): Promise<Shipment[]>;
+  saveShipment(uid: string | null, input: ShipmentInput): Promise<Shipment>;
+  pendingDispatches(): Promise<PendingDispatch[]>;
+  dispatchItems(id: number, qtyMilli: number, date?: string | null): Promise<PendingDispatch[]>;
+  warehouseStock(warehouseUid: string): Promise<WarehouseStockRow[]>;
   customerCredit(uid: string): Promise<CustomerCredit>;
   saveCreditDoc(uid: string, kind: string, input: CreditDocInput): Promise<CustomerCredit>;
   /** Copia los documentos del cliente en una carpeta elegida (escritorio). null si se canceló. */

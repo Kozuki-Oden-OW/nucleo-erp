@@ -15,9 +15,11 @@ export interface Prefs {
   extraModules: string[];
   /** Cómo escribe la persona los precios de venta: netos o con IVA (se guardan siempre netos). */
   priceEntry: "neto" | "con_iva";
+  /** Color de cada empresa (copia local para mostrarlo en el selector sin abrirlas todas). */
+  companyAccents: Record<string, string>;
 }
 
-const DEFAULTS: Prefs = { theme: "sistema", density: "comoda", view: "simple", sidebarCollapsed: false, extraModules: [], priceEntry: "neto" };
+const DEFAULTS: Prefs = { theme: "sistema", density: "comoda", view: "simple", sidebarCollapsed: false, extraModules: [], priceEntry: "neto", companyAccents: {} };
 const KEY = "nucleo.prefs.v1";
 
 function load(): Prefs {

@@ -268,6 +268,64 @@ fn ciclo_de_venta_por_ipc() {
             .is_dir()
     );
 
+    // Reservas: se aparta lo que hay, lo que falta queda por despachar y se despacha después.
+    let rp = ipc.ok(
+        "add_product",
+        json!({ "input": { "name": "Tlog 10E", "kind": "producto", "price_minor": 32900,
+        "cost_minor": 23000, "initial_stock_milli": 1000, "stock_policy": "reservar" } }),
+    );
+    assert_eq!(rp["stock_policy"], "reservar");
+    let rl = json!({ "product_uid": rp["uid"], "description": "Tlog 10E", "qty_milli": 3000, "unit_price_minor": 32900, "discount_ppm": 0, "taxable": true });
+    let rv = ipc.ok("save_sale", json!({ "input": { "doc_type": "VEN", "customer_uid": c2["uid"], "issue_date": HOY, "lines": [rl] }, "uid": null }));
+    let rv = ipc.ok("effect_sale", json!({ "uid": rv["uid"], "input": { "mode": "contado", "method": "Efectivo", "due_date": null } }));
+    assert_eq!(rv["dispatch"][0]["reserved_milli"], 1000);
+    assert_eq!(rv["dispatch"][0]["missing_milli"], 2000);
+    let pend = ipc.ok("pending_dispatches", json!({}));
+    let did = pend[0]["id"].clone();
+    let pend = ipc.ok(
+        "dispatch_items",
+        json!({ "id": did, "qtyMilli": 1000, "date": null }),
+    );
+    assert_eq!(pend[0]["pending_milli"], 2000);
+    let wh = ipc.ok("warehouses", json!({}))[0]["uid"].clone();
+    let st = ipc.ok("warehouse_stock", json!({ "warehouseUid": wh }));
+    assert!(
+        st.as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["product"]["uid"] == rp["uid"] && r["on_hand_milli"] == 0)
+    );
+
+    // Promociones y envíos con los nombres de la interfaz.
+    let pr = ipc.ok("save_promotion", json!({ "uid": null, "input": { "name": "3x2 Tlog", "kind": "lleva_paga",
+        "rule": { "items": [{ "product_uid": rp["uid"], "qty_milli": 0 }], "buy": 3, "pay": 2 } } }));
+    assert_eq!(pr[0]["status"], "activa");
+    assert_eq!(pr[0]["products"][0]["name"], "Tlog 10E");
+    let en = ipc.ok(
+        "save_shipment",
+        json!({ "uid": null, "input": { "sale_uid": rv["uid"], "carrier": "Starken",
+        "tracking": "998877", "first_name": "Ana", "status": "en_camino" } }),
+    );
+    assert_eq!(en["status"], "en_camino");
+    assert_eq!(
+        ipc.ok("shipments", json!({ "saleUid": rv["uid"] }))
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    // Color por empresa (y la ventana sin empresa de lanzamiento).
+    let b = ipc.ok("update_business", json!({ "patch": { "accent": "verde" } }));
+    assert_eq!(b["accent"], "verde");
+    assert!(
+        ipc.call(
+            "update_business",
+            json!({ "patch": { "accent": "fucsia" } })
+        )
+        .is_err()
+    );
+    assert!(ipc.ok("launch_company", json!({})).is_null());
+
     let dir = tempfile::tempdir().unwrap();
     let dest = dir.path().join("ventas.csv");
     ipc.ok("save_report_file", json!({ "reportId": "ventas_cliente", "path": dest.to_str().unwrap(), "bytes": [65, 59, 66] }));

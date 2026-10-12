@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "./backend";
 import type {
-  CreditDocInput, CustomerCredit,
+  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, Shipment, ShipmentInput, WarehouseStockRow,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
@@ -48,7 +48,7 @@ export class TauriBackend implements Backend {
   readonly kind = "tauri" as const;
   readonly features: ReadonlySet<Feature> = new Set<Feature>([
     "clientes", "respaldos", "negocio", "busqueda", "usuarios", "documentos", "numeracion", "monedas", "auditoria",
-    "productos", "ventas", "compras", "inventario", "dinero", "dashboard", "comex", "impuestos", "remuneraciones", "reportes",
+    "productos", "ventas", "compras", "inventario", "dinero", "dashboard", "comex", "impuestos", "remuneraciones", "reportes", "promociones", "envios",
   ]);
 
   async appInfo(): Promise<AppInfo> {
@@ -56,6 +56,9 @@ export class TauriBackend implements Backend {
   }
   createCompany(name: string, profile: BusinessProfile) { return call<CreatedCompany>("create_company", { name, profile }); }
   openCompany(uid: string) { return call<SessionInfo>("open_company", { uid }); }
+  launchCompany() { return call<string | null>("launch_company"); }
+  openNewWindow(uid: string) { return call<void>("open_new_window", { uid }); }
+  setWindowTitle(title: string) { return call<void>("set_window_title", { title }); }
   sessionInfo() { return call<SessionInfo>("session_info"); }
   login(username: string, password: string) { return call<SessionInfo>("login", { username, password }); }
   logout() { return call<SessionInfo>("logout"); }
@@ -109,6 +112,15 @@ export class TauriBackend implements Backend {
   addProduct(input: NewProduct) { return call<Product>("add_product", { input }); }
   updateProduct(uid: string, patch: ProductPatch) { return call<Product>("update_product", { uid, patch }); }
   updateCustomer(uid: string, input: NewCustomer) { return call<Customer>("update_customer", { uid, input }); }
+  promotions() { return call<Promotion[]>("promotions"); }
+  savePromotion(uid: string | null, input: PromotionInput) { return call<Promotion[]>("save_promotion", { uid, input }); }
+  setPromotionActive(uid: string, active: boolean) { return call<Promotion[]>("set_promotion_active", { uid, active }); }
+  deletePromotion(uid: string) { return call<Promotion[]>("delete_promotion", { uid }); }
+  shipments(saleUid?: string | null) { return call<Shipment[]>("shipments", { saleUid: saleUid ?? null }); }
+  saveShipment(uid: string | null, input: ShipmentInput) { return call<Shipment>("save_shipment", { uid, input }); }
+  pendingDispatches() { return call<PendingDispatch[]>("pending_dispatches"); }
+  dispatchItems(id: number, qtyMilli: number, date?: string | null) { return call<PendingDispatch[]>("dispatch_items", { id, qtyMilli, date: date ?? null }); }
+  warehouseStock(warehouseUid: string) { return call<WarehouseStockRow[]>("warehouse_stock", { warehouseUid }); }
   customerCredit(uid: string) { return call<CustomerCredit>("customer_credit", { uid }); }
   saveCreditDoc(uid: string, kind: string, input: CreditDocInput) { return call<CustomerCredit>("save_credit_doc", { uid, kind, input }); }
   async exportCustomerFolder(uid: string): Promise<{ folder: string; files: number } | null> {

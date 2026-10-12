@@ -2,6 +2,30 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [0.5.0] — 2026-10-12
+
+- **Descuentos y promociones (nuevo módulo):**
+  - Tipos de promoción: pack a precio fijo o con %, descuento por cantidad con tramos (opcionalmente sumando productos), lleva X paga Y, descuento por cliente y para clientes preferenciales.
+  - Cada promoción tiene vigencia por fechas y se puede pausar.
+  - Al vender, «Aplicar promociones» las aplica como descuento por línea. Si varias tocan el mismo producto, se usa la de mayor ahorro.
+  - Avisa si un pack o una línea queda bajo el costo.
+- **Envíos (nuevo módulo):**
+  - Datos del envío: agencia, número de orden de transporte o seguimiento, nombre, apellido, celular, dirección, comuna, fecha de envío y de recepción.
+  - Estados con color: no despachado y no entregado (problemas) en rojo, en camino en amarillo, entregado en verde.
+  - Se crean desde la venta, que guarda el historial.
+- **Si no hay stock, por producto:**
+  - Opciones: usar la regla del negocio, no vender sin stock, vender igual o tomar reservas.
+  - Con reservas, la venta aparta lo que hay y deja pendiente lo que falta. Se ve en Inventario → «Por despachar» y en la venta, y el stock se descuenta al despachar.
+- **Realizar inventario:**
+  - Muestra de inmediato todos los productos de la bodega, con las columnas «Inventario» y «Stock actual».
+  - Cada producto tiene su botón «Actualizar stock». También hay «Copiar stock actual» y, al final, «Actualizar inventario completo».
+  - Se quitó la opción «Diferencia (+/−)».
+- **Empresas:**
+  - El selector muestra todas las empresas y permite agregar una nueva.
+  - Cada empresa puede tener su color (Mi negocio → Color de la empresa).
+  - Cualquier empresa se puede abrir en otra ventana; la ventana lleva el nombre de la empresa.
+- **Clientes:** marca de «cliente preferencial».
+
 ## [0.4.0] — 2026-10-12
 
 - **Crédito a clientes:** opción «Habilitar crédito» en la ficha con días, monto (cupo) y condiciones.

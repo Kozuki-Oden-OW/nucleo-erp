@@ -47,6 +47,9 @@ pub struct NewProduct {
     /// Hoja de costo avanzado: si trae datos, el costo sale de ella.
     #[serde(default)]
     pub cost_sheet: Option<nucleo_domain::costing::CostSheet>,
+    /// Qué hacer sin stock: "general" (por defecto), "bloquear", "vender" o "reservar".
+    #[serde(default)]
+    pub stock_policy: Option<String>,
 }
 
 /// Cambios a la ficha de un producto (el stock y el costo no se editan aquí).
@@ -68,6 +71,9 @@ pub struct ProductPatch {
     /// solo como referencia.
     #[serde(default)]
     pub cost_sheet: Option<nucleo_domain::costing::CostSheet>,
+    /// Qué hacer sin stock; `None` = no cambia.
+    #[serde(default)]
+    pub stock_policy: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -183,6 +189,8 @@ pub struct SaleDetail {
     pub timeline: Vec<TimelineItem>,
     /// Condiciones guardadas en el documento (forma de pago, referencias, receptor).
     pub terms: Option<crate::sale_terms::SaleTerms>,
+    /// Productos que faltan despachar (ventas de productos con reservas).
+    pub dispatch: Vec<crate::dispatch_ops::PendingDispatch>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -549,6 +557,7 @@ impl CompanySession {
         let sheet = self.prepare_cost_sheet(input.cost_sheet.as_ref())?;
         let cost_e4 = sheet.as_ref().map(|(e4, _)| *e4).unwrap_or(cost * 10_000);
         let category_id = self.category_id(input.category_uid.as_deref())?;
+        let policy = crate::dispatch_ops::check_policy(input.stock_policy.as_deref())?;
         let stock = input.initial_stock_milli.unwrap_or(0);
         if !(0..=MAX_QTY_MILLI).contains(&stock) || (stock > 0 && kind == "servicio") {
             return Err(AppError::Validation(
@@ -576,6 +585,14 @@ impl CompanySession {
                 created_at: &now,
             },
         )?;
+        let row = match policy {
+            Some(pol) if pol != "general" && kind != "servicio" => {
+                products::set_stock_policy(&tx, row.id, pol)?;
+                products::by_id(&tx, row.id)?
+                    .ok_or_else(|| AppError::NotFound("el producto".into()))?
+            }
+            _ => row,
+        };
         if stock > 0 {
             let wh = products::default_warehouse(&tx, &now)?;
             let today = local_today(&tx)?;
@@ -639,6 +656,7 @@ impl CompanySession {
         }
         let unit = patch.unit.trim().to_uppercase();
         let category_id = self.category_id(patch.category_uid.as_deref())?;
+        let policy = crate::dispatch_ops::check_policy(patch.stock_policy.as_deref())?;
         let sheet = self.prepare_cost_sheet(patch.cost_sheet.as_ref())?;
         if let Some(c) = patch.cost_minor
             && !(0..=MAX_PRICE_MINOR).contains(&c)
@@ -678,6 +696,11 @@ impl CompanySession {
                 updated_at: &now,
             },
         )?;
+        if let Some(pol) = policy
+            && before.kind != "servicio"
+        {
+            products::set_stock_policy(&tx, before.id, pol)?;
+        }
         let after = products::by_id(&tx, before.id)?
             .ok_or_else(|| AppError::NotFound("el producto".into()))?;
         audit::append(
@@ -1123,6 +1146,7 @@ impl CompanySession {
             chain,
             timeline,
             terms: db::sale_terms(conn, s.id)?.and_then(|j| serde_json::from_str(&j).ok()),
+            dispatch: self.sale_dispatch(s.id)?,
         })
     }
 
@@ -1261,6 +1285,7 @@ impl CompanySession {
         let today = local_today(&tx)?;
         let wh = products::default_warehouse(&tx, &now)?;
         let mut cost_total: i64 = 0;
+        let mut reserved_lines = 0;
         for l in &lines {
             let Some(pid) = l.product_id else { continue };
             let Some(p) = products::by_id(&tx, pid)? else {
@@ -1273,6 +1298,21 @@ impl CompanySession {
             let cost = line_cost_minor(avg, l.qty_milli);
             db::set_line_cost(&tx, l.id, avg, cost)?;
             cost_total += cost;
+            if p.stock_policy == "reservar" {
+                // Se aparta lo que hay y lo que falta queda pendiente; se descuenta al despachar.
+                nucleo_db::dispatch::insert(
+                    &tx,
+                    pid,
+                    wh,
+                    l.qty_milli,
+                    &s.doc_type,
+                    s.id,
+                    l.id,
+                    &now,
+                )?;
+                reserved_lines += 1;
+                continue;
+            }
             products::insert_movement(
                 &tx,
                 &Movement {
@@ -1305,6 +1345,12 @@ impl CompanySession {
         let total = s.totals.total_minor;
         let mut texts =
             vec!["Venta efectuada: se descontó stock y se fijaron costo y margen".to_string()];
+        if reserved_lines > 0 {
+            texts.push(format!(
+                "{reserved_lines} {} por despachar: se descuenta del stock al despachar (Inventario → Por despachar)",
+                if reserved_lines == 1 { "producto queda" } else { "productos quedan" }
+            ));
+        }
         if total > 0 {
             let rec = db::insert_receivable(
                 &tx,
@@ -1522,15 +1568,27 @@ impl CompanySession {
                 .unwrap_or_else(|| products::default_warehouse(&tx, &now))?;
             let note = format!("Anulación de {}", s.number);
             let mut moved = false;
+            // Lo que no se alcanzó a despachar no salió de bodega: solo se libera la reserva.
+            let pending: std::collections::HashMap<i64, i64> =
+                nucleo_db::dispatch::release_sale(&tx, &s.doc_type, s.id, &now)?
+                    .into_iter()
+                    .collect();
+            if !pending.is_empty() {
+                texts.push("Reservas por despachar liberadas".into());
+            }
             for l in &lines {
                 let (Some(pid), Some(cost)) = (l.product_id, l.unit_cost_e4) else {
                     continue;
                 };
+                let back = l.qty_milli - pending.get(&l.id).copied().unwrap_or(0);
+                if back <= 0 {
+                    continue;
+                }
                 let (on_hand, avg) = products::balance(&tx, pid, wh)?;
                 let new_avg = nucleo_domain::inventory::weighted_average_cost(
                     Decimal::from(on_hand),
                     Decimal::from(avg),
-                    Decimal::from(l.qty_milli),
+                    Decimal::from(back),
                     Decimal::from(cost),
                 )
                 .round()
@@ -1543,7 +1601,7 @@ impl CompanySession {
                         warehouse_id: wh,
                         date: &today,
                         kind: "ajuste",
-                        qty_milli: l.qty_milli,
+                        qty_milli: back,
                         unit_cost_e4: cost,
                         avg_cost_after_e4: new_avg,
                         source_type: &s.doc_type,

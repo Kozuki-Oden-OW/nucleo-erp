@@ -87,6 +87,7 @@ fn bodegas_transferencias_y_ajustes() {
             initial_stock_milli: Some(10_000),
             category_uid: None,
             cost_sheet: None,
+            stock_policy: None,
         })
         .unwrap();
     let ws = s.create_warehouse("Sala de ventas").unwrap();
@@ -207,6 +208,7 @@ fn stock_negativo_y_analisis() {
             initial_stock_milli: Some(100_000),
             category_uid: None,
             cost_sheet: None,
+            stock_policy: None,
         })
         .unwrap();
     // 20 días de venta de 2 unidades en los últimos 60 días → 40 u en 20+ días con stock.

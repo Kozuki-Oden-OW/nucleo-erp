@@ -124,6 +124,8 @@ export interface BusinessSettings {
   tax_rate_user_ppm: number | null;
   /** Logo del negocio (imagen data: PNG, JPG o WebP) para la interfaz y los documentos. */
   logo: string | null;
+  /** Color de la interfaz para este negocio; null = el de NÚCLEO. */
+  accent: string | null;
 }
 
 /* ───── Maestros ───── */
@@ -150,6 +152,8 @@ export interface CustomerProfile {
   credit_enabled: boolean;
   /** Condiciones del crédito (pagaré, garantía, forma de pago…). */
   credit_conditions: string | null;
+  /** Cliente preferencial (recibe las promociones para preferenciales). */
+  preferred: boolean;
 }
 export interface Customer extends CustomerProfile {
   id: number;
@@ -213,7 +217,11 @@ export interface Product {
   cost_sheet: CostSheet | null;
   /** Con movimientos de stock, el costo lo mueven las compras y los ajustes. */
   has_movements: boolean;
+  /** Qué hacer cuando no hay stock. */
+  stock_policy: StockPolicy;
 }
+/** general = regla del negocio · bloquear = no vender sin stock · vender = vender igual · reservar = apartar y dejar pendiente. */
+export type StockPolicy = "general" | "bloquear" | "vender" | "reservar";
 export interface ProductCategory {
   uid: string;
   name: string;
@@ -231,6 +239,7 @@ export interface NewProduct {
   initial_stock_milli?: number;
   category_uid?: string | null;
   cost_sheet?: CostSheet | null;
+  stock_policy?: StockPolicy;
 }
 
 export interface ProductPatch {
@@ -244,7 +253,30 @@ export interface ProductPatch {
   /** Nuevo costo en pesos (solo sin movimientos de stock). */
   cost_minor?: number | null;
   cost_sheet?: CostSheet | null;
+  stock_policy?: StockPolicy;
 }
+
+/** Una línea vendida que falta despachar. */
+export interface PendingDispatch {
+  id: number;
+  sale_uid: string;
+  sale_number: string;
+  issue_date: string;
+  customer: string | null;
+  product_uid: string;
+  product_name: string;
+  sku: string;
+  unit: string;
+  ordered_milli: number;
+  dispatched_milli: number;
+  pending_milli: number;
+  /** Lo que hay en bodega para este pedido (por orden de llegada). */
+  reserved_milli: number;
+  /** Lo que falta conseguir. */
+  missing_milli: number;
+  on_hand_milli: number;
+}
+export interface WarehouseStockRow { product: Product; on_hand_milli: number }
 
 /* ───── Ventas ───── */
 
@@ -350,6 +382,8 @@ export interface SaleDetail extends SaleSummary {
   chain: DocLink[];
   terms: SaleTerms | null;
   timeline: { at: string; text: string }[];
+  /** Productos que faltan despachar. */
+  dispatch: PendingDispatch[];
 }
 export interface SaleInput {
   doc_type: SaleDocType;
@@ -1105,6 +1139,97 @@ export interface ReportDef {
   available: boolean;
 }
 export interface ReportParams { id: string; from?: string | null; to?: string | null; group?: string | null }
+
+/* ───── Descuentos y promociones ───── */
+
+export type PromoKind = "pack" | "cantidad" | "lleva_paga" | "cliente" | "preferencial";
+export interface PromoItem { product_uid: string; qty_milli: number }
+export interface PromoTier { min_milli: number; pct_ppm: number }
+export interface PromoRule {
+  items: PromoItem[];
+  category_uid: string | null;
+  all_products: boolean;
+  /** Pack: precio total neto. */
+  pack_price_minor: number | null;
+  pct_ppm: number | null;
+  tiers: PromoTier[];
+  /** Por cantidad: suma las unidades de todos los productos del alcance. */
+  mixed: boolean;
+  buy: number;
+  pay: number;
+  customer_uids: string[];
+}
+export interface PromoProduct { uid: string; sku: string; name: string; unit: string; price_minor: number; cost_e4: number; qty_milli: number }
+export type PromoStatus = "activa" | "programada" | "vencida" | "pausada";
+export interface Promotion {
+  uid: string;
+  name: string;
+  kind: PromoKind;
+  rule: PromoRule;
+  starts_on: string | null;
+  ends_on: string | null;
+  active: boolean;
+  status: PromoStatus;
+  notes: string | null;
+  created_at: string;
+  products: PromoProduct[];
+  category: string | null;
+  category_product_uids: string[];
+  customers: { uid: string; name: string }[];
+}
+export interface PromotionInput {
+  name: string;
+  kind: PromoKind;
+  rule: PromoRule;
+  starts_on?: string | null;
+  ends_on?: string | null;
+  active?: boolean;
+  notes?: string | null;
+}
+
+/* ───── Envíos ───── */
+
+export type ShipmentStatus = "no_despachado" | "en_camino" | "entregado" | "no_entregado";
+export interface Shipment {
+  uid: string;
+  number: string;
+  sale_uid: string | null;
+  sale_number: string | null;
+  customer_uid: string | null;
+  customer_name: string | null;
+  carrier: string | null;
+  tracking: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  address: string | null;
+  commune: string | null;
+  city: string | null;
+  region: string | null;
+  shipped_on: string | null;
+  delivered_on: string | null;
+  status: ShipmentStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
+export interface ShipmentInput {
+  sale_uid?: string | null;
+  customer_uid?: string | null;
+  carrier?: string | null;
+  tracking?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  commune?: string | null;
+  city?: string | null;
+  region?: string | null;
+  shipped_on?: string | null;
+  delivered_on?: string | null;
+  status: ShipmentStatus;
+  notes?: string | null;
+}
 
 /* ───── Crédito a clientes ───── */
 

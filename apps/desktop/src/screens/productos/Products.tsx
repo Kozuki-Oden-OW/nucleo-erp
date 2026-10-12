@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Boxes, Package, PackagePlus, Pencil, Search, Tags } from "lucide-react";
-import { useBackend, errorMessage, type PriceHistoryRow, type Product, type ProductCategory } from "../../data";
+import { useBackend, errorMessage, type PriceHistoryRow, type Product, type ProductCategory, type StockPolicy } from "../../data";
 import { EMPTY_COST_SHEET, grossFromNet, type CostSheet } from "../../data/costing";
-import { CategoriesDrawer, CategorySelect, CostInput, PriceInput, useTaxPpm } from "./parts";
+import { CategoriesDrawer, CategorySelect, CostInput, PriceInput, StockPolicySelect, stockPolicyLabel, useTaxPpm } from "./parts";
 import { useSession } from "../../lib/session";
 import { formatDate, formatMoney, formatQty, parseQty } from "../../lib/format";
 import { UNITS } from "../../data/catalogs";
@@ -122,6 +122,7 @@ export function Products({ route }: { route: Route }) {
               ...(product.kind === "producto" ? [
                 { label: "Stock disponible", value: <span className="num">{formatQty(product.on_hand_milli)} {product.unit}</span> },
                 { label: "Stock mínimo", value: <span className="num">{formatQty(product.min_milli)} {product.unit}</span> },
+                { label: "Si no hay stock", value: stockPolicyLabel(product.stock_policy) },
               ] : []),
             ]} />
             {can("compras.ver") && <PriceHistory productUid={product.uid} />}
@@ -157,15 +158,16 @@ function NewProductDrawer({ open, onClose, onCreated, cats, taxPpm, defaultCat, 
   const [cost, setCost] = useState<number | null>(null);
   const [sheet, setSheet] = useState<CostSheet | null>(null);
   const [stock, setStock] = useState("");
+  const [policy, setPolicy] = useState<StockPolicy>("general");
   const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { if (open) { setName(""); setSku(""); setPrice(null); setCost(null); setSheet(null); setStock(""); setErr(null); setTaxable(true); setCat(defaultCat); } }, [open, defaultCat]);
+  useEffect(() => { if (open) { setName(""); setSku(""); setPrice(null); setCost(null); setSheet(null); setStock(""); setPolicy("general"); setErr(null); setTaxable(true); setCat(defaultCat); } }, [open, defaultCat]);
   useEffect(() => { setUnit(kind === "servicio" ? "sv" : "un"); }, [kind]);
   async function save() {
     const stockMilli = kind === "producto" && stock.trim() ? parseQty(stock) : 0;
     if (stockMilli === null) { setErr("Revisa el stock inicial: escribe solo números (ej. 12 o 2,5)."); return; }
     try {
       const p = await backend.addProduct({ name, sku: sku || undefined, unit, kind, price_minor: price ?? 0, cost_minor: cost ?? 0, taxable,
-        initial_stock_milli: stockMilli || undefined, category_uid: cat, cost_sheet: sheet });
+        initial_stock_milli: stockMilli || undefined, category_uid: cat, cost_sheet: sheet, ...(kind === "producto" ? { stock_policy: policy } : {}) });
       toast("success", `${p.name} agregado.`);
       onCreated(p);
     } catch (e) { setErr(errorMessage(e)); }
@@ -187,6 +189,7 @@ function NewProductDrawer({ open, onClose, onCreated, cats, taxPpm, defaultCat, 
           <Field label="Stock inicial" optional inputMode="decimal" value={stock} onChange={(e) => setStock(e.target.value)} suffix={unit}
             hint="Lo que tienes hoy en bodega. Después el stock se mueve solo con ventas y compras." className="max-w-[14rem]" inputClassName="text-right num" />
         )}
+        {kind === "producto" && <StockPolicySelect value={policy} onChange={setPolicy} />}
         {marginNotice(price, cost)}
         {err && <Notice tone="danger">{err}</Notice>}
       </div>
@@ -205,6 +208,7 @@ function EditProductDrawer({ product, onClose, onSaved, cats, taxPpm }: { produc
   const [price, setPrice] = useState<number | null>(product.price_minor);
   const [taxable, setTaxable] = useState(product.taxable);
   const [min, setMin] = useState(product.min_milli ? formatQty(product.min_milli) : "");
+  const [policy, setPolicy] = useState<StockPolicy>(product.stock_policy);
   const initialCost = Math.round(product.cost_e4 / 10_000);
   const [cost, setCost] = useState<number | null>(initialCost);
   const [sheet, setSheet] = useState<CostSheet | null>(product.cost_sheet);
@@ -216,7 +220,7 @@ function EditProductDrawer({ product, onClose, onSaved, cats, taxPpm }: { produc
     if (minMilli === null) { setErr("Revisa el stock mínimo: escribe solo números."); return; }
     try {
       await backend.updateProduct(product.uid, {
-        name, sku, unit, price_minor: price ?? 0, taxable, min_milli: minMilli, category_uid: cat,
+        name, sku, unit, price_minor: price ?? 0, taxable, min_milli: minMilli, category_uid: cat, stock_policy: policy,
         ...(costs ? { cost_sheet: sheet ?? (product.cost_sheet ? EMPTY_COST_SHEET : null), cost_minor: !locked && !sheet && cost !== initialCost ? cost ?? 0 : null } : {}),
       });
       toast("success", "Producto actualizado.");
@@ -248,6 +252,7 @@ function EditProductDrawer({ product, onClose, onSaved, cats, taxPpm }: { produc
           <Field label="Stock mínimo" optional inputMode="decimal" value={min} onChange={(e) => setMin(e.target.value)} suffix={unit}
             hint="Bajo este nivel el producto aparece en “Poco stock”." className="max-w-[14rem]" inputClassName="text-right num" />
         )}
+        {product.kind === "producto" && <StockPolicySelect value={policy} onChange={setPolicy} />}
         {costs && marginNotice(price, locked ? initialCost : cost)}
         {err && <Notice tone="danger">{err}</Notice>}
       </div>

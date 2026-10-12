@@ -1,6 +1,6 @@
 // Árbol de navegación (Blueprint §4.2) y visibilidad por perfil (§1.3).
 import {
-  Banknote, BarChart3, Boxes, Building2, FileText, HandCoins, Home, Landmark, Package, Settings, Ship, ShoppingBag, ShoppingCart, Users,
+  BadgePercent, Banknote, BarChart3, Boxes, Building2, FileText, HandCoins, Home, Landmark, Package, Settings, Ship, ShoppingBag, ShoppingCart, Truck, Users,
   type LucideIcon,
 } from "lucide-react";
 import type { Feature } from "../data/backend";
@@ -36,8 +36,10 @@ export const NAV: NavItem[] = [
   },
   { id: "clientes", label: "Clientes", icon: Users, href: "/clientes", profiles: ALL, feature: "clientes", phase: 1, perm: "clientes.ver" },
   { id: "productos", label: "Productos y servicios", icon: Package, href: "/productos", profiles: ALL, feature: "productos", phase: 5, perm: "productos.ver" },
+  { id: "promociones", label: "Descuentos y promociones", icon: BadgePercent, href: "/promociones", profiles: ALL, feature: "promociones", phase: 12, perm: "productos.ver" },
   { id: "comprar", label: "Comprar", icon: ShoppingCart, href: "/compras", profiles: ["negocio", "empresa"], feature: "compras", phase: 6, perm: "compras.ver" },
   { id: "inventario", label: "Inventario", icon: Boxes, href: "/inventario", profiles: ALL, feature: "inventario", phase: 7, perm: "inventario.ver" },
+  { id: "envios", label: "Envíos", icon: Truck, href: "/envios", profiles: ALL, feature: "envios", phase: 12, perm: "ventas.ver" },
   { id: "dinero", label: "Dinero", icon: Banknote, href: "/dinero", profiles: ALL, feature: "dinero", phase: 8, perm: "dinero.ver" },
   { id: "comex", label: "COMEX", icon: Ship, href: "/comex", profiles: ["empresa"], feature: "comex", phase: 9, perm: "comex.ver" },
   { id: "contabilidad", label: "Impuestos", icon: Landmark, href: "/contabilidad", profiles: ["negocio", "empresa"], feature: "impuestos", phase: 10, perm: "contabilidad.ver" },

@@ -1,8 +1,9 @@
 // Editor de cotización, venta o factura interna. Pensado para digitar rápido con el teclado:
 // buscar producto → Enter → ajustar cantidad → siguiente producto.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Info, Save, Trash2 } from "lucide-react";
-import { useBackend, errorMessage, type BusinessSettings, type Customer, type LineInput, type Product, type QuoteDetail, type Receiver, type SaleDetail, type SaleTerms } from "../../data";
+import { ArrowLeft, BadgePercent, CheckCircle2, Info, Save, Trash2 } from "lucide-react";
+import { applyPromotions } from "../../data/promos";
+import { useBackend, errorMessage, type BusinessSettings, type Customer, type LineInput, type Product, type Promotion, type QuoteDetail, type Receiver, type SaleDetail, type SaleTerms } from "../../data";
 import { EMPTY_TERMS, receiverFromCustomer } from "../../data/saleTerms";
 import { PaymentCard, ReceiverCard, ReferencesCard } from "./terms";
 import { computeTotals, lineAmounts } from "../../data/calc";
@@ -89,10 +90,25 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
   }, [customer, terms.receiver]);
 
   const taxPpm = biz?.tax_enabled ? biz.tax_rate_ppm : null;
+  // Promociones vigentes que calzan con la venta (no aplica a cotizaciones de interesados sin cliente).
+  const [promos, setPromos] = useState<Promotion[]>([]);
+  const [costs, setCosts] = useState<Record<string, number>>({});
+  useEffect(() => { if (backend.features.has("promociones")) backend.promotions().then(setPromos).catch(() => setPromos([])); }, [backend]);
+  const promo = useMemo(() => applyPromotions(promos, rows, customer ? { uid: customer.uid, preferred: customer.preferred } : null), [promos, rows, customer]);
+  const promoApplied = promo.lines.every((l, i) => !l || rows[i]!.discount_ppm === l.discount_ppm);
+  const belowCost = rows.filter((r, i) => {
+    const l = promo.lines[i]; const c = r.product_uid ? costs[r.product_uid] : undefined;
+    return l && c && r.unit_price_minor * (1 - l.discount_ppm / 1_000_000) * 10_000 < c;
+  }).map((r) => r.description);
+  function applyPromos() {
+    setRows((rs) => rs.map((r, i) => { const l = promo.lines[i]; return l ? { ...r, discount_ppm: l.discount_ppm, discText: String(l.discount_ppm / 10_000).replace(".", ",") } : r; }));
+    toast("success", `Promociones aplicadas: ahorro ${formatMoney(promo.total_saving_minor)} sin IVA.`);
+  }
   const totals = useMemo(() => computeTotals(rows, taxPpm), [rows, taxPpm]);
   const creditWarn = useCreditWarning(customer?.uid, totals.total_minor, isSale && terms.payment === "credito");
 
   function addProduct(p: Product | null, text: string) {
+    if (p) setCosts((c) => ({ ...c, [p.uid]: p.cost_e4 }));
     const row = toRow({ product_uid: p?.uid ?? null, description: p?.name ?? text, qty_milli: 1000, unit_price_minor: p?.price_minor ?? 0, discount_ppm: 0, taxable: p?.taxable ?? true });
     const existingRow = p ? rows.find((r) => r.product_uid === p.uid) : undefined;
     if (existingRow) {
@@ -276,6 +292,23 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
             </dl>
             <p className="mt-4 rounded-md bg-surface-2 px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-muted">DOCUMENTO INTERNO — NO TRIBUTARIO</p>
           </Card>
+          {promo.applied.length > 0 && (
+            <Card title="Promociones" subtitle={promoApplied ? "Aplicadas como descuento en cada línea." : "Calzan con esta venta."}>
+              <ul className="flex flex-col gap-2 text-sm">
+                {promo.applied.map((a) => (
+                  <li key={a.uid} className="flex items-start gap-2">
+                    <BadgePercent size={15} className="mt-0.5 shrink-0 text-accent" aria-hidden />
+                    <span className="min-w-0 flex-1"><span className="font-medium text-ink">{a.name}</span><span className="block text-xs text-muted">{a.detail}</span></span>
+                    <span className="num font-medium text-success">−{formatMoney(a.saving_minor)}</span>
+                  </li>
+                ))}
+              </ul>
+              {promoApplied
+                ? <p className="mt-3 flex items-center gap-1.5 text-sm font-medium text-success"><CheckCircle2 size={15} aria-hidden /> Ahorro {formatMoney(promo.total_saving_minor)} (sin IVA)</p>
+                : <Button className="mt-3 w-full" icon={BadgePercent} onClick={applyPromos}>Aplicar promociones (−{formatMoney(promo.total_saving_minor)})</Button>}
+              {belowCost.length > 0 && <Notice tone="warning">Con el descuento, {belowCost.join(", ")} queda bajo el costo.</Notice>}
+            </Card>
+          )}
           {err && <Notice tone="danger">{err}</Notice>}
           <Button size="lg" icon={Save} onClick={save} disabled={busy || rows.length === 0}>{busy ? "Guardando…" : kind === "COT" ? "Guardar cotización" : "Guardar y continuar"}</Button>
         </aside>

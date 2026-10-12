@@ -6,7 +6,7 @@ const base: Customer = {
   id: 1, uid: "cli_1", rut: "76123456-0", name: "Ferretería Sur SpA", email: null, phone: null, created_at: "2026-01-01T00:00:00Z",
   kind: "empresa", trade_name: null, business_activity: "Ferretería", address: null, commune: null, city: null, region: null,
   contact_name: null, invoice_email: null, payment_terms_days: 30, credit_limit_minor: 1_000_000, notes: null,
-  credit_enabled: true, credit_conditions: null,
+  credit_enabled: true, credit_conditions: null, preferred: false,
 };
 const fmt = (n: number) => `$${n}`;
 

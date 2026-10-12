@@ -3,7 +3,9 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Bell, ChevronsLeft, ChevronsRight, FlaskConical, KeyRound, LogOut, Monitor, Moon, PanelLeft, Plus, Search, Sun, TriangleAlert, FileWarning,
 } from "lucide-react";
-import { useBackend, type AppInfo, type Dashboard, type SessionInfo } from "../data";
+import { useBackend, type AppInfo, type CreatedCompany, type Dashboard, type SessionInfo } from "../data";
+import { applyAccent } from "../lib/accent";
+import { CompanySwitcher } from "./CompanySwitcher";
 import { useSession } from "../lib/session";
 import { navigate, type Route } from "../lib/router";
 import { usePrefs, type Theme } from "../lib/prefs";
@@ -27,12 +29,14 @@ export function AppShell({
   session,
   route,
   onSwitch,
+  onCreated,
   children,
 }: {
   info: AppInfo;
   session: SessionInfo;
   route: Route;
   onSwitch: (uid: string) => void;
+  onCreated?: (c: CreatedCompany) => void;
   children: ReactNode;
 }) {
   const backend = useBackend();
@@ -75,7 +79,18 @@ export function AppShell({
   // Logo del negocio en el menú (se refresca al navegar, por ejemplo después de cambiarlo).
   const [logo, setLogo] = useState<string | null>(null);
   useEffect(() => {
-    const load = () => { backend.business().then((b) => setLogo(b.logo ?? null)).catch(() => setLogo(null)); };
+    const load = () => {
+      backend.business().then((b) => {
+        setLogo(b.logo ?? null);
+        applyAccent(b.accent);
+        if ((prefs.companyAccents[session.company.uid] ?? null) !== (b.accent ?? null)) {
+          const map = { ...prefs.companyAccents };
+          if (b.accent) map[session.company.uid] = b.accent; else delete map[session.company.uid];
+          set({ companyAccents: map });
+        }
+      }).catch(() => setLogo(null));
+    };
+    void backend.setWindowTitle(`NÚCLEO ERP — ${session.company.name}`).catch(() => {});
     load();
     window.addEventListener("nucleo:logo", load);
     return () => window.removeEventListener("nucleo:logo", load);
@@ -123,14 +138,7 @@ export function AppShell({
             {!collapsed && (
               <>
                 {logo && <img src={logo} alt={`Logo de ${session.company.name}`} className="mt-3 max-h-12 max-w-full object-contain" />}
-                <select
-                  aria-label="Negocio activo"
-                  className="mt-3 h-9 w-full rounded-lg border border-line bg-surface-2 px-2 text-sm font-medium text-ink"
-                  value={session.company.uid}
-                  onChange={(e) => onSwitch(e.target.value)}
-                >
-                  {info.companies.map((c) => <option key={c.uid} value={c.uid}>{c.name}</option>)}
-                </select>
+                <CompanySwitcher info={info} current={session.company.uid} onSwitch={onSwitch} onCreated={onCreated} />
                 <div className="mt-1.5 px-0.5 text-xs text-muted">Perfil {PROFILE_LABEL[profile]}</div>
               </>
             )}

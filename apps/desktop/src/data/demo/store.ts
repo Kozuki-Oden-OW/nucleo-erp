@@ -7,7 +7,7 @@ import type {
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollRow, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView, SeveranceForm, SeveranceView, Worker, WorkerInput,
   F29Inputs, F29Source, F29View, RcvImportReport, TaxDocInput, TaxDocLine, TaxProfile,
-  AppInfo, AttachmentRow, CreditDocInput, CustomerCredit, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
+  AppInfo, AttachmentRow, CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, PromoRule, Shipment, ShipmentInput, StockPolicy, WarehouseStockRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
   Customer, CustomerDetail, Dashboard, DocLink, EffectInput, EntityRef, ExternalRef, ExternalRefInput, Line, LineInput,
   NewCustomer, NewProduct, NewUser, Payment, PermissionRow,
   AdjustmentInput, InventoryOverview, InventorySettings, KardexRow, ProductInventory, ReorderInput, ReorderSettings, StockAnalysis, StockDocDone, StockDocRow, TransferInput, Warehouse, PriceHistoryRow, Product, ProductCategory, ProductPatch, PurchaseOrderDetail, PurchaseOrderSummary,
@@ -28,6 +28,7 @@ import { computeCostSheet, costSheetUsed, type CostSheet } from "../costing";
 import { REPORT_DEFS, buildReport, reportCatalog, type Facts } from "./reports";
 import { normalizeTerms } from "../saleTerms";
 import { DOC_KINDS, buildCredit, type CreditDocRowLike } from "../credit";
+import { EMPTY_RULE } from "../promos";
 import { CUSTOMER_NAMES, DEMO_ACTIVITIES, DEMO_COMMUNES, DEMO_COMPANY, DEMO_PRODUCT_CATEGORIES, DEMO_STREETS, EMPTY_PROFILE, PAYMENT_METHODS, PRODUCT_ROWS, SUPPLIER_NAMES, rng, rutDv } from "./seed";
 import reglas from "./reglas-demo.json";
 import { MANUAL_CODES, computeF29, type F29Note, type PurchaseKind } from "../f29";
@@ -107,7 +108,7 @@ export class DemoBackend implements Backend {
   readonly kind = "demo" as const;
   readonly features: ReadonlySet<Feature> = new Set<Feature>([
     "dashboard", "clientes", "productos", "ventas", "compras", "comex", "negocio", "busqueda",
-    "usuarios", "documentos", "numeracion", "monedas", "auditoria", "inventario", "dinero", "impuestos", "remuneraciones", "reportes",
+    "usuarios", "documentos", "numeracion", "monedas", "auditoria", "inventario", "dinero", "impuestos", "remuneraciones", "reportes", "promociones", "envios",
   ]);
   private company = { uid: "demo-company", name: DEMO_COMPANY, profile: "empresa" as BusinessProfile, created_at: "2026-01-02T12:00:00Z" };
   private biz: BusinessSettings;
@@ -123,6 +124,8 @@ export class DemoBackend implements Backend {
   private stockDocs: StockDocRow[] = [];
   private reorder: Record<string, ReorderSettings> = {};
   private allowNegative = true;
+  /** Ventas por despachar (productos con reservas). */
+  private resv: { id: number; sale_uid: string; line_no: number; product_uid: string; wh: string; qty: number; dispatched: number; status: "activa" | "consumida" | "liberada" }[] = [];
   private purchases: PurRec[] = [];
   private seq: Record<string, number> = {};
   private history: Record<string, number> = {};
@@ -143,22 +146,25 @@ export class DemoBackend implements Backend {
   private seqCfg: Record<string, { name: string; prefix: string; width: number }> = {
     COT: { name: "Cotización", prefix: "COT", width: 6 }, VEN: { name: "Venta", prefix: "VEN", width: 6 },
     FV: { name: "Factura interna", prefix: "FV", width: 6 }, PAG: { name: "Comprobante de pago", prefix: "PAG", width: 6 },
-    OC: { name: "Orden de compra", prefix: "OC", width: 6 },
+    OC: { name: "Orden de compra", prefix: "OC", width: 6 }, ENV: { name: "Envío", prefix: "ENV", width: 6 },
   };
   private rateRows: RateRow[] = [];
   private files: (AttachmentRow & { dataUrl: string; archived: boolean })[] = [];
   private creditDocs = new Map<string, CreditDocRowLike[]>();
+  private promos: (Omit<Promotion, "status" | "products" | "category" | "category_product_uids" | "customers"> & { archived: boolean })[] = [];
+  private ships: (Omit<Shipment, "sale_number" | "customer_name">)[] = [];
 
   constructor() {
     this.biz = {
       name: DEMO_COMPANY, profile: "empresa", rut: "76.543.210-3", legal_name: "Comercial Los Andes SpA (ficticia)",
       activity: "Venta al por menor de artículos de ferretería", address: "Av. Ejemplo 1234, Puerto Ejemplo", phone: "+56 9 5555 0000",
-      email: "contacto@ejemplo.cl", documentation_reminder: true, tax_enabled: true, tax_rate_ppm: TAX_PPM, tax_rule_source: TAX_SOURCE, tax_rate_user_ppm: null, logo: null,
+      email: "contacto@ejemplo.cl", documentation_reminder: true, tax_enabled: true, tax_rate_ppm: TAX_PPM, tax_rule_source: TAX_SOURCE, tax_rate_user_ppm: null, logo: null, accent: null,
     };
     this.seed();
     this.seedInventory();
     this.seedMoney();
     this.seedComex();
+    this.seedPromosAndShipments();
   }
 
   private next(docType: string): string {
@@ -216,6 +222,7 @@ export class DemoBackend implements Backend {
         uid: uid("pro"), sku, name, unit, kind: service ? "servicio" : "producto", price_minor: price, cost_e4: cost * 10_000,
         on_hand_milli: stock * 1000, min_milli: min * 1000, taxable: true,
         category_uid: ci >= 0 ? this.pcats[ci]!.uid : null, category: null, cost_sheet: null, has_movements: false,
+        stock_policy: "general",
       });
     }
     // Historia mensual agregada (12 meses) para el gráfico.
@@ -377,7 +384,7 @@ export class DemoBackend implements Backend {
     return {
       ...this.summary(s), customer_uid: s.customer_uid, lines: s.lines, totals: s.totals, cost_minor: s.cost_minor, payment_method: s.payment_method,
       notes: s.notes, quote_uid: s.quote_uid, quote_number: q?.number ?? null, payments: s.payments, external_ref: s.external_ref,
-      void_reason: s.void_reason, chain, timeline: s.timeline, terms: s.terms,
+      void_reason: s.void_reason, chain, timeline: s.timeline, terms: s.terms, dispatch: this.allocate().filter((d) => d.sale_uid === s.uid),
     };
   }
   private quoteSummary(q: QuoteRec): QuoteSummary {
@@ -406,16 +413,41 @@ export class DemoBackend implements Backend {
   /* ───────────── Núcleo ───────────── */
 
   async appInfo(): Promise<AppInfo> {
-    return wait({ version: "0.2.0-demo", data_dir: "(memoria del navegador)", backups_dir: "(no disponible en la demostración)", companies: [this.company], mode: "demo" as const });
+    return wait({ version: "0.2.0-demo", data_dir: "(memoria del navegador)", backups_dir: "(no disponible en la demostración)", companies: this.allCompanies(), mode: "demo" as const });
+  }
+  /** En la demostración todas las empresas comparten los datos ficticios; solo cambian nombre y color. */
+  private others: { uid: string; name: string; profile: BusinessProfile; created_at: string; accent: string | null }[] = [
+    { uid: "demo-company-2", name: "Distribuidora del Sur (demo)", profile: "negocio", created_at: "2026-03-01T12:00:00Z", accent: "morado" },
+  ];
+  private allCompanies() {
+    const cur = { ...this.company, accent: this.biz.accent };
+    const all = [cur, ...this.others].sort((a, b) => a.created_at.localeCompare(b.created_at));
+    return all.map(({ accent: _a, ...c }) => c);
   }
   async createCompany(name: string, profile: BusinessProfile): Promise<CreatedCompany> {
-    this.company = { ...this.company, name, profile };
-    this.biz = { ...this.biz, name, profile, tax_enabled: profile !== "emprendedor" };
-    return wait({ company: this.company, recovery_key: "DEMO-SIN-CLAVE-REAL" });
+    const c = { uid: uid("emp"), name, profile, created_at: now(), accent: null };
+    this.others.push(c);
+    const { accent: _a, ...info } = c;
+    return wait({ company: info, recovery_key: "DEMO-SIN-CLAVE-REAL" });
   }
-  async openCompany(): Promise<SessionInfo> {
+  async openCompany(u: string): Promise<SessionInfo> {
+    if (u !== this.company.uid) {
+      const next = this.others.find((c) => c.uid === u);
+      if (next) {
+        this.others = this.others.filter((c) => c.uid !== u);
+        this.others.push({ ...this.company, accent: this.biz.accent });
+        this.company = { uid: next.uid, name: next.name, profile: next.profile, created_at: next.created_at };
+        this.biz = { ...this.biz, name: next.name, profile: next.profile, accent: next.accent };
+      }
+    }
     return wait(this.session());
   }
+  async launchCompany(): Promise<string | null> { return wait(null); }
+  async openNewWindow(): Promise<void> {
+    window.open(window.location.href.split("#")[0], "_blank", "noopener");
+    return wait(undefined);
+  }
+  async setWindowTitle(title: string): Promise<void> { document.title = title; return wait(undefined); }
   async recoverKey(): Promise<void> { return wait(undefined); }
   async business(): Promise<BusinessSettings> { return wait(this.biz); }
   async updateBusiness(patch: Partial<BusinessSettings>): Promise<BusinessSettings> {
@@ -739,7 +771,7 @@ export class DemoBackend implements Backend {
       kind: input.kind === "empresa" ? "empresa" : "persona", trade_name: t(input.trade_name), business_activity: t(input.business_activity),
       address: t(input.address), commune: t(input.commune), city: t(input.city), region: t(input.region), contact_name: t(input.contact_name),
       invoice_email: t(input.invoice_email), payment_terms_days: days, credit_limit_minor: input.credit_limit_minor ?? null, notes: t(input.notes),
-      credit_enabled: !!input.credit_enabled, credit_conditions: t(input.credit_conditions),
+      credit_enabled: !!input.credit_enabled, credit_conditions: t(input.credit_conditions), preferred: !!input.preferred,
     };
   }
   async addCustomer(input: NewCustomer): Promise<Customer> {
@@ -793,6 +825,11 @@ export class DemoBackend implements Backend {
   }
   private catName(u: string | null): string | null { return u ? this.pcats.find((c) => c.uid === u)?.name ?? null : null; }
   /** Producto con los datos derivados (nombre de la categoría y si tiene movimientos). */
+  private policy(v: string | undefined | null): StockPolicy | null {
+    if (!v) return null;
+    if (!["general", "bloquear", "vender", "reservar"].includes(v)) throw new AppError("validacion", "Regla de stock no válida.");
+    return v as StockPolicy;
+  }
   private prodView(p: Product): Product {
     return { ...p, category: this.catName(p.category_uid), has_movements: this.moves.some((m) => m.product_uid === p.uid) };
   }
@@ -869,6 +906,8 @@ export class DemoBackend implements Backend {
       }
     }
     Object.assign(p, { name: patch.name.trim(), sku: patch.sku.trim(), unit: patch.unit, price_minor: patch.price_minor, taxable: patch.taxable, min_milli: patch.min_milli, category_uid });
+    const pol = this.policy(patch.stock_policy);
+    if (pol && p.kind === "producto") p.stock_policy = pol;
     this.log("producto.editar", "producto", p.uid);
     return wait(this.prodView(p));
   }
@@ -879,6 +918,7 @@ export class DemoBackend implements Backend {
       uid: uid("pro"), sku: input.sku?.trim() || `P-${this.products.length + 1}`, name: input.name.trim(), unit: input.unit || "un", kind: input.kind,
       price_minor: input.price_minor, cost_e4: sheet ? sheet.e4 : (input.cost_minor ?? 0) * 10_000, on_hand_milli: input.kind === "producto" ? Math.max(0, input.initial_stock_milli ?? 0) : 0, min_milli: 0, taxable: input.taxable ?? true,
       category_uid: this.checkCat(input.category_uid), category: null, cost_sheet: sheet?.sheet ?? null, has_movements: false,
+      stock_policy: input.kind === "producto" ? this.policy(input.stock_policy) ?? "general" : "general",
     };
     this.products.push(p);
     if (p.on_hand_milli > 0) this.mv(p.uid, p.on_hand_milli, "inicial", "Stock inicial", "AJU", null, "Stock inicial", this.today, p.cost_e4);
@@ -967,13 +1007,25 @@ export class DemoBackend implements Backend {
     if (!["borrador", "cotizada", "aceptada"].includes(s.commercial_state)) throw new AppError("estado", "Esta venta ya fue efectuada o anulada.");
     if (input.mode === "credito" && !s.customer_uid) throw new AppError("credito", "Para vender a crédito elige un cliente: necesitamos saber quién te debe.");
     if (input.mode === "credito" && !input.due_date) throw new AppError("vencimiento", "Indica la fecha en que te pagarán.");
-    if (!this.allowNegative) {
-      const short = s.lines.filter((l) => { const p = this.products.find((x) => x.uid === l.product_uid); return p && p.kind === "producto" && this.whQty(p.uid, this.defWh().uid) < l.qty_milli; });
-      if (short.length) throw new AppError("sin_stock", `No hay stock suficiente en la bodega principal: ${short.map((l) => l.description).join(", ")}. Registra la compra o un ajuste, o permite vender sin stock.`);
-    }
+    const wh = this.defWh().uid;
+    const short = s.lines.filter((l) => {
+      const p = this.products.find((x) => x.uid === l.product_uid);
+      if (!p || p.kind !== "producto") return false;
+      const check = p.stock_policy === "bloquear" || (p.stock_policy === "general" && !this.allowNegative);
+      return check && this.whQty(p.uid, wh) - this.committed(p.uid) < l.qty_milli;
+    });
+    if (short.length) throw new AppError("sin_stock", `No hay stock suficiente en la bodega principal: ${short.map((l) => l.description).join(", ")}. Registra la compra o un ajuste, o en la ficha del producto elige vender sin stock o tomar reservas.`);
+    let reserved = 0;
     for (const l of s.lines) {
       const p = this.products.find((x) => x.uid === l.product_uid);
-      if (p && p.kind === "producto") { p.on_hand_milli -= l.qty_milli; l.unit_cost_e4 = p.cost_e4; this.mv(p.uid, -l.qty_milli, "salida", s.number, s.doc_type, s.uid, null, s.issue_date); }
+      if (!p || p.kind !== "producto") continue;
+      l.unit_cost_e4 = p.cost_e4;
+      if (p.stock_policy === "reservar") {
+        this.resv.push({ id: this.resv.length + 1, sale_uid: s.uid, line_no: l.line_no, product_uid: p.uid, wh, qty: l.qty_milli, dispatched: 0, status: "activa" });
+        reserved++;
+        continue;
+      }
+      p.on_hand_milli -= l.qty_milli; this.mv(p.uid, -l.qty_milli, "salida", s.number, s.doc_type, s.uid, null, s.issue_date);
     }
     s.cost_minor = this.costOf(s.lines);
     s.commercial_state = "efectuada";
@@ -981,6 +1033,7 @@ export class DemoBackend implements Backend {
     s.due_date = input.mode === "credito" ? input.due_date : null;
     s.documentation_state = this.biz.documentation_reminder ? "pendiente" : "no_aplica";
     s.timeline.push({ at: now(), text: "Venta efectuada: se descontó stock y se fijaron costo y margen" });
+    if (reserved) s.timeline.push({ at: now(), text: `${reserved} ${reserved === 1 ? "producto queda" : "productos quedan"} por despachar: se descuenta del stock al despachar (Inventario → Por despachar)` });
     if (input.mode === "contado") {
       const acc = this.accountFor(input.account_uid, input.method);
       const pnum = this.next("PAG");
@@ -1034,16 +1087,213 @@ export class DemoBackend implements Backend {
     if (!reason.trim()) throw new AppError("motivo", "Escribe el motivo de la anulación: queda en la auditoría.");
     if (s.commercial_state === "anulada") throw new AppError("estado", "La venta ya está anulada.");
     if (s.commercial_state === "efectuada" || s.commercial_state === "cerrada") {
+      const open = this.resv.filter((r) => r.sale_uid === s.uid && r.status === "activa");
       for (const l of s.lines) {
         const p = this.products.find((x) => x.uid === l.product_uid);
-        if (p && p.kind === "producto") { p.on_hand_milli += l.qty_milli; this.mv(p.uid, l.qty_milli, "ajuste", s.number, s.doc_type, s.uid, `Anulación de ${s.number}`); }
+        const pending = open.filter((r) => r.line_no === l.line_no).reduce((a, r) => a + r.qty - r.dispatched, 0);
+        const back = l.qty_milli - pending;
+        if (p && p.kind === "producto" && back > 0) { p.on_hand_milli += back; this.mv(p.uid, back, "ajuste", s.number, s.doc_type, s.uid, `Anulación de ${s.number}`); }
       }
+      for (const r of open) r.status = "liberada";
+      if (open.length) s.timeline.push({ at: now(), text: "Reservas por despachar liberadas" });
     }
     s.commercial_state = "anulada";
     s.void_reason = reason.trim();
     s.timeline.push({ at: now(), text: `Anulada: ${reason.trim()} (stock devuelto)` });
     this.log("venta.anular", "venta", s.number);
     return wait(this.detail(s));
+  }
+
+  /* ───────────── Descuentos y promociones ───────────── */
+
+  private seedPromosAndShipments(): void {
+    const bySku = (sku: string) => this.products.find((p) => p.sku === sku)?.uid;
+    const pick = (...skus: string[]) => skus.map(bySku).filter((u): u is string => !!u);
+    const [a, b] = pick("TAL-18V", "ESM-115");
+    const base = { starts_on: null, ends_on: null, active: true, notes: null, created_at: now(), archived: false };
+    if (a && b) this.promos.push({ ...base, uid: uid("prm"), name: "Kit taladro + esmeril", kind: "pack", rule: { ...EMPTY_RULE, items: [{ product_uid: a, qty_milli: 1000 }, { product_uid: b, qty_milli: 1000 }], pack_price_minor: 84_990 } });
+    this.promos.push({ ...base, uid: uid("prm"), name: "Mayorista: más unidades, más descuento", kind: "cantidad", rule: { ...EMPTY_RULE, all_products: true, mixed: true, tiers: [{ min_milli: 20_000, pct_ppm: 50_000 }, { min_milli: 50_000, pct_ppm: 100_000 }] } });
+    const guantes = pick("GUA-NIT");
+    if (guantes.length) this.promos.push({ ...base, uid: uid("prm"), name: "Guantes 3x2", kind: "lleva_paga", rule: { ...EMPTY_RULE, items: guantes.map((u) => ({ product_uid: u, qty_milli: 0 })), buy: 3, pay: 2 } });
+    this.promos.push({ ...base, uid: uid("prm"), name: "Clientes preferenciales 5 %", kind: "preferencial", rule: { ...EMPTY_RULE, all_products: true, pct_ppm: 50_000 } });
+    // Dos clientes preferenciales de ejemplo.
+    this.customers.filter((c) => c.kind === "empresa").slice(0, 2).forEach((c) => { c.preferred = true; });
+    // Envíos de ejemplo.
+    const sales = this.sales.filter((s) => s.customer_uid && (s.commercial_state === "efectuada" || s.commercial_state === "cerrada")).slice(0, 4);
+    const carriers = ["Starken", "Chilexpress", "Blue Express", "Correos de Chile"];
+    const states: Shipment["status"][] = ["entregado", "en_camino", "no_despachado", "no_entregado"];
+    sales.forEach((s, i) => {
+      const c = this.customers.find((x) => x.uid === s.customer_uid)!;
+      const status = states[i]!;
+      this.ships.push({
+        uid: uid("env"), number: this.next("ENV"), sale_uid: s.uid, customer_uid: c.uid, carrier: carriers[i]!, tracking: status === "no_despachado" ? null : String(70_000_000 + i * 1_337_771),
+        first_name: c.kind === "persona" ? c.name.split(" ")[0]! : "Recepción", last_name: c.kind === "persona" ? c.name.split(" ").slice(1).join(" ") : c.name, phone: c.phone, address: c.address, commune: c.commune, city: c.city, region: c.region,
+        shipped_on: status === "no_despachado" ? null : addDays(s.issue_date, 1), delivered_on: status === "entregado" ? addDays(s.issue_date, 3) : null,
+        status, notes: status === "no_entregado" ? "Dirección incompleta: llamar al cliente para reprogramar." : null, created_at: now(), updated_at: null,
+      });
+    });
+  }
+  private promoView(p: (typeof this.promos)[number]): Promotion {
+    const t = this.today;
+    const status: Promotion["status"] = !p.active ? "pausada" : p.starts_on && p.starts_on > t ? "programada" : p.ends_on && p.ends_on < t ? "vencida" : "activa";
+    const products = p.rule.items.map((i) => {
+      const x = this.products.find((y) => y.uid === i.product_uid);
+      return x ? { uid: x.uid, sku: x.sku, name: x.name, unit: x.unit, price_minor: x.price_minor, cost_e4: x.cost_e4, qty_milli: i.qty_milli } : null;
+    }).filter((x): x is NonNullable<typeof x> => !!x);
+    return {
+      ...p, status, products, category: this.catName(p.rule.category_uid),
+      category_product_uids: p.rule.category_uid ? this.products.filter((x) => x.category_uid === p.rule.category_uid).map((x) => x.uid) : [],
+      customers: p.rule.customer_uids.map((u) => this.customers.find((c) => c.uid === u)).filter((c): c is Customer => !!c).map((c) => ({ uid: c.uid, name: c.name })),
+    };
+  }
+  async promotions(): Promise<Promotion[]> {
+    return wait(this.promos.filter((p) => !p.archived).slice().reverse().map((p) => this.promoView(p)));
+  }
+  async savePromotion(u: string | null, input: PromotionInput): Promise<Promotion[]> {
+    this.require("productos.editar");
+    const name = input.name.trim();
+    if (!name) throw new AppError("validacion", "El nombre de la promoción es obligatorio.");
+    const r: PromoRule = { ...EMPTY_RULE, ...input.rule };
+    const pct = (v: number | null | undefined) => v != null && v > 0 && v < 1_000_000;
+    const scoped = r.all_products || !!r.category_uid || r.items.length > 0;
+    switch (input.kind) {
+      case "pack":
+        if (r.items.length < 2 && r.items.reduce((a, i) => a + i.qty_milli, 0) < 2000) throw new AppError("validacion", "Un pack necesita al menos dos productos o dos unidades.");
+        if (r.items.some((i) => i.qty_milli <= 0)) throw new AppError("validacion", "Cada producto del pack necesita una cantidad.");
+        if ((r.pack_price_minor == null) === (r.pct_ppm == null) || (r.pack_price_minor != null && r.pack_price_minor <= 0) || (r.pct_ppm != null && !pct(r.pct_ppm)))
+          throw new AppError("validacion", "Indica el precio del pack o el porcentaje de descuento (uno de los dos).");
+        break;
+      case "cantidad":
+        if (!scoped) throw new AppError("validacion", "Elige los productos, una categoría o todos los productos.");
+        if (!r.tiers.length || r.tiers.some((t) => t.min_milli <= 0 || !pct(t.pct_ppm))) throw new AppError("validacion", "Revisa los tramos: cantidad mínima y porcentaje entre 0 y 100.");
+        r.tiers = [...r.tiers].sort((a, b) => a.min_milli - b.min_milli);
+        break;
+      case "lleva_paga":
+        if (!scoped) throw new AppError("validacion", "Elige los productos, una categoría o todos los productos.");
+        if (r.buy < 2 || r.pay < 1 || r.pay >= r.buy) throw new AppError("validacion", "En «lleva X paga Y», Y debe ser menor que X (ej. lleva 3 paga 2).");
+        break;
+      default:
+        if (!scoped) r.all_products = true;
+        if (!pct(r.pct_ppm)) throw new AppError("validacion", "El porcentaje debe ser mayor que 0 y menor que 100.");
+        if (input.kind === "cliente" && !r.customer_uids.length) throw new AppError("validacion", "Elige al menos un cliente.");
+    }
+    if (input.starts_on && input.ends_on && input.ends_on < input.starts_on) throw new AppError("validacion", "La promoción termina antes de empezar.");
+    const data = { name, kind: input.kind, rule: r, starts_on: input.starts_on || null, ends_on: input.ends_on || null, active: input.active ?? true, notes: input.notes?.trim() || null };
+    if (u) {
+      const p = this.promos.find((x) => x.uid === u && !x.archived);
+      if (!p) throw new AppError("no_encontrado", "No encontramos esa promoción.");
+      Object.assign(p, data);
+    } else {
+      this.promos.push({ ...data, uid: uid("prm"), created_at: now(), archived: false });
+    }
+    this.log(u ? "promocion.editar" : "promocion.crear", "promocion", name);
+    return this.promotions();
+  }
+  async setPromotionActive(u: string, active: boolean): Promise<Promotion[]> {
+    this.require("productos.editar");
+    const p = this.promos.find((x) => x.uid === u && !x.archived);
+    if (!p) throw new AppError("no_encontrado", "No encontramos esa promoción.");
+    p.active = active;
+    this.log("promocion.estado", "promocion", p.name);
+    return this.promotions();
+  }
+  async deletePromotion(u: string): Promise<Promotion[]> {
+    this.require("productos.editar");
+    const p = this.promos.find((x) => x.uid === u && !x.archived);
+    if (!p) throw new AppError("no_encontrado", "No encontramos esa promoción.");
+    p.archived = true; p.active = false;
+    this.log("promocion.eliminar", "promocion", p.name);
+    return this.promotions();
+  }
+
+  /* ───────────── Envíos ───────────── */
+
+  private shipView(e: (typeof this.ships)[number]): Shipment {
+    return { ...e, sale_number: e.sale_uid ? this.sales.find((s) => s.uid === e.sale_uid)?.number ?? null : null, customer_name: e.customer_uid ? this.customerName(e.customer_uid) : null };
+  }
+  async shipments(saleUid?: string | null): Promise<Shipment[]> {
+    return wait(this.ships.filter((e) => !saleUid || e.sale_uid === saleUid).slice().reverse().map((e) => this.shipView(e)));
+  }
+  async saveShipment(u: string | null, input: ShipmentInput): Promise<Shipment> {
+    this.require("ventas.crear");
+    const status = input.status || "no_despachado";
+    if (!["no_despachado", "en_camino", "entregado", "no_entregado"].includes(status)) throw new AppError("validacion", "Estado del envío no válido.");
+    const sale = input.sale_uid ? this.findSale(input.sale_uid) : null;
+    let shipped = input.shipped_on || null;
+    let delivered = input.delivered_on || null;
+    if (status !== "no_despachado" && !shipped) shipped = this.today;
+    if (status === "entregado" && !delivered) delivered = this.today;
+    if (status !== "entregado" && status !== "no_entregado") delivered = null;
+    if (shipped && delivered && delivered < shipped) throw new AppError("validacion", "La fecha de recepción no puede ser anterior al envío.");
+    const t = (v: string | null | undefined) => (v && v.trim() ? v.trim() : null);
+    const data = {
+      sale_uid: sale?.uid ?? null, customer_uid: input.customer_uid || sale?.customer_uid || null, carrier: t(input.carrier), tracking: t(input.tracking),
+      first_name: t(input.first_name), last_name: t(input.last_name), phone: t(input.phone), address: t(input.address), commune: t(input.commune),
+      city: t(input.city), region: t(input.region), shipped_on: shipped, delivered_on: delivered, status, notes: t(input.notes),
+    };
+    const label = (s: string) => ({ no_despachado: "No despachado", en_camino: "En camino", entregado: "Entregado", no_entregado: "No entregado (problemas)" } as Record<string, string>)[s]!;
+    let e = u ? this.ships.find((x) => x.uid === u) : undefined;
+    let text: string;
+    if (u) {
+      if (!e) throw new AppError("no_encontrado", "No encontramos ese envío.");
+      text = e.status !== status ? `${e.number}: ${label(e.status)} → ${label(status)}` : `${e.number} actualizado`;
+      Object.assign(e, data, { updated_at: now() });
+    } else {
+      e = { ...data, uid: uid("env"), number: this.next("ENV"), created_at: now(), updated_at: null };
+      this.ships.push(e);
+      text = `${e.number} creado · ${label(status)}`;
+    }
+    if (sale) sale.timeline.push({ at: now(), text });
+    this.log("envio.guardar", "envio", e.number);
+    return wait(this.shipView(e));
+  }
+
+  /* ───────────── Por despachar ───────────── */
+
+  private committed(product_uid: string): number {
+    return this.resv.filter((r) => r.product_uid === product_uid && r.status === "activa").reduce((a, r) => a + r.qty - r.dispatched, 0);
+  }
+  /** Reparte el stock de cada producto entre sus pedidos pendientes, del más antiguo al más nuevo. */
+  private allocate(): PendingDispatch[] {
+    const free = new Map<string, number>();
+    return this.resv.filter((r) => r.status === "activa").map((r) => {
+      const s = this.sales.find((x) => x.uid === r.sale_uid)!;
+      const p = this.products.find((x) => x.uid === r.product_uid)!;
+      const onHand = this.whQty(p.uid, r.wh);
+      if (!free.has(p.uid)) free.set(p.uid, Math.max(0, onHand));
+      const pending = r.qty - r.dispatched;
+      const reserved = Math.max(0, Math.min(pending, free.get(p.uid)!));
+      free.set(p.uid, free.get(p.uid)! - reserved);
+      return {
+        id: r.id, sale_uid: s.uid, sale_number: s.number, issue_date: s.issue_date, customer: s.customer_uid ? this.customerName(s.customer_uid) : null,
+        product_uid: p.uid, product_name: p.name, sku: p.sku, unit: p.unit, ordered_milli: r.qty, dispatched_milli: r.dispatched, pending_milli: pending,
+        reserved_milli: reserved, missing_milli: pending - reserved, on_hand_milli: onHand,
+      };
+    });
+  }
+  async pendingDispatches(): Promise<PendingDispatch[]> { return wait(this.allocate()); }
+  async dispatchItems(id: number, qtyMilli: number, date?: string | null): Promise<PendingDispatch[]> {
+    this.require("ventas.efectuar");
+    const r = this.resv.find((x) => x.id === id && x.status === "activa");
+    if (!r) throw new AppError("no_encontrado", "No encontramos ese pedido por despachar.");
+    const pending = r.qty - r.dispatched;
+    if (qtyMilli <= 0 || qtyMilli > pending) throw new AppError("validacion", "La cantidad a despachar debe ser mayor que cero y no superar lo pendiente.");
+    const p = this.products.find((x) => x.uid === r.product_uid)!;
+    if (this.whQty(p.uid, r.wh) < qtyMilli) throw new AppError("sin_stock", `No hay stock suficiente de ${p.name} para despachar: registra la compra o la recepción primero.`);
+    const s = this.sales.find((x) => x.uid === r.sale_uid)!;
+    p.on_hand_milli -= qtyMilli;
+    this.mv(p.uid, -qtyMilli, "salida", s.number, s.doc_type, s.uid, "Despacho", date || this.today, undefined, r.wh);
+    r.dispatched += qtyMilli;
+    if (r.dispatched >= r.qty) r.status = "consumida";
+    const left = r.qty - r.dispatched;
+    s.timeline.push({ at: now(), text: left ? `Despachado ${qtyMilli / 1000} ${p.unit} de ${p.name}; quedan ${left / 1000} por despachar` : `Despachado ${qtyMilli / 1000} ${p.unit} de ${p.name} (completo)` });
+    this.log("venta.despachar", "venta", s.number);
+    return this.pendingDispatches();
+  }
+  async warehouseStock(warehouseUid: string): Promise<WarehouseStockRow[]> {
+    if (!this.whs.some((w) => w.uid === warehouseUid)) throw new AppError("no_encontrado", "No encontramos esa bodega.");
+    return wait(this.products.filter((p) => p.kind === "producto").sort((a, b) => a.name.localeCompare(b.name, "es"))
+      .map((p) => ({ product: this.prodView(p), on_hand_milli: this.whQty(p.uid, warehouseUid) })));
   }
 
   /* ───────────── Inventario ───────────── */

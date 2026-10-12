@@ -32,6 +32,8 @@ pub struct ProductRow {
     pub cost_sheet: Option<serde_json::Value>,
     /// `true` si el producto ya tiene movimientos de stock (el costo lo mueve el libro de stock).
     pub has_movements: bool,
+    /// Qué hacer sin stock: "general", "bloquear", "vender" o "reservar".
+    pub stock_policy: String,
 }
 
 const SELECT: &str = "SELECT p.id, p.uid, coalesce(p.sku, ''), p.name, lower(p.unit_code),
@@ -40,7 +42,7 @@ const SELECT: &str = "SELECT p.id, p.uid, coalesce(p.sku, ''), p.name, lower(p.u
         coalesce((SELECT sum(b.on_hand_milli) FROM stock_balances b WHERE b.product_id = p.id), 0),
         coalesce(p.min_stock_milli, 0), p.taxable, p.track_stock,
         c.uid, c.name, p.cost_sheet_json,
-        EXISTS (SELECT 1 FROM stock_movements m WHERE m.product_id = p.id)
+        EXISTS (SELECT 1 FROM stock_movements m WHERE m.product_id = p.id), p.stock_policy
     FROM products p LEFT JOIN categories c ON c.id = p.category_id";
 
 fn map(r: &Row<'_>) -> rusqlite::Result<ProductRow> {
@@ -63,6 +65,7 @@ fn map(r: &Row<'_>) -> rusqlite::Result<ProductRow> {
             .get::<_, Option<String>>(14)?
             .and_then(|j| serde_json::from_str(&j).ok()),
         has_movements: r.get::<_, i64>(15)? == 1,
+        stock_policy: r.get(16)?,
     })
 }
 
@@ -253,6 +256,29 @@ pub fn set_cost(
         rusqlite::params![id, cost_e4, cost_sheet_json, updated_at],
     )?;
     Ok(())
+}
+
+/// Cambia qué hacer cuando el producto no tiene stock.
+pub fn set_stock_policy(conn: &Connection, id: i64, policy: &str) -> DbResult<()> {
+    conn.execute(
+        "UPDATE products SET stock_policy = ?2 WHERE id = ?1",
+        rusqlite::params![id, policy],
+    )?;
+    Ok(())
+}
+
+/// Productos con stock (activos) y su saldo en una bodega, por nombre.
+pub fn warehouse_stock(conn: &Connection, warehouse_id: i64) -> DbResult<Vec<(ProductRow, i64)>> {
+    let mut stmt = conn.prepare(&format!(
+        "{SELECT} WHERE p.archived_at IS NULL AND p.track_stock = 1 ORDER BY p.name COLLATE NOCASE"
+    ))?;
+    let rows = stmt.query_map([], map)?.collect::<Result<Vec<_>, _>>()?;
+    let mut out = Vec::with_capacity(rows.len());
+    for p in rows {
+        let (on_hand, _) = balance(conn, p.id, warehouse_id)?;
+        out.push((p, on_hand));
+    }
+    Ok(out)
 }
 
 /// Guarda solo la hoja de costo (como referencia), sin tocar el costo promedio.

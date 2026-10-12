@@ -7,6 +7,7 @@ use nucleo_app::core_ops::{
     BusinessPatch, BusinessSettings, CurrentUser, EntityRef, NewUser, SecuritySettings, UserPatch,
 };
 use nucleo_app::credit_ops::{CreditDocInput, CustomerCredit};
+use nucleo_app::dispatch_ops::{PendingDispatch, WarehouseStockRow};
 use nucleo_app::f22_ops::{F22Inputs, F22View};
 use nucleo_app::f29_ops::{F29Inputs, F29View, RcvImportReport, TaxDocInput, TaxProfile};
 use nucleo_app::finance_ops::{
@@ -26,12 +27,14 @@ use nucleo_app::nucleo_db::finance::{AccountRow, CategoryRow, LedgerRow, Recurri
 use nucleo_app::nucleo_db::inventory::{StockDocRow, WarehouseRow};
 use nucleo_app::nucleo_db::products::ProductRow;
 use nucleo_app::nucleo_db::purchases::PriceHistoryRow;
+use nucleo_app::nucleo_db::shipments::ShipmentRow;
 use nucleo_app::nucleo_db::suppliers::SupplierRow;
 use nucleo_app::nucleo_db::users::{PermissionRow, RoleRow, UserRow};
 use nucleo_app::payroll_ops::{
     Indicators, IndicatorsView, LreExport, PayrollSettings, PayrollView, PayslipMonth, PayslipView,
     PreviredView, SeveranceForm, SeveranceView, Worker, WorkerInput,
 };
+use nucleo_app::promo_ops::{Promotion, PromotionInput};
 use nucleo_app::purchase_ops::{
     NewSupplier, PoDetail, PoInput, PoSummary, PurchaseDetail, PurchaseFilter, PurchaseInput,
     PurchaseSummary, ReceiveLine, SupplierDetail,
@@ -41,6 +44,7 @@ use nucleo_app::sales_ops::{
     CustomerDetail, EffectInput, ExternalRefInput, NewProduct, ProductPatch, QuoteDetail,
     QuoteInput, QuoteSummary, SaleDetail, SaleFilter, SaleInput, SaleSummary,
 };
+use nucleo_app::ship_ops::ShipmentInput;
 use nucleo_app::{
     AppError, AppService, BusinessProfile, CompanyInfo, CompanySession, CreatedCompany, NewCustomer,
 };
@@ -157,6 +161,43 @@ fn with_session<T>(
 }
 
 /* ───────────────────────────── Empresas y sesión ───────────────────────────── */
+
+/// Empresa con que se abrió esta ventana (`--empresa <uid>`), si se abrió desde «Abrir en otra ventana».
+#[tauri::command]
+pub fn launch_company() -> Option<String> {
+    let args: Vec<String> = std::env::args().collect();
+    args.iter()
+        .position(|a| a == "--empresa")
+        .and_then(|i| args.get(i + 1).cloned())
+}
+
+/// Abre otra ventana de NÚCLEO (otro proceso, con su propia sesión) con la empresa indicada.
+/// Cada empresa es su propia base de datos; si la misma está abierta en dos ventanas, SQLite
+/// ordena las escrituras (modo WAL con espera).
+#[tauri::command]
+pub fn open_new_window(state: State<'_, AppState>, uid: String) -> CmdResult<()> {
+    let known = svc(&state)?.list_companies()?.iter().any(|c| c.uid == uid);
+    if !known {
+        return Err(internal("no encontramos esa empresa"));
+    }
+    let exe = std::env::current_exe().map_err(|e| internal(&e.to_string()))?;
+    std::process::Command::new(exe)
+        .arg("--empresa")
+        .arg(&uid)
+        .spawn()
+        .map_err(|e| internal(&format!("no se pudo abrir otra ventana: {e}")))?;
+    Ok(())
+}
+
+/// Título de la ventana con el nombre de la empresa (para distinguir ventanas en la barra de tareas).
+#[tauri::command]
+pub fn set_window_title<R: tauri::Runtime>(
+    window: tauri::Window<R>,
+    title: String,
+) -> CmdResult<()> {
+    let t: String = title.chars().take(120).collect();
+    window.set_title(&t).map_err(|e| internal(&e.to_string()))
+}
 
 #[tauri::command]
 pub fn app_info(state: State<'_, AppState>) -> CmdResult<AppInfo> {
@@ -1385,6 +1426,76 @@ pub fn save_report_file(
 }
 
 /* ───────────────────────────── Crédito a clientes ───────────────────────────── */
+
+#[tauri::command]
+pub fn promotions(state: State<'_, AppState>) -> CmdResult<Vec<Promotion>> {
+    with_session(&state, |s| Ok(s.promotions()?))
+}
+
+#[tauri::command]
+pub fn save_promotion(
+    state: State<'_, AppState>,
+    uid: Option<String>,
+    input: PromotionInput,
+) -> CmdResult<Vec<Promotion>> {
+    with_session(&state, |s| Ok(s.save_promotion(uid.as_deref(), &input)?))
+}
+
+#[tauri::command]
+pub fn set_promotion_active(
+    state: State<'_, AppState>,
+    uid: String,
+    active: bool,
+) -> CmdResult<Vec<Promotion>> {
+    with_session(&state, |s| Ok(s.set_promotion_active(&uid, active)?))
+}
+
+#[tauri::command]
+pub fn delete_promotion(state: State<'_, AppState>, uid: String) -> CmdResult<Vec<Promotion>> {
+    with_session(&state, |s| Ok(s.delete_promotion(&uid)?))
+}
+
+#[tauri::command]
+pub fn shipments(
+    state: State<'_, AppState>,
+    sale_uid: Option<String>,
+) -> CmdResult<Vec<ShipmentRow>> {
+    with_session(&state, |s| Ok(s.shipments(sale_uid.as_deref())?))
+}
+
+#[tauri::command]
+pub fn save_shipment(
+    state: State<'_, AppState>,
+    uid: Option<String>,
+    input: ShipmentInput,
+) -> CmdResult<ShipmentRow> {
+    with_session(&state, |s| Ok(s.save_shipment(uid.as_deref(), &input)?))
+}
+
+#[tauri::command]
+pub fn pending_dispatches(state: State<'_, AppState>) -> CmdResult<Vec<PendingDispatch>> {
+    with_session(&state, |s| Ok(s.pending_dispatches()?))
+}
+
+#[tauri::command]
+pub fn dispatch_items(
+    state: State<'_, AppState>,
+    id: i64,
+    qty_milli: i64,
+    date: Option<String>,
+) -> CmdResult<Vec<PendingDispatch>> {
+    with_session(&state, |s| {
+        Ok(s.dispatch_items(id, qty_milli, date.as_deref())?)
+    })
+}
+
+#[tauri::command]
+pub fn warehouse_stock(
+    state: State<'_, AppState>,
+    warehouse_uid: String,
+) -> CmdResult<Vec<WarehouseStockRow>> {
+    with_session(&state, |s| Ok(s.warehouse_stock(&warehouse_uid)?))
+}
 
 #[tauri::command]
 pub fn customer_credit(state: State<'_, AppState>, uid: String) -> CmdResult<CustomerCredit> {

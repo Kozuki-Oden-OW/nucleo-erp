@@ -8,6 +8,7 @@ import { useSession } from "../../lib/session";
 import { Badge, Button, Card, Checkbox, EmptyState, Field, Kpi, Notice, PageHeader, Spinner, Tabs, type Tone } from "../../ui/kit";
 import { Dialog, useToast } from "../../ui/overlay";
 import { DataTable, type Column } from "../../ui/table";
+import { Dispatches } from "./Dispatches";
 
 export const STOCK_STATUS: Record<StockStatus, [Tone, string]> = {
   sin_stock: ["danger", "Sin stock"],
@@ -23,13 +24,16 @@ export function StockStatusBadge({ status }: { status: StockStatus }) {
   return <Badge tone={tone}>{label}</Badge>;
 }
 
-type Tab = "existencias" | "movimientos" | "bodegas";
+type Tab = "existencias" | "despachar" | "movimientos" | "bodegas";
 type Filter = "todos" | StockStatus;
 
 export function Inventory({ route }: { route: Route }) {
   const { can } = useSession();
   const tab = (route.query.get("tab") as Tab) || "existencias";
   const setTab = (t: Tab) => navigate(t === "existencias" ? "/inventario" : `/inventario?tab=${t}`, { replace: true });
+  const backend = useBackend();
+  const [pending, setPending] = useState<number | undefined>(undefined);
+  useEffect(() => { backend.pendingDispatches().then((r) => setPending(r.length)).catch(() => {}); }, [backend]);
   return (
     <div className="anim-in">
       <PageHeader
@@ -42,9 +46,10 @@ export function Inventory({ route }: { route: Route }) {
           </>
         )}
       />
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: "existencias", label: "Existencias" }, { value: "movimientos", label: "Ajustes y transferencias" }, { value: "bodegas", label: "Bodegas" }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: "existencias", label: "Existencias" }, { value: "despachar", label: "Por despachar", count: pending }, { value: "movimientos", label: "Ajustes y transferencias" }, { value: "bodegas", label: "Bodegas" }]} />
       <div className="mt-4">
         {tab === "existencias" && <Stock route={route} />}
+        {tab === "despachar" && <Dispatches onCount={setPending} />}
         {tab === "movimientos" && <Docs />}
         {tab === "bodegas" && <Warehouses />}
       </div>

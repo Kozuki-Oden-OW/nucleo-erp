@@ -51,6 +51,8 @@ Todo es entero: las sumas y los reportes se hacen en SQL sin perder exactitud y 
 | 22 | `0022_categorias_costo.sql` | `categories.uid` y `created_at`, nombre único entre las activas, conjunto inicial de seis categorías (solo si no hay ninguna) y `products.cost_sheet_json` (hoja del costo avanzado) |
 | 23 | `0023_ficha_cliente_condiciones_venta.sql` | `customers.region`, `contact_name`, `invoice_email` y `sales.terms_json` (forma de pago, referencias y receptor del documento) |
 | 24 | `0024_credito_clientes.sql` | `customers.credit_enabled` (se activa en quienes ya tenían días de crédito) y `credit_conditions`; tabla `customer_credit_docs` (respaldos del crédito por tipo, con estado, fechas, nota y adjunto) |
+| 25 | `0025_stock_reservas_despachos.sql` | `products.stock_policy` (general, bloquear, vender, reservar), `stock_reservations.dispatched_milli` y `v_stock_position` con lo reservado pendiente |
+| 26 | `0026_promociones_envios.sql` | `customers.preferred`, tabla `promotions` (tipo, regla JSON, vigencia, activa) y `shipments` (agencia, seguimiento, destinatario, fechas y estado) con numeración ENV |
 
 Las migraciones son transaccionales y versionadas con `PRAGMA user_version`. **Pre-1.0:** se pueden
 reescribir (en la Fase 2 se reemplazó la tabla mínima de clientes de la Fase 1); desde la primera beta

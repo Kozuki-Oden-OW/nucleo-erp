@@ -29,6 +29,7 @@ fn product(s: &mut CompanySession, name: &str, price: i64, cost: i64, stock_unit
         initial_stock_milli: Some(stock_units * 1000),
         category_uid: None,
         cost_sheet: None,
+        stock_policy: None,
     })
     .unwrap()
     .uid
@@ -264,6 +265,7 @@ fn factura_interna_al_contado_y_emprendedor_sin_impuesto() {
             initial_stock_milli: None,
             category_uid: None,
             cost_sheet: None,
+            stock_policy: None,
         })
         .unwrap();
     assert_eq!(servicio.unit, "sv");
@@ -389,6 +391,7 @@ fn editar_producto_y_cliente() {
                 category_uid: None,
                 cost_minor: None,
                 cost_sheet: None,
+                stock_policy: None,
             },
         )
         .unwrap();
@@ -408,6 +411,7 @@ fn editar_producto_y_cliente() {
                 category_uid: None,
                 cost_minor: None,
                 cost_sheet: None,
+                stock_policy: None,
             }
         )
         .is_err()

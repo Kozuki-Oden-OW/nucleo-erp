@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { open as openFile } from "@tauri-apps/plugin-dialog";
-import { Building2, Coins, DatabaseBackup, Hash, Lock, Palette, ShieldCheck, Users } from "lucide-react";
+import { Building2, Check, Coins, DatabaseBackup, Hash, Lock, Palette, ShieldCheck, Users } from "lucide-react";
 import { useBackend, errorMessage, type AppInfo, type BackupDone, type BusinessProfile, type BusinessSettings, type SessionInfo } from "../../data";
 import { formatBytes, formatPpm, parsePercent } from "../../lib/format";
 import { navigate, type Route } from "../../lib/router";
@@ -11,6 +11,7 @@ import { useSession } from "../../lib/session";
 import { CurrenciesSection, NumberingSection, SecuritySection } from "./Catalogs";
 import { UsersSection } from "./Users";
 import { LogoCard } from "./LogoCard";
+import { ACCENTS, applyAccent } from "../../lib/accent";
 
 type Section = "negocio" | "usuarios" | "numeracion" | "monedas" | "respaldos" | "seguridad" | "apariencia";
 const SECTIONS: { id: Section; label: string; icon: typeof Building2; feature?: string }[] = [
@@ -113,6 +114,30 @@ function BusinessSection({ onChanged }: { onChanged: () => void }) {
         </div>
       </Card>
       <LogoCard biz={b} editable={editable} onChange={(nb) => { setB({ ...b, logo: nb.logo }); onChanged(); }} />
+      <Card title="Color de la empresa" subtitle="Cambia el color de botones y destacados solo para esta empresa. Así reconoces en cuál estás, sobre todo con dos ventanas abiertas.">
+        <div className="flex flex-wrap gap-3" role="radiogroup" aria-label="Color de la empresa">
+          {ACCENTS.map((a) => {
+            const on = (b.accent ?? "turquesa") === a.id;
+            return (
+              <button key={a.id} type="button" role="radio" aria-checked={on} disabled={!editable}
+                onClick={async () => {
+                  try {
+                    const nb = await backend.updateBusiness({ accent: a.id === "turquesa" ? "" : a.id });
+                    setB({ ...b, accent: nb.accent }); applyAccent(nb.accent);
+                    window.dispatchEvent(new Event("nucleo:logo"));
+                    toast("success", `Color «${a.label}» aplicado a ${b.name}.`);
+                  } catch (e) { toast("danger", errorMessage(e)); }
+                }}
+                className={cx("flex w-28 flex-col items-center gap-2 rounded-xl border p-3 text-xs font-medium transition-colors", on ? "border-accent bg-accent-soft text-ink" : "border-line text-muted hover:border-line-strong hover:text-ink")}>
+                <span className="flex h-9 w-9 items-center justify-center rounded-full" style={{ background: `linear-gradient(135deg, ${a.light} 50%, ${a.dark} 50%)` }} aria-hidden>
+                  {on && <Check size={16} className="text-white drop-shadow" />}
+                </span>
+                {a.label}
+              </button>
+            );
+          })}
+        </div>
+      </Card>
       <Card title="Documentación tributaria e impuestos" subtitle="NÚCLEO no es un sistema tributario: no emite ni envía nada. Solo te recuerda y calcula referencias.">
         <div className="flex flex-col gap-4">
           <Checkbox

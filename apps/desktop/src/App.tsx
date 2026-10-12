@@ -22,6 +22,8 @@ import { Remuneraciones } from "./screens/remuneraciones/Remuneraciones";
 import { LiquidacionRoute } from "./screens/remuneraciones/Liquidacion";
 import { FiniquitoRoute } from "./screens/remuneraciones/Finiquito";
 import { Analisis } from "./screens/analisis/Analisis";
+import { Promotions } from "./screens/promociones/Promotions";
+import { Shipments } from "./screens/envios/Shipments";
 import { ImportEditLoader, ImportEditor } from "./screens/comex/ImportEditor";
 import { ImportView } from "./screens/comex/ImportView";
 import { Purchases } from "./screens/compras/Purchases";
@@ -31,6 +33,7 @@ import { PurchaseView } from "./screens/compras/PurchaseView";
 import { Inventory } from "./screens/inventario/Inventory";
 import { ProductStock } from "./screens/inventario/ProductStock";
 import { StockDocEditor } from "./screens/inventario/StockDocEditor";
+import { CountEditor } from "./screens/inventario/CountEditor";
 import { Config } from "./screens/config/Config";
 import { Money } from "./screens/dinero/Money";
 import { ExpenseView } from "./screens/dinero/Expenses";
@@ -68,7 +71,8 @@ function Root({ onDemo }: { onDemo?: () => void }) {
     try {
       const i = await backend.appInfo();
       setInfo(i);
-      const uid = openUid ?? session?.company.uid ?? i.companies[0]?.uid;
+      const launched = !openUid && !session ? await backend.launchCompany().catch(() => null) : null;
+      const uid = openUid ?? session?.company.uid ?? (launched && i.companies.some((c) => c.uid === launched) ? launched : i.companies[0]?.uid);
       if (uid) setSession(await backend.openCompany(uid));
     } catch (e) {
       setError(errorMessage(e));
@@ -92,7 +96,7 @@ function Root({ onDemo }: { onDemo?: () => void }) {
   return (
     <SessionProvider session={session} setSession={setSession}>
       <InactivityLock session={session} onLocked={(s) => { setLocked(true); setSession(s); }} />
-      <AppShell info={info} session={session} route={route} onSwitch={(uid) => void load(uid)}>
+      <AppShell info={info} session={session} route={route} onSwitch={(uid) => { navigate("/inicio", { replace: true }); void load(uid); }} onCreated={setPendingKey}>
         <Screen route={route} info={info} session={session} reload={() => void load()} />
       </AppShell>
     </SessionProvider>
@@ -159,7 +163,7 @@ function Screen({ route, info, session, reload }: { route: Route; info: AppInfo;
     case "inventario":
       if (!has.has("inventario")) return <Proximamente id="inventario" />;
       if (a === "producto" && b) return <ProductStock key={b} uid={b} />;
-      if (a === "ajuste") return <StockDocEditor key="aju" mode="ajuste" />;
+      if (a === "ajuste") return <CountEditor key="aju" />;
       if (a === "transferencia") return <StockDocEditor key="tra" mode="transferencia" />;
       return <Inventory route={route} />;
     case "dinero":
@@ -179,6 +183,10 @@ function Screen({ route, info, session, reload }: { route: Route; info: AppInfo;
       if (a === "finiquito" && b) return <FiniquitoRoute key={b} id={b} />;
       if (a === "liquidacion" && b) return <LiquidacionRoute key={route.raw} id={b} period={route.query.get("periodo")} />;
       return <Remuneraciones route={route} />;
+    case "promociones":
+      return has.has("promociones") ? <Promotions route={route} /> : <Proximamente id="promociones" />;
+    case "envios":
+      return has.has("envios") ? <Shipments route={route} /> : <Proximamente id="envios" />;
     case "analisis":
       return has.has("reportes") ? <Analisis route={route} /> : <Proximamente id="analisis" />;
     case "config":

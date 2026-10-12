@@ -82,6 +82,7 @@ pub(crate) fn validate_profile(
         notes: text(&p.notes, 2000, "las notas")?,
         credit_enabled: p.credit_enabled,
         credit_conditions: text(&p.credit_conditions, 2000, "las condiciones del crédito")?,
+        preferred: p.preferred,
     })
 }
 

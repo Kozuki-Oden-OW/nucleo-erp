@@ -16,7 +16,7 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | 9 | COMEX (requiere contador colaborador, D-07) | 🟡 Construido (2026-10-06); falta la firma de los casos golden — ver abajo |
 | 10 | Impuestos y contabilidad: A) borrador del F29 ✅ · B) sueldo empresarial, liquidaciones, Previred, LRE y finiquito ✅ · C) F22 Pro Pyme general ✅ (14 D N°8 y 14 A ⏳) · motor de asientos ⏳ | 🚧 |
 | 11 | Documentación externa e indicadores | ⏳ |
-| 12 | Reportes y dashboard del dueño | 🚧 A) 13 reportes base con exportación a Excel y CSV ✅ (2026-10-10) · B) Inicio completo y alertas ⏳ · C) análisis de productos y clientes ⏳ · D) PDF ⏳ · crédito a clientes con respaldos ✅ (2026-10-12, v0.4.0) |
+| 12 | Reportes y dashboard del dueño | 🚧 A) 13 reportes base con exportación a Excel y CSV ✅ (2026-10-10) · B) Inicio completo y alertas ⏳ · C) análisis de productos y clientes ⏳ · D) PDF ⏳ · crédito a clientes con respaldos ✅ (v0.4.0) · promociones, envíos, reservas y despachos, varias empresas ✅ (v0.5.0) |
 | 13 | Seguridad | ⏳ |
 | 14 | Testing | ⏳ |
 | 15 | Instalador → **MVP** | ⏳ |

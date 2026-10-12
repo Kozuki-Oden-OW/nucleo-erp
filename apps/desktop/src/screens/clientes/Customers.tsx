@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { FilePlus2, Pencil, Plus, Search, ShoppingBag, UserPlus, Users } from "lucide-react";
+import { Crown, FilePlus2, Pencil, Plus, Search, ShoppingBag, UserPlus, Users } from "lucide-react";
 import { useBackend, errorMessage, type Customer, type CustomerDetail, type NewCustomer } from "../../data";
 import { REGIONS } from "../../data/lre";
 import { formatDate, formatMoney, formatRut } from "../../lib/format";
 import { useTerm } from "../../lib/glosario";
 import { navigate, type Route } from "../../lib/router";
 import { MoneyField, SaleStatus } from "../../ui/doc";
-import { Button, Checkbox, DefinitionList, EmptyState, Field, Kpi, Notice, PageHeader, Segmented, Select, Spinner, TextArea } from "../../ui/kit";
+import { Badge, Button, Checkbox, DefinitionList, EmptyState, Field, Kpi, Notice, PageHeader, Segmented, Select, Spinner, TextArea } from "../../ui/kit";
 import { Drawer, useToast } from "../../ui/overlay";
 import { DataTable, type Column } from "../../ui/table";
 import { AttachmentsPanel } from "../documentos/Documents";
@@ -65,7 +65,7 @@ export function Customers({ route }: { route: Route }) {
 type Form = {
   kind: "persona" | "empresa"; name: string; rut: string; trade_name: string; business_activity: string; email: string; phone: string;
   invoice_email: string; contact_name: string; address: string; commune: string; city: string; region: string; days: string;
-  credit_limit: number | null; notes: string; credit_enabled: boolean; credit_conditions: string;
+  credit_limit: number | null; notes: string; credit_enabled: boolean; credit_conditions: string; preferred: boolean;
 };
 
 function toForm(c: Customer | undefined, initialName: string): Form {
@@ -74,7 +74,7 @@ function toForm(c: Customer | undefined, initialName: string): Form {
     business_activity: c?.business_activity ?? "", email: c?.email ?? "", phone: c?.phone ?? "", invoice_email: c?.invoice_email ?? "",
     contact_name: c?.contact_name ?? "", address: c?.address ?? "", commune: c?.commune ?? "", city: c?.city ?? "", region: c?.region ?? "",
     days: c?.payment_terms_days ? String(c.payment_terms_days) : "", credit_limit: c?.credit_limit_minor ?? null, notes: c?.notes ?? "",
-    credit_enabled: c?.credit_enabled ?? false, credit_conditions: c?.credit_conditions ?? "",
+    credit_enabled: c?.credit_enabled ?? false, credit_conditions: c?.credit_conditions ?? "", preferred: c?.preferred ?? false,
   };
 }
 
@@ -86,7 +86,7 @@ export function customerInput(f: Form): NewCustomer {
     trade_name: t(f.trade_name), business_activity: t(f.business_activity), invoice_email: t(f.invoice_email), contact_name: t(f.contact_name),
     address: t(f.address), commune: t(f.commune), city: t(f.city), region: t(f.region),
     payment_terms_days: f.credit_enabled ? Number(f.days) || 0 : 0, credit_limit_minor: f.credit_enabled ? f.credit_limit : null, notes: t(f.notes),
-    credit_enabled: f.credit_enabled, credit_conditions: f.credit_enabled ? t(f.credit_conditions) : null,
+    credit_enabled: f.credit_enabled, credit_conditions: f.credit_enabled ? t(f.credit_conditions) : null, preferred: f.preferred,
   };
 }
 
@@ -173,6 +173,8 @@ export function NewCustomerDrawer({ open, onClose, onCreated, initialName = "", 
                 placeholder="Ej. paga con transferencia los días 5; firma pagaré; cheque en garantía; tope por compra…" />
             </div>
           )}
+          <Checkbox label="Cliente preferencial" checked={form.preferred} onChange={(v) => set({ preferred: v })}
+            hint="Recibe las promociones para clientes preferenciales (Descuentos y promociones)." />
           <TextArea label="Notas" optional value={form.notes} onChange={(e) => set({ notes: e.target.value })} placeholder="Horario de recepción, condiciones especiales…" />
         </Section>
         {err && <Notice tone="danger">{err}</Notice>}
@@ -199,7 +201,7 @@ function CustomerDrawer({ uid, onClose, onChanged }: { uid: string; onClose: () 
     <Drawer
       open
       onClose={onClose}
-      title={c?.name ?? "Cliente"}
+      title={c ? <span className="inline-flex items-center gap-2">{c.name}{c.preferred && <Badge tone="accent" icon={Crown}>Preferencial</Badge>}</span> : "Cliente"}
       subtitle={c?.rut ? `RUT ${formatRut(c.rut)}` : undefined}
       width="w-[min(640px,100vw)]"
       footer={c && (

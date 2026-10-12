@@ -51,6 +51,7 @@ fn ciclo_de_compra_completo() {
             initial_stock_milli: Some(10_000),
             category_uid: None,
             cost_sheet: None,
+            stock_policy: None,
         })
         .unwrap();
     let prov = s
@@ -200,6 +201,7 @@ fn compra_directa_con_ingreso_y_anulacion() {
             initial_stock_milli: Some(2_000),
             category_uid: None,
             cost_sheet: None,
+            stock_policy: None,
         })
         .unwrap();
     let prov = s

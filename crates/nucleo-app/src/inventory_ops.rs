@@ -194,9 +194,7 @@ impl CompanySession {
 
     /// Verifica que una venta no deje stock negativo cuando el negocio no lo permite.
     pub(crate) fn check_stock_for_sale(&self, sale_id: i64) -> AppResult<()> {
-        if self.inventory_settings()?.allow_negative {
-            return Ok(());
-        }
+        let allow_negative = self.inventory_settings()?.allow_negative;
         let conn = self.db.conn();
         let wh = conn
             .query_row("SELECT id FROM warehouses WHERE is_default = 1", [], |r| {
@@ -205,7 +203,7 @@ impl CompanySession {
             .ok();
         let Some(wh) = wh else { return Ok(()) };
         let mut stmt = conn.prepare(
-            "SELECT p.id, p.name, sum(i.qty_milli) FROM sale_items i JOIN products p ON p.id = i.product_id
+            "SELECT p.id, p.name, sum(i.qty_milli), p.stock_policy FROM sale_items i JOIN products p ON p.id = i.product_id
              WHERE i.sale_id = ?1 AND p.track_stock = 1 GROUP BY p.id",
         )?;
         let need = stmt
@@ -214,12 +212,23 @@ impl CompanySession {
                     r.get::<_, i64>(0)?,
                     r.get::<_, String>(1)?,
                     r.get::<_, i64>(2)?,
+                    r.get::<_, String>(3)?,
                 ))
             })?
             .collect::<Result<Vec<_>, _>>()?;
         let mut short = Vec::new();
-        for (pid, name, qty) in need {
+        for (pid, name, qty, policy) in need {
+            let check = match policy.as_str() {
+                "vender" | "reservar" => false,
+                "bloquear" => true,
+                _ => !allow_negative,
+            };
+            if !check {
+                continue;
+            }
             let (on_hand, _) = products::balance(conn, pid, wh)?;
+            // Lo apartado para otras ventas por despachar no está disponible.
+            let on_hand = on_hand - nucleo_db::dispatch::committed(conn, pid, wh)?;
             if on_hand < qty {
                 short.push(format!(
                     "{name} (hay {}, se venden {})",
@@ -232,7 +241,7 @@ impl CompanySession {
             Ok(())
         } else {
             Err(AppError::Validation(format!(
-                "no hay stock suficiente en la bodega principal: {}. Registra la compra o un ajuste, o permite vender sin stock en Configuración",
+                "no hay stock suficiente en la bodega principal: {}. Registra la compra o un ajuste, o en la ficha del producto elige vender sin stock o tomar reservas",
                 short.join("; ")
             )))
         }
@@ -249,7 +258,7 @@ impl CompanySession {
         Ok(rows)
     }
 
-    fn warehouse(&self, uid: &str) -> AppResult<WarehouseRow> {
+    pub(crate) fn warehouse(&self, uid: &str) -> AppResult<WarehouseRow> {
         db::warehouse_by_uid(self.db.conn(), uid)?
             .ok_or_else(|| AppError::NotFound("la bodega".into()))
     }

@@ -74,6 +74,7 @@ fn reportes_con_cifras_conocidas() {
             initial_stock_milli: Some(10_000),
             category_uid: Some(sens.clone()),
             cost_sheet: None,
+            stock_policy: None,
         })
         .unwrap();
     assert_eq!(p.category.as_deref(), Some("Sensores"));
@@ -90,6 +91,7 @@ fn reportes_con_cifras_conocidas() {
         category_uid: Some(sens.clone()),
         cost_minor: Some(7_000),
         cost_sheet: None,
+        stock_policy: None,
     };
     assert!(s.update_product(&p.uid, &patch).is_err());
     let p2 = s
