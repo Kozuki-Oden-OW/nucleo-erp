@@ -1,6 +1,6 @@
 // Piezas de la ficha de producto: precio neto o con IVA, costo avanzado y categorías.
 import { useEffect, useMemo, useState } from "react";
-import { Calculator, ChevronDown, ChevronRight, FolderPlus, Pencil, Plus, Tags, Trash2 } from "lucide-react";
+import { Calculator, ChevronDown, ChevronRight, FolderPlus, Pencil, Plus, Star, Tags, Trash2, X } from "lucide-react";
 import { useBackend, errorMessage, type BusinessSettings, type CurrencyRow, type Product, type ProductCategory, type StockPolicy } from "../../data";
 import { computeCostSheet, costSheetUsed, EMPTY_COST_SHEET, grossFromNet, netFromGross, type CostSheet } from "../../data/costing";
 import { CURRENCY_DIGITS, formatMoney, formatPpm, formatQty, parseQty } from "../../lib/format";
@@ -157,14 +157,47 @@ export function CostInput({ cost, onCost, sheet, onSheet, taxPpm, unit, disabled
 
 /* ───────────── Categorías ───────────── */
 
-export function CategorySelect({ value, onChange, categories, onManage }: {
-  value: string | null; onChange: (v: string | null) => void; categories: ProductCategory[]; onManage?: () => void;
+/**
+ * Categorías del producto: puede estar en varias (ej. «Ropa» y «One Piece»). La primera es la
+ * principal, con la que se agrupan los reportes por categoría.
+ */
+export function CategoriesField({ main, extras, onChange, categories, onManage }: {
+  main: string | null; extras: string[]; onChange: (main: string | null, extras: string[]) => void; categories: ProductCategory[]; onManage?: () => void;
 }) {
+  const chosen = [main, ...extras].filter((u): u is string => !!u);
+  const name = (u: string) => categories.find((c) => c.uid === u)?.name ?? "—";
+  const free = categories.filter((c) => !chosen.includes(c.uid));
+  const add = (u: string) => (main ? onChange(main, [...extras, u]) : onChange(u, extras));
+  const remove = (u: string) => {
+    if (u === main) onChange(extras[0] ?? null, extras.slice(1));
+    else onChange(main, extras.filter((x) => x !== u));
+  };
+  const makeMain = (u: string) => onChange(u, [main, ...extras].filter((x): x is string => !!x && x !== u));
   return (
-    <div className="flex items-end gap-2">
-      <Select label="Categoría" optional className="flex-1" value={value ?? ""} onChange={(e) => onChange(e.target.value || null)}
-        options={[{ value: "", label: "Sin categoría" }, ...categories.map((c) => ({ value: c.uid, label: c.name }))]} />
-      {onManage && <Button variant="ghost" size="sm" icon={Tags} onClick={onManage}>Categorías</Button>}
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[13px] font-medium text-ink">Categorías <span className="font-normal text-muted">(opcional, puede tener varias)</span></span>
+        {onManage && <Button variant="ghost" size="sm" icon={Tags} onClick={onManage}>Administrar</Button>}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {chosen.map((u) => (
+          <span key={u} className={cx("inline-flex items-center gap-1 rounded-full border py-0.5 pl-3 pr-1 text-sm",
+            u === main ? "border-accent bg-accent-soft text-accent" : "border-line bg-surface-2 text-ink")}>
+            {u === main ? <span className="inline-flex items-center gap-1"><Star size={12} className="fill-current" aria-hidden />{name(u)}</span>
+              : <button type="button" className="hover:underline" title="Hacerla principal" onClick={() => makeMain(u)}>{name(u)}</button>}
+            <button type="button" aria-label={`Quitar ${name(u)}`} className="rounded-full p-1 hover:bg-surface-3" onClick={() => remove(u)}><X size={12} /></button>
+          </span>
+        ))}
+        {free.length > 0 && (
+          <select aria-label="Agregar categoría" value="" onChange={(e) => e.target.value && add(e.target.value)}
+            className="h-8 rounded-full border border-dashed border-line-strong bg-transparent px-3 text-sm text-muted hover:border-accent hover:text-accent">
+            <option value="">+ Agregar categoría</option>
+            {free.map((c) => <option key={c.uid} value={c.uid}>{c.name}</option>)}
+          </select>
+        )}
+        {categories.length === 0 && <span className="text-sm text-muted">Aún no tienes categorías.</span>}
+      </div>
+      {chosen.length > 1 && <span className="text-xs text-muted">★ Principal: se usa en los reportes por categoría. Toca otra para hacerla principal.</span>}
     </div>
   );
 }
@@ -223,7 +256,7 @@ export function CategoriesDrawer({ open, onClose, categories, onChanged, product
         footer={<><Button variant="ghost" onClick={() => setDeleting(null)}>Cancelar</Button>
           <Button variant="danger" onClick={async () => { if (deleting && await run(backend.deleteCategory(deleting.uid), "Categoría eliminada.")) setDeleting(null); }}>Eliminar</Button></>}>
         <p className="text-sm text-ink">
-          ¿Eliminar «{deleting?.name}»?{deleting && deleting.product_count > 0 ? ` Sus ${deleting.product_count} productos quedan sin categoría; no se borra ningún producto.` : ""}
+          ¿Eliminar «{deleting?.name}»?{deleting && deleting.product_count > 0 ? ` Sus ${deleting.product_count} productos dejan de estar en ella (si tienen otra categoría, esa pasa a ser la principal); no se borra ningún producto.` : ""}
         </p>
       </Dialog>
       {adding && (
@@ -242,7 +275,7 @@ function AssignProducts({ category, products, onClose, onSave }: {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const list = useMemo(() => {
     const words = q.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").split(/\s+/).filter(Boolean);
-    return products.filter((p) => p.category_uid !== category.uid && (!onlyFree || !p.category_uid)
+    return products.filter((p) => p.category_uid !== category.uid && !p.extra_category_uids.includes(category.uid) && (!onlyFree || !p.category_uid)
       && words.every((w) => `${p.name} ${p.sku}`.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").includes(w)));
   }, [products, q, onlyFree, category.uid]);
   const toggle = (u: string) => setPicked((s) => { const n = new Set(s); if (n.has(u)) n.delete(u); else n.add(u); return n; });
@@ -267,7 +300,7 @@ function AssignProducts({ category, products, onClose, onSave }: {
                 <input type="checkbox" checked={picked.has(p.uid)} onChange={() => toggle(p.uid)} className="h-4 w-4 accent-[var(--accent)]" />
                 <span className="w-20 shrink-0 font-mono text-[12px] text-muted">{p.sku}</span>
                 <span className="min-w-0 flex-1 truncate text-ink">{p.name}</span>
-                {p.category && <span className="truncate text-xs text-muted">{p.category}</span>}
+                {p.category && <span className="truncate text-xs text-muted">{[p.category, ...p.extra_categories].join(" · ")}</span>}
               </label>
             </li>
           ))}

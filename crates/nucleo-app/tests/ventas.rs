@@ -28,6 +28,7 @@ fn product(s: &mut CompanySession, name: &str, price: i64, cost: i64, stock_unit
         taxable: Some(true),
         initial_stock_milli: Some(stock_units * 1000),
         category_uid: None,
+        extra_category_uids: None,
         cost_sheet: None,
         stock_policy: None,
     })
@@ -264,6 +265,7 @@ fn factura_interna_al_contado_y_emprendedor_sin_impuesto() {
             taxable: Some(true),
             initial_stock_milli: None,
             category_uid: None,
+            extra_category_uids: None,
             cost_sheet: None,
             stock_policy: None,
         })
@@ -389,6 +391,7 @@ fn editar_producto_y_cliente() {
                 taxable: true,
                 min_milli: 3_000,
                 category_uid: None,
+                extra_category_uids: None,
                 cost_minor: None,
                 cost_sheet: None,
                 stock_policy: None,
@@ -409,6 +412,7 @@ fn editar_producto_y_cliente() {
                 taxable: true,
                 min_milli: 0,
                 category_uid: None,
+                extra_category_uids: None,
                 cost_minor: None,
                 cost_sheet: None,
                 stock_policy: None,

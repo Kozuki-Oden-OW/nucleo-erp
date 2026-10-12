@@ -1,6 +1,6 @@
 // Árbol de navegación (Blueprint §4.2) y visibilidad por perfil (§1.3).
 import {
-  BadgePercent, Banknote, BarChart3, Boxes, Building2, FileText, HandCoins, Home, Landmark, Package, Settings, Ship, ShoppingBag, ShoppingCart, Truck, Users,
+  BadgePercent, Banknote, BarChart3, Boxes, Building2, FileText, HandCoins, Home, Landmark, Package, Receipt, Settings, Ship, ShoppingBag, ShoppingCart, Truck, Users,
   type LucideIcon,
 } from "lucide-react";
 import type { Feature } from "../data/backend";
@@ -40,6 +40,7 @@ export const NAV: NavItem[] = [
   { id: "comprar", label: "Comprar", icon: ShoppingCart, href: "/compras", profiles: ["negocio", "empresa"], feature: "compras", phase: 6, perm: "compras.ver" },
   { id: "inventario", label: "Inventario", icon: Boxes, href: "/inventario", profiles: ALL, feature: "inventario", phase: 7, perm: "inventario.ver" },
   { id: "envios", label: "Envíos", icon: Truck, href: "/envios", profiles: ALL, feature: "envios", phase: 12, perm: "ventas.ver" },
+  { id: "gastos", label: "Gastos", icon: Receipt, href: "/gastos", profiles: ALL, feature: "gastos", phase: 12, perm: "dinero.ver" },
   { id: "dinero", label: "Dinero", icon: Banknote, href: "/dinero", profiles: ALL, feature: "dinero", phase: 8, perm: "dinero.ver" },
   { id: "comex", label: "COMEX", icon: Ship, href: "/comex", profiles: ["empresa"], feature: "comex", phase: 9, perm: "comex.ver" },
   { id: "contabilidad", label: "Impuestos", icon: Landmark, href: "/contabilidad", profiles: ["negocio", "empresa"], feature: "impuestos", phase: 10, perm: "contabilidad.ver" },

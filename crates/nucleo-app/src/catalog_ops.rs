@@ -168,7 +168,8 @@ impl CompanySession {
         Ok(categories::list(self.db.conn())?)
     }
 
-    /// Pone (o quita, con `None`) la categoría de varios productos.
+    /// Agrega una categoría a varios productos (sin categoría: queda como principal; con otra: se
+    /// suma a sus categorías). Con `None`, les quita la categoría principal.
     pub fn assign_category(
         &mut self,
         product_uids: &[String],
@@ -190,7 +191,10 @@ impl CompanySession {
         let user = self.actor_name()?;
         let now = now_utc();
         let tx = self.db.conn_mut().transaction()?;
-        let n = categories::assign(&tx, &ids, category_id, &now)?;
+        let n = match category_id {
+            Some(c) => categories::add_to(&tx, &ids, c, &now)?,
+            None => categories::assign(&tx, &ids, None, &now)?,
+        };
         audit::append(
             &tx,
             &AuditEntry {
@@ -200,6 +204,40 @@ impl CompanySession {
                 entity_id: category_uid,
                 after_json: serde_json::to_string(
                     &serde_json::json!({ "productos": product_uids, "cambiados": n }),
+                )
+                .ok(),
+                ..Default::default()
+            },
+        )?;
+        tx.commit()?;
+        Ok(categories::list(self.db.conn())?)
+    }
+
+    /// Quita una categoría a un producto (la principal u otra).
+    pub fn remove_product_category(
+        &mut self,
+        product_uid: &str,
+        category_uid: &str,
+    ) -> AppResult<Vec<CategoryRow>> {
+        self.require("productos.editar")?;
+        let p = products::by_uid(self.db.conn(), product_uid)?
+            .ok_or_else(|| AppError::NotFound("el producto".into()))?;
+        let c = self
+            .category_id(Some(category_uid))?
+            .ok_or_else(|| AppError::NotFound("la categoría".into()))?;
+        let user = self.actor_name()?;
+        let now = now_utc();
+        let tx = self.db.conn_mut().transaction()?;
+        categories::remove_from(&tx, p.id, c, &now)?;
+        audit::append(
+            &tx,
+            &AuditEntry {
+                user_name: &user,
+                action: "categoria.quitar",
+                entity: "producto",
+                entity_id: Some(product_uid),
+                after_json: serde_json::to_string(
+                    &serde_json::json!({ "categoria": category_uid }),
                 )
                 .ok(),
                 ..Default::default()

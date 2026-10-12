@@ -11,9 +11,10 @@ use nucleo_app::dispatch_ops::{PendingDispatch, WarehouseStockRow};
 use nucleo_app::f22_ops::{F22Inputs, F22View};
 use nucleo_app::f29_ops::{F29Inputs, F29View, RcvImportReport, TaxDocInput, TaxProfile};
 use nucleo_app::finance_ops::{
-    AccountInput, CalendarItem, DashboardData, ExpenseDetail, ExpenseFilter, ExpenseInput,
-    ExpenseSummary, MoneyOverview, MoneyTransferInput, RecurringInput,
+    AccountInput, CalendarItem, CategoryInput, DashboardData, ExpenseDetail, ExpenseFilter,
+    ExpenseInput, ExpenseSummary, MoneyOverview, MoneyTransferInput, RecurringInput,
 };
+use nucleo_app::gastos_ops::ExpenseInsights;
 use nucleo_app::inventory_ops::{
     AdjustmentInput, InventoryOverview, InventorySettings, ProductInventory, ReorderInput,
     StockDocDone, TransferInput,
@@ -663,6 +664,17 @@ pub fn delete_category(
 }
 
 #[tauri::command]
+pub fn remove_product_category(
+    state: State<'_, AppState>,
+    product_uid: String,
+    category_uid: String,
+) -> CmdResult<Vec<ProductCategoryRow>> {
+    with_session(&state, |s| {
+        Ok(s.remove_product_category(&product_uid, &category_uid)?)
+    })
+}
+
+#[tauri::command]
 pub fn assign_category(
     state: State<'_, AppState>,
     product_uids: Vec<String>,
@@ -956,6 +968,24 @@ pub fn add_expense_category(
     fixed: bool,
 ) -> CmdResult<Vec<CategoryRow>> {
     with_session(&state, |s| Ok(s.add_expense_category(&name, fixed)?))
+}
+
+#[tauri::command]
+pub fn expense_categories_all(state: State<'_, AppState>) -> CmdResult<Vec<CategoryRow>> {
+    with_session(&state, |s| Ok(s.expense_categories_all()?))
+}
+
+#[tauri::command]
+pub fn save_expense_category(
+    state: State<'_, AppState>,
+    input: CategoryInput,
+) -> CmdResult<Vec<CategoryRow>> {
+    with_session(&state, |s| Ok(s.save_expense_category(&input)?))
+}
+
+#[tauri::command]
+pub fn expense_insights(state: State<'_, AppState>, months: i64) -> CmdResult<ExpenseInsights> {
+    with_session(&state, |s| Ok(s.expense_insights(months)?))
 }
 
 #[tauri::command]

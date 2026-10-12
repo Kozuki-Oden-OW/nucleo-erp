@@ -33,6 +33,7 @@ fn product(s: &mut CompanySession, sku: &str, stock: i64, policy: &str) -> Strin
         taxable: Some(true),
         initial_stock_milli: Some(stock * 1000),
         category_uid: None,
+        extra_category_uids: None,
         cost_sheet: None,
         stock_policy: Some(policy.into()),
     })
@@ -114,6 +115,7 @@ fn reglas_de_stock_por_producto() {
             taxable: None,
             initial_stock_milli: None,
             category_uid: None,
+            extra_category_uids: None,
             cost_sheet: None,
             stock_policy: Some("regalar".into()),
         })
@@ -161,6 +163,7 @@ fn reservas_y_despachos() {
         taxable: true,
         min_milli: 0,
         category_uid: None,
+        extra_category_uids: None,
         cost_minor: None,
         cost_sheet: None,
         stock_policy: Some("bloquear".into()),

@@ -75,6 +75,8 @@ fn f22_desde_cobros_y_pagos() {
         paid_account_uid: None,
         notes: None,
         recurring_id: None,
+        quantity_milli: None,
+        unit_minor: None,
     })
     .unwrap();
 

@@ -5,8 +5,8 @@
 use crate::company::CompanySession;
 use crate::inventory_ops::{date_ord, date_str};
 use crate::sales_ops::{
-    MAX_PRICE_MINOR, Payment, TimelineItem, local_today, log, method_code, method_label, opt_text,
-    parse_date,
+    MAX_PRICE_MINOR, MAX_QTY_MILLI, Payment, TimelineItem, local_today, log, method_code,
+    method_label, opt_text, parse_date,
 };
 use crate::{AppError, AppResult};
 use nucleo_db::finance::{
@@ -61,6 +61,26 @@ pub struct ExpenseInput {
     pub paid_account_uid: Option<String>,
     pub notes: Option<String>,
     pub recurring_id: Option<i64>,
+    /// Cantidad en milésimas (vacío = 1). Con `unit_minor`, el total es cantidad × valor.
+    #[serde(default)]
+    pub quantity_milli: Option<i64>,
+    /// Valor de cada unidad, con o sin IVA igual que el total.
+    #[serde(default)]
+    pub unit_minor: Option<i64>,
+}
+
+/// Crea (sin `id`) o modifica una categoría de gasto.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CategoryInput {
+    pub id: Option<i64>,
+    pub name: String,
+    pub fixed: bool,
+    #[serde(default)]
+    pub group_name: Option<String>,
+    #[serde(default)]
+    pub monthly_budget_minor: Option<i64>,
+    #[serde(default)]
+    pub archived: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -69,9 +89,13 @@ pub struct ExpenseSummary {
     pub number: String,
     pub date: String,
     pub due_date: Option<String>,
+    pub category_id: i64,
     pub category: String,
+    pub group_name: String,
     pub supplier_name: Option<String>,
     pub description: String,
+    pub quantity_milli: i64,
+    pub unit_minor: i64,
     pub total_minor: i64,
     pub paid_minor: i64,
     pub status: String,
@@ -97,6 +121,7 @@ pub struct ExpenseFilter {
     pub from: Option<String>,
     pub to: Option<String>,
     pub include_void: Option<bool>,
+    pub category_id: Option<i64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -311,9 +336,13 @@ fn expense_summary(g: &ExpenseRow) -> ExpenseSummary {
         number: g.number.clone(),
         date: g.date.clone(),
         due_date: g.due_date.clone(),
+        category_id: g.category_id,
         category: g.category.clone(),
+        group_name: g.group_name.clone(),
         supplier_name: g.supplier_name.clone(),
         description: g.description.clone(),
+        quantity_milli: g.quantity_milli.unwrap_or(1000),
+        unit_minor: g.unit_minor.unwrap_or(g.total_minor),
         total_minor: g.total_minor,
         paid_minor: g.paid_minor,
         status: g.status.clone(),
@@ -550,6 +579,88 @@ impl CompanySession {
         self.expense_categories()
     }
 
+    /// Todas las categorías (también archivadas), para administrarlas.
+    pub fn expense_categories_all(&self) -> AppResult<Vec<CategoryRow>> {
+        self.require("dinero.ver")?;
+        Ok(db::all_categories(self.db.conn())?)
+    }
+
+    /// Crea o modifica una categoría: nombre, fijo o variable, grupo, presupuesto mensual y archivo.
+    pub fn save_expense_category(&mut self, input: &CategoryInput) -> AppResult<Vec<CategoryRow>> {
+        self.require("dinero.registrar")?;
+        let name = input.name.trim();
+        if name.is_empty() || name.chars().count() > 60 {
+            return Err(AppError::Validation(
+                "el nombre de la categoría es obligatorio (hasta 60 caracteres)".into(),
+            ));
+        }
+        let group = input
+            .group_name
+            .as_deref()
+            .map(str::trim)
+            .filter(|g| !g.is_empty())
+            .unwrap_or("Otros");
+        if group.chars().count() > 60 {
+            return Err(AppError::Validation(
+                "el grupo puede tener hasta 60 caracteres".into(),
+            ));
+        }
+        let budget = match input.monthly_budget_minor {
+            Some(b) if !(0..=MAX_PRICE_MINOR).contains(&b) => {
+                return Err(AppError::Validation(
+                    "el presupuesto no puede ser negativo".into(),
+                ));
+            }
+            Some(0) | None => None,
+            b => b,
+        };
+        let behavior = if input.fixed { "fijo" } else { "variable" };
+        let now = now_utc();
+        let user = self.actor_name()?;
+        let tx = self.db.conn_mut().transaction()?;
+        let (id, text) = match input.id {
+            Some(id) => {
+                let old = db::all_categories(&tx)?
+                    .into_iter()
+                    .find(|c| c.id == id)
+                    .ok_or_else(|| AppError::NotFound("la categoría".into()))?;
+                db::update_category(
+                    &tx,
+                    id,
+                    name,
+                    behavior,
+                    group,
+                    budget,
+                    input.archived.then_some(now.as_str()),
+                )?;
+                let text = if input.archived && !old.archived {
+                    format!("Categoría {name} archivada")
+                } else if !input.archived && old.archived {
+                    format!("Categoría {name} reactivada")
+                } else {
+                    format!("Categoría {name} modificada")
+                };
+                (id, text)
+            }
+            None => {
+                let id = db::insert_category(&tx, name, behavior)?;
+                db::update_category(&tx, id, name, behavior, group, budget, None)?;
+                (id, format!("Categoría {name} creada"))
+            }
+        };
+        log(
+            &tx,
+            &user,
+            "gasto.categoria",
+            "categoria",
+            &id.to_string(),
+            &text,
+            None,
+        )?;
+        tx.commit()?;
+        self.expense_categories_all()
+    }
+
     pub fn list_expenses(&self, f: &ExpenseFilter) -> AppResult<Vec<ExpenseSummary>> {
         self.require("dinero.ver")?;
         Ok(db::list_expenses(
@@ -558,7 +669,8 @@ impl CompanySession {
             f.from.as_deref(),
             f.to.as_deref(),
             f.include_void.unwrap_or(false),
-            2000,
+            f.category_id,
+            5000,
         )?
         .iter()
         .map(expense_summary)
@@ -621,11 +733,32 @@ impl CompanySession {
                 "describe el gasto (hasta 200 caracteres)".into(),
             ));
         }
-        if input.total_minor <= 0 || input.total_minor > MAX_PRICE_MINOR {
+        let qty = input.quantity_milli.unwrap_or(1000);
+        if !(1..=MAX_QTY_MILLI).contains(&qty) {
+            return Err(AppError::Validation(
+                "la cantidad debe ser mayor que cero".into(),
+            ));
+        }
+        // Con valor unitario, el total es cantidad × valor (redondeado al peso).
+        let total_minor = match input.unit_minor {
+            Some(u) if !(0..=MAX_PRICE_MINOR).contains(&u) => {
+                return Err(AppError::Validation(
+                    "el valor no puede ser negativo".into(),
+                ));
+            }
+            Some(u) => nucleo_domain::comex::div_round(u as i128 * qty as i128, 1000) as i64,
+            None => input.total_minor,
+        };
+        if total_minor <= 0 || total_minor > MAX_PRICE_MINOR {
             return Err(AppError::Validation(
                 "el monto debe ser mayor que cero".into(),
             ));
         }
+        let unit_minor = input.unit_minor.or(if qty == 1000 {
+            None
+        } else {
+            Some(nucleo_domain::comex::div_round(total_minor as i128 * 1000, qty as i128) as i64)
+        });
         let date = parse_date("la fecha", &input.date)?;
         let due = match input.due_date.as_deref().filter(|d| !d.is_empty()) {
             Some(d) => parse_date("el vencimiento", d)?,
@@ -640,14 +773,14 @@ impl CompanySession {
         // IVA incluido: se separa con la tasa vigente del negocio (informativo).
         let (net, tax) = match (input.tax_included, self.tax_ppm()?) {
             (true, Some(ppm)) => {
-                let net = (Decimal::from(input.total_minor) * Decimal::from(1_000_000)
+                let net = (Decimal::from(total_minor) * Decimal::from(1_000_000)
                     / Decimal::from(1_000_000 + ppm))
                 .round()
                 .to_i64()
-                .unwrap_or(input.total_minor);
-                (net, input.total_minor - net)
+                .unwrap_or(total_minor);
+                (net, total_minor - net)
             }
-            _ => (input.total_minor, 0),
+            _ => (total_minor, 0),
         };
         let now = now_utc();
         let by = self.user_id();
@@ -667,9 +800,11 @@ impl CompanySession {
                 description,
                 net_minor: net,
                 tax_minor: tax,
-                total_minor: input.total_minor,
+                total_minor,
                 recurring_id: input.recurring_id,
                 notes: notes.as_deref(),
+                quantity_milli: (qty != 1000 || unit_minor.is_some()).then_some(qty),
+                unit_minor,
             },
             by,
             &now,
@@ -679,7 +814,7 @@ impl CompanySession {
             id,
             supplier.as_ref().map(|s| s.id),
             &due,
-            input.total_minor,
+            total_minor,
         )?;
         log(
             &tx,
@@ -702,7 +837,7 @@ impl CompanySession {
                 acc,
                 &date,
                 code,
-                input.total_minor,
+                total_minor,
                 pay,
                 by,
                 &now,

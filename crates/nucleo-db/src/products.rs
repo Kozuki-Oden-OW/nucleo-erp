@@ -34,6 +34,9 @@ pub struct ProductRow {
     pub has_movements: bool,
     /// Qué hacer sin stock: "general", "bloquear", "vender" o "reservar".
     pub stock_policy: String,
+    /// Otras categorías del producto (además de la principal), por nombre.
+    pub extra_category_uids: Vec<String>,
+    pub extra_categories: Vec<String>,
 }
 
 const SELECT: &str = "SELECT p.id, p.uid, coalesce(p.sku, ''), p.name, lower(p.unit_code),
@@ -42,7 +45,10 @@ const SELECT: &str = "SELECT p.id, p.uid, coalesce(p.sku, ''), p.name, lower(p.u
         coalesce((SELECT sum(b.on_hand_milli) FROM stock_balances b WHERE b.product_id = p.id), 0),
         coalesce(p.min_stock_milli, 0), p.taxable, p.track_stock,
         c.uid, c.name, p.cost_sheet_json,
-        EXISTS (SELECT 1 FROM stock_movements m WHERE m.product_id = p.id), p.stock_policy
+        EXISTS (SELECT 1 FROM stock_movements m WHERE m.product_id = p.id), p.stock_policy,
+        (SELECT json_group_array(json_array(q.uid, q.name)) FROM (
+            SELECT c2.uid, c2.name FROM product_extra_categories x JOIN categories c2 ON c2.id = x.category_id
+            WHERE x.product_id = p.id AND c2.archived_at IS NULL ORDER BY c2.name COLLATE NOCASE) q)
     FROM products p LEFT JOIN categories c ON c.id = p.category_id";
 
 fn map(r: &Row<'_>) -> rusqlite::Result<ProductRow> {
@@ -66,7 +72,49 @@ fn map(r: &Row<'_>) -> rusqlite::Result<ProductRow> {
             .and_then(|j| serde_json::from_str(&j).ok()),
         has_movements: r.get::<_, i64>(15)? == 1,
         stock_policy: r.get(16)?,
+        extra_category_uids: Vec::new(),
+        extra_categories: Vec::new(),
     })
+    .map(|mut p| {
+        let pairs: Vec<(String, String)> = r
+            .get::<_, Option<String>>(17)
+            .ok()
+            .flatten()
+            .and_then(|j| serde_json::from_str(&j).ok())
+            .unwrap_or_default();
+        (p.extra_category_uids, p.extra_categories) = pairs.into_iter().unzip();
+        p
+    })
+}
+
+/// Quita de las otras categorías la que quedó como principal.
+pub fn drop_main_from_extra(conn: &Connection, product_id: i64) -> DbResult<()> {
+    conn.execute(
+        "DELETE FROM product_extra_categories WHERE product_id = ?1
+           AND category_id IS (SELECT category_id FROM products WHERE id = ?1)",
+        [product_id],
+    )?;
+    Ok(())
+}
+
+/// Reemplaza las otras categorías de un producto (sin repetir la principal).
+pub fn set_extra_categories(
+    conn: &Connection,
+    product_id: i64,
+    category_ids: &[i64],
+) -> DbResult<()> {
+    conn.execute(
+        "DELETE FROM product_extra_categories WHERE product_id = ?1",
+        [product_id],
+    )?;
+    let mut stmt = conn.prepare(
+        "INSERT OR IGNORE INTO product_extra_categories (product_id, category_id)
+         SELECT ?1, ?2 WHERE ?2 IS NOT (SELECT category_id FROM products WHERE id = ?1)",
+    )?;
+    for c in category_ids {
+        stmt.execute((product_id, c))?;
+    }
+    Ok(())
 }
 
 pub fn by_uid(conn: &Connection, uid: &str) -> DbResult<Option<ProductRow>> {

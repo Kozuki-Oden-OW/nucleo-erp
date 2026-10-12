@@ -73,6 +73,7 @@ fn reportes_con_cifras_conocidas() {
             taxable: Some(false),
             initial_stock_milli: Some(10_000),
             category_uid: Some(sens.clone()),
+            extra_category_uids: None,
             cost_sheet: None,
             stock_policy: None,
         })
@@ -89,6 +90,7 @@ fn reportes_con_cifras_conocidas() {
         taxable: false,
         min_milli: 0,
         category_uid: Some(sens.clone()),
+        extra_category_uids: None,
         cost_minor: Some(7_000),
         cost_sheet: None,
         stock_policy: None,
@@ -162,6 +164,8 @@ fn reportes_con_cifras_conocidas() {
         paid_account_uid: None,
         notes: None,
         recurring_id: None,
+        quantity_milli: None,
+        unit_minor: None,
     })
     .unwrap();
 
@@ -187,6 +191,58 @@ fn reportes_con_cifras_conocidas() {
     assert_eq!(t[col(&r, "gastos")], Cell::Int(5_000));
     assert_eq!(t[col(&r, "utilidad")], Cell::Int(7_000));
 
+    // Punto de equilibrio: margen 40 %, gastos 5.000 → hay que vender 12.500 netos.
+    let r = report(&s, "punto_equilibrio");
+    let t = r.totals.as_ref().unwrap();
+    assert_eq!(t[col(&r, "necesaria")], Cell::Int(12_500));
+    assert_eq!(t[col(&r, "diferencia")], Cell::Int(17_500));
+    assert_eq!(t[col(&r, "cumplimiento")], Cell::Int(2_400_000));
+
+    // Gastos → análisis: todavía sin un mes completo, usa lo que va del mes.
+    let ins = s.expense_insights(6).unwrap();
+    assert!(ins.partial);
+    assert_eq!(ins.months_used, 1);
+    assert_eq!(ins.avg_sales_minor, 30_000);
+    assert_eq!(ins.margin_ppm, Some(400_000));
+    assert_eq!(ins.avg_expenses_minor, 5_000);
+    assert_eq!(ins.break_even_minor, Some(12_500));
+    assert_eq!(ins.avg_profit_minor, 7_000);
+    assert_eq!(ins.payables_30d_minor, 5_000);
+    let luz_i = ins
+        .categories
+        .iter()
+        .find(|c| c.name == "Electricidad")
+        .unwrap();
+    assert_eq!(luz_i.this_month_minor, 5_000);
+    assert_eq!(luz_i.group_name, "Local y oficina");
+
+    // Cantidad × valor: 3 almuerzos de $8.990 = $26.970.
+    let comida = cat
+        .iter()
+        .find(|c| c.name == "Alimentación y comidas")
+        .unwrap()
+        .id;
+    let g = s
+        .register_expense(&ExpenseInput {
+            category_id: comida,
+            supplier_uid: None,
+            date: day(0),
+            description: "Almuerzos visita a cliente".into(),
+            total_minor: 0,
+            tax_included: false,
+            due_date: None,
+            paid_method: Some("Efectivo".into()),
+            paid_account_uid: None,
+            notes: None,
+            recurring_id: None,
+            quantity_milli: Some(3_000),
+            unit_minor: Some(8_990),
+        })
+        .unwrap();
+    assert_eq!(g.summary.total_minor, 26_970);
+    assert_eq!(g.summary.quantity_milli, 3_000);
+    assert_eq!(g.summary.unit_minor, 8_990);
+
     // Inventario: quedan 7 a $6.000 = $42.000; rotación 18.000 / 42.000 = 0,43.
     let r = report(&s, "inventario");
     let row = &r.rows[0];
@@ -200,6 +256,11 @@ fn reportes_con_cifras_conocidas() {
             .unwrap()
             .starts_with("/inventario/producto/")
     );
+
+    // Inventario: total invertido (7 × $6.000) y valor total neto (7 × $10.000).
+    let ov = s.inventory_overview().unwrap();
+    assert_eq!(ov.total_value_minor, 42_000);
+    assert_eq!(ov.total_sale_value_minor, 70_000);
 
     // Por cobrar y por pagar al día.
     let r = report(&s, "por_cobrar");

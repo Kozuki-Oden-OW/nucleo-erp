@@ -201,36 +201,79 @@ pub struct CategoryRow {
     pub id: i64,
     pub name: String,
     pub behavior: String,
+    /// Grupo para ordenar y resumir (ej. «Vehículo y transporte»).
+    pub group_name: String,
+    /// Presupuesto mensual (con IVA, como se registran los gastos), si se definió.
+    pub monthly_budget_minor: Option<i64>,
+    pub archived: bool,
 }
 
+const CAT_SELECT: &str = "SELECT id, name, behavior, group_name, monthly_budget_minor, archived_at IS NOT NULL FROM expense_categories";
+
+fn map_category(r: &Row<'_>) -> rusqlite::Result<CategoryRow> {
+    Ok(CategoryRow {
+        id: r.get(0)?,
+        name: r.get(1)?,
+        behavior: r.get(2)?,
+        group_name: r.get(3)?,
+        monthly_budget_minor: r.get(4)?,
+        archived: r.get(5)?,
+    })
+}
+
+/// Categorías vigentes, por nombre.
 pub fn categories(conn: &Connection) -> DbResult<Vec<CategoryRow>> {
-    let mut stmt = conn.prepare("SELECT id, name, behavior FROM expense_categories WHERE archived_at IS NULL ORDER BY name COLLATE NOCASE")?;
-    let rows = stmt.query_map([], |r| {
-        Ok(CategoryRow {
-            id: r.get(0)?,
-            name: r.get(1)?,
-            behavior: r.get(2)?,
-        })
-    })?;
+    let mut stmt = conn.prepare(&format!(
+        "{CAT_SELECT} WHERE archived_at IS NULL ORDER BY name COLLATE NOCASE"
+    ))?;
+    let rows = stmt.query_map([], map_category)?;
     Ok(rows.collect::<Result<_, _>>()?)
 }
 
-pub fn insert_category(conn: &Connection, name: &str, behavior: &str) -> DbResult<i64> {
-    let res = conn.execute(
-        "INSERT INTO expense_categories (name, behavior) VALUES (?1, ?2)",
-        (name.trim(), behavior),
-    );
+/// Todas las categorías, también las archivadas (para administrarlas).
+pub fn all_categories(conn: &Connection) -> DbResult<Vec<CategoryRow>> {
+    let mut stmt = conn.prepare(&format!(
+        "{CAT_SELECT} ORDER BY archived_at IS NOT NULL, group_name COLLATE NOCASE, name COLLATE NOCASE"
+    ))?;
+    let rows = stmt.query_map([], map_category)?;
+    Ok(rows.collect::<Result<_, _>>()?)
+}
+
+fn dup_category<T>(res: rusqlite::Result<T>) -> DbResult<T> {
     match res {
         Err(rusqlite::Error::SqliteFailure(e, _))
             if e.code == rusqlite::ErrorCode::ConstraintViolation =>
         {
             Err(DbError::Duplicate("categoría"))
         }
-        other => {
-            other?;
-            Ok(conn.last_insert_rowid())
-        }
+        other => Ok(other?),
     }
+}
+
+pub fn insert_category(conn: &Connection, name: &str, behavior: &str) -> DbResult<i64> {
+    dup_category(conn.execute(
+        "INSERT INTO expense_categories (name, behavior) VALUES (?1, ?2)",
+        (name.trim(), behavior),
+    ))?;
+    Ok(conn.last_insert_rowid())
+}
+
+/// Cambia nombre, tipo, grupo, presupuesto y si está archivada.
+pub fn update_category(
+    conn: &Connection,
+    id: i64,
+    name: &str,
+    behavior: &str,
+    group_name: &str,
+    budget: Option<i64>,
+    archived_at: Option<&str>,
+) -> DbResult<()> {
+    dup_category(conn.execute(
+        "UPDATE expense_categories SET name = ?2, behavior = ?3, group_name = ?4, monthly_budget_minor = ?5,
+            archived_at = CASE WHEN ?6 IS NULL THEN NULL ELSE coalesce(archived_at, ?6) END WHERE id = ?1",
+        rusqlite::params![id, name, behavior, group_name, budget, archived_at],
+    ))?;
+    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -253,12 +296,15 @@ pub struct ExpenseRow {
     pub void_reason: Option<String>,
     pub notes: Option<String>,
     pub recurring_id: Option<i64>,
+    pub quantity_milli: Option<i64>,
+    pub unit_minor: Option<i64>,
+    pub group_name: String,
 }
 
 const EXP_SELECT: &str = "SELECT g.id, g.uid, g.number, g.category_id, k.name, v.uid, v.name, g.expense_date, g.due_date, g.description,
         g.net_minor, g.tax_minor, g.total_minor,
         coalesce((SELECT sum(b.paid_minor) FROM payables b WHERE b.source_type = 'GAS' AND b.source_id = g.id AND b.status <> 'anulada'), 0),
-        g.status, g.void_reason, g.notes, g.recurring_schedule_id
+        g.status, g.void_reason, g.notes, g.recurring_schedule_id, g.quantity_milli, g.unit_minor, k.group_name
     FROM expenses g JOIN expense_categories k ON k.id = g.category_id LEFT JOIN suppliers v ON v.id = g.supplier_id";
 
 fn map_expense(r: &Row<'_>) -> rusqlite::Result<ExpenseRow> {
@@ -281,6 +327,9 @@ fn map_expense(r: &Row<'_>) -> rusqlite::Result<ExpenseRow> {
         void_reason: r.get(15)?,
         notes: r.get(16)?,
         recurring_id: r.get(17)?,
+        quantity_milli: r.get(18)?,
+        unit_minor: r.get(19)?,
+        group_name: r.get(20)?,
     })
 }
 
@@ -295,6 +344,8 @@ pub struct ExpenseWrite<'a> {
     pub total_minor: i64,
     pub recurring_id: Option<i64>,
     pub notes: Option<&'a str>,
+    pub quantity_milli: Option<i64>,
+    pub unit_minor: Option<i64>,
 }
 
 pub fn insert_expense(
@@ -307,11 +358,11 @@ pub fn insert_expense(
 ) -> DbResult<i64> {
     conn.execute(
         "INSERT INTO expenses (uid, number, category_id, supplier_id, expense_date, due_date, description, net_minor, tax_minor,
-            total_minor, recurring_schedule_id, notes, created_by, created_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+            total_minor, recurring_schedule_id, notes, created_by, created_at, quantity_milli, unit_minor)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
         rusqlite::params![
             uid, number, w.category_id, w.supplier_id, w.date, w.due_date, w.description, w.net_minor, w.tax_minor,
-            w.total_minor, w.recurring_id, w.notes, by, now
+            w.total_minor, w.recurring_id, w.notes, by, now, w.quantity_milli, w.unit_minor
         ],
     )?;
     Ok(conn.last_insert_rowid())
@@ -333,17 +384,18 @@ pub fn list_expenses(
     from: Option<&str>,
     to: Option<&str>,
     include_void: bool,
+    category_id: Option<i64>,
     limit: u32,
 ) -> DbResult<Vec<ExpenseRow>> {
     let like = format!("%{}%", query.trim());
     let mut stmt = conn.prepare(&format!(
         "{EXP_SELECT} WHERE (?1 = '%%' OR g.number LIKE ?1 OR g.description LIKE ?1 OR k.name LIKE ?1 OR coalesce(v.name, '') LIKE ?1)
            AND (?2 IS NULL OR g.expense_date >= ?2) AND (?3 IS NULL OR g.expense_date <= ?3)
-           AND (?4 = 1 OR g.status = 'registrado')
+           AND (?4 = 1 OR g.status = 'registrado') AND (?6 IS NULL OR g.category_id = ?6)
          ORDER BY g.expense_date DESC, g.id DESC LIMIT ?5"
     ))?;
     let rows = stmt.query_map(
-        rusqlite::params![like, from, to, include_void as i64, limit],
+        rusqlite::params![like, from, to, include_void as i64, limit, category_id],
         map_expense,
     )?;
     Ok(rows.collect::<Result<_, _>>()?)
@@ -369,6 +421,33 @@ pub fn expenses_by_category(
     )?;
     let rows = stmt.query_map((from, to), |r| Ok((r.get(0)?, r.get(1)?)))?;
     Ok(rows.collect::<Result<_, _>>()?)
+}
+
+/// Gastos netos (sin IVA recuperable) por mes y categoría: (AAAA-MM, categoría, neto, total).
+pub fn expenses_by_month_category(
+    conn: &Connection,
+    from: &str,
+    to: &str,
+) -> DbResult<Vec<(String, i64, i64, i64)>> {
+    let mut stmt = conn.prepare(
+        "SELECT substr(expense_date, 1, 7), category_id, sum(net_minor), sum(total_minor) FROM expenses
+         WHERE status = 'registrado' AND expense_date BETWEEN ?1 AND ?2 GROUP BY 1, 2 ORDER BY 1",
+    )?;
+    let rows = stmt.query_map((from, to), |r| {
+        Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
+    })?;
+    Ok(rows.collect::<Result<_, _>>()?)
+}
+
+/// Primer día con actividad (venta vigente o gasto registrado), si hay.
+pub fn first_activity(conn: &Connection) -> DbResult<Option<String>> {
+    Ok(conn.query_row(
+        "SELECT min(d) FROM (
+            SELECT min(issue_date) AS d FROM sales WHERE commercial_state IN ('efectuada', 'cerrada')
+            UNION ALL SELECT min(expense_date) FROM expenses WHERE status = 'registrado')",
+        [],
+        |r| r.get(0),
+    )?)
 }
 
 pub fn insert_expense_payable(

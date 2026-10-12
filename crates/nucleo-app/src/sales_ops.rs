@@ -44,6 +44,9 @@ pub struct NewProduct {
     /// Categoría (uid), opcional.
     #[serde(default)]
     pub category_uid: Option<String>,
+    /// Otras categorías del producto (uids), además de la principal.
+    #[serde(default)]
+    pub extra_category_uids: Option<Vec<String>>,
     /// Hoja de costo avanzado: si trae datos, el costo sale de ella.
     #[serde(default)]
     pub cost_sheet: Option<nucleo_domain::costing::CostSheet>,
@@ -61,9 +64,12 @@ pub struct ProductPatch {
     pub price_minor: i64,
     pub taxable: bool,
     pub min_milli: i64,
-    /// Categoría (uid); `None` = sin categoría.
+    /// Categoría principal (uid); `None` = sin categoría.
     #[serde(default)]
     pub category_uid: Option<String>,
+    /// Otras categorías (uids); `None` = no cambian.
+    #[serde(default)]
+    pub extra_category_uids: Option<Vec<String>>,
     /// Nuevo costo (pesos). Solo se acepta si el producto no tiene movimientos de stock.
     #[serde(default)]
     pub cost_minor: Option<i64>,
@@ -504,6 +510,25 @@ impl CompanySession {
 
     /* ───────────── Productos ───────────── */
 
+    /// Ids de las otras categorías (hasta 20, sin repetir).
+    fn extra_category_ids(&self, uids: Option<&[String]>) -> AppResult<Option<Vec<i64>>> {
+        let Some(uids) = uids else { return Ok(None) };
+        if uids.len() > 20 {
+            return Err(AppError::Validation(
+                "un producto puede tener hasta 20 categorías".into(),
+            ));
+        }
+        let mut ids = Vec::with_capacity(uids.len());
+        for u in uids.iter().filter(|u| !u.is_empty()) {
+            if let Some(id) = self.category_id(Some(u))?
+                && !ids.contains(&id)
+            {
+                ids.push(id);
+            }
+        }
+        Ok(Some(ids))
+    }
+
     fn public_product(&self, mut p: ProductRow) -> ProductRow {
         if !self.can("costos.ver") {
             p.cost_e4 = 0;
@@ -557,6 +582,7 @@ impl CompanySession {
         let sheet = self.prepare_cost_sheet(input.cost_sheet.as_ref())?;
         let cost_e4 = sheet.as_ref().map(|(e4, _)| *e4).unwrap_or(cost * 10_000);
         let category_id = self.category_id(input.category_uid.as_deref())?;
+        let extra_ids = self.extra_category_ids(input.extra_category_uids.as_deref())?;
         let policy = crate::dispatch_ops::check_policy(input.stock_policy.as_deref())?;
         let stock = input.initial_stock_milli.unwrap_or(0);
         if !(0..=MAX_QTY_MILLI).contains(&stock) || (stock > 0 && kind == "servicio") {
@@ -588,6 +614,14 @@ impl CompanySession {
         let row = match policy {
             Some(pol) if pol != "general" && kind != "servicio" => {
                 products::set_stock_policy(&tx, row.id, pol)?;
+                products::by_id(&tx, row.id)?
+                    .ok_or_else(|| AppError::NotFound("el producto".into()))?
+            }
+            _ => row,
+        };
+        let row = match &extra_ids {
+            Some(ids) if !ids.is_empty() => {
+                products::set_extra_categories(&tx, row.id, ids)?;
                 products::by_id(&tx, row.id)?
                     .ok_or_else(|| AppError::NotFound("el producto".into()))?
             }
@@ -656,6 +690,7 @@ impl CompanySession {
         }
         let unit = patch.unit.trim().to_uppercase();
         let category_id = self.category_id(patch.category_uid.as_deref())?;
+        let extra_ids = self.extra_category_ids(patch.extra_category_uids.as_deref())?;
         let policy = crate::dispatch_ops::check_policy(patch.stock_policy.as_deref())?;
         let sheet = self.prepare_cost_sheet(patch.cost_sheet.as_ref())?;
         if let Some(c) = patch.cost_minor
@@ -700,6 +735,10 @@ impl CompanySession {
             && before.kind != "servicio"
         {
             products::set_stock_policy(&tx, before.id, pol)?;
+        }
+        match &extra_ids {
+            Some(ids) => products::set_extra_categories(&tx, before.id, ids)?,
+            None => products::drop_main_from_extra(&tx, before.id)?,
         }
         let after = products::by_id(&tx, before.id)?
             .ok_or_else(|| AppError::NotFound("el producto".into()))?;

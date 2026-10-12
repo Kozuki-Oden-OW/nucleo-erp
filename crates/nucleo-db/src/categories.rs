@@ -19,7 +19,8 @@ pub struct CategoryRow {
 pub fn list(conn: &Connection) -> DbResult<Vec<CategoryRow>> {
     let mut stmt = conn.prepare(
         "SELECT c.id, c.uid, c.name,
-            (SELECT count(*) FROM products p WHERE p.category_id = c.id AND p.archived_at IS NULL)
+            (SELECT count(*) FROM products p WHERE p.archived_at IS NULL AND (p.category_id = c.id
+                OR EXISTS (SELECT 1 FROM product_extra_categories x WHERE x.product_id = p.id AND x.category_id = c.id)))
          FROM categories c WHERE c.archived_at IS NULL
          ORDER BY c.name COLLATE NOCASE",
     )?;
@@ -77,11 +78,23 @@ pub fn rename(conn: &Connection, id: i64, name: &str) -> DbResult<()> {
     Ok(())
 }
 
-/// Elimina (archiva) la categoría. Sus productos quedan sin categoría.
+/// Elimina (archiva) la categoría. Si era la principal de un producto, pasa a principal otra de
+/// sus categorías; si no tiene otra, queda sin categoría.
 pub fn archive(conn: &Connection, id: i64, now: &str) -> DbResult<usize> {
+    conn.execute(
+        "DELETE FROM product_extra_categories WHERE category_id = ?1",
+        [id],
+    )?;
     let moved = conn.execute(
-        "UPDATE products SET category_id = NULL, updated_at = ?2 WHERE category_id = ?1",
+        "UPDATE products SET updated_at = ?2, category_id = (
+            SELECT x.category_id FROM product_extra_categories x JOIN categories k ON k.id = x.category_id
+            WHERE x.product_id = products.id AND k.archived_at IS NULL ORDER BY k.name COLLATE NOCASE LIMIT 1)
+         WHERE category_id = ?1",
         (id, now),
+    )?;
+    conn.execute(
+        "DELETE FROM product_extra_categories WHERE (product_id, category_id) IN (SELECT id, category_id FROM products WHERE category_id IS NOT NULL)",
+        [],
     )?;
     conn.execute(
         "UPDATE categories SET archived_at = ?2 WHERE id = ?1",
@@ -90,7 +103,64 @@ pub fn archive(conn: &Connection, id: i64, now: &str) -> DbResult<usize> {
     Ok(moved)
 }
 
-/// Asigna (o quita, con `None`) la categoría de varios productos. Devuelve cuántos cambiaron.
+/// Agrega una categoría a varios productos: si no tienen categoría, queda como principal; si ya
+/// tienen otra, se suma a sus otras categorías. Devuelve cuántos cambiaron.
+pub fn add_to(
+    conn: &Connection,
+    product_ids: &[i64],
+    category_id: i64,
+    now: &str,
+) -> DbResult<usize> {
+    let mut main = conn.prepare(
+        "UPDATE products SET category_id = ?2, updated_at = ?3 WHERE id = ?1 AND category_id IS NULL",
+    )?;
+    let mut extra = conn.prepare(
+        "INSERT OR IGNORE INTO product_extra_categories (product_id, category_id)
+         SELECT id, ?2 FROM products WHERE id = ?1 AND category_id IS NOT ?2",
+    )?;
+    let mut n = 0;
+    for id in product_ids {
+        let changed = main.execute(rusqlite::params![id, category_id, now])?
+            + extra.execute(rusqlite::params![id, category_id])?;
+        n += changed.min(1);
+    }
+    Ok(n)
+}
+
+/// Quita una categoría de un producto (principal u otra). Si era la principal, pasa a principal
+/// otra de sus categorías.
+pub fn remove_from(
+    conn: &Connection,
+    product_id: i64,
+    category_id: i64,
+    now: &str,
+) -> DbResult<()> {
+    conn.execute(
+        "DELETE FROM product_extra_categories WHERE product_id = ?1 AND category_id = ?2",
+        (product_id, category_id),
+    )?;
+    let promoted: Option<i64> = conn
+        .query_row(
+            "SELECT x.category_id FROM product_extra_categories x JOIN categories k ON k.id = x.category_id
+             WHERE x.product_id = ?1 AND k.archived_at IS NULL ORDER BY k.name COLLATE NOCASE LIMIT 1",
+            [product_id],
+            |r| r.get(0),
+        )
+        .optional()?;
+    let n = conn.execute(
+        "UPDATE products SET category_id = ?3, updated_at = ?4 WHERE id = ?1 AND category_id = ?2",
+        rusqlite::params![product_id, category_id, promoted, now],
+    )?;
+    if let Some(p) = promoted.filter(|_| n > 0) {
+        conn.execute(
+            "DELETE FROM product_extra_categories WHERE product_id = ?1 AND category_id = ?2",
+            (product_id, p),
+        )?;
+    }
+    Ok(())
+}
+
+/// Asigna (o quita, con `None`) la categoría principal de varios productos. Devuelve cuántos cambiaron.
 pub fn assign(
     conn: &Connection,
     product_ids: &[i64],
@@ -101,9 +171,13 @@ pub fn assign(
         "UPDATE products SET category_id = ?2, updated_at = ?3
          WHERE id = ?1 AND category_id IS NOT ?2",
     )?;
+    let mut drop_extra = conn.prepare(
+        "DELETE FROM product_extra_categories WHERE product_id = ?1 AND category_id IS ?2",
+    )?;
     let mut n = 0;
     for id in product_ids {
         n += stmt.execute(rusqlite::params![id, category_id, now])?;
+        drop_extra.execute(rusqlite::params![id, category_id])?;
     }
     Ok(n)
 }

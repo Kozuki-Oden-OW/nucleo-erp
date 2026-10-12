@@ -13,7 +13,8 @@ export function formatCLP(minor: number): string {
 
 /** Monto en unidad mínima → texto con símbolo. */
 export function formatMoney(minor: number, currency = "CLP"): string {
-  if (currency === "CLP") return clp.format(minor);
+  // Signo menos tipográfico delante del símbolo: −$5.000 (y no $-5.000).
+  if (currency === "CLP") return minor < 0 ? `−${clp.format(-minor)}` : clp.format(minor);
   const d = CURRENCY_DIGITS[currency] ?? 2;
   return new Intl.NumberFormat("es-CL", { style: "currency", currency, minimumFractionDigits: d, maximumFractionDigits: d }).format(minor / 10 ** d);
 }

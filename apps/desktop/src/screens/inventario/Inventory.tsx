@@ -1,6 +1,6 @@
 // Inventario: existencias con análisis (velocidad, cobertura, quiebre), ajustes y transferencias, bodegas.
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowLeftRight, Boxes, ClipboardCheck, PackageX, Plus, Search, Star, Archive, Pencil, TrendingDown, Warehouse as WarehouseIcon } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, Boxes, Tag, ClipboardCheck, PackageX, Plus, Search, Star, Archive, Pencil, TrendingDown, Warehouse as WarehouseIcon } from "lucide-react";
 import { useBackend, errorMessage, type InventoryOverview, type StockAnalysis, type StockDocRow, type StockStatus, type Warehouse } from "../../data";
 import { formatDate, formatMoney, formatQty } from "../../lib/format";
 import { navigate, type Route } from "../../lib/router";
@@ -86,8 +86,10 @@ function Stock({ route }: { route: Route }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Kpi label="Valor del inventario" value={formatMoney(o.total_value_minor)} hint={`${o.rows.filter((r) => r.on_hand_milli > 0).length} productos con stock`} icon={Boxes} onClick={() => setFilter("todos")} />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <Kpi label="Total invertido" value={formatMoney(o.total_value_minor)} hint={`Stock × costo · ${o.rows.filter((r) => r.on_hand_milli > 0).length} productos con stock`} icon={Boxes} onClick={() => setFilter("todos")} />
+        <Kpi label="Valor total neto" value={formatMoney(o.total_sale_value_minor)} tone="success" icon={Tag} onClick={() => setFilter("todos")}
+          hint={o.total_value_minor > 0 ? `A precio de venta sin IVA · ganarías ${formatMoney(o.total_sale_value_minor - o.total_value_minor)}` : "Stock × precio de venta, sin IVA"} />
         <Kpi label="Sin stock" value={count("sin_stock")} tone={count("sin_stock") ? "danger" : undefined} icon={PackageX} onClick={() => setFilter("sin_stock")} />
         <Kpi label="Riesgo de quiebre" value={count("riesgo_quiebre")} tone={count("riesgo_quiebre") ? "warning" : undefined} hint="Se acaba antes de reponer" icon={AlertTriangle} onClick={() => setFilter("riesgo_quiebre")} />
         <Kpi label="Bajo el mínimo" value={count("bajo_minimo")} tone={count("bajo_minimo") ? "warning" : undefined} icon={TrendingDown} onClick={() => setFilter("bajo_minimo")} />

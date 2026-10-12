@@ -27,6 +27,7 @@ fn product(s: &mut CompanySession, sku: &str) -> String {
         taxable: Some(true),
         initial_stock_milli: Some(10_000),
         category_uid: None,
+        extra_category_uids: None,
         cost_sheet: None,
         stock_policy: None,
     })

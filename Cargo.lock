@@ -2182,7 +2182,7 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
 name = "nucleo-app"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "argon2",
  "data-encoding",
@@ -2203,7 +2203,7 @@ dependencies = [
 
 [[package]]
 name = "nucleo-db"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "hex",
  "rusqlite",
@@ -2218,7 +2218,7 @@ dependencies = [
 
 [[package]]
 name = "nucleo-desktop"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "data-encoding",
  "nucleo-app",
@@ -2232,7 +2232,7 @@ dependencies = [
 
 [[package]]
 name = "nucleo-domain"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "rust_decimal",
  "rust_decimal_macros",
@@ -2243,7 +2243,7 @@ dependencies = [
 
 [[package]]
 name = "nucleo-io"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "aes-gcm",
  "argon2",
@@ -2259,7 +2259,7 @@ dependencies = [
 
 [[package]]
 name = "nucleo-rules"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "ed25519-dalek",
  "hex",
@@ -2273,7 +2273,7 @@ dependencies = [
 
 [[package]]
 name = "nucleo-tools"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "ed25519-dalek",
  "getrandom 0.3.4",

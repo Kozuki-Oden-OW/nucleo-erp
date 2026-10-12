@@ -11,7 +11,7 @@ import type {
   SeveranceForm, SeveranceView, Worker, WorkerInput,
   F29Inputs, F29View, RcvImportReport, TaxDocInput, TaxProfile,
   ImportCostInput, ImportDetail, ImportInput, ImportReceiveLine, ImportStage, ImportSummary, IncotermDef,
-  AccountInput, CalendarItem, ExpenseCategory, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow, MoneyAccount,
+  AccountInput, CalendarItem, CategoryInput, ExpenseCategory, ExpenseInsights, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow, MoneyAccount,
   MoneyOverview, MoneyTransferInput, Recurring, RecurringInput,
   AdjustmentInput, InventoryOverview, InventorySettings, ProductInventory, ReorderInput, StockDocDone, StockDocRow, TransferInput, Warehouse,
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
@@ -48,7 +48,7 @@ export class TauriBackend implements Backend {
   readonly kind = "tauri" as const;
   readonly features: ReadonlySet<Feature> = new Set<Feature>([
     "clientes", "respaldos", "negocio", "busqueda", "usuarios", "documentos", "numeracion", "monedas", "auditoria",
-    "productos", "ventas", "compras", "inventario", "dinero", "dashboard", "comex", "impuestos", "remuneraciones", "reportes", "promociones", "envios",
+    "productos", "ventas", "compras", "inventario", "dinero", "dashboard", "comex", "impuestos", "remuneraciones", "reportes", "promociones", "envios", "gastos",
   ]);
 
   async appInfo(): Promise<AppInfo> {
@@ -132,6 +132,7 @@ export class TauriBackend implements Backend {
   saveCategory(uid: string | null, name: string) { return call<ProductCategory[]>("save_category", { uid, name }); }
   deleteCategory(uid: string) { return call<ProductCategory[]>("delete_category", { uid }); }
   assignCategory(productUids: string[], categoryUid: string | null) { return call<ProductCategory[]>("assign_category", { productUids, categoryUid }); }
+  removeProductCategory(productUid: string, categoryUid: string) { return call<ProductCategory[]>("remove_product_category", { productUid, categoryUid }); }
   listQuotes(query?: string) { return call<QuoteSummary[]>("list_quotes", { query: query ?? null }); }
   quote(uid: string) { return call<QuoteDetail>("quote", { uid }); }
   saveQuote(input: QuoteInput, uid?: string) { return call<QuoteDetail>("save_quote", { input, uid: uid ?? null }); }
@@ -186,6 +187,9 @@ export class TauriBackend implements Backend {
   transferMoney(input: MoneyTransferInput) { return call<MoneyAccount[]>("transfer_money", { input: { ...input, notes: input.notes ?? null } }); }
   expenseCategories() { return call<ExpenseCategory[]>("expense_categories"); }
   addExpenseCategory(name: string, fixed: boolean) { return call<ExpenseCategory[]>("add_expense_category", { name, fixed }); }
+  expenseCategoriesAll() { return call<ExpenseCategory[]>("expense_categories_all"); }
+  saveExpenseCategory(input: CategoryInput) { return call<ExpenseCategory[]>("save_expense_category", { input }); }
+  expenseInsights(months: number) { return call<ExpenseInsights>("expense_insights", { months }); }
   listExpenses(filter: ExpenseFilter) { return call<ExpenseSummary[]>("list_expenses", { filter }); }
   expense(uid: string) { return call<ExpenseDetail>("expense", { uid }); }
   registerExpense(input: ExpenseInput) { return call<ExpenseDetail>("register_expense", { input }); }

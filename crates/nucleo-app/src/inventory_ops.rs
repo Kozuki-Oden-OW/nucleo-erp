@@ -69,7 +69,10 @@ pub struct StockAnalysis {
 #[derive(Debug, Clone, Serialize)]
 pub struct InventoryOverview {
     pub window_days: i64,
+    /// Lo invertido: stock × costo promedio (sin IVA). Cero sin permiso para ver costos.
     pub total_value_minor: i64,
+    /// Lo que vale a precio de venta: stock × precio neto (sin IVA).
+    pub total_sale_value_minor: i64,
     pub rows: Vec<StockAnalysis>,
 }
 
@@ -821,9 +824,24 @@ impl CompanySession {
     pub fn inventory_overview(&self) -> AppResult<InventoryOverview> {
         self.require("inventario.ver")?;
         let (total, rows) = self.analyze(None)?;
+        let prices: HashMap<String, i64> = products::search(self.db.conn(), "", 100_000)?
+            .into_iter()
+            .map(|p| (p.uid, p.price_minor))
+            .collect();
+        let total_sale: i64 = rows
+            .iter()
+            .filter(|r| r.on_hand_milli > 0)
+            .map(|r| {
+                nucleo_domain::comex::div_round(
+                    r.on_hand_milli as i128 * prices.get(&r.uid).copied().unwrap_or(0) as i128,
+                    1000,
+                ) as i64
+            })
+            .sum();
         Ok(InventoryOverview {
             window_days: WINDOW_DAYS,
             total_value_minor: total,
+            total_sale_value_minor: total_sale,
             rows,
         })
     }

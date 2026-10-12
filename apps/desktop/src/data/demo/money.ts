@@ -1,13 +1,21 @@
 // Piezas puras del módulo Dinero de la demostración: mismas reglas que `finance_ops.rs`.
 import type { Aging, ExpenseCategory, Recurring } from "../types";
 
-/** Categorías de gasto iniciales (las mismas que siembra la migración 0007). */
-export const DEMO_CATEGORIES: ExpenseCategory[] = [
-  ["Arriendo", "fijo"], ["Electricidad", "variable"], ["Agua", "variable"], ["Internet y telefonía", "fijo"],
-  ["Transporte", "variable"], ["Marketing", "variable"], ["Remuneraciones", "fijo"], ["Honorarios", "variable"],
-  ["Software", "fijo"], ["Maquinaria y equipos", "variable"], ["Materiales", "variable"], ["Logística", "variable"],
-  ["Impuestos y contribuciones", "variable"], ["Comisiones bancarias", "variable"], ["Otros", "variable"],
-].map(([name, behavior], i) => ({ id: i + 1, name: name!, behavior: behavior as ExpenseCategory["behavior"] }));
+/** Categorías de gasto iniciales (las mismas que siembran las migraciones 0007 y 0027). */
+export const DEMO_CATEGORIES: ExpenseCategory[] = ([
+  ["Arriendo", "fijo", "Local y oficina"], ["Electricidad", "variable", "Local y oficina"], ["Agua", "variable", "Local y oficina"],
+  ["Internet y telefonía", "fijo", "Local y oficina"], ["Transporte", "variable", "Vehículo y transporte"], ["Publicidad y marketing", "variable", "Ventas y publicidad"],
+  ["Remuneraciones", "fijo", "Personas y estudios"], ["Honorarios", "variable", "Personas y estudios"], ["Software", "fijo", "Servicios"],
+  ["Maquinaria y equipos", "variable", "Operación"], ["Materiales", "variable", "Operación"], ["Logística", "variable", "Operación"],
+  ["Impuestos y contribuciones", "variable", "Impuestos y finanzas"], ["Comisiones bancarias", "variable", "Impuestos y finanzas"], ["Otros", "variable", "Otros"],
+  ["Combustible", "variable", "Vehículo y transporte"], ["Peajes y estacionamientos", "variable", "Vehículo y transporte"], ["Mantención de vehículos", "variable", "Vehículo y transporte"],
+  ["Viajes y pasajes", "variable", "Viajes y comidas"], ["Alojamiento", "variable", "Viajes y comidas"], ["Alimentación y comidas", "variable", "Viajes y comidas"],
+  ["Gas", "variable", "Local y oficina"], ["Aseo y mantención", "variable", "Local y oficina"], ["Útiles de oficina", "variable", "Local y oficina"],
+  ["Reparaciones", "variable", "Local y oficina"], ["Estudios y capacitación", "variable", "Personas y estudios"],
+  ["Comisiones de venta y plataformas", "variable", "Ventas y publicidad"], ["Envases y embalaje", "variable", "Operación"],
+  ["Contabilidad y asesorías", "fijo", "Servicios"], ["Seguros", "fijo", "Servicios"], ["Intereses de créditos", "fijo", "Impuestos y finanzas"],
+  ["Patentes y permisos", "variable", "Impuestos y finanzas"],
+] as const).map(([name, behavior, group_name], i) => ({ id: i + 1, name, behavior, group_name, monthly_budget_minor: null, archived: false }));
 
 export const PROJECTION_WEEKS = 13;
 

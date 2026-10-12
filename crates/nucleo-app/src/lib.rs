@@ -14,6 +14,7 @@ pub mod error;
 pub mod f22_ops;
 pub mod f29_ops;
 pub mod finance_ops;
+pub mod gastos_ops;
 pub mod inventory_ops;
 pub mod keys;
 pub mod payroll_ops;

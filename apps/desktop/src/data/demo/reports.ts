@@ -1,5 +1,6 @@
 // Reportes de la demostración: misma estructura y reglas que nucleo-app::report_ops (Rust),
 // calculados sobre los datos en memoria. El escritorio usa la versión en Rust.
+import { breakEven } from "../gastos";
 import type { DueRow, Report, ReportCell, ReportColumn, ReportColumnKind, ReportDef, ReportKpi } from "../types";
 
 export interface FactLine { product_uid: string | null; sku: string; name: string; category: string | null; unit: string; qty: number; net: number; cost: number }
@@ -29,6 +30,7 @@ export const REPORT_DEFS: Def[] = [
   { id: "ventas_producto", group: "Ventas", title: "Ventas por producto", description: "Cantidades, neto, costo y margen de cada producto o servicio.", uses_period: true, perms: ["ventas.ver"] },
   { id: "ventas_categoria", group: "Ventas", title: "Ventas por categoría", description: "Qué categorías venden más y cuáles dejan más margen.", uses_period: true, perms: ["ventas.ver"] },
   { id: "utilidad", group: "Rentabilidad", title: "¿Gano o pierdo? (utilidad)", description: "Ventas menos costo de lo vendido, gastos y remuneraciones, mes a mes.", uses_period: true, perms: ["ventas.ver", "costos.ver", "dinero.ver"] },
+  { id: "punto_equilibrio", group: "Rentabilidad", title: "¿Cuánto necesito vender? (punto de equilibrio)", description: "La venta promedio que cubre todos tus gastos, mes a mes y por día.", uses_period: true, perms: ["ventas.ver", "costos.ver", "dinero.ver"] },
   { id: "compras_proveedor", group: "Compras y gastos", title: "Compras por proveedor", description: "Cuánto le compras a cada proveedor y cuánto le debes.", uses_period: true, perms: ["compras.ver"] },
   { id: "gastos_categoria", group: "Compras y gastos", title: "Gastos por categoría", description: "En qué se va el dinero: fijos y variables.", uses_period: true, perms: ["dinero.ver"] },
   { id: "inventario", group: "Inventario", title: "Inventario valorizado y rotación", description: "Cuánto vale tu stock, qué se mueve y qué no.", uses_period: true, perms: ["inventario.ver", "costos.ver"] },
@@ -151,7 +153,45 @@ export function buildReport(id: string, f: Facts, from: string, to: string, grou
       if (byProduct) {
         r.kpis.push(kpi("Productos vendidos", data.length, "int"));
         if (data.some((x) => x.cells[2] === null)) r.notes.push("Hay productos sin categoría: asígnalas en Productos → Categorías para verlos agrupados.");
-      } else r.chart = { label: 0, series: [3] };
+      } else {
+        r.chart = { label: 0, series: [3] };
+        r.notes.push("Si un producto está en varias categorías, se cuenta en su categoría principal para no sumar dos veces la misma venta.");
+      }
+      break;
+    }
+    case "punto_equilibrio": {
+      const by = new Map<string, number[]>(months(from, to).map((m) => [m, [0, 0, 0, 0]]));
+      const at = (m: string) => { const e = by.get(m) ?? [0, 0, 0, 0]; by.set(m, e); return e; };
+      for (const s of sales) { const e = at(s.date.slice(0, 7)); e[0]! += s.net; e[1]! += s.cost; }
+      for (const x of f.expenses) if (inRange(x.date)) at(x.date.slice(0, 7))[2]! += x.net;
+      const payroll = can("remuneraciones.ver");
+      if (payroll) for (const p of f.payroll) if (p.period >= from.slice(0, 7) && p.period <= to.slice(0, 7)) at(p.period)[3]! += p.cost;
+      const tt = [0, 0, 0, 0];
+      for (const v of by.values()) v.forEach((x, i) => { tt[i]! += x; });
+      const n = Math.max(1, by.size);
+      const margin = tt[0]! > 0 ? divRound((tt[0]! - tt[1]!) * 1_000_000, tt[0]!) : null;
+      const need = (exp: number) => (margin === null ? null : breakEven(exp, margin));
+      r.columns = [col("mes", "Mes", "month"), col("ventas", "Ventas netas", "money"), col("gastos", "Gastos y remuneraciones", "money"),
+        col("necesaria", "Venta necesaria", "money"), col("diferencia", "Sobra o falta", "money"), col("cumplimiento", "Cumplimiento %", "pct")];
+      for (const m of [...by.keys()].sort()) {
+        const v = by.get(m)!, exp = v[2]! + v[3]!, nd = need(exp);
+        r.rows.push([m, v[0]!, exp, nd, nd === null ? null : v[0]! - nd, nd === null ? null : ppm(v[0]!, nd)]);
+      }
+      const exp = tt[2]! + tt[3]!, nd = need(exp);
+      r.totals = ["Total", tt[0]!, exp, nd, nd === null ? null : tt[0]! - nd, nd === null ? null : ppm(tt[0]!, nd)];
+      const avg = (x: number) => divRound(x, n);
+      r.kpis = [kpi("Venta promedio al mes", avg(tt[0]!), "money"), kpi("Gastos promedio al mes", avg(exp), "money")];
+      if (nd !== null) {
+        const an = avg(nd);
+        r.kpis.push(kpi("Venta necesaria al mes (media)", an, "money", avg(tt[0]!) >= an ? "success" : "warning"));
+        r.kpis.push(kpi("Venta necesaria al día", divRound(an * 12, 365), "money"));
+      }
+      if (margin !== null) r.kpis.push(kpi("Margen sobre la venta", margin, "pct"));
+      r.chart = { label: 0, series: [1, 3] };
+      r.notes.push("Venta necesaria = gastos y remuneraciones ÷ margen sobre la venta del período (ventas netas menos costo de lo vendido, sin IVA). Por día = media mensual × 12 ÷ 365.");
+      if (margin === null) r.notes.push("No hay ventas en el período: sin margen no se puede calcular la venta necesaria. En Gastos → «¿Cuánto necesito vender?» puedes simularla con un margen estimado.");
+      else if (margin <= 0) r.notes.push("El margen del período es cero o negativo: vendes bajo el costo y ninguna venta cubre los gastos. Revisa precios y costos.");
+      if (!payroll) r.notes.push("Sin permiso para ver remuneraciones: no se incluyen.");
       break;
     }
     case "utilidad": {

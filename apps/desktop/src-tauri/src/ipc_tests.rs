@@ -615,9 +615,36 @@ fn dinero_por_ipc() {
             .len(),
         1
     );
+    // Gastos: cantidad × valor, categorías con grupo y presupuesto, y análisis.
+    let comb = ipc
+        .ok("expense_categories", json!({}))
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "Combustible")
+        .unwrap()["id"]
+        .clone();
+    let b = ipc.ok("register_expense", json!({ "input": { "category_id": comb, "supplier_uid": null, "date": HOY, "description": "Bencina 93", "total_minor": 0, "quantity_milli": 40000, "unit_minor": 1290, "tax_included": false, "due_date": null, "paid_method": "Efectivo", "paid_account_uid": null, "recurring_id": null } }));
+    assert_eq!(b["total_minor"], 51600);
+    assert_eq!(b["quantity_milli"], 40000);
+    let all = ipc.ok("save_expense_category", json!({ "input": { "id": comb, "name": "Combustible", "fixed": false, "group_name": "Vehículo y transporte", "monthly_budget_minor": 80000, "archived": false } }));
+    assert!(
+        all.as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["name"] == "Combustible" && c["monthly_budget_minor"] == 80000)
+    );
+    let ins = ipc.ok("expense_insights", json!({ "months": 6 }));
+    assert!(
+        ins["categories"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["name"] == "Combustible" && c["this_month_minor"] == 51600)
+    );
     let g = ipc.ok("void_expense", json!({ "uid": uid, "reason": "Duplicado" }));
     assert_eq!(g["payment_state"], "anulado");
-    assert_eq!(ipc.ok("dashboard", json!({}))["cash_minor"], 500000);
+    assert_eq!(ipc.ok("dashboard", json!({}))["cash_minor"], 500000 - 51600);
 }
 
 #[test]

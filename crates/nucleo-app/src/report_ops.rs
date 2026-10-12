@@ -129,6 +129,14 @@ const DEFS: &[Def] = &[
         perms: &["ventas.ver", "costos.ver", "dinero.ver"],
     },
     Def {
+        id: "punto_equilibrio",
+        group: "Rentabilidad",
+        title: "¿Cuánto necesito vender? (punto de equilibrio)",
+        description: "La venta promedio que cubre todos tus gastos, mes a mes y por día.",
+        uses_period: true,
+        perms: &["ventas.ver", "costos.ver", "dinero.ver"],
+    },
+    Def {
         id: "compras_proveedor",
         group: "Compras y gastos",
         title: "Compras por proveedor",
@@ -605,6 +613,7 @@ impl CompanySession {
                         label: 0,
                         series: vec![3],
                     });
+                    r.notes.push("Si un producto está en varias categorías, se cuenta en su categoría principal para no sumar dos veces la misma venta.".into());
                 }
             }
             "utilidad" => {
@@ -686,6 +695,110 @@ impl CompanySession {
                 r.notes.push("Es una utilidad de gestión: ventas netas menos el costo de lo vendido, los gastos registrados y el costo empresa de las liquidaciones emitidas. No reemplaza el estado de resultados contable.".into());
                 if payroll && tt[3] > 0 && db::payroll_like_expenses(conn, &from, &to)? > 0 {
                     r.notes.push("Tienes gastos en la categoría «Remuneraciones» y también liquidaciones emitidas: revisa que los sueldos no se cuenten dos veces.".into());
+                }
+                if !payroll {
+                    r.notes
+                        .push("Sin permiso para ver remuneraciones: no se incluyen.".into());
+                }
+            }
+            "punto_equilibrio" => {
+                // [ventas, costo, gastos, remuneraciones] por mes.
+                let mut by: BTreeMap<String, [i64; 4]> = months(&from, &to)
+                    .into_iter()
+                    .map(|m| (m, [0; 4]))
+                    .collect();
+                for row in db::sales_by_period(conn, &from, &to, "mes")? {
+                    let e = by.entry(row[0].text().to_string()).or_default();
+                    e[0] += row[2].int();
+                    e[1] += row[5].int();
+                }
+                for row in db::expenses_by_month(conn, &from, &to)? {
+                    by.entry(row[0].text().to_string()).or_default()[2] += row[1].int();
+                }
+                let payroll = self.can("remuneraciones.ver");
+                if payroll {
+                    for row in db::payroll_by_month(conn, &from, &to)? {
+                        by.entry(row[0].text().to_string()).or_default()[3] += row[1].int();
+                    }
+                }
+                let mut tt = [0i64; 4];
+                for v in by.values() {
+                    for i in 0..4 {
+                        tt[i] += v[i];
+                    }
+                }
+                let n = by.len().max(1) as i64;
+                // Margen sobre la venta de todo el período: suaviza los meses con poca venta.
+                let margin = (tt[0] > 0).then(|| {
+                    nucleo_domain::comex::div_round(
+                        (tt[0] - tt[1]) as i128 * 1_000_000,
+                        tt[0] as i128,
+                    ) as i64
+                });
+                let need = |exp: i64| margin.and_then(|m| crate::gastos_ops::break_even(exp, m));
+                r.columns = vec![
+                    col("mes", "Mes", "month"),
+                    col("ventas", "Ventas netas", "money"),
+                    col("gastos", "Gastos y remuneraciones", "money"),
+                    col("necesaria", "Venta necesaria", "money"),
+                    col("diferencia", "Sobra o falta", "money"),
+                    col("cumplimiento", "Cumplimiento %", "pct"),
+                ];
+                for (m, v) in &by {
+                    let exp = v[2] + v[3];
+                    let nd = need(exp);
+                    r.rows.push(vec![
+                        m.clone().into(),
+                        v[0].into(),
+                        exp.into(),
+                        nd.into(),
+                        nd.map(|x| v[0] - x).into(),
+                        nd.map(|x| ppm(v[0], x)).unwrap_or(Cell::Null),
+                    ]);
+                }
+                let exp = tt[2] + tt[3];
+                let nd = need(exp);
+                r.totals = Some(vec![
+                    "Total".into(),
+                    tt[0].into(),
+                    exp.into(),
+                    nd.into(),
+                    nd.map(|x| tt[0] - x).into(),
+                    nd.map(|x| ppm(tt[0], x)).unwrap_or(Cell::Null),
+                ]);
+                let avg = |x: i64| nucleo_domain::comex::div_round(x as i128, n as i128) as i64;
+                let avg_need = nd.map(avg);
+                r.kpis = vec![
+                    kpi("Venta promedio al mes", avg(tt[0]), "money"),
+                    kpi("Gastos promedio al mes", avg(exp), "money"),
+                ];
+                if let Some(an) = avg_need {
+                    r.kpis.push(ReportKpi {
+                        tone: Some(if avg(tt[0]) >= an {
+                            "success"
+                        } else {
+                            "warning"
+                        }),
+                        ..kpi("Venta necesaria al mes (media)", an, "money")
+                    });
+                    r.kpis.push(kpi(
+                        "Venta necesaria al día",
+                        nucleo_domain::comex::div_round(an as i128 * 12, 365) as i64,
+                        "money",
+                    ));
+                }
+                if let Some(m) = margin {
+                    r.kpis.push(kpi("Margen sobre la venta", m, "pct"));
+                }
+                r.chart = Some(ReportChart {
+                    label: 0,
+                    series: vec![1, 3],
+                });
+                r.notes.push("Venta necesaria = gastos y remuneraciones ÷ margen sobre la venta del período (ventas netas menos costo de lo vendido, sin IVA). Por día = media mensual × 12 ÷ 365.".into());
+                if margin.is_none() {
+                    r.notes.push("No hay ventas en el período: sin margen no se puede calcular la venta necesaria. En Gastos → «¿Cuánto necesito vender?» puedes simularla con un margen estimado.".into());
+                } else if margin.is_some_and(|m| m <= 0) {
+                    r.notes.push("El margen del período es cero o negativo: vendes bajo el costo y ninguna venta cubre los gastos. Revisa precios y costos.".into());
                 }
                 if !payroll {
                     r.notes

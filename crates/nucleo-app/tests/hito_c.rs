@@ -162,6 +162,8 @@ fn cuanto_me_deben_cuanto_debo_y_cuanto_tendre() {
             paid_account_uid: None,
             notes: None,
             recurring_id: None,
+            quantity_milli: None,
+            unit_minor: None,
         })
         .unwrap();
     assert_eq!(g.summary.payment_state, "pagado");
@@ -183,6 +185,8 @@ fn cuanto_me_deben_cuanto_debo_y_cuanto_tendre() {
             paid_account_uid: None,
             notes: None,
             recurring_id: None,
+            quantity_milli: None,
+            unit_minor: None,
         })
         .unwrap();
     assert_eq!(g2.summary.payment_state, "por_pagar");

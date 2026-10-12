@@ -86,6 +86,7 @@ fn bodegas_transferencias_y_ajustes() {
             taxable: Some(true),
             initial_stock_milli: Some(10_000),
             category_uid: None,
+            extra_category_uids: None,
             cost_sheet: None,
             stock_policy: None,
         })
@@ -207,6 +208,7 @@ fn stock_negativo_y_analisis() {
             taxable: Some(true),
             initial_stock_milli: Some(100_000),
             category_uid: None,
+            extra_category_uids: None,
             cost_sheet: None,
             stock_policy: None,
         })

@@ -148,8 +148,9 @@ impl CompanySession {
         let category_product_uids = match &rule.category_uid {
             Some(u) => {
                 let mut st = conn.prepare(
-                    "SELECT p.uid FROM products p JOIN categories c ON c.id = p.category_id
-                     WHERE c.uid = ?1 AND p.archived_at IS NULL",
+                    "SELECT p.uid FROM products p, categories c
+                     WHERE c.uid = ?1 AND p.archived_at IS NULL AND (p.category_id = c.id OR EXISTS (
+                         SELECT 1 FROM product_extra_categories x WHERE x.product_id = p.id AND x.category_id = c.id))",
                 )?;
                 st.query_map([u], |r| r.get::<_, String>(0))?
                     .collect::<Result<Vec<_>, _>>()?

@@ -9,7 +9,6 @@ import { useSession } from "../../lib/session";
 import { Badge, Button, Card, EmptyState, Kpi, Notice, Segmented, Spinner, Tabs } from "../../ui/kit";
 import { AccountsTab } from "./Accounts";
 import { DueTable, accountLabel } from "./common";
-import { ExpensesTab } from "./Expenses";
 import { FlowChart } from "./FlowChart";
 import { RecurringTab } from "./Recurring";
 
@@ -41,7 +40,6 @@ export function Money({ route }: { route: Route }) {
         tabs={[
           { value: "resumen", label: "Resumen" },
           { value: "cuentas", label: "Cuentas" },
-          { value: "gastos", label: "Gastos" },
           { value: "por_cobrar", label: t("por_cobrar"), count: ov?.receivables.length },
           { value: "por_pagar", label: t("por_pagar"), count: ov?.payables.length },
           { value: "calendario", label: "Calendario" },
@@ -52,7 +50,7 @@ export function Money({ route }: { route: Route }) {
         {err && <Notice tone="danger">{err}</Notice>}
         {tab === "resumen" && (ov ? <Overview ov={ov} /> : !err && <Spinner label="Calculando tu caja…" />)}
         {tab === "cuentas" && <AccountsTab route={route} onChanged={reload} />}
-        {tab === "gastos" && <ExpensesTab route={route} onChanged={reload} />}
+        {tab === "gastos" && <GoToExpenses />}
         {tab === "por_cobrar" && ov && (
           <DueBlock total={ov.receivable_minor} overdue={ov.receivable_overdue_minor} aging={ov.receivable_aging} kind="cobro">
             <DueTable rows={ov.receivables} kind="cobro" empty={<EmptyState icon={HandCoins} title="Nadie te debe dinero">Las ventas a crédito aparecen aquí hasta que se pagan.</EmptyState>} />
@@ -70,18 +68,24 @@ export function Money({ route }: { route: Route }) {
   );
 }
 
+/** Los gastos ahora tienen su propio módulo en el menú. */
+function GoToExpenses() {
+  useEffect(() => { navigate("/gastos?tab=registro", { replace: true }); }, []);
+  return null;
+}
+
 function PageHeaderBar({ write, tab }: { write: boolean; tab: Tab }) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
         <h1 className="text-[22px] font-semibold leading-tight tracking-tight text-ink">Dinero</h1>
-        <p className="mt-1 text-sm text-muted">Cajas y bancos, lo que te deben, lo que debes, tus gastos y cómo viene la caja en las próximas semanas.</p>
+        <p className="mt-1 text-sm text-muted">Cajas y bancos, lo que te deben, lo que debes y cómo viene la caja en las próximas semanas.</p>
       </div>
       {write && (
         <div className="flex flex-wrap items-center gap-2">
           {tab === "cuentas" && <Button variant="secondary" icon={ArrowLeftRight} onClick={() => navigate("/dinero?tab=cuentas&traspaso=1")}>Traspasar</Button>}
           {tab === "recurrentes" && <Button variant="secondary" icon={Repeat} onClick={() => navigate("/dinero?tab=recurrentes&nuevo=1")}>Nuevo recurrente</Button>}
-          <Button icon={Receipt} onClick={() => navigate("/dinero?tab=gastos&nuevo=1")}>Registrar gasto</Button>
+          <Button icon={Receipt} onClick={() => navigate("/gastos?tab=registro&nuevo=1")}>Registrar gasto</Button>
         </div>
       )}
     </div>

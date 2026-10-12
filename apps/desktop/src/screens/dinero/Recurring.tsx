@@ -17,7 +17,7 @@ function when(r: Recurring): string {
   return `${FREQ[r.frequency]}, el día ${day}${r.ends_on ? ` hasta ${formatDate(r.ends_on)}` : ""}`;
 }
 
-export function RecurringTab({ onChanged }: { onChanged: () => void }) {
+export function RecurringTab({ onChanged, base = "/dinero?tab=recurrentes" }: { onChanged: () => void; base?: string }) {
   const backend = useBackend();
   const { can } = useSession();
   const route = useRoute();
@@ -31,7 +31,7 @@ export function RecurringTab({ onChanged }: { onChanged: () => void }) {
   if (!rows) return <Spinner />;
   const monthly = (dir: Recurring["direction"]) => rows.filter((r) => r.active && r.direction === dir)
     .reduce((a, r) => a + (r.frequency === "semanal" ? (r.amount_minor * 52) / 12 : r.frequency === "mensual" ? r.amount_minor : r.frequency === "bimestral" ? r.amount_minor / 2 : r.frequency === "trimestral" ? r.amount_minor / 3 : r.amount_minor / 12), 0);
-  const close = () => { setEditing(null); if (creating) navigate("/dinero?tab=recurrentes", { replace: true }); };
+  const close = () => { setEditing(null); if (creating) navigate(base, { replace: true }); };
   const saved = (r: Recurring[]) => { setRows(r); onChanged(); close(); };
   return (
     <div className="flex flex-col gap-4">
@@ -46,7 +46,7 @@ export function RecurringTab({ onChanged }: { onChanged: () => void }) {
         </div>
       )}
       {rows.length === 0 ? (
-        <EmptyState icon={Repeat} title="Sin movimientos recurrentes" action={write && <Button icon={Plus} onClick={() => navigate("/dinero?tab=recurrentes&nuevo=1", { replace: true })}>Agregar el primero</Button>}>
+        <EmptyState icon={Repeat} title="Sin movimientos recurrentes" action={write && <Button icon={Plus} onClick={() => navigate(`${base}&nuevo=1`, { replace: true })}>Agregar el primero</Button>}>
           Anota tus pagos fijos para ver con anticipación cuánto dinero vas a necesitar.
         </EmptyState>
       ) : (

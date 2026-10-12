@@ -50,6 +50,7 @@ fn ciclo_de_compra_completo() {
             taxable: Some(true),
             initial_stock_milli: Some(10_000),
             category_uid: None,
+            extra_category_uids: None,
             cost_sheet: None,
             stock_policy: None,
         })
@@ -200,6 +201,7 @@ fn compra_directa_con_ingreso_y_anulacion() {
             taxable: Some(true),
             initial_stock_milli: Some(2_000),
             category_uid: None,
+            extra_category_uids: None,
             cost_sheet: None,
             stock_policy: None,
         })

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Boxes, Package, PackagePlus, Pencil, Search, Tags } from "lucide-react";
 import { useBackend, errorMessage, type PriceHistoryRow, type Product, type ProductCategory, type StockPolicy } from "../../data";
 import { EMPTY_COST_SHEET, gainOverCost, grossFromNet, marginOnSale, pctText, type CostSheet } from "../../data/costing";
-import { CategoriesDrawer, CategorySelect, CostInput, PriceInput, StockPolicySelect, stockPolicyLabel, useTaxPpm } from "./parts";
+import { CategoriesDrawer, CategoriesField, CostInput, PriceInput, StockPolicySelect, stockPolicyLabel, useTaxPpm } from "./parts";
 import { useSession } from "../../lib/session";
 import { formatDate, formatMoney, formatQty, parseQty } from "../../lib/format";
 import { UNITS } from "../../data/catalogs";
@@ -43,7 +43,7 @@ export function Products({ route }: { route: Route }) {
   }, [backend, query, version]);
 
   const shown = useMemo(() => rows.filter((p) => (filter === "todos" || (filter === "servicios" ? p.kind === "servicio" : p.kind === "producto" && p.on_hand_milli <= p.min_milli))
-    && (!catFilter || (catFilter === "sin" ? !p.category_uid : p.category_uid === catFilter))), [rows, filter, catFilter]);
+    && (!catFilter || (catFilter === "sin" ? !p.category_uid : p.category_uid === catFilter || p.extra_category_uids.includes(catFilter)))), [rows, filter, catFilter]);
   const low = rows.filter((p) => p.kind === "producto" && p.on_hand_milli <= p.min_milli).length;
   const product = viewing ? rows.find((p) => p.uid === viewing) : undefined;
 
@@ -52,7 +52,7 @@ export function Products({ route }: { route: Route }) {
     { key: "n", header: "Nombre", render: (p) => (
       <span className="flex min-w-0 flex-col leading-tight">
         <span className="truncate font-medium text-ink">{p.name}</span>
-        {p.category && <span className="truncate text-[11.5px] text-muted">{p.category}</span>}
+        {p.category && <span className="truncate text-[11.5px] text-muted">{[p.category, ...p.extra_categories].join(" · ")}</span>}
       </span>
     ) },
     { key: "k", header: "Stock", width: "9rem", align: "right", render: (p) => p.kind === "servicio" ? <Badge>Servicio</Badge> : (
@@ -117,7 +117,9 @@ export function Products({ route }: { route: Route }) {
           <div className="flex flex-col gap-6">
             <DefinitionList items={[
               { label: "Tipo", value: product.kind === "servicio" ? "Servicio" : "Producto" },
-              { label: "Categoría", value: product.category ?? <span className="text-muted">Sin categoría</span> },
+              { label: product.extra_categories.length ? "Categorías" : "Categoría", value: product.category
+                ? <span className="flex flex-wrap gap-1.5">{[product.category, ...product.extra_categories].map((c, i) => <Badge key={c} tone={i === 0 ? "accent" : "neutral"}>{c}</Badge>)}</span>
+                : <span className="text-muted">Sin categoría</span> },
               { label: "Unidad", value: product.unit },
               { label: taxPpm !== null ? "Precio de venta neto" : "Precio de venta", value: <span className="num">{formatMoney(product.price_minor)}</span> },
               ...(taxPpm !== null ? [{ label: "Precio con IVA", value: <span className="num">{product.taxable ? formatMoney(grossFromNet(product.price_minor, taxPpm)) : `${formatMoney(product.price_minor)} (exento)`}</span> }] : []),
@@ -164,6 +166,7 @@ function NewProductDrawer({ open, onClose, onCreated, cats, taxPpm, defaultCat, 
   const [sku, setSku] = useState("");
   const [unit, setUnit] = useState("un");
   const [cat, setCat] = useState<string | null>(null);
+  const [extraCats, setExtraCats] = useState<string[]>([]);
   const [price, setPrice] = useState<number | null>(null);
   const [taxable, setTaxable] = useState(true);
   const [cost, setCost] = useState<number | null>(null);
@@ -171,14 +174,14 @@ function NewProductDrawer({ open, onClose, onCreated, cats, taxPpm, defaultCat, 
   const [stock, setStock] = useState("");
   const [policy, setPolicy] = useState<StockPolicy>("general");
   const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { if (open) { setName(""); setSku(""); setPrice(null); setCost(null); setSheet(null); setStock(""); setPolicy("general"); setErr(null); setTaxable(true); setCat(defaultCat); } }, [open, defaultCat]);
+  useEffect(() => { if (open) { setName(""); setSku(""); setPrice(null); setCost(null); setSheet(null); setStock(""); setPolicy("general"); setErr(null); setTaxable(true); setCat(defaultCat); setExtraCats([]); } }, [open, defaultCat]);
   useEffect(() => { setUnit(kind === "servicio" ? "sv" : "un"); }, [kind]);
   async function save() {
     const stockMilli = kind === "producto" && stock.trim() ? parseQty(stock) : 0;
     if (stockMilli === null) { setErr("Revisa el stock inicial: escribe solo números (ej. 12 o 2,5)."); return; }
     try {
       const p = await backend.addProduct({ name, sku: sku || undefined, unit, kind, price_minor: price ?? 0, cost_minor: cost ?? 0, taxable,
-        initial_stock_milli: stockMilli || undefined, category_uid: cat, cost_sheet: sheet, ...(kind === "producto" ? { stock_policy: policy } : {}) });
+        initial_stock_milli: stockMilli || undefined, category_uid: cat, extra_category_uids: extraCats, cost_sheet: sheet, ...(kind === "producto" ? { stock_policy: policy } : {}) });
       toast("success", `${p.name} agregado.`);
       onCreated(p);
     } catch (e) { setErr(errorMessage(e)); }
@@ -192,7 +195,7 @@ function NewProductDrawer({ open, onClose, onCreated, cats, taxPpm, defaultCat, 
           <Field label="Código" optional value={sku} onChange={(e) => setSku(e.target.value)} placeholder="Se genera si lo dejas vacío" />
           <Select label="Unidad" value={unit} onChange={(e) => setUnit(e.target.value)} options={UNITS} />
         </div>
-        <CategorySelect value={cat} onChange={setCat} categories={cats} onManage={onManage} />
+        <CategoriesField main={cat} extras={extraCats} onChange={(m, e) => { setCat(m); setExtraCats(e); }} categories={cats} onManage={onManage} />
         <PriceInput net={price} onNet={setPrice} taxPpm={taxPpm} taxable={taxable} />
         {taxPpm !== null && <Checkbox label="Afecto a IVA" hint="Desmárcalo si el producto o servicio está exento." checked={taxable} onChange={setTaxable} />}
         <CostInput cost={cost} onCost={setCost} sheet={sheet} onSheet={setSheet} taxPpm={taxPpm} unit={unit} />
@@ -216,6 +219,7 @@ function EditProductDrawer({ product, onClose, onSaved, cats, taxPpm }: { produc
   const [sku, setSku] = useState(product.sku);
   const [unit, setUnit] = useState(product.unit);
   const [cat, setCat] = useState<string | null>(product.category_uid);
+  const [extraCats, setExtraCats] = useState<string[]>(product.extra_category_uids);
   const [price, setPrice] = useState<number | null>(product.price_minor);
   const [taxable, setTaxable] = useState(product.taxable);
   const [min, setMin] = useState(product.min_milli ? formatQty(product.min_milli) : "");
@@ -231,7 +235,7 @@ function EditProductDrawer({ product, onClose, onSaved, cats, taxPpm }: { produc
     if (minMilli === null) { setErr("Revisa el stock mínimo: escribe solo números."); return; }
     try {
       await backend.updateProduct(product.uid, {
-        name, sku, unit, price_minor: price ?? 0, taxable, min_milli: minMilli, category_uid: cat, stock_policy: policy,
+        name, sku, unit, price_minor: price ?? 0, taxable, min_milli: minMilli, category_uid: cat, extra_category_uids: extraCats, stock_policy: policy,
         ...(costs ? { cost_sheet: sheet ?? (product.cost_sheet ? EMPTY_COST_SHEET : null), cost_minor: !locked && !sheet && cost !== initialCost ? cost ?? 0 : null } : {}),
       });
       toast("success", "Producto actualizado.");
@@ -247,7 +251,7 @@ function EditProductDrawer({ product, onClose, onSaved, cats, taxPpm }: { produc
           <Field label="Código" value={sku} onChange={(e) => setSku(e.target.value)} />
           <Select label="Unidad" value={unit} onChange={(e) => setUnit(e.target.value)} options={UNITS} />
         </div>
-        <CategorySelect value={cat} onChange={setCat} categories={cats} />
+        <CategoriesField main={cat} extras={extraCats} onChange={(m, e) => { setCat(m); setExtraCats(e); }} categories={cats} />
         <PriceInput net={price} onNet={setPrice} taxPpm={taxPpm} taxable={taxable} />
         {taxPpm !== null && <Checkbox label="Afecto a IVA" hint="Desmárcalo si el producto o servicio está exento." checked={taxable} onChange={setTaxable} />}
         {costs && (locked ? (

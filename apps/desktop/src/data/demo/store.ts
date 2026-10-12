@@ -15,12 +15,14 @@ import type {
   QuoteInput, QuoteStatus, QuoteSummary, RateRow, RoleRow, SaleDetail, SaleDocType, SaleInput, SaleSummary, SearchHit,
   SecuritySettings, SequenceRow, SessionInfo, Totals, UserPatch, UserRow,
   Report, ReportDef, ReportParams, SaleTerms,
-  AccountInput, AccountKind, CalendarItem, DueRow, ExpenseCategory, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow,
+  AccountInput, AccountKind, CalendarItem, CategoryInput, ExpenseInsights, DueRow, ExpenseCategory, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow,
   MoneyAccount, MoneyOverview, MoneyTransferInput, Recurring, RecurringInput,
   EtaChange, ImportCostInput, ImportDetail, ImportInput, ImportItemRow, ImportReceiveLine, ImportStage, ImportSummary, IncotermDef, StageChange, TransportMode,
 } from "../types";
 import incotermsJson from "./incoterms.json";
 import { COST_LABEL, STAGE_LABEL, landedCost, toClp, type Basis, type CostKind, type LandedResult } from "../comex";
+import { buildInsights } from "./gastos";
+import { lineTotal } from "../gastos";
 import { DEMO_CATEGORIES, PROJECTION_WEEKS, agingAdd, emptyAging, methodCode, occurrences } from "./money";
 import { DEMO_PERMISSIONS, DEMO_ROLES } from "./roles";
 import { CURRENCY_DIGITS, addDays, daysBetween, todayIso } from "../../lib/format";
@@ -75,7 +77,7 @@ interface TransferRec { uid: string; from: string; to: string; date: string; amo
 interface GasRec {
   uid: string; number: string; category_id: number; supplier_uid: string | null; date: string; due_date: string | null; description: string;
   net: number; tax: number; total: number; status: "registrado" | "anulado"; payments: Payment[]; void_reason: string | null; notes: string | null;
-  recurring_id: number | null; timeline: { at: string; text: string }[];
+  recurring_id: number | null; timeline: { at: string; text: string }[]; qty: number | null; unit: number | null;
 }
 type ImpItemRec = ImportItemRow;
 interface ImpCostRec {
@@ -108,7 +110,7 @@ export class DemoBackend implements Backend {
   readonly kind = "demo" as const;
   readonly features: ReadonlySet<Feature> = new Set<Feature>([
     "dashboard", "clientes", "productos", "ventas", "compras", "comex", "negocio", "busqueda",
-    "usuarios", "documentos", "numeracion", "monedas", "auditoria", "inventario", "dinero", "impuestos", "remuneraciones", "reportes", "promociones", "envios",
+    "usuarios", "documentos", "numeracion", "monedas", "auditoria", "inventario", "dinero", "impuestos", "remuneraciones", "reportes", "promociones", "envios", "gastos",
   ]);
   private company = { uid: "demo-company", name: DEMO_COMPANY, profile: "empresa" as BusinessProfile, created_at: "2026-01-02T12:00:00Z" };
   private biz: BusinessSettings;
@@ -221,7 +223,7 @@ export class DemoBackend implements Backend {
       this.products.push({
         uid: uid("pro"), sku, name, unit, kind: service ? "servicio" : "producto", price_minor: price, cost_e4: cost * 10_000,
         on_hand_milli: stock * 1000, min_milli: min * 1000, taxable: true,
-        category_uid: ci >= 0 ? this.pcats[ci]!.uid : null, category: null, cost_sheet: null, has_movements: false,
+        category_uid: ci >= 0 ? this.pcats[ci]!.uid : null, category: null, extra_category_uids: [], extra_categories: [], cost_sheet: null, has_movements: false,
         stock_policy: "general",
       });
     }
@@ -233,10 +235,12 @@ export class DemoBackend implements Backend {
       const season = 1 + 0.25 * Math.sin((d.getMonth() + 2) / 12 * Math.PI * 2);
       this.history[ym] = Math.round((9_500_000 + r() * 3_000_000) * season / 1000) * 1000;
     }
-    // Ventas detalladas de los últimos 45 días.
+    // Ventas detalladas desde el 1 del mes anterior (un mes completo para los promedios).
     const goods = this.products.filter((p) => p.kind === "producto");
-    for (let i = 0; i < 70; i++) {
-      const date = addDays(this.today, -Math.floor(r() * 45));
+    const prevFirst = (() => { const d = new Date(`${this.today}T12:00:00Z`); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - 1); return d.toISOString().slice(0, 10); })();
+    const span = Math.round((Date.parse(`${this.today}T12:00:00Z`) - Date.parse(`${prevFirst}T12:00:00Z`)) / 86_400_000) + 1;
+    for (let i = 0; i < 80; i++) {
+      const date = addDays(this.today, -Math.floor(r() * span));
       const n = 1 + Math.floor(r() * 4);
       const lines: LineInput[] = [];
       for (let k = 0; k < n; k++) {
@@ -820,8 +824,12 @@ export class DemoBackend implements Backend {
   async searchProducts(query: string): Promise<Product[]> {
     const q = norm(query.trim());
     const words = q.split(/\s+/).filter(Boolean);
-    const rows = words.length ? this.products.filter((p) => { const h = norm(`${p.name} ${p.sku} ${this.catName(p.category_uid) ?? ""}`); return words.every((w) => h.includes(w)); }) : this.products;
+    const rows = words.length ? this.products.filter((p) => { const h = norm(`${p.name} ${p.sku} ${this.catName(p.category_uid) ?? ""} ${p.extra_category_uids.map((c) => this.catName(c)).join(" ")}`); return words.every((w) => h.includes(w)); }) : this.products;
     return wait(rows.map((p) => this.prodView(p)), 30);
+  }
+  private extraCats(uids: string[]): string[] {
+    if (uids.length > 20) throw new AppError("validacion", "Un producto puede tener hasta 20 categorías.");
+    return [...new Set(uids.filter(Boolean).map((u) => this.checkCat(u)!))];
   }
   private catName(u: string | null): string | null { return u ? this.pcats.find((c) => c.uid === u)?.name ?? null : null; }
   /** Producto con los datos derivados (nombre de la categoría y si tiene movimientos). */
@@ -831,7 +839,10 @@ export class DemoBackend implements Backend {
     return v as StockPolicy;
   }
   private prodView(p: Product): Product {
-    return { ...p, category: this.catName(p.category_uid), has_movements: this.moves.some((m) => m.product_uid === p.uid) };
+    const extras = p.extra_category_uids.filter((c) => this.pcats.some((k) => k.uid === c) && c !== p.category_uid)
+      .sort((a, b) => (this.catName(a) ?? "").localeCompare(this.catName(b) ?? "", "es"));
+    return { ...p, category: this.catName(p.category_uid), extra_category_uids: extras, extra_categories: extras.map((c) => this.catName(c)!),
+      has_movements: this.moves.some((m) => m.product_uid === p.uid) };
   }
   private checkCat(u: string | null | undefined): string | null {
     if (!u) return null;
@@ -847,7 +858,7 @@ export class DemoBackend implements Backend {
     return { e4: r.unit_cost_e4, sheet: s };
   }
   async productCategories(): Promise<ProductCategory[]> {
-    return wait(this.pcats.map((c) => ({ ...c, product_count: this.products.filter((p) => p.category_uid === c.uid).length })).sort((a, b) => a.name.localeCompare(b.name, "es")));
+    return wait(this.pcats.map((c) => ({ ...c, product_count: this.products.filter((p) => p.category_uid === c.uid || p.extra_category_uids.includes(c.uid)).length })).sort((a, b) => a.name.localeCompare(b.name, "es")));
   }
   async saveCategory(u: string | null, name: string): Promise<ProductCategory[]> {
     this.require("productos.editar");
@@ -869,8 +880,15 @@ export class DemoBackend implements Backend {
   async deleteCategory(u: string): Promise<ProductCategory[]> {
     this.require("productos.editar");
     this.checkCat(u);
-    for (const p of this.products) if (p.category_uid === u) p.category_uid = null;
     this.pcats = this.pcats.filter((c) => c.uid !== u);
+    for (const p of this.products) {
+      p.extra_category_uids = p.extra_category_uids.filter((c) => c !== u);
+      if (p.category_uid === u) {
+        const next = [...p.extra_category_uids].sort((a, b) => (this.catName(a) ?? "").localeCompare(this.catName(b) ?? "", "es"))[0] ?? null;
+        p.category_uid = next;
+        p.extra_category_uids = p.extra_category_uids.filter((c) => c !== next);
+      }
+    }
     this.log("categoria.eliminar", "categoria", u);
     return this.productCategories();
   }
@@ -880,9 +898,21 @@ export class DemoBackend implements Backend {
     for (const u of productUids) {
       const p = this.products.find((x) => x.uid === u);
       if (!p) throw new AppError("no_encontrado", "No encontramos ese producto.");
-      p.category_uid = cat;
+      // Agregar: sin categoría queda como principal; con otra, se suma.
+      if (cat === null) p.category_uid = null;
+      else if (!p.category_uid) p.category_uid = cat;
+      else if (p.category_uid !== cat && !p.extra_category_uids.includes(cat)) p.extra_category_uids = [...p.extra_category_uids, cat];
     }
     this.log("categoria.asignar", "categoria", cat ?? "sin categoría");
+    return this.productCategories();
+  }
+  async removeProductCategory(productUid: string, categoryUid: string): Promise<ProductCategory[]> {
+    this.require("productos.editar");
+    const p = this.products.find((x) => x.uid === productUid);
+    if (!p) throw new AppError("no_encontrado", "No encontramos ese producto.");
+    p.extra_category_uids = p.extra_category_uids.filter((c) => c !== categoryUid);
+    if (p.category_uid === categoryUid) { p.category_uid = p.extra_category_uids[0] ?? null; p.extra_category_uids = p.extra_category_uids.slice(1); }
+    this.log("categoria.quitar", "producto", productUid);
     return this.productCategories();
   }
   async updateProduct(u: string, patch: ProductPatch): Promise<Product> {
@@ -893,6 +923,7 @@ export class DemoBackend implements Backend {
     if (!patch.sku.trim()) throw new AppError("codigo", "El código es obligatorio.");
     if (this.products.some((x) => x.uid !== u && x.sku.toLowerCase() === patch.sku.trim().toLowerCase())) throw new AppError("duplicado", "Ya existe un producto con ese código.");
     const category_uid = this.checkCat(patch.category_uid);
+    const extras = patch.extra_category_uids == null ? p.extra_category_uids : this.extraCats(patch.extra_category_uids);
     const sheet = this.sheetCost(patch.cost_sheet);
     const moved = this.moves.some((m) => m.product_uid === p.uid);
     if (sheet) {
@@ -905,7 +936,7 @@ export class DemoBackend implements Backend {
         p.cost_e4 = patch.cost_minor * 10_000;
       }
     }
-    Object.assign(p, { name: patch.name.trim(), sku: patch.sku.trim(), unit: patch.unit, price_minor: patch.price_minor, taxable: patch.taxable, min_milli: patch.min_milli, category_uid });
+    Object.assign(p, { name: patch.name.trim(), sku: patch.sku.trim(), unit: patch.unit, price_minor: patch.price_minor, taxable: patch.taxable, min_milli: patch.min_milli, category_uid, extra_category_uids: extras.filter((c) => c !== category_uid) });
     const pol = this.policy(patch.stock_policy);
     if (pol && p.kind === "producto") p.stock_policy = pol;
     this.log("producto.editar", "producto", p.uid);
@@ -917,9 +948,10 @@ export class DemoBackend implements Backend {
     const p: Product = {
       uid: uid("pro"), sku: input.sku?.trim() || `P-${this.products.length + 1}`, name: input.name.trim(), unit: input.unit || "un", kind: input.kind,
       price_minor: input.price_minor, cost_e4: sheet ? sheet.e4 : (input.cost_minor ?? 0) * 10_000, on_hand_milli: input.kind === "producto" ? Math.max(0, input.initial_stock_milli ?? 0) : 0, min_milli: 0, taxable: input.taxable ?? true,
-      category_uid: this.checkCat(input.category_uid), category: null, cost_sheet: sheet?.sheet ?? null, has_movements: false,
+      category_uid: this.checkCat(input.category_uid), category: null, extra_category_uids: [], extra_categories: [], cost_sheet: sheet?.sheet ?? null, has_movements: false,
       stock_policy: input.kind === "producto" ? this.policy(input.stock_policy) ?? "general" : "general",
     };
+    p.extra_category_uids = this.extraCats(input.extra_category_uids ?? []).filter((c) => c !== p.category_uid);
     this.products.push(p);
     if (p.on_hand_milli > 0) this.mv(p.uid, p.on_hand_milli, "inicial", "Stock inicial", "AJU", null, "Stock inicial", this.today, p.cost_e4);
     this.log("producto.crear", "producto", p.uid);
@@ -1142,7 +1174,7 @@ export class DemoBackend implements Backend {
     }).filter((x): x is NonNullable<typeof x> => !!x);
     return {
       ...p, status, products, category: this.catName(p.rule.category_uid),
-      category_product_uids: p.rule.category_uid ? this.products.filter((x) => x.category_uid === p.rule.category_uid).map((x) => x.uid) : [],
+      category_product_uids: p.rule.category_uid ? this.products.filter((x) => x.category_uid === p.rule.category_uid || x.extra_category_uids.includes(p.rule.category_uid!)).map((x) => x.uid) : [],
       customers: p.rule.customer_uids.map((u) => this.customers.find((c) => c.uid === u)).filter((c): c is Customer => !!c).map((c) => ({ uid: c.uid, name: c.name })),
     };
   }
@@ -1494,7 +1526,8 @@ export class DemoBackend implements Backend {
   async inventoryOverview(): Promise<InventoryOverview> {
     this.require("inventario.ver");
     const rows = this.products.filter((p) => p.kind === "producto").map((p) => this.analysis(p)).sort((a, b) => a.name.localeCompare(b.name, "es"));
-    return wait({ window_days: 90, total_value_minor: rows.reduce((a, r) => a + r.stock_value_minor, 0), rows }, 120);
+    const sale = this.products.filter((p) => p.kind === "producto" && p.on_hand_milli > 0).reduce((a, p) => a + Math.round((p.on_hand_milli * p.price_minor) / 1000), 0);
+    return wait({ window_days: 90, total_value_minor: rows.reduce((a, r) => a + r.stock_value_minor, 0), total_sale_value_minor: sale, rows }, 120);
   }
   async productInventory(u: string, warehouseUid?: string): Promise<ProductInventory> {
     this.require("inventario.ver");
@@ -2213,20 +2246,20 @@ export class DemoBackend implements Backend {
     for (const c of this.purchases) for (const p of c.payments) this.payAcc[p.number] = this.accountFor(null, p.method);
     const cat = (n: string) => DEMO_CATEGORIES.find((c) => c.name === n)!.id;
     const monthDay = (offsetMonths: number, day: number) => { const d = new Date(`${t}T12:00:00`); d.setDate(1); d.setMonth(d.getMonth() + offsetMonths); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`; };
-    const begin = monthDay(-2, 1);
+    const begin = monthDay(-1, 1);
     this.recs = [
       { id: 1, direction: "egreso", description: "Arriendo del local", category_id: cat("Arriendo"), category: "Arriendo", amount_minor: 650_000, frequency: "mensual", day_of_period: 5, starts_on: begin, ends_on: null, active: true },
       { id: 2, direction: "egreso", description: "Internet y teléfono", category_id: cat("Internet y telefonía"), category: "Internet y telefonía", amount_minor: 39_990, frequency: "mensual", day_of_period: 12, starts_on: begin, ends_on: null, active: true },
-      { id: 3, direction: "egreso", description: "Sueldos", category_id: cat("Remuneraciones"), category: "Remuneraciones", amount_minor: 1_850_000, frequency: "mensual", day_of_period: 30, starts_on: begin, ends_on: null, active: true },
+      { id: 3, direction: "egreso", description: "Sueldos", category_id: cat("Remuneraciones"), category: "Remuneraciones", amount_minor: 950_000, frequency: "mensual", day_of_period: 30, starts_on: begin, ends_on: null, active: true },
       { id: 4, direction: "ingreso", description: "Mantención mensual · Constructora (contrato)", category_id: null, category: null, amount_minor: 180_000, frequency: "mensual", day_of_period: 15, starts_on: begin, ends_on: null, active: true },
     ];
     // Gastos de los dos meses anteriores y del actual (los recurrentes ya pagados no se repiten en el calendario).
-    const add = (date: string, category: string, description: string, total: number, paid: string | null, due = date, recurring_id: number | null = null, supplier_uid: string | null = null) => {
+    const add = (date: string, category: string, description: string, total: number, paid: string | null, due = date, recurring_id: number | null = null, supplier_uid: string | null = null, qty: number | null = null, unit: number | null = null) => {
       if (date > t) return;
       const ppm = this.taxPpm();
       const affected = !["Arriendo", "Remuneraciones", "Impuestos y contribuciones", "Honorarios"].includes(category);
       const net = affected && ppm ? Math.round((total * 1_000_000) / (1_000_000 + ppm)) : total;
-      const g: GasRec = { uid: uid("gas"), number: this.next("GAS"), category_id: cat(category), supplier_uid, date, due_date: due, description, net, tax: total - net, total, status: "registrado", payments: [], void_reason: null, notes: null, recurring_id, timeline: [{ at: `${date}T15:00:00Z`, text: `Registrado · ${category} · ${description}` }] };
+      const g: GasRec = { uid: uid("gas"), number: this.next("GAS"), category_id: cat(category), supplier_uid, date, due_date: due, description, net, tax: total - net, total, status: "registrado", payments: [], void_reason: null, notes: null, recurring_id, timeline: [{ at: `${date}T15:00:00Z`, text: `Registrado · ${category} · ${description}` }], qty, unit };
       if (paid) {
         const pnum = this.next("EGR");
         g.payments.push({ number: pnum, date, amount_minor: total, method: paid });
@@ -2235,15 +2268,24 @@ export class DemoBackend implements Backend {
       } else g.timeline.push({ at: `${date}T15:00:00Z`, text: `Queda en Dinero que debes (vence ${due})` });
       this.gastos.push(g);
     };
-    for (const m of [-2, -1, 0]) {
+    for (const m of [-1, 0]) {
       add(monthDay(m, 5), "Arriendo", "Arriendo del local", 650_000, "Transferencia", monthDay(m, 5), 1);
       add(monthDay(m, 12), "Internet y telefonía", "Internet y teléfono", 39_990, "Transferencia", monthDay(m, 12), 2);
-      if (m < 0) add(monthDay(m, 28), "Remuneraciones", "Sueldos", 1_850_000, "Transferencia", monthDay(m, 28), 3);
-      add(monthDay(m, 8), "Transporte", "Fletes y combustible", 68_400 + (m + 2) * 4_150, "Efectivo");
+      if (m < 0) add(monthDay(m, 28), "Remuneraciones", "Sueldos", 950_000, "Transferencia", monthDay(m, 28), 3);
+      add(monthDay(m, 8), "Transporte", "Fletes a clientes", 38_400 + (m + 1) * 2_150, "Efectivo");
+      const litros = 38_000 + (m + 1) * 2_500;
+      add(monthDay(m, 3), "Combustible", "Bencina 93 camioneta", Math.round((litros * 1_289) / 1000), "Tarjeta de débito", undefined, null, null, litros, 1_289);
+      add(monthDay(m, 17), "Combustible", "Bencina 93 camioneta", Math.round((32_000 * 1_295) / 1000), "Tarjeta de débito", undefined, null, null, 32_000, 1_295);
+      add(monthDay(m, 14), "Alimentación y comidas", "Almuerzos en terreno", 4 * 7_490, "Efectivo", undefined, null, null, 4_000, 7_490);
+      add(monthDay(m, 21), "Publicidad y marketing", "Avisos en redes sociales", 45_000, "Tarjeta de crédito");
+      if (m < 0) add(monthDay(m, 25), "Electricidad", "Cuenta de luz", 78_900, "Transferencia");
     }
+    add(monthDay(-1, 10), "Viajes y pasajes", "Pasajes a Santiago (feria del rubro)", 2 * 54_900, "Tarjeta de crédito", undefined, null, null, 2_000, 54_900);
+    add(monthDay(-1, 11), "Alojamiento", "Hotel feria del rubro", 2 * 48_000, "Tarjeta de crédito", undefined, null, null, 2_000, 48_000);
+    add(monthDay(-1, 6), "Estudios y capacitación", "Curso de ventas online", 89_000, "Transferencia");
+    add(monthDay(-1, 9), "Peajes y estacionamientos", "Peajes ruta 5", 6 * 3_100, "Efectivo", undefined, null, null, 6_000, 3_100);
     add(addDays(t, -4), "Electricidad", "Cuenta de luz", 84_350, null, addDays(t, 8));
-    add(addDays(t, -9), "Marketing", "Avisos en redes sociales", 45_000, "Tarjeta de crédito");
-    add(addDays(t, -20), "Honorarios", "Contador (honorarios del mes)", 180_000, null, addDays(t, -3));
+    add(addDays(t, -20), "Contabilidad y asesorías", "Contador (honorarios del mes)", 180_000, null, addDays(t, -3));
     this.transfers = [{ uid: uid("trs"), from: "cta-caja", to: "cta-banco", date: addDays(t, -14), amount: 400_000, notes: "Depósito de efectivo" }];
   }
   private findGasto(u: string): GasRec {
@@ -2254,8 +2296,10 @@ export class DemoBackend implements Backend {
   private gastoSummary(g: GasRec): ExpenseSummary {
     const paid = this.paidOf(g.payments);
     return {
-      uid: g.uid, number: g.number, date: g.date, due_date: g.due_date, category: this.cats.find((c) => c.id === g.category_id)?.name ?? "Otros",
-      supplier_name: g.supplier_uid ? this.supplierName(g.supplier_uid) : null, description: g.description, total_minor: g.total, paid_minor: g.status === "anulado" ? 0 : paid,
+      uid: g.uid, number: g.number, date: g.date, due_date: g.due_date, category_id: g.category_id, category: this.cats.find((c) => c.id === g.category_id)?.name ?? "Otros",
+      group_name: this.cats.find((c) => c.id === g.category_id)?.group_name ?? "Otros",
+      supplier_name: g.supplier_uid ? this.supplierName(g.supplier_uid) : null, description: g.description,
+      quantity_milli: g.qty ?? 1000, unit_minor: g.unit ?? g.total, total_minor: g.total, paid_minor: g.status === "anulado" ? 0 : paid,
       status: g.status, payment_state: g.status === "anulado" ? "anulado" : paid >= g.total ? "pagado" : paid > 0 ? "abonado" : "por_pagar",
     };
   }
@@ -2346,13 +2390,39 @@ export class DemoBackend implements Backend {
     this.log("dinero.traspasar", "cuenta", `${from.name} → ${to.name}`);
     return wait(this.accountRows());
   }
-  async expenseCategories(): Promise<ExpenseCategory[]> { return wait([...this.cats].sort((a, b) => a.name.localeCompare(b.name))); }
+  async expenseCategories(): Promise<ExpenseCategory[]> { return wait(this.cats.filter((c) => !c.archived).sort((a, b) => a.name.localeCompare(b.name))); }
+  async expenseCategoriesAll(): Promise<ExpenseCategory[]> {
+    this.require("dinero.ver");
+    return wait([...this.cats].sort((a, b) => Number(a.archived) - Number(b.archived) || a.group_name.localeCompare(b.group_name) || a.name.localeCompare(b.name)));
+  }
+  async saveExpenseCategory(input: CategoryInput): Promise<ExpenseCategory[]> {
+    this.require("dinero.registrar");
+    const n = input.name.trim();
+    if (!n || n.length > 60) throw new AppError("validacion", "Escribe el nombre de la categoría (hasta 60 caracteres).");
+    if (this.cats.some((c) => c.id !== input.id && norm(c.name) === norm(n))) throw new AppError("duplicado", "Esa categoría ya existe.");
+    if ((input.monthly_budget_minor ?? 0) < 0) throw new AppError("validacion", "El presupuesto no puede ser negativo.");
+    const data = { name: n, behavior: (input.fixed ? "fijo" : "variable") as ExpenseCategory["behavior"], group_name: input.group_name?.trim() || "Otros",
+      monthly_budget_minor: input.monthly_budget_minor || null, archived: input.archived };
+    if (input.id === null) this.cats.push({ id: Math.max(0, ...this.cats.map((c) => c.id)) + 1, ...data, archived: false });
+    else {
+      const c = this.cats.find((x) => x.id === input.id);
+      if (!c) throw new AppError("no_encontrado", "No encontramos esa categoría.");
+      Object.assign(c, data);
+    }
+    this.log("gasto.categoria", "categoria", n);
+    return this.expenseCategoriesAll();
+  }
+  async expenseInsights(months: number): Promise<ExpenseInsights> {
+    this.require("dinero.ver");
+    const cash = this.accountRows().filter((a) => !a.archived).reduce((x, a) => x + a.balance_minor, 0);
+    return wait(buildInsights(this.reportFacts(), this.cats, this.recs, cash, this.taxPpm(), months, this.canDo), 90);
+  }
   async addExpenseCategory(name: string, fixed: boolean): Promise<ExpenseCategory[]> {
     this.require("dinero.registrar");
     const n = name.trim();
     if (!n || n.length > 60) throw new AppError("validacion", "Escribe el nombre de la categoría (hasta 60 caracteres).");
     if (this.cats.some((c) => norm(c.name) === norm(n))) throw new AppError("duplicado", "Esa categoría ya existe.");
-    this.cats.push({ id: this.cats.length + 1, name: n, behavior: fixed ? "fijo" : "variable" });
+    this.cats.push({ id: Math.max(0, ...this.cats.map((c) => c.id)) + 1, name: n, behavior: fixed ? "fijo" : "variable", group_name: "Otros", monthly_budget_minor: null, archived: false });
     return this.expenseCategories();
   }
   async listExpenses(filter: ExpenseFilter): Promise<ExpenseSummary[]> {
@@ -2360,6 +2430,7 @@ export class DemoBackend implements Backend {
     const q = norm(filter.query?.trim() ?? "");
     const rows = this.gastos.map((g) => this.gastoSummary(g)).filter((g) =>
       (filter.include_void || g.status !== "anulado") && (!filter.from || g.date >= filter.from) && (!filter.to || g.date <= filter.to)
+      && (filter.category_id == null || g.category_id === filter.category_id)
       && (!q || norm(`${g.number} ${g.description} ${g.category} ${g.supplier_name ?? ""}`).includes(q)));
     return wait(rows.sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number)));
   }
@@ -2371,12 +2442,18 @@ export class DemoBackend implements Backend {
     if (input.supplier_uid) this.findSupplier(input.supplier_uid);
     const description = input.description.trim();
     if (!description || description.length > 200) throw new AppError("validacion", "Describe el gasto (hasta 200 caracteres).");
+    const qty = input.quantity_milli ?? 1000;
+    if (!(qty > 0)) throw new AppError("validacion", "La cantidad debe ser mayor que cero.");
+    if ((input.unit_minor ?? 0) < 0) throw new AppError("validacion", "El valor no puede ser negativo.");
+    const totalMinor = input.unit_minor != null ? lineTotal(qty, input.unit_minor) : input.total_minor;
+    input = { ...input, total_minor: totalMinor };
     if (!(input.total_minor > 0)) throw new AppError("monto", "El monto debe ser mayor que cero.");
+    const unitMinor = input.unit_minor ?? (qty === 1000 ? null : Math.round((totalMinor * 1000) / qty));
     const due = input.due_date || input.date;
     if (due < input.date) throw new AppError("vencimiento", "El vencimiento no puede ser anterior al gasto.");
     const ppm = this.taxPpm();
     const net = input.tax_included && ppm ? Math.round((input.total_minor * 1_000_000) / (1_000_000 + ppm)) : input.total_minor;
-    const g: GasRec = { uid: uid("gas"), number: this.next("GAS"), category_id: cat.id, supplier_uid: input.supplier_uid || null, date: input.date, due_date: due, description, net, tax: input.total_minor - net, total: input.total_minor, status: "registrado", payments: [], void_reason: null, notes: input.notes?.trim() || null, recurring_id: input.recurring_id, timeline: [] };
+    const g: GasRec = { uid: uid("gas"), number: this.next("GAS"), category_id: cat.id, supplier_uid: input.supplier_uid || null, date: input.date, due_date: due, description, net, tax: input.total_minor - net, total: input.total_minor, status: "registrado", payments: [], void_reason: null, notes: input.notes?.trim() || null, recurring_id: input.recurring_id, timeline: [], qty: qty !== 1000 || unitMinor !== null ? qty : null, unit: unitMinor };
     g.timeline.push({ at: now(), text: `${g.number} registrado · ${cat.name} · ${description}` });
     if (input.paid_method) {
       const acc = this.accountFor(input.paid_account_uid, input.paid_method);

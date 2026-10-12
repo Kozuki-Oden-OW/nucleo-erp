@@ -11,7 +11,7 @@ import type {
   SeveranceForm, SeveranceView, Worker, WorkerInput,
   F29Inputs, F29View, RcvImportReport, TaxDocInput, TaxProfile,
   ImportCostInput, ImportDetail, ImportInput, ImportReceiveLine, ImportStage, ImportSummary, IncotermDef,
-  AccountInput, CalendarItem, ExpenseCategory, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow, MoneyAccount,
+  AccountInput, CalendarItem, CategoryInput, ExpenseCategory, ExpenseInsights, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow, MoneyAccount,
   MoneyOverview, MoneyTransferInput, Recurring, RecurringInput,
   AdjustmentInput, InventoryOverview, InventorySettings, ProductInventory, ReorderInput, StockDocDone, StockDocRow, TransferInput, Warehouse,
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
@@ -38,7 +38,7 @@ export interface SaleFilter {
 export type Feature =
   | "dashboard" | "clientes" | "productos" | "ventas" | "compras" | "comex" | "negocio" | "respaldos" | "busqueda"
   | "usuarios" | "documentos" | "numeracion" | "monedas" | "auditoria" | "inventario" | "dinero" | "impuestos" | "remuneraciones"
-  | "reportes" | "promociones" | "envios";
+  | "reportes" | "promociones" | "envios" | "gastos";
 
 export interface Backend {
   readonly kind: "tauri" | "demo";
@@ -127,6 +127,8 @@ export interface Backend {
   deleteCategory(uid: string): Promise<ProductCategory[]>;
   /** Pone (o quita, con null) la categoría de varios productos. */
   assignCategory(productUids: string[], categoryUid: string | null): Promise<ProductCategory[]>;
+  /** Quita una categoría a un producto (si era la principal, otra pasa a principal). */
+  removeProductCategory(productUid: string, categoryUid: string): Promise<ProductCategory[]>;
 
   // Ventas
   listQuotes(query?: string): Promise<QuoteSummary[]>;
@@ -186,6 +188,12 @@ export interface Backend {
   transferMoney(input: MoneyTransferInput): Promise<MoneyAccount[]>;
   expenseCategories(): Promise<ExpenseCategory[]>;
   addExpenseCategory(name: string, fixed: boolean): Promise<ExpenseCategory[]>;
+  /** Todas las categorías de gasto, también las archivadas. */
+  expenseCategoriesAll(): Promise<ExpenseCategory[]>;
+  /** Crea (sin id) o modifica una categoría: tipo, grupo, presupuesto y archivo. */
+  saveExpenseCategory(input: CategoryInput): Promise<ExpenseCategory[]>;
+  /** Resumen de gastos y punto de equilibrio con el promedio de los últimos `months` meses. */
+  expenseInsights(months: number): Promise<ExpenseInsights>;
   listExpenses(filter: ExpenseFilter): Promise<ExpenseSummary[]>;
   expense(uid: string): Promise<ExpenseDetail>;
   registerExpense(input: ExpenseInput): Promise<ExpenseDetail>;

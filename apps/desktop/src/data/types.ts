@@ -211,8 +211,12 @@ export interface Product {
   on_hand_milli: number;
   min_milli: number;
   taxable: boolean;
+  /** Categoría principal (la de los reportes por categoría). */
   category_uid: string | null;
   category: string | null;
+  /** Otras categorías del producto, además de la principal. */
+  extra_category_uids: string[];
+  extra_categories: string[];
   /** Hoja con que se calculó el costo (costo avanzado), si se usó. */
   cost_sheet: CostSheet | null;
   /** Con movimientos de stock, el costo lo mueven las compras y los ajustes. */
@@ -238,6 +242,7 @@ export interface NewProduct {
   /** Stock con que parte (milésimas). Solo productos. */
   initial_stock_milli?: number;
   category_uid?: string | null;
+  extra_category_uids?: string[] | null;
   cost_sheet?: CostSheet | null;
   stock_policy?: StockPolicy;
 }
@@ -250,6 +255,8 @@ export interface ProductPatch {
   taxable: boolean;
   min_milli: number;
   category_uid?: string | null;
+  /** Otras categorías; sin enviar = no cambian. */
+  extra_category_uids?: string[] | null;
   /** Nuevo costo en pesos (solo sin movimientos de stock). */
   cost_minor?: number | null;
   cost_sheet?: CostSheet | null;
@@ -543,7 +550,14 @@ export interface StockAnalysis {
   status: StockStatus;
   advice: { kind: "comprar" | "no_comprar" | "exceso" | "sin_datos"; quantity_milli: number | null; explanation: string };
 }
-export interface InventoryOverview { window_days: number; total_value_minor: number; rows: StockAnalysis[] }
+export interface InventoryOverview {
+  window_days: number;
+  /** Total invertido: stock × costo promedio (sin IVA). */
+  total_value_minor: number;
+  /** Valor a precio de venta: stock × precio neto (sin IVA). */
+  total_sale_value_minor: number;
+  rows: StockAnalysis[];
+}
 export interface StockByWarehouse { warehouse_uid: string; warehouse_name: string; on_hand_milli: number; avg_cost_e4: number }
 export interface KardexRow {
   id: number;
@@ -593,7 +607,24 @@ export interface LedgerRow {
   status: "vigente" | "anulado";
 }
 export interface MoneyTransferInput { from_uid: string; to_uid: string; date: string; amount_minor: number; notes?: string }
-export interface ExpenseCategory { id: number; name: string; behavior: "fijo" | "variable" }
+export interface ExpenseCategory {
+  id: number;
+  name: string;
+  behavior: "fijo" | "variable";
+  /** Grupo para ordenar y resumir (ej. «Vehículo y transporte»). */
+  group_name: string;
+  /** Presupuesto mensual (como se registran los gastos), si se definió. */
+  monthly_budget_minor: number | null;
+  archived: boolean;
+}
+export interface CategoryInput {
+  id: number | null;
+  name: string;
+  fixed: boolean;
+  group_name: string | null;
+  monthly_budget_minor: number | null;
+  archived: boolean;
+}
 export interface ExpenseInput {
   category_id: number;
   supplier_uid: string | null;
@@ -606,15 +637,22 @@ export interface ExpenseInput {
   paid_account_uid: string | null;
   notes?: string;
   recurring_id: number | null;
+  /** Cantidad en milésimas (vacío = 1). Con `unit_minor`, el total es cantidad × valor. */
+  quantity_milli?: number | null;
+  unit_minor?: number | null;
 }
 export interface ExpenseSummary {
   uid: string;
   number: string;
   date: string;
   due_date: string | null;
+  category_id: number;
   category: string;
+  group_name: string;
   supplier_name: string | null;
   description: string;
+  quantity_milli: number;
+  unit_minor: number;
   total_minor: number;
   paid_minor: number;
   status: "registrado" | "anulado";
@@ -629,7 +667,55 @@ export interface ExpenseDetail extends ExpenseSummary {
   notes: string | null;
   timeline: { at: string; text: string }[];
 }
-export interface ExpenseFilter { query?: string; from?: string; to?: string; include_void?: boolean }
+export interface ExpenseFilter { query?: string; from?: string; to?: string; include_void?: boolean; category_id?: number | null }
+export interface InsightMonth {
+  month: string;
+  sales_net_minor: number;
+  sales_count: number;
+  cost_minor: number;
+  fixed_minor: number;
+  variable_minor: number;
+  payroll_minor: number;
+  profit_minor: number;
+}
+export interface CategoryInsight {
+  id: number;
+  name: string;
+  group_name: string;
+  behavior: "fijo" | "variable";
+  avg_month_minor: number;
+  this_month_minor: number;
+  budget_minor: number | null;
+}
+/** Resumen de gastos y punto de equilibrio (promedio de los últimos meses completos). */
+export interface ExpenseInsights {
+  today: string;
+  months: InsightMonth[];
+  months_used: number;
+  partial: boolean;
+  current: InsightMonth;
+  avg_sales_minor: number;
+  avg_sales_count: number;
+  avg_ticket_minor: number | null;
+  avg_cost_minor: number;
+  /** Margen sobre la venta en ppm. */
+  margin_ppm: number | null;
+  avg_fixed_minor: number;
+  avg_variable_minor: number;
+  avg_payroll_minor: number;
+  avg_expenses_minor: number;
+  break_even_minor: number | null;
+  coverage_ppm: number | null;
+  avg_profit_minor: number;
+  recurring_month_minor: number;
+  cash_minor: number;
+  payables_30d_minor: number;
+  tax_ppm: number | null;
+  categories: CategoryInsight[];
+  sales_visible: boolean;
+  payroll_included: boolean;
+  notes: string[];
+}
 export type Frequency = "semanal" | "mensual" | "bimestral" | "trimestral" | "anual";
 export interface Recurring {
   id: number;

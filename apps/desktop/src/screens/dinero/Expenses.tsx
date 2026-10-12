@@ -5,7 +5,8 @@ import {
   useBackend, errorMessage, type ExpenseCategory, type ExpenseDetail, type ExpenseInput, type ExpenseSummary, type Recurring, type Supplier,
 } from "../../data";
 import { PAYMENT_METHODS } from "../../data/catalogs";
-import { addDays, formatDate, formatMoney, todayIso } from "../../lib/format";
+import { addDays, formatDate, formatMoney, formatQty, parseQty, todayIso } from "../../lib/format";
+import { lineTotal } from "../../data/gastos";
 import { goBack, navigate, type Route } from "../../lib/router";
 import { useSession } from "../../lib/session";
 import { MoneyField } from "../../ui/doc";
@@ -17,11 +18,12 @@ import { SupplierFormDrawer } from "../compras/common";
 import { SupplierPicker } from "../ventas/pickers";
 import { AccountSelect, ExpenseStateBadge, PayDialog } from "./common";
 
-type Period = "mes" | "anterior" | "todo";
+type Period = "mes" | "anterior" | "anio" | "todo";
 
 function monthRange(p: Period): { from?: string; to?: string } {
   const t = todayIso();
   if (p === "todo") return {};
+  if (p === "anio") return { from: `${t.slice(0, 4)}-01-01`, to: t };
   const d = new Date(`${t}T12:00:00`);
   d.setDate(1);
   if (p === "anterior") d.setMonth(d.getMonth() - 1);
@@ -30,11 +32,14 @@ function monthRange(p: Period): { from?: string; to?: string } {
   return { from, to: `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}` };
 }
 
-export function ExpensesTab({ route, onChanged }: { route: Route; onChanged: () => void }) {
+export function ExpensesTab({ route, onChanged, base = "/gastos?tab=registro" }: { route: Route; onChanged: () => void; base?: string }) {
   const backend = useBackend();
   const { can } = useSession();
   const [query, setQuery] = useState("");
   const [period, setPeriod] = useState<Period>("mes");
+  const [catFilter, setCatFilter] = useState<number | null>(null);
+  const [cats, setCats] = useState<ExpenseCategory[]>([]);
+  useEffect(() => { backend.expenseCategoriesAll().then(setCats).catch(() => {}); }, [backend]);
   const [withVoid, setWithVoid] = useState(false);
   const [rows, setRows] = useState<ExpenseSummary[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -43,10 +48,11 @@ export function ExpensesTab({ route, onChanged }: { route: Route; onChanged: () 
   useEffect(() => {
     let alive = true;
     const tm = setTimeout(() => {
-      backend.listExpenses({ query, ...monthRange(period), include_void: withVoid }).then((r) => alive && setRows(r)).catch((e) => alive && setErr(errorMessage(e)));
+      backend.listExpenses({ query, ...monthRange(period), include_void: withVoid, category_id: catFilter }).then((r) => alive && setRows(r)).catch((e) => alive && setErr(errorMessage(e)));
     }, 90);
     return () => { alive = false; clearTimeout(tm); };
-  }, [backend, query, period, withVoid, version]);
+  }, [backend, query, period, withVoid, catFilter, version]);
+  const initialCat = Number(route.query.get("cat")) || null;
 
   const live = (rows ?? []).filter((g) => g.status !== "anulado");
   const total = live.reduce((a, g) => a + g.total_minor, 0);
@@ -62,6 +68,7 @@ export function ExpensesTab({ route, onChanged }: { route: Route; onChanged: () 
     { key: "f", header: "Fecha", width: "7rem", render: (g) => <span className="num text-muted">{formatDate(g.date)}</span> },
     { key: "c", header: "Categoría", width: "11rem", render: (g) => <span className="text-muted">{g.category}</span> },
     { key: "d", header: "Descripción", render: (g) => <span className="truncate text-ink">{g.description}{g.supplier_name && <span className="text-muted"> · {g.supplier_name}</span>}</span> },
+    { key: "q", header: "Cantidad × valor", width: "10rem", align: "right", render: (g) => g.quantity_milli !== 1000 ? <span className="num text-muted">{formatQty(g.quantity_milli)} × {formatMoney(g.unit_minor)}</span> : <span className="text-muted">—</span> },
     { key: "e", header: "Estado", width: "10.5rem", render: (g) => <ExpenseStateBadge g={g} /> },
     { key: "t", header: "Total", width: "8.5rem", align: "right", render: (g) => <span className={`num font-medium ${g.status === "anulado" ? "text-muted line-through" : ""}`}>{formatMoney(g.total_minor)}</span> },
   ];
@@ -70,7 +77,9 @@ export function ExpensesTab({ route, onChanged }: { route: Route; onChanged: () 
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-4">
         <Field aria-label="Buscar gastos" leading={<Search size={15} />} placeholder="Número, descripción, categoría o proveedor" value={query} onChange={(e) => setQuery(e.target.value)} className="w-full max-w-md" />
-        <Segmented label="Período" value={period} onChange={setPeriod} options={[{ value: "mes", label: "Este mes" }, { value: "anterior", label: "Mes anterior" }, { value: "todo", label: "Todo" }]} />
+        <Segmented label="Período" value={period} onChange={setPeriod} options={[{ value: "mes", label: "Este mes" }, { value: "anterior", label: "Mes anterior" }, { value: "anio", label: "Este año" }, { value: "todo", label: "Todo" }]} />
+        <Select aria-label="Categoría" value={catFilter === null ? "" : String(catFilter)} onChange={(e) => setCatFilter(e.target.value ? Number(e.target.value) : null)}
+          options={[{ value: "", label: "Todas las categorías" }, ...cats.map((c) => ({ value: String(c.id), label: c.archived ? `${c.name} (archivada)` : c.name }))]} />
         <Checkbox label="Incluir anulados" checked={withVoid} onChange={setWithVoid} />
       </div>
       {rows && live.length > 0 && (
@@ -81,17 +90,19 @@ export function ExpensesTab({ route, onChanged }: { route: Route; onChanged: () 
         </div>
       )}
       {err && <Notice tone="danger">{err}</Notice>}
-      <DataTable label="Gastos" columns={cols} rows={rows ?? []} rowKey={(g) => g.uid} onOpen={(g) => navigate(`/dinero/gasto/${g.uid}`)}
-        empty={<EmptyState icon={Receipt} title={query ? "Sin coincidencias" : "Sin gastos en este período"} action={can("dinero.registrar") && !query && <Button icon={Plus} onClick={() => navigate("/dinero?tab=gastos&nuevo=1", { replace: true })}>Registrar gasto</Button>}>
-          Arriendo, luz, internet, sueldos, fletes… todo lo que pagas para que el negocio funcione.
+      <DataTable label="Gastos" columns={cols} rows={rows ?? []} rowKey={(g) => g.uid} onOpen={(g) => navigate(`/gastos/gasto/${g.uid}`)}
+        empty={<EmptyState icon={Receipt} title={query ? "Sin coincidencias" : "Sin gastos en este período"} action={can("dinero.registrar") && !query && <Button icon={Plus} onClick={() => navigate(`${base}&nuevo=1`, { replace: true })}>Registrar gasto</Button>}>
+          Bencina, comida, viajes, arriendo, luz, estudios, publicidad… todo lo que pagas para que el negocio funcione.
         </EmptyState>} />
-      <ExpenseFormDrawer open={creating} onClose={() => navigate("/dinero?tab=gastos", { replace: true })}
-        onSaved={(g) => { setVersion((v) => v + 1); onChanged(); navigate(`/dinero/gasto/${g.uid}`); }} />
+      <ExpenseFormDrawer open={creating} initialCategory={initialCat} onClose={() => navigate(base, { replace: true })}
+        onSaved={(g, again) => { setVersion((v) => v + 1); onChanged(); if (!again) navigate(`/gastos/gasto/${g.uid}`); }} />
     </div>
   );
 }
 
-export function ExpenseFormDrawer({ open, onClose, onSaved }: { open: boolean; onClose: () => void; onSaved: (g: ExpenseDetail) => void }) {
+export function ExpenseFormDrawer({ open, onClose, onSaved, initialCategory = null }: {
+  open: boolean; onClose: () => void; onSaved: (g: ExpenseDetail, again: boolean) => void; initialCategory?: number | null;
+}) {
   const backend = useBackend();
   const toast = useToast();
   const [cats, setCats] = useState<ExpenseCategory[]>([]);
@@ -99,6 +110,9 @@ export function ExpenseFormDrawer({ open, onClose, onSaved }: { open: boolean; o
   const blank = (): ExpenseInput => ({ category_id: 0, supplier_uid: null, date: todayIso(), description: "", total_minor: 0, tax_included: true, due_date: null, paid_method: PAYMENT_METHODS[1]!, paid_account_uid: null, recurring_id: null });
   const [f, setF] = useState<ExpenseInput>(blank);
   const [amount, setAmount] = useState<number | null>(null);
+  const [qtyText, setQtyText] = useState("1");
+  const qty = parseQty(qtyText);
+  const total = amount !== null && qty ? lineTotal(qty, amount) : null;
   const [paid, setPaid] = useState<"pagado" | "por_pagar">("pagado");
   const [supplier, setSupplier] = useState<Supplier | null>(null);
   const [newSupplier, setNewSupplier] = useState<string | null>(null);
@@ -107,11 +121,15 @@ export function ExpenseFormDrawer({ open, onClose, onSaved }: { open: boolean; o
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (!open) return;
-    setF(blank()); setAmount(null); setPaid("pagado"); setSupplier(null); setErr(null);
-    backend.expenseCategories().then((c) => { setCats(c); setF((x) => ({ ...x, category_id: x.category_id || (c.find((k) => k.name === "Otros")?.id ?? c[0]?.id ?? 0) })); }).catch(() => {});
+    setF(blank()); setAmount(null); setQtyText("1"); setPaid("pagado"); setSupplier(null); setErr(null);
+    backend.expenseCategories().then((c) => {
+      setCats(c);
+      const pre = initialCategory && c.some((k) => k.id === initialCategory) ? initialCategory : null;
+      setF((x) => ({ ...x, category_id: pre ?? (x.category_id || (c.find((k) => k.name === "Otros")?.id ?? c[0]?.id ?? 0)) }));
+    }).catch(() => {});
     backend.recurring().then((r) => setRecs(r.filter((x) => x.active && x.direction === "egreso"))).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [backend, open]);
+  }, [backend, open, initialCategory]);
 
   function fromRecurring(id: string) {
     const r = recs.find((x) => String(x.id) === id);
@@ -129,30 +147,33 @@ export function ExpenseFormDrawer({ open, onClose, onSaved }: { open: boolean; o
       setNewCat(null);
     } catch (e) { toast("danger", errorMessage(e)); }
   }
-  async function save() {
+  async function save(again = false) {
     setBusy(true); setErr(null);
     try {
       const g = await backend.registerExpense({
-        ...f, total_minor: amount ?? 0, supplier_uid: supplier?.uid ?? null,
+        ...f, total_minor: total ?? 0, quantity_milli: qty ?? 1000, unit_minor: amount, supplier_uid: supplier?.uid ?? null,
         paid_method: paid === "pagado" ? f.paid_method : null, paid_account_uid: paid === "pagado" ? f.paid_account_uid : null,
         due_date: paid === "por_pagar" ? f.due_date || addDays(f.date, 30) : null, notes: f.notes?.trim() || undefined,
       });
       toast("success", `${g.number} registrado${g.payment_state === "pagado" ? " y pagado" : ": queda en Dinero que debes"}.`);
-      onSaved(g);
+      onSaved(g, again);
+      if (again) { setF((x) => ({ ...blank(), category_id: x.category_id, date: x.date, paid_method: x.paid_method, paid_account_uid: x.paid_account_uid })); setAmount(null); setQtyText("1"); }
     } catch (e) { setErr(errorMessage(e)); } finally { setBusy(false); }
   }
   const cat = cats.find((c) => c.id === f.category_id);
   return (
     <>
       <Drawer open={open && newSupplier === null} onClose={onClose} title="Registrar gasto" subtitle="Queda en tu historial y en la auditoría. Si te equivocas, se anula con motivo."
-        footer={<><Button variant="ghost" onClick={onClose}>Cancelar</Button><Button icon={Receipt} onClick={save} disabled={busy || !amount || !f.description.trim() || !f.category_id}>{busy ? "Guardando…" : "Registrar gasto"}</Button></>}>
+        footer={<><Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button variant="secondary" icon={Plus} onClick={() => save(true)} disabled={busy || !total || !f.description.trim() || !f.category_id}>Guardar y anotar otro</Button>
+          <Button icon={Receipt} onClick={() => save(false)} disabled={busy || !total || !f.description.trim() || !f.category_id}>{busy ? "Guardando…" : "Registrar gasto"}</Button></>}>
         <div className="flex flex-col gap-4">
           {recs.length > 0 && (
             <Select label="¿Es un pago recurrente?" optional value={f.recurring_id ? String(f.recurring_id) : ""} onChange={(e) => fromRecurring(e.target.value)}
               options={[{ value: "", label: "No" }, ...recs.map((r) => ({ value: String(r.id), label: `${r.description} · ${formatMoney(r.amount_minor)}` }))]}
               hint="Al registrarlo, deja de aparecer como pendiente en el calendario de este período." />
           )}
-          <Field label="Descripción" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} placeholder="Ej. cuenta de luz de septiembre" data-autofocus />
+          <Field label="¿En qué gastaste?" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} placeholder="Ej. bencina 93, almuerzo con cliente, pasaje a Santiago" data-autofocus />
           <div className="grid gap-4 sm:grid-cols-2">
             {newCat === null ? (
               <Select label="Categoría" value={String(f.category_id)} onChange={(e) => e.target.value === "nueva" ? setNewCat("") : setF({ ...f, category_id: Number(e.target.value) })}
@@ -167,10 +188,15 @@ export function ExpenseFormDrawer({ open, onClose, onSaved }: { open: boolean; o
             )}
             <Field label="Fecha del gasto" type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} />
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <MoneyField label="Monto total" value={amount} onValue={setAmount} />
-            <div className="flex items-end pb-2"><Checkbox label="El monto incluye IVA" checked={f.tax_included} onChange={(v) => setF({ ...f, tax_included: v })} hint="Se separa con la tasa de tu negocio (informativo)." /></div>
+          <div className="grid gap-4 sm:grid-cols-[1fr_8rem]">
+            <MoneyField label={qty && qty !== 1000 ? "Valor de cada uno" : "Valor"} value={amount} onValue={setAmount} hint="Lo que pagaste por unidad (litro, almuerzo, noche…)." />
+            <Field label="Cantidad" inputMode="decimal" value={qtyText} onChange={(e) => setQtyText(e.target.value)} error={qty === null ? "Revisa la cantidad" : undefined} inputClassName="text-right" />
           </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-surface-2 px-4 py-3">
+            <span className="text-sm text-muted">{qty && qty !== 1000 && amount !== null ? `${formatQty(qty)} × ${formatMoney(amount)}` : "Total del gasto"}</span>
+            <span className="num text-[20px] font-semibold text-ink">{formatMoney(total ?? 0)}</span>
+          </div>
+          <Checkbox label="El valor incluye IVA" checked={f.tax_included} onChange={(v) => setF({ ...f, tax_included: v })} hint="Si tienes factura, el IVA se separa con la tasa de tu negocio (informativo)." />
           <div className="flex flex-col gap-1.5">
             <span className="text-[13px] font-medium text-ink">Proveedor <span className="font-normal text-muted">(opcional)</span></span>
             <SupplierPicker value={supplier} onChange={setSupplier} onCreate={(name) => setNewSupplier(name)} />
@@ -210,7 +236,7 @@ export function ExpenseView({ uid }: { uid: string }) {
   return (
     <div className="anim-in">
       <PageHeader
-        back={<button onClick={() => goBack("/dinero?tab=gastos")} className="mb-2 inline-flex items-center gap-1 text-sm text-muted hover:text-ink"><ArrowLeft size={15} /> Gastos</button>}
+        back={<button onClick={() => goBack("/gastos?tab=registro")} className="mb-2 inline-flex items-center gap-1 text-sm text-muted hover:text-ink"><ArrowLeft size={15} /> Gastos</button>}
         title={<span className="flex flex-wrap items-center gap-3"><span>{g.description}</span><ExpenseStateBadge g={g} /></span>}
         subtitle={`${g.number} · ${g.category} · ${formatDate(g.date)}${g.supplier_name ? ` · ${g.supplier_name}` : ""}`}
         actions={write && g.status === "registrado" && (
@@ -225,7 +251,8 @@ export function ExpenseView({ uid }: { uid: string }) {
         <div className="flex min-w-0 flex-col gap-6">
           <Card title="Detalle">
             <DefinitionList items={[
-              { label: "Categoría", value: g.category },
+              { label: "Categoría", value: `${g.category} · ${g.group_name}` },
+              ...(g.quantity_milli !== 1000 ? [{ label: "Cantidad × valor", value: <span className="num">{formatQty(g.quantity_milli)} × {formatMoney(g.unit_minor)}</span> }] : []),
               { label: "Proveedor", value: g.supplier_name ?? "—" },
               { label: "Fecha", value: formatDate(g.date) },
               { label: "Vence", value: formatDate(g.due_date) },

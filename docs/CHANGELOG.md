@@ -2,6 +2,31 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [0.6.0] — 2026-10-12
+
+- **Gastos (nuevo módulo en el menú):**
+  - Se anota cada gasto con cantidad × valor (ej. 40 litros de bencina a $1.289) y «Guardar y anotar otro».
+  - Botones de «Anotar rápido»: bencina, transporte, comida, viajes, alojamiento, arriendo, estudios, publicidad, peajes y oficina.
+  - Categorías nuevas agrupadas (vehículo y transporte, viajes y comidas, local y oficina, personas y estudios, ventas y publicidad, operación, servicios, impuestos y finanzas). Cada una puede tener presupuesto mensual, y el sistema avisa cuando se supera.
+  - Resumen: lo gastado en el mes, los gastos promedio, la venta necesaria y lo que queda (o se pierde) al mes. Incluye un gráfico mes a mes y en qué se va el dinero.
+  - Gastos fijos (recurrentes) en el mismo módulo.
+  - «¿Cuánto necesito vender?» calcula:
+    - el punto de equilibrio y la venta necesaria con una utilidad meta (al mes, por semana y por día de venta);
+    - cuánto se cubre hoy;
+    - una proyección a 12 meses con crecimiento;
+    - el reparto de la utilidad entre reserva, reinversión, publicidad, inversiones y retiro;
+    - los meses de colchón.
+
+    Si recién empiezas, puedes simular con un margen estimado.
+- **Análisis y reportes:** reporte nuevo «¿Cuánto necesito vender? (punto de equilibrio)» con la venta necesaria por mes, la media mensual y diaria, y el cumplimiento.
+- **Productos en varias categorías:**
+  - Un producto puede estar en varias categorías, por ejemplo «Ropa» y «One Piece».
+  - La principal se usa en los reportes por categoría.
+  - El filtro de productos y las promociones por categoría consideran todas sus categorías.
+- **Inventario:** «Valor del inventario» pasa a llamarse «Total invertido» (stock × costo). Se agrega «Valor total neto» (stock × precio de venta sin IVA), que muestra lo que ganarías al venderlo todo.
+- Los montos negativos se muestran como −$5.000.
+- Dinero: los gastos se registran ahora desde el módulo Gastos.
+
 ## [0.5.1] — 2026-10-12
 
 - **Precio de venta:** dos campos enlazados, «Precio de venta (Con IVA)» y «Precio neto (sin IVA)». Al escribir uno, el otro se calcula con la tasa de IVA del negocio (19 % sobre el neto). Ejemplo: $39.000 con IVA son $32.773 netos.

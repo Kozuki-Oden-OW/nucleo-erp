@@ -37,6 +37,7 @@ import { CountEditor } from "./screens/inventario/CountEditor";
 import { Config } from "./screens/config/Config";
 import { Money } from "./screens/dinero/Money";
 import { ExpenseView } from "./screens/dinero/Expenses";
+import { Gastos } from "./screens/gastos/Gastos";
 import { Products } from "./screens/productos/Products";
 import { DocEditor } from "./screens/ventas/DocEditor";
 import { QuoteView } from "./screens/ventas/QuoteView";
@@ -168,8 +169,12 @@ function Screen({ route, info, session, reload }: { route: Route; info: AppInfo;
       return <Inventory route={route} />;
     case "dinero":
       if (!has.has("dinero")) return <Proximamente id="dinero" />;
-      if (a === "gasto" && b) return <ExpenseView key={b} uid={b} />;
+      if (a === "gasto" && b) { navigate(`/gastos/gasto/${b}`, { replace: true }); return null; }
       return <Money route={route} />;
+    case "gastos":
+      if (!has.has("gastos") || !has.has("dinero")) return <Proximamente id="gastos" />;
+      if (a === "gasto" && b) return <ExpenseView key={b} uid={b} />;
+      return <Gastos route={route} />;
     case "comex":
       if (!has.has("comex")) return <Proximamente id="comex" />;
       if (a === "importacion" && b === "nueva") return <ImportEditor key={route.raw} />;
