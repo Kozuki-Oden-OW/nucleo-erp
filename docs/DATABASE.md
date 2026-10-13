@@ -55,6 +55,7 @@ Todo es entero: las sumas y los reportes se hacen en SQL sin perder exactitud y 
 | 26 | `0026_promociones_envios.sql` | `customers.preferred`, tabla `promotions` (tipo, regla JSON, vigencia, activa) y `shipments` (agencia, seguimiento, destinatario, fechas y estado) con numeración ENV |
 | 27 | `0027_gastos.sql` | `expenses.quantity_milli` y `unit_minor` (cantidad × valor), `expense_categories.group_name` y `monthly_budget_minor`; categorías nuevas (combustible, viajes, alojamiento, comidas, estudios…) y «Marketing» pasa a «Publicidad y marketing» |
 | 28 | `0028_producto_varias_categorias.sql` | Tabla `product_extra_categories`: otras categorías de un producto además de la principal (`products.category_id`) |
+| 29 | `0029_tipos_referencia.sql` | Tabla `reference_kinds`: tipos de referencia propios del negocio (se guardan en el documento como `C:<nombre>`) |
 
 Las migraciones son transaccionales y versionadas con `PRAGMA user_version`. **Pre-1.0:** se pueden
 reescribir (en la Fase 2 se reemplazó la tabla mínima de clientes de la Fase 1); desde la primera beta

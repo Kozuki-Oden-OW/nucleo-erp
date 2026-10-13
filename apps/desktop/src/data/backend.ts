@@ -11,7 +11,7 @@ import type {
   SeveranceForm, SeveranceView, Worker, WorkerInput,
   F29Inputs, F29View, RcvImportReport, TaxDocInput, TaxProfile,
   ImportCostInput, ImportDetail, ImportInput, ImportReceiveLine, ImportStage, ImportSummary, IncotermDef,
-  AccountInput, CalendarItem, CategoryInput, ExpenseCategory, ExpenseInsights, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow, MoneyAccount,
+  AccountInput, CalendarItem, CategoryInput, ReferenceKind, ExpenseCategory, ExpenseInsights, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow, MoneyAccount,
   MoneyOverview, MoneyTransferInput, Recurring, RecurringInput,
   AdjustmentInput, InventoryOverview, InventorySettings, ProductInventory, ReorderInput, StockDocDone, StockDocRow, TransferInput, Warehouse,
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
@@ -127,6 +127,10 @@ export interface Backend {
   deleteCategory(uid: string): Promise<ProductCategory[]>;
   /** Pone (o quita, con null) la categoría de varios productos. */
   assignCategory(productUids: string[], categoryUid: string | null): Promise<ProductCategory[]>;
+  /** Tipos de referencia para ventas: del SII, canales comunes y los propios del negocio. */
+  referenceKinds(): Promise<ReferenceKind[]>;
+  addReferenceKind(label: string): Promise<ReferenceKind[]>;
+  archiveReferenceKind(id: number): Promise<ReferenceKind[]>;
   /** Quita una categoría a un producto (si era la principal, otra pasa a principal). */
   removeProductCategory(productUid: string, categoryUid: string): Promise<ProductCategory[]>;
 

@@ -15,7 +15,7 @@ import type {
   QuoteInput, QuoteStatus, QuoteSummary, RateRow, RoleRow, SaleDetail, SaleDocType, SaleInput, SaleSummary, SearchHit,
   SecuritySettings, SequenceRow, SessionInfo, Totals, UserPatch, UserRow,
   Report, ReportDef, ReportParams, SaleTerms,
-  AccountInput, AccountKind, CalendarItem, CategoryInput, ExpenseInsights, DueRow, ExpenseCategory, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow,
+  AccountInput, AccountKind, CalendarItem, CategoryInput, ReferenceKind, ExpenseInsights, DueRow, ExpenseCategory, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow,
   MoneyAccount, MoneyOverview, MoneyTransferInput, Recurring, RecurringInput,
   EtaChange, ImportCostInput, ImportDetail, ImportInput, ImportItemRow, ImportReceiveLine, ImportStage, ImportSummary, IncotermDef, StageChange, TransportMode,
 } from "../types";
@@ -28,7 +28,7 @@ import { DEMO_PERMISSIONS, DEMO_ROLES } from "./roles";
 import { CURRENCY_DIGITS, addDays, daysBetween, todayIso } from "../../lib/format";
 import { computeCostSheet, costSheetUsed, type CostSheet } from "../costing";
 import { REPORT_DEFS, buildReport, reportCatalog, type Facts } from "./reports";
-import { normalizeTerms } from "../saleTerms";
+import { CUSTOM_KIND_PREFIX, REFERENCE_KINDS, normalizeTerms } from "../saleTerms";
 import { DOC_KINDS, buildCredit, type CreditDocRowLike } from "../credit";
 import { EMPTY_RULE } from "../promos";
 import { CUSTOMER_NAMES, DEMO_ACTIVITIES, DEMO_COMMUNES, DEMO_COMPANY, DEMO_PRODUCT_CATEGORIES, DEMO_STREETS, EMPTY_PROFILE, PAYMENT_METHODS, PRODUCT_ROWS, SUPPLIER_NAMES, rng, rutDv } from "./seed";
@@ -905,6 +905,28 @@ export class DemoBackend implements Backend {
     }
     this.log("categoria.asignar", "categoria", cat ?? "sin categoría");
     return this.productCategories();
+  }
+  private refKinds: { id: number; label: string }[] = [];
+  async referenceKinds(): Promise<ReferenceKind[]> {
+    this.require("ventas.ver");
+    const base = REFERENCE_KINDS.filter((k) => k.value !== "OTRO").map((k) => ({ code: k.value, label: k.label, custom_id: null }));
+    const own = [...this.refKinds].sort((a, b) => a.label.localeCompare(b.label, "es")).map((k) => ({ code: `${CUSTOM_KIND_PREFIX}${k.label}`, label: k.label, custom_id: k.id }));
+    return wait([...base, ...own, { code: "OTRO", label: "Otro", custom_id: null }]);
+  }
+  async addReferenceKind(label: string): Promise<ReferenceKind[]> {
+    this.require("ventas.crear");
+    const l = label.trim();
+    if (!l || l.length > 40) throw new AppError("validacion", "Escribe el nombre del tipo (hasta 40 caracteres).");
+    if (REFERENCE_KINDS.some((k) => norm(k.label) === norm(l)) || this.refKinds.some((k) => norm(k.label) === norm(l))) throw new AppError("duplicado", "Ese tipo ya existe.");
+    this.refKinds.push({ id: Math.max(0, ...this.refKinds.map((k) => k.id)) + 1, label: l });
+    this.log("referencia.tipo", "tipo_referencia", l);
+    return this.referenceKinds();
+  }
+  async archiveReferenceKind(id: number): Promise<ReferenceKind[]> {
+    this.require("ventas.crear");
+    if (!this.refKinds.some((k) => k.id === id)) throw new AppError("no_encontrado", "No encontramos ese tipo de referencia.");
+    this.refKinds = this.refKinds.filter((k) => k.id !== id);
+    return this.referenceKinds();
   }
   async removeProductCategory(productUid: string, categoryUid: string): Promise<ProductCategory[]> {
     this.require("productos.editar");

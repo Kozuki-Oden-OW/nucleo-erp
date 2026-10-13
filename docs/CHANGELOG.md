@@ -2,6 +2,12 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [0.6.1] — 2026-10-13
+
+- **Referencias de la venta:**
+  - Nuevos tipos: Mercado Libre, pedido de internet, pedido por WhatsApp y pedido por redes sociales.
+  - Puedes crear tipos propios («+ Nuevo tipo…» en la lista o el botón «Tipos»), por ejemplo Falabella, Ripley o feria, y archivarlos cuando ya no los uses.
+
 ## [0.6.0] — 2026-10-12
 
 - **Gastos (nuevo módulo en el menú):**

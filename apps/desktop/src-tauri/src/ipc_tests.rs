@@ -243,6 +243,34 @@ fn ciclo_de_venta_por_ipc() {
                 "city": null, "region": null, "email": null, "phone": null, "contact": null } } }, "uid": null }));
     assert_eq!(fv2["terms"]["references"][0]["folio"], "4500012345");
     assert_eq!(fv2["terms"]["due_date"], "2026-11-05");
+    // Tipos de referencia: Mercado Libre de serie y uno propio.
+    let kinds = ipc.ok("add_reference_kind", json!({ "label": "Falabella" }));
+    assert!(kinds.as_array().unwrap().iter().any(|k| k["code"] == "ML"));
+    let fala = kinds
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|k| k["label"] == "Falabella")
+        .unwrap()
+        .clone();
+    assert_eq!(fala["code"], "C:Falabella");
+    assert!(
+        ipc.call("add_reference_kind", json!({ "label": "falabella" }))
+            .is_err(),
+        "nombre repetido"
+    );
+    let v3 = ipc.ok("save_sale", json!({ "input": { "doc_type": "VEN", "customer_uid": null, "issue_date": HOY, "lines": [line],
+        "terms": { "payment": "", "references": [{ "kind": "C:Falabella", "folio": "FAL-889", "date": null, "note": null },
+            { "kind": "ML", "folio": "2000012345", "date": null, "note": null }] } }, "uid": null }));
+    assert_eq!(v3["terms"]["references"][0]["kind"], "C:Falabella");
+    let kinds = ipc.ok("archive_reference_kind", json!({ "id": fala["custom_id"] }));
+    assert!(
+        !kinds
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|k| k["label"] == "Falabella")
+    );
 
     // Crédito: se habilita en la ficha y se respalda con documentos opcionales.
     ipc.ok("update_customer", json!({ "uid": c2["uid"], "input": { "name": "Clínica Sur SpA", "kind": "empresa",

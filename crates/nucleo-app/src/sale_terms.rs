@@ -17,8 +17,38 @@ pub const REFERENCE_KINDS: &[(&str, &str)] = &[
     ("52", "Guía de despacho"),
     ("803", "Contrato"),
     ("805", "Proceso ChileCompra"),
+    ("ML", "Mercado Libre"),
+    ("WEB", "Pedido de internet"),
+    ("WSP", "Pedido por WhatsApp"),
+    ("RRSS", "Pedido por redes sociales"),
     ("OTRO", "Otro"),
 ];
+
+/// Prefijo de los tipos de referencia propios del negocio: «C:Falabella».
+pub const CUSTOM_KIND_PREFIX: &str = "C:";
+
+/// Tipo de referencia que ofrece la interfaz.
+#[derive(Debug, Clone, Serialize)]
+pub struct ReferenceKind {
+    /// Lo que se guarda en el documento ("801", "ML", "C:Falabella"…).
+    pub code: String,
+    pub label: String,
+    /// Id del tipo propio (para archivarlo); vacío en los del sistema.
+    pub custom_id: Option<i64>,
+}
+
+/// Normaliza un tipo: los del sistema tal cual; los propios como «C:<nombre>» (1 a 40 caracteres).
+pub fn check_kind(kind: &str) -> AppResult<String> {
+    if REFERENCE_KINDS.iter().any(|(k, _)| *k == kind) {
+        return Ok(kind.to_string());
+    }
+    match kind.strip_prefix(CUSTOM_KIND_PREFIX).map(str::trim) {
+        Some(l) if !l.is_empty() && l.chars().count() <= 40 => {
+            Ok(format!("{CUSTOM_KIND_PREFIX}{l}"))
+        }
+        _ => Err(AppError::Validation("tipo de referencia no válido".into())),
+    }
+}
 
 pub const PAYMENTS: &[&str] = &[
     "efectivo",
@@ -153,16 +183,14 @@ impl SaleTerms {
             if folio.is_empty() && r.date.as_deref().unwrap_or("").is_empty() {
                 continue;
             }
-            if !REFERENCE_KINDS.iter().any(|(k, _)| *k == r.kind) {
-                return Err(AppError::Validation("tipo de referencia no válido".into()));
-            }
+            let kind = check_kind(&r.kind)?;
             if folio.is_empty() || folio.chars().count() > 40 {
                 return Err(AppError::Validation(
                     "cada referencia necesita su número o folio (hasta 40 caracteres)".into(),
                 ));
             }
             references.push(SaleReference {
-                kind: r.kind.clone(),
+                kind,
                 folio: folio.to_string(),
                 date: match r.date.as_deref().filter(|d| !d.is_empty()) {
                     Some(d) => Some(parse_date("la fecha de la referencia", d)?),
@@ -238,9 +266,102 @@ impl SaleTerms {
     }
 }
 
+impl crate::company::CompanySession {
+    /// Tipos de referencia: los del SII, los canales comunes y los propios del negocio.
+    pub fn reference_kinds(&self) -> AppResult<Vec<ReferenceKind>> {
+        self.require("ventas.ver")?;
+        let mut out: Vec<ReferenceKind> = REFERENCE_KINDS
+            .iter()
+            .filter(|(k, _)| *k != "OTRO")
+            .map(|(k, l)| ReferenceKind {
+                code: (*k).into(),
+                label: (*l).into(),
+                custom_id: None,
+            })
+            .collect();
+        out.extend(
+            nucleo_db::reference_kinds::list(self.db.conn())?
+                .into_iter()
+                .map(|(id, l)| ReferenceKind {
+                    code: format!("{CUSTOM_KIND_PREFIX}{l}"),
+                    label: l,
+                    custom_id: Some(id),
+                }),
+        );
+        out.push(ReferenceKind {
+            code: "OTRO".into(),
+            label: "Otro".into(),
+            custom_id: None,
+        });
+        Ok(out)
+    }
+
+    /// Crea un tipo de referencia propio (ej. «Falabella»).
+    pub fn add_reference_kind(&mut self, label: &str) -> AppResult<Vec<ReferenceKind>> {
+        self.require("ventas.crear")?;
+        let label = label.trim();
+        if label.is_empty() || label.chars().count() > 40 {
+            return Err(AppError::Validation(
+                "escribe el nombre del tipo (hasta 40 caracteres)".into(),
+            ));
+        }
+        if REFERENCE_KINDS
+            .iter()
+            .any(|(_, l)| l.eq_ignore_ascii_case(label))
+        {
+            return Err(AppError::Validation("ese tipo ya existe".into()));
+        }
+        let now = nucleo_db::now_utc();
+        let user = self.actor_name()?;
+        let tx = self.db.conn_mut().transaction()?;
+        let id = nucleo_db::reference_kinds::insert(&tx, label, &now)?;
+        crate::sales_ops::log(
+            &tx,
+            &user,
+            "referencia.tipo",
+            "tipo_referencia",
+            &id.to_string(),
+            &format!("Tipo de referencia «{label}» creado"),
+            None,
+        )?;
+        tx.commit()?;
+        self.reference_kinds()
+    }
+
+    /// Archiva un tipo propio: deja de ofrecerse; los documentos lo conservan.
+    pub fn archive_reference_kind(&mut self, id: i64) -> AppResult<Vec<ReferenceKind>> {
+        self.require("ventas.crear")?;
+        let now = nucleo_db::now_utc();
+        let user = self.actor_name()?;
+        let tx = self.db.conn_mut().transaction()?;
+        if nucleo_db::reference_kinds::archive(&tx, id, &now)? == 0 {
+            return Err(AppError::NotFound("ese tipo de referencia".into()));
+        }
+        crate::sales_ops::log(
+            &tx,
+            &user,
+            "referencia.tipo",
+            "tipo_referencia",
+            &id.to_string(),
+            "Tipo de referencia archivado",
+            None,
+        )?;
+        tx.commit()?;
+        self.reference_kinds()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tipos_propios() {
+        assert_eq!(check_kind("ML").unwrap(), "ML");
+        assert_eq!(check_kind("C: Falabella ").unwrap(), "C:Falabella");
+        assert!(check_kind("C:").is_err());
+        assert!(check_kind("XYZ").is_err());
+    }
 
     #[test]
     fn credito_calcula_vencimiento_y_limpia() {

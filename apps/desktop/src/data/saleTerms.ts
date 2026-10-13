@@ -14,9 +14,24 @@ export const REFERENCE_KINDS: { value: string; label: string; short: string }[] 
   { value: "52", label: "Guía de despacho", short: "Guía de despacho" },
   { value: "803", label: "Contrato", short: "Contrato" },
   { value: "805", label: "Proceso ChileCompra", short: "ChileCompra" },
+  { value: "ML", label: "Mercado Libre", short: "Mercado Libre" },
+  { value: "WEB", label: "Pedido de internet", short: "Pedido de internet" },
+  { value: "WSP", label: "Pedido por WhatsApp", short: "WhatsApp" },
+  { value: "RRSS", label: "Pedido por redes sociales", short: "Redes sociales" },
   { value: "OTRO", label: "Otro", short: "Otro" },
 ];
-export const referenceLabel = (k: string) => REFERENCE_KINDS.find((r) => r.value === k)?.short ?? k;
+/** Prefijo de los tipos propios del negocio: «C:Falabella». */
+export const CUSTOM_KIND_PREFIX = "C:";
+export const referenceLabel = (k: string) =>
+  k.startsWith(CUSTOM_KIND_PREFIX) ? k.slice(CUSTOM_KIND_PREFIX.length) : REFERENCE_KINDS.find((r) => r.value === k)?.short ?? k;
+
+/** Normaliza un tipo (igual que `check_kind` en Rust): los del sistema tal cual; los propios como «C:<nombre>». */
+export function checkKind(kind: string): string {
+  if (REFERENCE_KINDS.some((r) => r.value === kind)) return kind;
+  const l = kind.startsWith(CUSTOM_KIND_PREFIX) ? kind.slice(CUSTOM_KIND_PREFIX.length).trim() : "";
+  if (!l || l.length > 40) throw new AppError("validacion", "Tipo de referencia no válido.");
+  return `${CUSTOM_KIND_PREFIX}${l}`;
+}
 
 export const CREDIT_DAYS = [15, 30, 45, 60, 90];
 export const BANKS = [
@@ -73,7 +88,7 @@ export function normalizeTerms(t: SaleTerms | null | undefined, issueDate: strin
   }
   const references = t.references.filter((r) => r.folio.trim() || r.date).map((r) => {
     if (!r.folio.trim()) throw new AppError("validacion", "Cada referencia necesita su número o folio.");
-    return { kind: r.kind, folio: r.folio.trim(), date: r.date || null, note: clean(r.note) };
+    return { kind: checkKind(r.kind), folio: r.folio.trim(), date: r.date || null, note: clean(r.note) };
   });
   const rv = t.receiver;
   const receiver: Receiver | null = rv && Object.values(rv).some((v) => clean(v)) ? {

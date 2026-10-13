@@ -175,6 +175,8 @@ export interface NewCustomer extends Partial<CustomerProfile> {
 
 export type SalePayment = "" | "efectivo" | "tarjeta" | "transferencia" | "credito" | "cheque" | "otro";
 export interface SaleReference { kind: string; folio: string; date: string | null; note: string | null }
+/** Tipo de referencia: del SII, canal común (Mercado Libre…) o propio del negocio ("C:<nombre>"). */
+export interface ReferenceKind { code: string; label: string; custom_id: number | null }
 export interface Receiver {
   rut: string | null; name: string | null; trade_name: string | null; activity: string | null; address: string | null;
   commune: string | null; city: string | null; region: string | null; email: string | null; phone: string | null; contact: string | null;

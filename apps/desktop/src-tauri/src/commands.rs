@@ -664,6 +664,29 @@ pub fn delete_category(
 }
 
 #[tauri::command]
+pub fn reference_kinds(
+    state: State<'_, AppState>,
+) -> CmdResult<Vec<nucleo_app::sale_terms::ReferenceKind>> {
+    with_session(&state, |s| Ok(s.reference_kinds()?))
+}
+
+#[tauri::command]
+pub fn add_reference_kind(
+    state: State<'_, AppState>,
+    label: String,
+) -> CmdResult<Vec<nucleo_app::sale_terms::ReferenceKind>> {
+    with_session(&state, |s| Ok(s.add_reference_kind(&label)?))
+}
+
+#[tauri::command]
+pub fn archive_reference_kind(
+    state: State<'_, AppState>,
+    id: i64,
+) -> CmdResult<Vec<nucleo_app::sale_terms::ReferenceKind>> {
+    with_session(&state, |s| Ok(s.archive_reference_kind(id)?))
+}
+
+#[tauri::command]
 pub fn remove_product_category(
     state: State<'_, AppState>,
     product_uid: String,

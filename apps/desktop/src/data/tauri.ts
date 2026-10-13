@@ -11,7 +11,7 @@ import type {
   SeveranceForm, SeveranceView, Worker, WorkerInput,
   F29Inputs, F29View, RcvImportReport, TaxDocInput, TaxProfile,
   ImportCostInput, ImportDetail, ImportInput, ImportReceiveLine, ImportStage, ImportSummary, IncotermDef,
-  AccountInput, CalendarItem, CategoryInput, ExpenseCategory, ExpenseInsights, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow, MoneyAccount,
+  AccountInput, CalendarItem, CategoryInput, ReferenceKind, ExpenseCategory, ExpenseInsights, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow, MoneyAccount,
   MoneyOverview, MoneyTransferInput, Recurring, RecurringInput,
   AdjustmentInput, InventoryOverview, InventorySettings, ProductInventory, ReorderInput, StockDocDone, StockDocRow, TransferInput, Warehouse,
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
@@ -132,6 +132,9 @@ export class TauriBackend implements Backend {
   saveCategory(uid: string | null, name: string) { return call<ProductCategory[]>("save_category", { uid, name }); }
   deleteCategory(uid: string) { return call<ProductCategory[]>("delete_category", { uid }); }
   assignCategory(productUids: string[], categoryUid: string | null) { return call<ProductCategory[]>("assign_category", { productUids, categoryUid }); }
+  referenceKinds() { return call<ReferenceKind[]>("reference_kinds"); }
+  addReferenceKind(label: string) { return call<ReferenceKind[]>("add_reference_kind", { label }); }
+  archiveReferenceKind(id: number) { return call<ReferenceKind[]>("archive_reference_kind", { id }); }
   removeProductCategory(productUid: string, categoryUid: string) { return call<ProductCategory[]>("remove_product_category", { productUid, categoryUid }); }
   listQuotes(query?: string) { return call<QuoteSummary[]>("list_quotes", { query: query ?? null }); }
   quote(uid: string) { return call<QuoteDetail>("quote", { uid }); }

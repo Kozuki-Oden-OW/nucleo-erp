@@ -19,6 +19,7 @@ pub mod payroll;
 pub mod products;
 pub mod promotions;
 pub mod purchases;
+pub mod reference_kinds;
 pub mod reports;
 pub mod sales;
 pub mod shipments;

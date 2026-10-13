@@ -150,6 +150,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "producto_varias_categorias",
         sql: include_str!("../migrations/0028_producto_varias_categorias.sql"),
     },
+    Migration {
+        version: 29,
+        name: "tipos_referencia",
+        sql: include_str!("../migrations/0029_tipos_referencia.sql"),
+    },
 ];
 
 pub fn latest_version() -> i64 {
