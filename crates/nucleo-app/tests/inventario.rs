@@ -2,7 +2,8 @@
 //! análisis (velocidad, cobertura, sugerencia de compra).
 
 use nucleo_app::inventory_ops::{
-    AdjustmentInput, InventorySettings, ReorderInput, StockLineInput, TransferInput,
+    AdjustmentInput, InventorySettings, ReorderInput, StockEntryInput, StockEntryLineInput,
+    StockLineInput, TransferInput,
 };
 use nucleo_app::sales_ops::{EffectInput, LineInput, NewProduct, SaleInput};
 use nucleo_app::{AppService, BusinessProfile, CompanySession, MemoryKeyStore};
@@ -191,6 +192,90 @@ fn bodegas_transferencias_y_ajustes() {
             .unwrap()
             .is_default
     );
+    assert!(s.verify_audit().unwrap().ok);
+}
+
+#[test]
+fn agregar_stock_con_costo_recalcula_el_promedio() {
+    let (_d, _app, mut s) = session();
+    let p = s
+        .add_product(&NewProduct {
+            sku: Some("TOR-6".into()),
+            name: "Tornillo 6 mm".into(),
+            unit: None,
+            kind: "producto".into(),
+            price_minor: 150,
+            cost_minor: Some(100),
+            taxable: Some(true),
+            initial_stock_milli: Some(10_000),
+            category_uid: None,
+            extra_category_uids: None,
+            cost_sheet: None,
+            stock_policy: None,
+        })
+        .unwrap();
+    let main = s
+        .warehouses()
+        .unwrap()
+        .into_iter()
+        .find(|w| w.is_default)
+        .unwrap()
+        .uid;
+    let entry = |qty: i64, cost: Option<i64>| StockEntryInput {
+        warehouse_uid: main.clone(),
+        date: days_ago(0),
+        supplier_uid: None,
+        reference: Some("Factura 1234".into()),
+        notes: None,
+        lines: vec![StockEntryLineInput {
+            product_uid: p.uid.clone(),
+            qty_milli: qty,
+            unit_cost_minor: cost,
+        }],
+    };
+    // 10 a $100 + 30 a $140 → 40 a $130.
+    let done = s.add_stock(&entry(30_000, Some(140))).unwrap();
+    assert_eq!(done.number, "ING-000001");
+    let inv = s.product_inventory(&p.uid, None).unwrap();
+    assert_eq!(inv.product.on_hand_milli, 40_000);
+    assert_eq!(inv.by_warehouse[0].avg_cost_e4, 1_300_000);
+    let k = &inv.kardex[0];
+    assert_eq!(
+        (k.document.as_str(), k.kind.as_str(), k.source_type.as_str()),
+        ("ING-000001", "entrada", "ING")
+    );
+    assert_eq!(k.unit_cost_e4, 1_400_000);
+    assert_eq!(k.reason.as_deref(), Some("Factura 1234"));
+
+    // Sin costo: entra al costo promedio actual, que no cambia.
+    s.add_stock(&entry(5_000, None)).unwrap();
+    let inv = s.product_inventory(&p.uid, None).unwrap();
+    assert_eq!(inv.product.on_hand_milli, 45_000);
+    assert_eq!(inv.by_warehouse[0].avg_cost_e4, 1_300_000);
+
+    assert!(
+        s.add_stock(&entry(0, Some(100))).is_err(),
+        "cantidad mayor que cero"
+    );
+    assert!(
+        s.add_stock(&entry(-1_000, Some(100))).is_err(),
+        "no descuenta"
+    );
+    assert!(
+        s.add_stock(&entry(1_000, Some(-5))).is_err(),
+        "costo no negativo"
+    );
+    assert!(
+        s.add_stock(&StockEntryInput {
+            supplier_uid: Some("no-existe".into()),
+            ..entry(1_000, Some(100))
+        })
+        .is_err()
+    );
+    let docs = s.stock_documents().unwrap();
+    assert_eq!(docs.len(), 2);
+    assert_eq!(docs[0].kind, "ingreso");
+    assert!(docs[0].description.contains("Factura 1234"));
     assert!(s.verify_audit().unwrap().ok);
 }
 

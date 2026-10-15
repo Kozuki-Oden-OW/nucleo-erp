@@ -17,7 +17,7 @@ use nucleo_app::finance_ops::{
 use nucleo_app::gastos_ops::ExpenseInsights;
 use nucleo_app::inventory_ops::{
     AdjustmentInput, InventoryOverview, InventorySettings, ProductInventory, ReorderInput,
-    StockDocDone, TransferInput,
+    StockDocDone, StockEntryInput, TransferInput,
 };
 use nucleo_app::nucleo_db::audit::{AuditRow, ChainReport};
 use nucleo_app::nucleo_db::categories::CategoryRow as ProductCategoryRow;
@@ -897,6 +897,11 @@ pub fn archive_warehouse(state: State<'_, AppState>, uid: String) -> CmdResult<V
 #[tauri::command]
 pub fn adjust_stock(state: State<'_, AppState>, input: AdjustmentInput) -> CmdResult<StockDocDone> {
     with_session(&state, |s| Ok(s.adjust_stock(&input)?))
+}
+
+#[tauri::command]
+pub fn add_stock(state: State<'_, AppState>, input: StockEntryInput) -> CmdResult<StockDocDone> {
+    with_session(&state, |s| Ok(s.add_stock(&input)?))
 }
 
 #[tauri::command]

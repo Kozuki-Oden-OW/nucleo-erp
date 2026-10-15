@@ -33,6 +33,7 @@ import { PurchaseView } from "./screens/compras/PurchaseView";
 import { Inventory } from "./screens/inventario/Inventory";
 import { ProductStock } from "./screens/inventario/ProductStock";
 import { StockDocEditor } from "./screens/inventario/StockDocEditor";
+import { StockEntryEditor } from "./screens/inventario/StockEntryEditor";
 import { CountEditor } from "./screens/inventario/CountEditor";
 import { Config } from "./screens/config/Config";
 import { Money } from "./screens/dinero/Money";
@@ -165,6 +166,7 @@ function Screen({ route, info, session, reload }: { route: Route; info: AppInfo;
       if (!has.has("inventario")) return <Proximamente id="inventario" />;
       if (a === "producto" && b) return <ProductStock key={b} uid={b} />;
       if (a === "ajuste") return <CountEditor key="aju" />;
+      if (a === "ingreso") return <StockEntryEditor key={route.raw} />;
       if (a === "transferencia") return <StockDocEditor key="tra" mode="transferencia" />;
       return <Inventory route={route} />;
     case "dinero":

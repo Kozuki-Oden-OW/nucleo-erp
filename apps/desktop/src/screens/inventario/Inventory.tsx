@@ -1,6 +1,6 @@
 // Inventario: existencias con análisis (velocidad, cobertura, quiebre), ajustes y transferencias, bodegas.
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowLeftRight, Boxes, Tag, ClipboardCheck, PackageX, Plus, Search, Star, Archive, Pencil, TrendingDown, Warehouse as WarehouseIcon } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, Boxes, Tag, ClipboardCheck, PackagePlus, PackageX, Plus, Search, Star, Archive, Pencil, TrendingDown, Warehouse as WarehouseIcon } from "lucide-react";
 import { useBackend, errorMessage, type InventoryOverview, type StockAnalysis, type StockDocRow, type StockStatus, type Warehouse } from "../../data";
 import { formatDate, formatMoney, formatQty } from "../../lib/format";
 import { navigate, type Route } from "../../lib/router";
@@ -42,11 +42,12 @@ export function Inventory({ route }: { route: Route }) {
         actions={can("inventario.ajustar") && (
           <>
             <Button variant="secondary" icon={ArrowLeftRight} onClick={() => navigate("/inventario/transferencia")}>Transferir</Button>
-            <Button icon={ClipboardCheck} onClick={() => navigate("/inventario/ajuste")}>Realizar inventario</Button>
+            <Button variant="secondary" icon={ClipboardCheck} onClick={() => navigate("/inventario/ajuste")}>Realizar inventario</Button>
+            <Button icon={PackagePlus} onClick={() => navigate("/inventario/ingreso")}>Agregar stock</Button>
           </>
         )}
       />
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: "existencias", label: "Existencias" }, { value: "despachar", label: "Por despachar", count: pending }, { value: "movimientos", label: "Ajustes y transferencias" }, { value: "bodegas", label: "Bodegas" }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: "existencias", label: "Existencias" }, { value: "despachar", label: "Por despachar", count: pending }, { value: "movimientos", label: "Movimientos" }, { value: "bodegas", label: "Bodegas" }]} />
       <div className="mt-4">
         {tab === "existencias" && <Stock route={route} />}
         {tab === "despachar" && <Dispatches onCount={setPending} />}
@@ -112,7 +113,7 @@ function Docs() {
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => { backend.stockDocuments().then(setRows).catch((e) => setErr(errorMessage(e))); }, [backend]);
   if (err) return <Notice tone="danger">{err}</Notice>;
-  const kind: Record<StockDocRow["kind"], [Tone, string]> = { ajuste: ["warning", "Ajuste"], conteo: ["info", "Conteo"], transferencia: ["accent", "Transferencia"] };
+  const kind: Record<StockDocRow["kind"], [Tone, string]> = { ingreso: ["success", "Ingreso"], ajuste: ["warning", "Ajuste"], conteo: ["info", "Conteo"], transferencia: ["accent", "Transferencia"] };
   const cols: Column<StockDocRow>[] = [
     { key: "n", header: "Número", width: "9rem", render: (d) => <span className="font-mono text-[13px] font-medium">{d.number}</span> },
     { key: "f", header: "Fecha", width: "7rem", render: (d) => <span className="num text-muted">{formatDate(d.date)}</span> },
@@ -121,8 +122,8 @@ function Docs() {
     { key: "l", header: "Productos", width: "6.5rem", align: "right", render: (d) => <span className="num">{d.lines}</span> },
     { key: "u", header: "Por", width: "9rem", render: (d) => <span className="text-muted">{d.created_by ?? "—"}</span> },
   ];
-  return <DataTable label="Ajustes y transferencias" columns={cols} rows={rows ?? []} rowKey={(d) => d.uid}
-    empty={<EmptyState icon={ClipboardCheck} title="Sin ajustes ni transferencias">Los conteos y las correcciones de stock aparecen aquí, con su motivo.</EmptyState>} />;
+  return <DataTable label="Ingresos, ajustes y transferencias" columns={cols} rows={rows ?? []} rowKey={(d) => d.uid}
+    empty={<EmptyState icon={ClipboardCheck} title="Sin movimientos de inventario">Los ingresos de stock, los conteos y las correcciones aparecen aquí, con su detalle.</EmptyState>} />;
 }
 
 function Warehouses() {

@@ -140,6 +140,7 @@ informativo, sin renta guiada · D-11 promociones no acumulables por defecto · 
 | D-F7-06 | Se permite vender sin stock por defecto; el negocio puede prohibirlo | No detener la venta por un inventario mal cargado, pero dar control a quien lo quiera |
 | D-F7-07 | Recálculo retroactivo del costo (entradas con fecha pasada) y reservas por notas de venta se postergan | Requieren rehacer costos de ventas ya efectuadas; se diseñan con la contabilidad (Fase 10) |
 | D-F7-08 | El análisis se calcula al abrir la pantalla; la foto diaria (`stock_daily_snapshot`) y el cálculo en segundo plano llegan con el dashboard (Fase 12) | Medido en segundos para catálogos grandes; suficiente para el MVP |
+| D-F7-09 | «Agregar stock» es un documento propio (ING) que solo mueve inventario: entra como `entrada` con su costo y recalcula el promedio; sin costo, entra al promedio actual. No crea deuda, IVA ni asiento | Cubre la mercadería que llega sin pasar por Compras (stock propio, regalos de proveedor, cargas iniciales tardías); la factura sigue registrándose como compra para no contar dos veces |
 
 ## Decisiones de la Fase 8
 

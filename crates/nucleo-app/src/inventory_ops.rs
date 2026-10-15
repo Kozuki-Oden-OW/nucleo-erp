@@ -111,6 +111,26 @@ pub struct TransferInput {
     pub lines: Vec<StockLineInput>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct StockEntryLineInput {
+    pub product_uid: String,
+    /// Cantidad que llegó (mayor que cero).
+    pub qty_milli: i64,
+    /// Costo unitario neto (sin IVA) en pesos. Vacío: se usa el costo promedio actual.
+    pub unit_cost_minor: Option<i64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct StockEntryInput {
+    pub warehouse_uid: String,
+    pub date: String,
+    pub supplier_uid: Option<String>,
+    /// Documento de respaldo, ej. «Factura 1234» o «Guía 88».
+    pub reference: Option<String>,
+    pub notes: Option<String>,
+    pub lines: Vec<StockEntryLineInput>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct StockDocDone {
     pub number: String,
@@ -624,6 +644,138 @@ impl CompanySession {
         })
     }
 
+    /// Agregar stock: ingresa mercadería que llegó, con su costo (recalcula el costo promedio).
+    /// No crea deuda con el proveedor ni crédito de IVA: para eso se registra una compra.
+    pub fn add_stock(&mut self, input: &StockEntryInput) -> AppResult<StockDocDone> {
+        self.require("inventario.ajustar")?;
+        let w = self.warehouse(&input.warehouse_uid)?;
+        if w.archived {
+            return Err(AppError::Validation("la bodega está archivada".into()));
+        }
+        let date = parse_date("la fecha", &input.date)?;
+        let reference = opt_text(&input.reference, 80, "el documento de respaldo")?;
+        let notes = opt_text(&input.notes, 500, "las notas")?;
+        let supplier = match input.supplier_uid.as_deref().map(str::trim) {
+            Some(u) if !u.is_empty() => Some(
+                nucleo_db::suppliers::by_uid(self.db.conn(), u)?
+                    .ok_or_else(|| AppError::NotFound("el proveedor".into()))?,
+            ),
+            _ => None,
+        };
+        let qty: Vec<StockLineInput> = input
+            .lines
+            .iter()
+            .map(|l| StockLineInput {
+                product_uid: l.product_uid.clone(),
+                qty_milli: l.qty_milli,
+            })
+            .collect();
+        let lines = self.stock_lines(&qty)?;
+        for ((p, q), l) in lines.iter().zip(&input.lines) {
+            if *q <= 0 {
+                return Err(AppError::Validation(format!(
+                    "{}: la cantidad que llegó debe ser mayor que cero",
+                    p.name
+                )));
+            }
+            if l.unit_cost_minor
+                .is_some_and(|c| !(0..=crate::sales_ops::MAX_PRICE_MINOR).contains(&c))
+            {
+                return Err(AppError::Validation(format!(
+                    "revisa el costo de {}",
+                    p.name
+                )));
+            }
+        }
+        let reason = [
+            supplier.as_ref().map(|s| s.name.as_str()),
+            reference.as_deref(),
+            notes.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join(" · ");
+        let reason = (!reason.is_empty()).then_some(reason);
+        let now = now_utc();
+        let by = self.user_id();
+        let user = self.actor_name()?;
+        let show_cost = self.can("costos.ver");
+        let tx = self.db.conn_mut().transaction()?;
+        let number = dbcore::take_number(&tx, "ING")?;
+        let euid = uuid::Uuid::now_v7().to_string();
+        let eid = db::insert_entry(
+            &tx,
+            &euid,
+            &number,
+            w.id,
+            &date,
+            supplier.as_ref().map(|s| s.id),
+            reference.as_deref(),
+            notes.as_deref(),
+            by,
+            &now,
+        )?;
+        let mut total: i64 = 0;
+        for ((p, q), l) in lines.iter().zip(&input.lines) {
+            let (on_hand, avg) = products::balance(&tx, p.id, w.id)?;
+            let cost = l.unit_cost_minor.map(|c| c * 10_000).unwrap_or(avg);
+            // Con stock nulo o negativo, el costo del ingreso pasa a ser el promedio.
+            let new_avg = inv::weighted_average_cost(
+                Decimal::from(on_hand),
+                Decimal::from(avg),
+                Decimal::from(*q),
+                Decimal::from(cost),
+            )
+            .round()
+            .to_i64()
+            .unwrap_or(cost);
+            products::insert_movement(
+                &tx,
+                &Movement {
+                    product_id: p.id,
+                    warehouse_id: w.id,
+                    date: &date,
+                    kind: "entrada",
+                    qty_milli: *q,
+                    unit_cost_e4: cost,
+                    avg_cost_after_e4: new_avg,
+                    source_type: "ING",
+                    source_id: eid,
+                    source_line_id: None,
+                    reason: reason.as_deref(),
+                    created_by: by,
+                    created_at: &now,
+                },
+            )?;
+            total += (Decimal::from(*q) * Decimal::from(cost) / Decimal::from(10_000_000))
+                .round()
+                .to_i64()
+                .unwrap_or(0);
+        }
+        let mut text = format!("{number} en {}: {} productos", w.name, lines.len());
+        if show_cost {
+            text.push_str(&format!(" · {} neto", pesos(total)));
+        }
+        if let Some(r) = &reason {
+            text.push_str(&format!(" · {r}"));
+        }
+        log(
+            &tx,
+            &user,
+            "inventario.ingreso",
+            "ingreso",
+            &euid,
+            &text,
+            None,
+        )?;
+        tx.commit()?;
+        Ok(StockDocDone {
+            number,
+            moved_lines: lines.len() as i64,
+        })
+    }
+
     pub fn stock_documents(&self) -> AppResult<Vec<StockDocRow>> {
         self.require("inventario.ver")?;
         Ok(db::stock_documents(self.db.conn(), 200)?)
@@ -936,4 +1088,17 @@ impl CompanySession {
         tx.commit()?;
         self.product_inventory(uid, None)
     }
+}
+
+/// Pesos con separador de miles, para los textos de auditoría (ej. «$1.250.000»).
+fn pesos(n: i64) -> String {
+    let digits = n.unsigned_abs().to_string();
+    let mut out = String::new();
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push('.');
+        }
+        out.push(c);
+    }
+    format!("{}${out}", if n < 0 { "−" } else { "" })
 }

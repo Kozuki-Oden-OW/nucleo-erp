@@ -183,6 +183,7 @@ pub fn kardex(
                 WHEN 'REC' THEN (SELECT number FROM receipts WHERE id = m.source_id)
                 WHEN 'AJU' THEN (SELECT number FROM stock_adjustments WHERE id = m.source_id)
                 WHEN 'TRA' THEN (SELECT number FROM stock_transfers WHERE id = m.source_id)
+                WHEN 'ING' THEN (SELECT number FROM stock_entries WHERE id = m.source_id)
             END,
             CASE m.source_type
                 WHEN 'VEN' THEN (SELECT uid FROM sales WHERE id = m.source_id)
@@ -270,6 +271,27 @@ pub fn insert_transfer(
     Ok(conn.last_insert_rowid())
 }
 
+#[allow(clippy::too_many_arguments)]
+pub fn insert_entry(
+    conn: &Connection,
+    uid: &str,
+    number: &str,
+    warehouse_id: i64,
+    date: &str,
+    supplier_id: Option<i64>,
+    reference: Option<&str>,
+    notes: Option<&str>,
+    by: Option<i64>,
+    now: &str,
+) -> DbResult<i64> {
+    conn.execute(
+        "INSERT INTO stock_entries (uid, number, warehouse_id, entry_date, supplier_id, reference, notes, created_by, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        rusqlite::params![uid, number, warehouse_id, date, supplier_id, reference, notes, by, now],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct StockDocRow {
     pub uid: String,
@@ -281,7 +303,7 @@ pub struct StockDocRow {
     pub created_by: Option<String>,
 }
 
-/// Últimos ajustes y transferencias (para la pestaña "Movimientos").
+/// Últimos ingresos, ajustes y transferencias (para la pestaña "Movimientos").
 pub fn stock_documents(conn: &Connection, limit: u32) -> DbResult<Vec<StockDocRow>> {
     let mut stmt = conn.prepare(
         "SELECT * FROM (
@@ -295,6 +317,13 @@ pub fn stock_documents(conn: &Connection, limit: u32) -> DbResult<Vec<StockDocRo
                 u.display_name, t.id
             FROM stock_transfers t JOIN warehouses f ON f.id = t.from_warehouse_id JOIN warehouses d ON d.id = t.to_warehouse_id
             LEFT JOIN users u ON u.id = t.created_by
+            UNION ALL
+            SELECT e.uid, e.number, 'ingreso', e.entry_date,
+                w.name || coalesce(' · ' || s.name, '') || coalesce(' · ' || e.reference, '') || coalesce(' · ' || e.notes, ''),
+                (SELECT count(*) FROM stock_movements m WHERE m.source_type = 'ING' AND m.source_id = e.id),
+                u.display_name, e.id
+            FROM stock_entries e JOIN warehouses w ON w.id = e.warehouse_id
+            LEFT JOIN suppliers s ON s.id = e.supplier_id LEFT JOIN users u ON u.id = e.created_by
          ) ORDER BY d DESC, 1 DESC LIMIT ?1",
     )?;
     let rows = stmt.query_map([limit], |r| {

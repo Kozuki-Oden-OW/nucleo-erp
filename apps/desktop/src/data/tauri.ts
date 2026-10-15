@@ -13,7 +13,7 @@ import type {
   ImportCostInput, ImportDetail, ImportInput, ImportReceiveLine, ImportStage, ImportSummary, IncotermDef,
   AccountInput, CalendarItem, CategoryInput, ReferenceKind, ExpenseCategory, ExpenseInsights, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow, MoneyAccount,
   MoneyOverview, MoneyTransferInput, Recurring, RecurringInput,
-  AdjustmentInput, InventoryOverview, InventorySettings, ProductInventory, ReorderInput, StockDocDone, StockDocRow, TransferInput, Warehouse,
+  AdjustmentInput, InventoryOverview, InventorySettings, ProductInventory, ReorderInput, StockDocDone, StockDocRow, StockEntryInput, TransferInput, Warehouse,
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
   Customer, CustomerDetail, Dashboard, EffectInput, EntityRef, ExternalRefInput, NewCustomer, NewProduct, NewUser, PermissionRow,
   PriceHistoryRow, Product, ProductCategory, ProductPatch, PurchaseDetail, PurchaseInput, PurchaseOrderDetail, PurchaseOrderInput, PurchaseOrderSummary,
@@ -177,6 +177,7 @@ export class TauriBackend implements Backend {
   setDefaultWarehouse(uid: string) { return call<Warehouse[]>("set_default_warehouse", { uid }); }
   archiveWarehouse(uid: string) { return call<Warehouse[]>("archive_warehouse", { uid }); }
   adjustStock(input: AdjustmentInput) { return call<StockDocDone>("adjust_stock", { input }); }
+  addStock(input: StockEntryInput) { return call<StockDocDone>("add_stock", { input: { ...input, supplier_uid: input.supplier_uid ?? null, reference: input.reference ?? null, notes: input.notes ?? null } }); }
   transferStock(input: TransferInput) { return call<StockDocDone>("transfer_stock", { input: { ...input, notes: input.notes ?? null } }); }
   stockDocuments() { return call<StockDocRow[]>("stock_documents"); }
   inventoryOverview() { return call<InventoryOverview>("inventory_overview"); }

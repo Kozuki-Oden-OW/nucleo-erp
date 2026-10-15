@@ -13,7 +13,7 @@ import type {
   ImportCostInput, ImportDetail, ImportInput, ImportReceiveLine, ImportStage, ImportSummary, IncotermDef,
   AccountInput, CalendarItem, CategoryInput, ReferenceKind, ExpenseCategory, ExpenseInsights, ExpenseDetail, ExpenseFilter, ExpenseInput, ExpenseSummary, LedgerRow, MoneyAccount,
   MoneyOverview, MoneyTransferInput, Recurring, RecurringInput,
-  AdjustmentInput, InventoryOverview, InventorySettings, ProductInventory, ReorderInput, StockDocDone, StockDocRow, TransferInput, Warehouse,
+  AdjustmentInput, InventoryOverview, InventorySettings, ProductInventory, ReorderInput, StockDocDone, StockDocRow, StockEntryInput, TransferInput, Warehouse,
   AppInfo, AttachmentRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
   Customer, CustomerDetail, Dashboard, EffectInput, EntityRef, ExternalRefInput, NewCustomer, NewProduct, NewUser,
   PermissionRow, PriceHistoryRow, Product, ProductCategory, ProductPatch, PurchaseDetail, PurchaseInput, PurchaseOrderDetail, PurchaseOrderInput,
@@ -177,6 +177,8 @@ export interface Backend {
   setDefaultWarehouse(uid: string): Promise<Warehouse[]>;
   archiveWarehouse(uid: string): Promise<Warehouse[]>;
   adjustStock(input: AdjustmentInput): Promise<StockDocDone>;
+  /** Agregar stock (ING): mercadería que llegó, con cantidad, costo, fecha y bodega. */
+  addStock(input: StockEntryInput): Promise<StockDocDone>;
   transferStock(input: TransferInput): Promise<StockDocDone>;
   stockDocuments(): Promise<StockDocRow[]>;
   inventoryOverview(): Promise<InventoryOverview>;

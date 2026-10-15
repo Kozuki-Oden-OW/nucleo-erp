@@ -126,6 +126,7 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         commands::set_default_warehouse,
         commands::archive_warehouse,
         commands::adjust_stock,
+        commands::add_stock,
         commands::transfer_stock,
         commands::stock_documents,
         commands::inventory_overview,

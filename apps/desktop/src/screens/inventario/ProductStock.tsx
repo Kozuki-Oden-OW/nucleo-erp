@@ -1,6 +1,6 @@
 // Ficha de inventario de un producto: stock por bodega, análisis explicado, parámetros de reposición y kárdex.
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Lightbulb, Save } from "lucide-react";
+import { ArrowLeft, Lightbulb, PackagePlus, Save } from "lucide-react";
 import { useBackend, errorMessage, type KardexRow, type ProductInventory } from "../../data";
 import { formatDate, formatMoney, formatQty, parseQty } from "../../lib/format";
 import { goBack, navigate } from "../../lib/router";
@@ -41,6 +41,7 @@ export function ProductStock({ uid }: { uid: string }) {
         back={<button onClick={() => goBack("/inventario")} className="mb-2 inline-flex items-center gap-1 text-sm text-muted hover:text-ink"><ArrowLeft size={15} /> Inventario</button>}
         title={<span className="flex flex-wrap items-center gap-3">{p.name}{a && <StockStatusBadge status={a.status} />}</span>}
         subtitle={`${p.sku} · stock total ${formatQty(p.on_hand_milli)} ${p.unit}${costs ? ` · costo promedio ${formatMoney(Math.round(p.cost_e4 / 10_000))}` : ""}`}
+        actions={can("inventario.ajustar") && p.kind === "producto" && <Button icon={PackagePlus} onClick={() => navigate(`/inventario/ingreso?producto=${p.uid}`)}>Agregar stock</Button>}
       />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex min-w-0 flex-col gap-6">
@@ -79,7 +80,7 @@ export function ProductStock({ uid }: { uid: string }) {
                       return (
                         <tr key={k.id} className="border-b border-line last:border-0" title={k.reason ?? undefined}>
                           <td className="num whitespace-nowrap px-4 py-2 text-muted">{formatDate(k.date)}</td>
-                          <td className="whitespace-nowrap px-2 text-ink">{k.source_type === "IMP" && k.kind === "entrada" ? "Importación" : KIND[k.kind]}{k.reason && k.kind === "ajuste" && <div className="max-w-[16rem] truncate text-xs text-muted">{k.reason}</div>}</td>
+                          <td className="whitespace-nowrap px-2 text-ink">{k.source_type === "IMP" && k.kind === "entrada" ? "Importación" : k.source_type === "ING" ? "Ingreso de stock" : KIND[k.kind]}{k.reason && (k.kind === "ajuste" || k.source_type === "ING") && <div className="max-w-[16rem] truncate text-xs text-muted">{k.reason}</div>}</td>
                           <td className="px-2">{href ? <button className="font-mono text-[12.5px] text-accent hover:underline" onClick={() => navigate(href)}>{k.document}</button> : <span className="whitespace-nowrap font-mono text-[12.5px] text-muted">{k.document}</span>}</td>
                           {d.by_warehouse.length > 1 && !wh && <td className="whitespace-nowrap px-2 text-muted">{k.warehouse_name}</td>}
                           <td className={`num px-2 text-right font-medium ${k.qty_milli > 0 ? "text-success" : "text-danger"}`}>{k.qty_milli > 0 ? "+" : "−"}{formatQty(Math.abs(k.qty_milli))}</td>

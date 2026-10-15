@@ -56,6 +56,7 @@ Todo es entero: las sumas y los reportes se hacen en SQL sin perder exactitud y 
 | 27 | `0027_gastos.sql` | `expenses.quantity_milli` y `unit_minor` (cantidad × valor), `expense_categories.group_name` y `monthly_budget_minor`; categorías nuevas (combustible, viajes, alojamiento, comidas, estudios…) y «Marketing» pasa a «Publicidad y marketing» |
 | 28 | `0028_producto_varias_categorias.sql` | Tabla `product_extra_categories`: otras categorías de un producto además de la principal (`products.category_id`) |
 | 29 | `0029_tipos_referencia.sql` | Tabla `reference_kinds`: tipos de referencia propios del negocio (se guardan en el documento como `C:<nombre>`) |
+| 30 | `0030_ingresos_stock.sql` | Tipo de documento `ING` y tabla `stock_entries` («Agregar stock»): encabezado del ingreso con bodega, fecha, proveedor y documento de respaldo opcionales; los movimientos van a `stock_movements` como `entrada` con origen `ING` |
 
 Las migraciones son transaccionales y versionadas con `PRAGMA user_version`. **Pre-1.0:** se pueden
 reescribir (en la Fase 2 se reemplazó la tabla mínima de clientes de la Fase 1); desde la primera beta

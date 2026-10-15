@@ -2,6 +2,15 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [0.6.2] — 2026-10-15
+
+- **Inventario · Agregar stock:**
+  - Botón «Agregar stock» junto a «Realizar inventario» (y en la ficha de cada producto) para ingresar la mercadería que llegó.
+  - Por producto: cantidad y costo unitario (neto, o con IVA y el sistema lo descuenta). Si dejas el costo vacío, entra al costo promedio actual.
+  - Bodega, fecha de llegada y, si quieres, proveedor, documento de respaldo (factura, guía) y notas.
+  - Muestra cuánto queda en bodega, en cuánto queda el costo promedio y el total que ingresa.
+  - Queda como documento ING en el kárdex, en la pestaña «Movimientos» y en la auditoría. No crea deuda con el proveedor ni IVA crédito: para eso se registra una compra.
+
 ## [0.6.1] — 2026-10-13
 
 - **Referencias de la venta:**

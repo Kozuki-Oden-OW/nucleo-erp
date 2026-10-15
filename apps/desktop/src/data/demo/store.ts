@@ -10,7 +10,7 @@ import type {
   AppInfo, AttachmentRow, CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, PromoRule, Shipment, ShipmentInput, StockPolicy, WarehouseStockRow, AuditRow, BackupDone, BusinessProfile, BusinessSettings, ChainReport, CreatedCompany, CurrencyRow,
   Customer, CustomerDetail, Dashboard, DocLink, EffectInput, EntityRef, ExternalRef, ExternalRefInput, Line, LineInput,
   NewCustomer, NewProduct, NewUser, Payment, PermissionRow,
-  AdjustmentInput, InventoryOverview, InventorySettings, KardexRow, ProductInventory, ReorderInput, ReorderSettings, StockAnalysis, StockDocDone, StockDocRow, TransferInput, Warehouse, PriceHistoryRow, Product, ProductCategory, ProductPatch, PurchaseOrderDetail, PurchaseOrderSummary,
+  AdjustmentInput, InventoryOverview, InventorySettings, KardexRow, ProductInventory, ReorderInput, ReorderSettings, StockAnalysis, StockDocDone, StockDocRow, StockEntryInput, TransferInput, Warehouse, PriceHistoryRow, Product, ProductCategory, ProductPatch, PurchaseOrderDetail, PurchaseOrderSummary,
   BuyLineInput, NewSupplier, PoLine, PoStatus, PurchaseDetail, PurchaseInput, PurchaseLine, PurchaseOrderInput, PurchaseSummary, ReceiveLine, Supplier, SupplierDetail, QuoteDetail,
   QuoteInput, QuoteStatus, QuoteSummary, RateRow, RoleRow, SaleDetail, SaleDocType, SaleInput, SaleSummary, SearchHit,
   SecuritySettings, SequenceRow, SessionInfo, Totals, UserPatch, UserRow,
@@ -1524,6 +1524,32 @@ export class DemoBackend implements Backend {
     this.log(input.kind === "conteo" ? "inventario.conteo" : "inventario.ajuste", "ajuste", number, input.reason.trim());
     return wait({ number, moved_lines: moved });
   }
+  async addStock(input: StockEntryInput): Promise<StockDocDone> {
+    this.require("inventario.ajustar");
+    const w = this.findWh(input.warehouse_uid);
+    if (w.archived) throw new AppError("bodega", "La bodega está archivada.");
+    if (!input.lines.length) throw new AppError("sin_lineas", "Agrega al menos un producto.");
+    for (const l of input.lines) {
+      const p = this.products.find((x) => x.uid === l.product_uid);
+      if (!p) throw new AppError("no_encontrado", "No encontramos uno de los productos.");
+      if (p.kind !== "producto") throw new AppError("servicio", `${p.name} es un servicio: no lleva stock.`);
+      if (l.qty_milli <= 0) throw new AppError("cantidad", `${p.name}: la cantidad que llegó debe ser mayor que cero.`);
+      if (l.unit_cost_minor !== null && l.unit_cost_minor < 0) throw new AppError("costo", `Revisa el costo de ${p.name}.`);
+    }
+    const supplier = input.supplier_uid ? this.suppliers.find((x) => x.uid === input.supplier_uid) : undefined;
+    const reason = [supplier?.name, input.reference?.trim(), input.notes?.trim()].filter(Boolean).join(" · ") || null;
+    const number = this.next("ING");
+    for (const l of input.lines) {
+      const p = this.products.find((x) => x.uid === l.product_uid)!;
+      const costE4 = l.unit_cost_minor === null ? p.cost_e4 : l.unit_cost_minor * 10_000;
+      this.stockInE4(p.uid, l.qty_milli, costE4, number, "ING", null, input.date, w.uid);
+      const last = this.moves[this.moves.length - 1];
+      if (last) last.reason = reason;
+    }
+    this.stockDocs.unshift({ uid: uid("ing"), number, kind: "ingreso", date: input.date, description: [w.name, reason].filter(Boolean).join(" · "), lines: input.lines.length, created_by: this.me().display_name });
+    this.log("inventario.ingreso", "ingreso", number);
+    return wait({ number, moved_lines: input.lines.length });
+  }
   async transferStock(input: TransferInput): Promise<StockDocDone> {
     this.require("inventario.ajustar");
     const from = this.findWh(input.from_uid), to = this.findWh(input.to_uid);
@@ -1627,10 +1653,10 @@ export class DemoBackend implements Backend {
   private stockIn(productUid: string | null, qty: number, costMinor: number, doc = "REC", sourceType = "OC", sourceUid: string | null = null, date = this.today): void {
     this.stockInE4(productUid, qty, costMinor * 10_000, doc, sourceType, sourceUid, date);
   }
-  private stockInE4(productUid: string | null, qty: number, costE4: number, doc: string, sourceType: string, sourceUid: string | null, date = this.today): void {
+  private stockInE4(productUid: string | null, qty: number, costE4: number, doc: string, sourceType: string, sourceUid: string | null, date = this.today, wh?: string): void {
     const p = this.products.find((x) => x.uid === productUid);
     if (!p || p.kind !== "producto") return;
-    this.mv(p.uid, qty, "entrada", doc, sourceType, sourceUid, null, date, costE4);
+    this.mv(p.uid, qty, "entrada", doc, sourceType, sourceUid, null, date, costE4, wh);
     const base = Math.max(0, p.on_hand_milli);
     p.cost_e4 = base + qty > 0 ? Math.round((p.cost_e4 * base + costE4 * qty) / (base + qty)) : costE4;
     p.on_hand_milli += qty;

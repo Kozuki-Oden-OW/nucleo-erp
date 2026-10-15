@@ -581,7 +581,10 @@ export interface StockLineInput { product_uid: string; qty_milli: number }
 export interface AdjustmentInput { warehouse_uid: string; date: string; kind: "ajuste" | "conteo"; reason: string; lines: StockLineInput[] }
 export interface TransferInput { from_uid: string; to_uid: string; date: string; notes?: string; lines: StockLineInput[] }
 export interface StockDocDone { number: string; moved_lines: number }
-export interface StockDocRow { uid: string; number: string; kind: "ajuste" | "conteo" | "transferencia"; date: string; description: string; lines: number; created_by: string | null }
+/** Agregar stock: lo que llegó, con su costo neto (sin IVA). Sin costo se usa el promedio actual. */
+export interface StockEntryLineInput { product_uid: string; qty_milli: number; unit_cost_minor: number | null }
+export interface StockEntryInput { warehouse_uid: string; date: string; supplier_uid?: string; reference?: string; notes?: string; lines: StockEntryLineInput[] }
+export interface StockDocRow { uid: string; number: string; kind: "ingreso" | "ajuste" | "conteo" | "transferencia"; date: string; description: string; lines: number; created_by: string | null }
 export interface ReorderInput extends ReorderSettings { min_milli: number }
 
 /* ───── Dinero ───── */

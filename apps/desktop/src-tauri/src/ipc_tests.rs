@@ -524,19 +524,28 @@ fn inventario_por_ipc() {
     assert_eq!(t["number"], "TRA-000001");
     let a = ipc.ok("adjust_stock", json!({ "input": { "warehouse_uid": main, "date": HOY, "kind": "conteo", "reason": "Conteo", "lines": [{ "product_uid": prod, "qty_milli": 39000 }] } }));
     assert_eq!(a["moved_lines"], 1);
+    let g = ipc.ok("add_stock", json!({ "input": { "warehouse_uid": main, "date": HOY, "supplier_uid": null, "reference": "Factura 77", "notes": null, "lines": [{ "product_uid": prod, "qty_milli": 5000, "unit_cost_minor": 1200 }] } }));
+    assert_eq!(g["number"], "ING-000001");
     assert_eq!(
         ipc.ok("stock_documents", json!({}))
             .as_array()
             .unwrap()
             .len(),
-        2
+        3
     );
     let inv = ipc.ok(
         "product_inventory",
         json!({ "uid": prod, "warehouseUid": null }),
     );
-    assert_eq!(inv["product"]["on_hand_milli"], 49000);
-    assert_eq!(inv["kardex"].as_array().unwrap().len(), 4);
+    assert_eq!(inv["product"]["on_hand_milli"], 54000);
+    assert_eq!(inv["kardex"].as_array().unwrap().len(), 5);
+    assert!(
+        inv["kardex"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|k| k["document"] == "ING-000001" && k["unit_cost_e4"] == 12_000_000)
+    );
     let inv = ipc.ok(
         "product_inventory",
         json!({ "uid": prod, "warehouseUid": other }),
