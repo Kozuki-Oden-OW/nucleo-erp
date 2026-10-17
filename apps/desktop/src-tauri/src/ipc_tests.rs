@@ -923,3 +923,119 @@ fn f22_por_ipc() {
         .is_err()
     );
 }
+
+#[test]
+fn inteligencia_contabilidad_y_conciliacion_por_ipc() {
+    let ipc = Ipc::new();
+    let created = ipc.ok(
+        "create_company",
+        json!({ "name": "Almacén Norte", "profile": "empresa" }),
+    );
+    ipc.ok("open_company", json!({ "uid": created["company"]["uid"] }));
+    let accs = ipc.ok("create_money_account", json!({ "input": { "kind": "banco", "name": "Cuenta corriente", "bank_name": null, "account_label": null, "opening_minor": 100000, "opening_date": HOY } }));
+    let banco = accs
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["kind"] == "banco")
+        .unwrap()["uid"]
+        .clone();
+    let cats = ipc.ok("expense_categories", json!({}));
+    let luz = cats
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "Electricidad")
+        .unwrap()["id"]
+        .clone();
+    ipc.ok("register_expense", json!({ "input": { "category_id": luz, "supplier_uid": null, "date": HOY, "description": "Cuenta de luz", "total_minor": 30000, "tax_included": false, "due_date": HOY, "paid_method": "Transferencia", "paid_account_uid": banco, "recurring_id": null } }));
+
+    // Inicio, alertas y reglas.
+    let d = ipc.ok("dashboard", json!({}));
+    assert!(d["alerts"].is_array());
+    assert_eq!(d["series"].as_array().unwrap().len(), 12);
+    ipc.ok("alerts", json!({}));
+    let mut s = ipc.ok("alert_settings", json!({}));
+    s["idle_days"] = json!(60);
+    assert_eq!(
+        ipc.ok("update_alert_settings", json!({ "settings": s }))["idle_days"],
+        60
+    );
+    assert!(ipc.ok("product_insights", json!({ "windowDays": 90 }))["rows"].is_array());
+    assert!(ipc.ok("customer_insights", json!({}))["rows"].is_array());
+
+    // Contabilidad.
+    assert!(
+        ipc.ok("ledger_accounts", json!({}))
+            .as_array()
+            .unwrap()
+            .len()
+            > 40
+    );
+    let m = ipc.ok("accounting_map", json!({}));
+    assert_eq!(m["concepts"]["bancos"], "1.1.02");
+    ipc.ok("update_accounting_map", json!({ "map": m }));
+    let j = ipc.ok("journal", json!({ "from": HOY, "to": "2099-12-31" }));
+    assert!(
+        j.as_array()
+            .unwrap()
+            .iter()
+            .any(|e| e["source_type"] == "GAS")
+    );
+    let e = ipc.ok(
+        "add_manual_entry",
+        json!({ "input": { "date": "2099-01-01", "description": "Aporte", "lines": [
+        { "account_code": "1.1.02", "debit_minor": 5000, "credit_minor": 0, "memo": null },
+        { "account_code": "3.1.02", "debit_minor": 0, "credit_minor": 5000, "memo": null } ] } }),
+    );
+    ipc.ok(
+        "reverse_manual_entry",
+        json!({ "uid": e["key"], "reason": "Error" }),
+    );
+    assert!(ipc.ok("accounting_periods", json!({})).is_array());
+    assert!(
+        ipc.call("close_period", json!({ "period": "2099-01" }))
+            .is_err(),
+        "mes futuro"
+    );
+    assert!(
+        ipc.call(
+            "reopen_period",
+            json!({ "period": "2026-01", "reason": "x" })
+        )
+        .is_err()
+    );
+    ipc.ok("save_ledger_account", json!({ "input": { "code": null, "parent_code": "1.2", "name": "Herramientas", "simple_name": null } }));
+    let bc = ipc.ok("report", json!({ "params": { "id": "balance_comprobacion", "from": HOY, "to": "2035-12-31", "group": null } }));
+    assert_eq!(bc["kpis"][0]["value"], 0);
+
+    // Conciliación bancaria: el pago del gasto ya está registrado y se concilia solo.
+    let r = ipc.ok("import_bank_statement", json!({ "input": { "account_uid": banco, "file_name": "cartola.csv", "lines": [
+        { "date": HOY, "description": "PAC ENEL", "reference": null, "amount_minor": -30000, "balance_minor": 70000 },
+        { "date": HOY, "description": "COMPRA COPEC", "reference": "12", "amount_minor": -15000, "balance_minor": 55000 } ] } }));
+    assert_eq!(r["auto_matched"], 1);
+    let v = ipc.ok("bank_reconciliation", json!({ "accountUid": banco }));
+    assert_eq!(v["pending"], 1);
+    let line = v["lines"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|l| l["status"] == "pendiente")
+        .unwrap();
+    let sug = line["suggestions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["action"] == "gasto")
+        .unwrap()
+        .clone();
+    assert_eq!(sug["category"], "Combustible");
+    let v = ipc.ok("reconcile_bank_line", json!({ "lineUid": line["uid"], "action": { "kind": "gasto", "target_uid": null, "category_id": sug["category_id"], "description": null, "tax_included": null, "supplier_uid": null, "note": null } }));
+    assert_eq!(v["pending"], 0);
+    assert_eq!(v["statement_balance_minor"], v["nucleo_balance_minor"]);
+    ipc.ok("auto_reconcile_bank", json!({ "accountUid": banco }));
+    ipc.ok(
+        "delete_bank_statement",
+        json!({ "statementUid": r["statement_uid"] }),
+    );
+}

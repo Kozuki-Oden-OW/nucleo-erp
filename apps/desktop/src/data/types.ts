@@ -957,7 +957,81 @@ export interface Dashboard {
   low_stock: { uid: string; name: string; on_hand_milli: number; min_milli: number }[];
   pending_documentation: number;
   upcoming_payments: { label: string; date: string; amount_minor: number; kind: "cobro" | "pago" }[];
-  series: { month: string; sales_minor: number }[];
+  series: { month: string; sales_minor: number; margin_minor: number }[];
+  today_profit_minor: number;
+  today_customers: number;
+  month_net_minor: number;
+  month_margin_ppm: number | null;
+  month_purchases_minor: number;
+  month_prev_same_minor: number;
+  alerts: AlertItem[];
+}
+
+/* ───── Alertas e inteligencia (Fase 12 B y C) ───── */
+
+export type AlertKind =
+  | "caja_negativa" | "cobros_vencidos" | "pagos_vencidos" | "pagos_proximos" | "sin_stock" | "bajo_minimo" | "margen_bajo"
+  | "alza_precios" | "detenidos" | "clientes_riesgo" | "importaciones" | "presupuesto" | "documentar";
+export interface AlertLine { label: string; value: string; href: string | null }
+export interface AlertItem {
+  kind: AlertKind; severity: "alta" | "media" | "info"; title: string; detail: string; count: number;
+  amount_minor: number | null; href: string; action: string; lines: AlertLine[];
+}
+export interface AlertSettings { disabled: AlertKind[]; idle_days: number; due_soon_days: number; price_rise_pct: number; low_margin_pct: number }
+export type ProductQuadrant = "estrella" | "volumen" | "oportunidad" | "revisar" | "sin_ventas" | "sin_datos";
+export interface ProductInsight {
+  uid: string; sku: string; name: string; category: string | null; unit: string; is_service: boolean;
+  qty_milli: number; net_minor: number; cost_minor: number; margin_minor: number; margin_ppm: number | null;
+  prev_net_minor: number; growth_ppm: number | null; sales_count: number; last_sale: string | null; days_since_sale: number | null;
+  on_hand_milli: number; stock_value_minor: number; abc: "A" | "B" | "C" | ""; quadrant: ProductQuadrant;
+  idle: boolean; low_margin: boolean; growing: boolean; falling: boolean; explanation: string;
+}
+export interface ProductInsights {
+  from: string; to: string; window_days: number; costs_visible: boolean; idle_days: number; low_margin_pct: number;
+  total_net_minor: number; total_margin_minor: number; idle_value_minor: number; rows: ProductInsight[];
+}
+export interface TrendPoint { month: string; qty_milli: number; net_minor: number; cost_minor: number }
+export type CustomerState = "nuevo" | "activo" | "en_riesgo" | "perdido" | "ocasional" | "sin_compras";
+export interface CustomerInsight {
+  uid: string; name: string; rut: string | null; purchases: number; first_purchase: string | null; last_purchase: string | null;
+  days_since: number | null; avg_interval_days: number | null; net_12m_minor: number; margin_12m_minor: number; purchases_12m: number;
+  avg_ticket_minor: number; pending_minor: number; overdue_minor: number; abc: "A" | "B" | "C" | ""; state: CustomerState; explanation: string;
+}
+export interface CustomerInsights { costs_visible: boolean; total_net_12m_minor: number; top_share_ppm: number; rows: CustomerInsight[] }
+
+/* ───── Conciliación bancaria ───── */
+
+export interface StatementLineInput { date: string; description: string; reference: string | null; amount_minor: number; balance_minor: number | null }
+export interface ImportStatementResult { statement_uid: string; added: number; duplicates: number; auto_matched: number }
+export type ReconcileKind = "vincular" | "vincular_traspaso" | "cobrar" | "pagar_compra" | "pagar_gasto" | "gasto" | "traspaso" | "ignorar" | "deshacer";
+export interface BankSuggestion { action: ReconcileKind; target_uid: string | null; label: string; detail: string; score: number; category_id: number | null; category: string | null }
+export interface StatementLineView {
+  uid: string; date: string; description: string; reference: string | null; amount_minor: number; balance_minor: number | null;
+  status: "pendiente" | "conciliado" | "ignorado"; matched: { kind: "pago" | "traspaso"; label: string; link: string | null } | null; note: string | null; suggestions: BankSuggestion[];
+}
+export interface ReconciliationView {
+  account: MoneyAccount;
+  statements: { uid: string; file_name: string | null; period_from: string | null; period_to: string | null; lines: number; imported_at: string }[];
+  lines: StatementLineView[]; statement_balance_minor: number | null; statement_date: string | null; nucleo_balance_minor: number | null;
+  pending: number; reconciled: number; ignored: number; unmatched: { date: string; document: string; detail: string; amount_minor: number; link: string | null }[];
+}
+export interface ReconcileAction { kind: ReconcileKind; target_uid?: string | null; category_id?: number | null; description?: string | null; tax_included?: boolean | null; supplier_uid?: string | null; note?: string | null }
+
+/* ───── Contabilidad (Fase 10) ───── */
+
+export type AccountNature = "activo" | "pasivo" | "patrimonio" | "ingreso" | "gasto";
+export interface LedgerAccount { code: string; name: string; simple_name: string | null; nature: AccountNature; postable: boolean; parent_code: string | null; archived: boolean; level: number }
+export interface LedgerAccountInput { code?: string; parent_code?: string; name: string; simple_name?: string }
+export interface AccountingMap { concepts: Record<string, string>; groups: Record<string, string> }
+export interface EntryLine { account_code: string; account_name: string; debit_minor: number; credit_minor: number; memo: string | null }
+export interface JournalEntry {
+  key: string; date: string; reference: string; description: string; origin: "automatico" | "manual" | "apertura" | "cierre";
+  source_type: string | null; link: string | null; status: "calculado" | "contabilizado" | "reversado"; lines: EntryLine[];
+}
+export interface ManualEntryInput { date: string; description: string; lines: { account_code: string; debit_minor: number; credit_minor: number; memo?: string | null }[] }
+export interface PeriodRow {
+  period: string; status: "abierto" | "cerrado"; entries: number; debit_minor: number; changed: boolean; current_debit_minor: number;
+  closed_at: string | null; closed_by: string | null;
 }
 
 /* ───── Búsqueda global ───── */

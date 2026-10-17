@@ -57,6 +57,8 @@ Todo es entero: las sumas y los reportes se hacen en SQL sin perder exactitud y 
 | 28 | `0028_producto_varias_categorias.sql` | Tabla `product_extra_categories`: otras categorías de un producto además de la principal (`products.category_id`) |
 | 29 | `0029_tipos_referencia.sql` | Tabla `reference_kinds`: tipos de referencia propios del negocio (se guardan en el documento como `C:<nombre>`) |
 | 30 | `0030_ingresos_stock.sql` | Tipo de documento `ING` y tabla `stock_entries` («Agregar stock»): encabezado del ingreso con bodega, fecha, proveedor y documento de respaldo opcionales; los movimientos van a `stock_movements` como `entrada` con origen `ING` |
+| 31 | `0031_plan_de_cuentas.sql` | Plan de cuentas base (activo, pasivo, patrimonio, ingresos, costos y gastos; nombre contable y nombre Simple) para la contabilidad automática; índice de asientos por estado y fecha |
+| 32 | `0032_conciliacion_bancaria.sql` | Tablas `bank_statements` (cartolas subidas) y `bank_statement_lines` (movimientos con huella única por cuenta, estado pendiente/conciliado/ignorado y vínculo a un cobro/pago o traspaso) |
 
 Las migraciones son transaccionales y versionadas con `PRAGMA user_version`. **Pre-1.0:** se pueden
 reescribir (en la Fase 2 se reemplazó la tabla mínima de clientes de la Fase 1); desde la primera beta

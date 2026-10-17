@@ -209,6 +209,20 @@ pub struct DashboardData {
     pub pending_documentation: i64,
     pub upcoming_payments: Vec<Upcoming>,
     pub series: Vec<MonthSales>,
+    /// Hoy: utilidad estimada (neto − costo de lo vendido). Cero sin permiso para ver costos.
+    pub today_profit_minor: i64,
+    /// Hoy: clientes distintos que compraron (cada venta sin cliente cuenta como uno).
+    pub today_customers: i64,
+    /// Este mes: venta neta (sin IVA), base del margen.
+    pub month_net_minor: i64,
+    /// Este mes: margen bruto sobre la venta neta (ppm).
+    pub month_margin_ppm: Option<i64>,
+    /// Este mes: compras registradas (neto).
+    pub month_purchases_minor: i64,
+    /// Mes anterior hasta el mismo día (para comparar parejo).
+    pub month_prev_same_minor: i64,
+    /// «Requiere tu atención».
+    pub alerts: Vec<crate::insight_ops::AlertItem>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -231,6 +245,8 @@ pub struct Upcoming {
 pub struct MonthSales {
     pub month: String,
     pub sales_minor: i64,
+    /// Neto − costo de lo vendido. Cero sin permiso para ver costos.
+    pub margin_minor: i64,
 }
 
 /* ───────────────────────────── Auxiliares ───────────────────────────── */
@@ -1393,21 +1409,88 @@ impl CompanySession {
         }
         months.reverse();
         for ym in months {
-            let v = if sales {
-                q(
-                    &format!(
-                        "SELECT sum(total_minor) FROM sales WHERE {LIVE} AND substr(issue_date, 1, 7) = ?1"
-                    ),
-                    &[&ym],
-                )?
+            let (v, mg) = if sales {
+                (
+                    q(
+                        &format!(
+                            "SELECT sum(total_minor) FROM sales WHERE {LIVE} AND substr(issue_date, 1, 7) = ?1"
+                        ),
+                        &[&ym],
+                    )?,
+                    if costs {
+                        q(
+                            &format!(
+                                "SELECT sum(net_minor + exempt_minor - cost_minor) FROM sales WHERE {LIVE} AND substr(issue_date, 1, 7) = ?1"
+                            ),
+                            &[&ym],
+                        )?
+                    } else {
+                        0
+                    },
+                )
             } else {
-                0
+                (0, 0)
             };
             series.push(MonthSales {
                 month: ym,
                 sales_minor: v,
+                margin_minor: mg,
             });
         }
+        let (today_profit, today_customers, month_net, prev_same) = if sales {
+            let day = today[8..10].parse::<i64>().unwrap_or(1);
+            let prev_last = date_ord(&prev_end).unwrap_or(t);
+            let same = date_str((date_ord(&prev_start).unwrap_or(t) + day - 1).min(prev_last));
+            (
+                if costs {
+                    q(
+                        &format!(
+                            "SELECT sum(net_minor + exempt_minor - cost_minor) FROM sales WHERE {LIVE} AND issue_date = ?1"
+                        ),
+                        &[&today],
+                    )?
+                } else {
+                    0
+                },
+                q(
+                    &format!(
+                        "SELECT count(DISTINCT coalesce(customer_id, -id)) FROM sales WHERE {LIVE} AND issue_date = ?1"
+                    ),
+                    &[&today],
+                )?,
+                q(
+                    &format!(
+                        "SELECT sum(net_minor + exempt_minor) FROM sales WHERE {LIVE} AND issue_date >= ?1"
+                    ),
+                    &[&month_start],
+                )?,
+                q(
+                    &format!(
+                        "SELECT sum(total_minor) FROM sales WHERE {LIVE} AND issue_date BETWEEN ?1 AND ?2"
+                    ),
+                    &[&prev_start, &same],
+                )?,
+            )
+        } else {
+            (0, 0, 0, 0)
+        };
+        let month_cost = if sales && costs {
+            q(
+                &format!("SELECT sum(cost_minor) FROM sales WHERE {LIVE} AND issue_date >= ?1"),
+                &[&month_start],
+            )?
+        } else {
+            0
+        };
+        let month_purchases = if self.can("compras.ver") {
+            q(
+                "SELECT sum(net_minor + exempt_minor) FROM purchases WHERE status = 'registrada' AND issue_date >= ?1",
+                &[&month_start],
+            )?
+        } else {
+            0
+        };
+        let alerts = self.alerts()?;
         Ok(DashboardData {
             today_sales_minor: today_sales,
             today_sales_count: today_count,
@@ -1424,6 +1507,14 @@ impl CompanySession {
             pending_documentation: pending_doc,
             upcoming_payments: upcoming,
             series,
+            today_profit_minor: today_profit,
+            today_customers,
+            month_net_minor: month_net,
+            month_margin_ppm: (costs && month_net != 0)
+                .then(|| ((month_net - month_cost) as i128 * 1_000_000 / month_net as i128) as i64),
+            month_purchases_minor: month_purchases,
+            month_prev_same_minor: prev_same,
+            alerts,
         })
     }
 }

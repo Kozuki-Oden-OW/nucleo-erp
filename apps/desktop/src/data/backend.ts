@@ -4,6 +4,9 @@
 // Las pantallas solo conocen esta interfaz; así un prototipo de la Fase 3 se convierte en pantalla
 // real cuando el comando Rust correspondiente existe.
 import type {
+  AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint,
+  AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
+  ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput,
   CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, Shipment, ShipmentInput, WarehouseStockRow,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
@@ -97,6 +100,27 @@ export interface Backend {
 
   // Inicio
   dashboard(): Promise<Dashboard>;
+  alerts(): Promise<AlertItem[]>;
+  alertSettings(): Promise<AlertSettings>;
+  updateAlertSettings(settings: AlertSettings): Promise<AlertSettings>;
+  productInsights(windowDays: number): Promise<ProductInsights>;
+  productTrend(uid: string): Promise<TrendPoint[]>;
+  customerInsights(): Promise<CustomerInsights>;
+  importBankStatement(accountUid: string, fileName: string | null, lines: StatementLineInput[]): Promise<ImportStatementResult>;
+  bankReconciliation(accountUid: string): Promise<ReconciliationView>;
+  reconcileBankLine(lineUid: string, action: ReconcileAction): Promise<ReconciliationView>;
+  autoReconcileBank(accountUid: string): Promise<ReconciliationView>;
+  deleteBankStatement(statementUid: string): Promise<void>;
+  ledgerAccounts(): Promise<LedgerAccount[]>;
+  saveLedgerAccount(input: LedgerAccountInput): Promise<LedgerAccount[]>;
+  accountingMap(): Promise<AccountingMap>;
+  updateAccountingMap(map: AccountingMap): Promise<AccountingMap>;
+  journal(from: string, to: string): Promise<JournalEntry[]>;
+  accountingPeriods(): Promise<PeriodRow[]>;
+  closePeriod(period: string): Promise<PeriodRow[]>;
+  reopenPeriod(period: string, reason: string): Promise<PeriodRow[]>;
+  addManualEntry(input: ManualEntryInput): Promise<JournalEntry>;
+  reverseManualEntry(uid: string, reason: string): Promise<JournalEntry>;
 
   // Clientes y productos
   searchCustomers(query: string): Promise<Customer[]>;

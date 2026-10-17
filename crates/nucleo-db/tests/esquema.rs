@@ -227,13 +227,7 @@ fn pagos_parciales_actualizan_saldos() {
 fn asientos_cuadrados_y_periodos_cerrados() {
     let (_d, db) = db();
     let c = db.conn();
-    c.execute_batch(
-        "INSERT INTO accounting_accounts (code, name, simple_name, nature) VALUES
-           ('1.1.03','Deudores por venta','Dinero que te deben','activo'),
-           ('4.1.01','Ventas','Ventas','ingreso'),
-           ('2.1.05','Impuesto por pagar','IVA estimado','pasivo');",
-    )
-    .unwrap();
+    // Las cuentas 1.1.03, 4.1.01 y 2.1.05 vienen en el plan de cuentas base (migración 0031).
     c.execute("INSERT INTO journal_entries (uid, entry_date, description, origin, created_at) VALUES ('j1','2026-10-05','Venta VEN-000089','automatico',?1)", [T]).unwrap();
     let je = c.last_insert_rowid();
     let line = |acc: &str, d: i64, h: i64| {

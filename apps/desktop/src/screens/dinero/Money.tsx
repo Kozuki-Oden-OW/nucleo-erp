@@ -11,8 +11,9 @@ import { AccountsTab } from "./Accounts";
 import { DueTable, accountLabel } from "./common";
 import { FlowChart } from "./FlowChart";
 import { RecurringTab } from "./Recurring";
+import { ReconciliationTab } from "./Reconciliation";
 
-type Tab = "resumen" | "cuentas" | "gastos" | "por_cobrar" | "por_pagar" | "calendario" | "recurrentes";
+type Tab = "resumen" | "cuentas" | "conciliacion" | "gastos" | "por_cobrar" | "por_pagar" | "calendario" | "recurrentes";
 
 export function Money({ route }: { route: Route }) {
   const backend = useBackend();
@@ -40,6 +41,7 @@ export function Money({ route }: { route: Route }) {
         tabs={[
           { value: "resumen", label: "Resumen" },
           { value: "cuentas", label: "Cuentas" },
+          { value: "conciliacion", label: "Conciliación bancaria" },
           { value: "por_cobrar", label: t("por_cobrar"), count: ov?.receivables.length },
           { value: "por_pagar", label: t("por_pagar"), count: ov?.payables.length },
           { value: "calendario", label: "Calendario" },
@@ -50,6 +52,7 @@ export function Money({ route }: { route: Route }) {
         {err && <Notice tone="danger">{err}</Notice>}
         {tab === "resumen" && (ov ? <Overview ov={ov} /> : !err && <Spinner label="Calculando tu caja…" />)}
         {tab === "cuentas" && <AccountsTab route={route} onChanged={reload} />}
+        {tab === "conciliacion" && <ReconciliationTab onChanged={reload} />}
         {tab === "gastos" && <GoToExpenses />}
         {tab === "por_cobrar" && ov && (
           <DueBlock total={ov.receivable_minor} overdue={ov.receivable_overdue_minor} aging={ov.receivable_aging} kind="cobro">

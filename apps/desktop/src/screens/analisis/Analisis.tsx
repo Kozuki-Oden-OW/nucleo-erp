@@ -7,7 +7,8 @@ import { monthLabel, reportFileName, reportToCsv, reportToXlsx } from "../../lib
 import { formatDate, formatInt, formatMoney, formatMoneyShort, formatQty, formatRut, todayIso } from "../../lib/format";
 import { navigate, type Route } from "../../lib/router";
 import { useSession } from "../../lib/session";
-import { Button, Card, EmptyState, Field, IconButton, Kpi, Notice, PageHeader, Segmented, Select, Spinner, cx } from "../../ui/kit";
+import { Button, Card, EmptyState, Field, IconButton, Kpi, Notice, PageHeader, Segmented, Select, Spinner, Tabs, cx } from "../../ui/kit";
+import { CustomersInsights, ProductsInsights } from "./Insights";
 import { useToast } from "../../ui/overlay";
 
 const MAX_ROWS = 2000;
@@ -61,9 +62,24 @@ export function presetRange(p: Preset, today = todayIso()): [string, string] {
 
 /* ───────────── Pantalla ───────────── */
 
+type Tab = "reportes" | "productos" | "clientes";
+
 export function Analisis({ route }: { route: Route }) {
   const id = route.query.get("r");
-  return id ? <ReportScreen key={id} id={id} route={route} /> : <Catalog />;
+  const { can } = useSession();
+  if (id) return <ReportScreen key={id} id={id} route={route} />;
+  const tab = (route.query.get("tab") as Tab) || "reportes";
+  const sales = can("ventas.ver");
+  return (
+    <div className="anim-in">
+      <PageHeader title="Análisis y reportes" subtitle={tab === "productos" ? "Qué se vende, qué deja margen, qué crece y qué está detenido." : tab === "clientes" ? "Quién te compra, cada cuánto, cuánto te deja y quién dejó de venir." : "Respuestas claras sobre tu negocio. Elige un reporte, ajusta el período y expórtalo a Excel si lo necesitas."} />
+      {sales && <Tabs value={tab} onChange={(t) => navigate(t === "reportes" ? "/analisis" : `/analisis?tab=${t}`, { replace: true })}
+        tabs={[{ value: "reportes", label: "Reportes" }, { value: "productos", label: "Productos" }, { value: "clientes", label: "Clientes" }]} />}
+      <div className="mt-4">
+        {tab === "productos" && sales ? <ProductsInsights route={route} /> : tab === "clientes" && sales ? <CustomersInsights route={route} /> : <Catalog />}
+      </div>
+    </div>
+  );
 }
 
 function Catalog() {
@@ -77,8 +93,7 @@ function Catalog() {
     return [...m.entries()];
   }, [defs]);
   return (
-    <div className="anim-in">
-      <PageHeader title="Análisis y reportes" subtitle="Respuestas claras sobre tu negocio. Elige un reporte, ajusta el período y expórtalo a Excel si lo necesitas." />
+    <div>
       {err && <Notice tone="danger">{err}</Notice>}
       {!defs && !err && <Spinner />}
       <div className="flex flex-col gap-7">

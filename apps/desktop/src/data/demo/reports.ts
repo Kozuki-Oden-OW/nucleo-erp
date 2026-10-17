@@ -38,6 +38,11 @@ export const REPORT_DEFS: Def[] = [
   { id: "por_pagar", group: "Dinero", title: "Por pagar (antigüedad)", description: "A quién le debes y qué vence primero.", uses_period: false, perms: ["dinero.ver"] },
   { id: "flujo_caja", group: "Dinero", title: "Flujo de caja", description: "Lo que entró y salió de cajas y bancos cada mes, con el saldo.", uses_period: true, perms: ["dinero.ver"] },
   { id: "iva", group: "Impuestos", title: "IVA estimado por mes", description: "IVA de tus ventas menos el de compras y gastos registrados.", uses_period: true, perms: ["contabilidad.ver"] },
+  { id: "libro_diario", group: "Contabilidad", title: "Libro diario", description: "Todos los asientos del período, automáticos y manuales, con su debe y haber.", uses_period: true, perms: ["contabilidad.ver"] },
+  { id: "libro_mayor", group: "Contabilidad", title: "Libro mayor", description: "Movimientos de cada cuenta con su saldo anterior y su saldo acumulado.", uses_period: true, perms: ["contabilidad.ver"] },
+  { id: "balance_comprobacion", group: "Contabilidad", title: "Balance de comprobación y saldos", description: "Sumas y saldos de cada cuenta en 8 columnas, con el resultado del período.", uses_period: true, perms: ["contabilidad.ver"] },
+  { id: "estado_resultados", group: "Contabilidad", title: "Estado de resultados", description: "Ventas, costo, margen bruto, gastos y resultado del período.", uses_period: true, perms: ["contabilidad.ver"] },
+  { id: "balance_general", group: "Contabilidad", title: "Balance general", description: "Lo que tienes, lo que debes y el patrimonio a la fecha de cierre del período.", uses_period: true, perms: ["contabilidad.ver"] },
   { id: "importaciones", group: "COMEX", title: "Importaciones", description: "Carpetas del período con FOB, costo final y costo por unidad.", uses_period: true, perms: ["comex.ver"] },
 ];
 const GROUPINGS: [string, string][] = [["mes", "Por mes"], ["semana", "Por semana"], ["dia", "Por día"]];

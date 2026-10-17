@@ -1,9 +1,10 @@
 // Estructura de pantalla (Blueprint §4.1): menú lateral, barra superior y área de trabajo.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  Bell, ChevronsLeft, ChevronsRight, FlaskConical, KeyRound, LogOut, Monitor, Moon, PanelLeft, Plus, Search, Sun, TriangleAlert, FileWarning,
+  Bell, ChevronsLeft, ChevronsRight, FlaskConical, KeyRound, LogOut, Monitor, Moon, PanelLeft, Plus, Search, Sun,
 } from "lucide-react";
-import { useBackend, type AppInfo, type CreatedCompany, type Dashboard, type SessionInfo } from "../data";
+import { useBackend, type AlertItem, type AppInfo, type CreatedCompany, type SessionInfo } from "../data";
+import { AlertList } from "./AlertList";
 import { applyAccent } from "../lib/accent";
 import { CompanySwitcher } from "./CompanySwitcher";
 import { useSession } from "../lib/session";
@@ -42,7 +43,7 @@ export function AppShell({
   const backend = useBackend();
   const { prefs, set } = usePrefs();
   const [palette, setPalette] = useState(false);
-  const [alerts, setAlerts] = useState<Dashboard | null>(null);
+  const [alerts, setAlerts] = useState<AlertItem[] | null>(null);
   const [bell, setBell] = useState(false);
   // En pantallas angostas (notebooks de 1024–1280 px) el menú se contrae solo para dar espacio a las tablas.
   const [narrow, setNarrow] = useState(() => window.innerWidth < 1200);
@@ -73,7 +74,7 @@ export function AppShell({
 
   useEffect(() => {
     if (!backend.features.has("dashboard")) return;
-    backend.dashboard().then(setAlerts).catch(() => setAlerts(null));
+    backend.alerts().then(setAlerts).catch(() => setAlerts(null));
   }, [backend, route.raw]);
 
   // Logo del negocio en el menú (se refresca al navegar, por ejemplo después de cambiarlo).
@@ -96,7 +97,8 @@ export function AppShell({
     return () => window.removeEventListener("nucleo:logo", load);
   }, [backend, session.company.uid]);
 
-  const alertCount = (alerts?.pending_documentation ?? 0) + (alerts?.low_stock.length ?? 0) + (alerts?.receivable_overdue_minor ? 1 : 0);
+  // La campana cuenta lo urgente e importante; lo informativo se ve al abrirla.
+  const alertCount = (alerts ?? []).filter((a) => a.severity !== "info").length;
 
   const navButton = (n: NavItem) => {
     const ready = !n.feature || backend.features.has(n.feature);
@@ -259,7 +261,7 @@ function ThemeMenu({ theme, onChange }: { theme: Theme; onChange: (t: Theme) => 
   return <IconButton icon={icon} label={`${label} (clic para cambiar)`} onClick={() => onChange(order[(order.indexOf(theme) + 1) % 3]!)} />;
 }
 
-function AlertsPopover({ data, onClose }: { data: Dashboard | null; onClose: () => void }) {
+function AlertsPopover({ data, onClose }: { data: AlertItem[] | null; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
@@ -268,21 +270,15 @@ function AlertsPopover({ data, onClose }: { data: Dashboard | null; onClose: () 
     window.addEventListener("keydown", k);
     return () => { window.removeEventListener("mousedown", h); window.removeEventListener("keydown", k); };
   }, [onClose]);
-  const go = (href: string) => { navigate(href); onClose(); };
-  const rows: { icon: typeof Bell; tone: string; text: string; href: string }[] = [];
-  if (data?.pending_documentation) rows.push({ icon: FileWarning, tone: "text-warning", text: `${data.pending_documentation} ventas pendientes de documentación tributaria`, href: "/ventas?tab=pendientes_doc" });
-  if (data?.receivable_overdue_minor) rows.push({ icon: TriangleAlert, tone: "text-danger", text: "Tienes cobros atrasados", href: "/ventas?tab=por_cobrar" });
-  if (data?.low_stock.length) rows.push({ icon: TriangleAlert, tone: "text-warning", text: `${data.low_stock.length} productos con poco stock`, href: "/productos?filtro=bajo" });
   return (
-    <div ref={ref} className="anim-in absolute right-0 top-11 z-30 w-80 rounded-xl border border-line bg-surface p-2 shadow-pop">
-      <div className="px-2 pb-1 pt-1 text-xs font-semibold uppercase tracking-wide text-muted">Alertas</div>
-      {rows.length === 0 && <div className="px-2 py-6 text-center text-sm text-muted">Todo en orden.</div>}
-      {rows.map((r) => (
-        <button key={r.text} onClick={() => go(r.href)} className="flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left text-sm hover:bg-surface-2">
-          <r.icon size={16} className={cx("mt-0.5 shrink-0", r.tone)} aria-hidden />
-          <span className="text-ink">{r.text}</span>
-        </button>
-      ))}
+    <div ref={ref} className="anim-in absolute right-0 top-11 z-30 w-96 rounded-xl border border-line bg-surface p-2 shadow-pop">
+      <div className="flex items-center px-2 pb-1 pt-1">
+        <span className="flex-1 text-xs font-semibold uppercase tracking-wide text-muted">Requiere tu atención</span>
+        <button className="text-xs font-medium text-accent hover:underline" onClick={() => { navigate("/"); onClose(); }}>Ver en el Inicio</button>
+      </div>
+      {!data || data.length === 0
+        ? <div className="px-2 py-6 text-center text-sm text-muted">Todo en orden.</div>
+        : <div className="max-h-[420px] overflow-auto"><AlertList alerts={data} compact onNavigate={onClose} /></div>}
     </div>
   );
 }

@@ -1,6 +1,12 @@
 //! Comandos IPC: capa delgada sobre `nucleo-app`. Aquí no hay reglas de negocio ni permisos:
 //! cada caso de uso de `nucleo-app` verifica el permiso de quien opera y audita.
 
+use nucleo_app::accounting_ops::{
+    AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
+};
+use nucleo_app::bank_ops::{
+    ImportStatementInput, ImportStatementResult, ReconcileAction, ReconciliationView,
+};
 use nucleo_app::comex_ops::{ImportCostInput, ImportDetail, ImportInput, ImportReceiveLine};
 use nucleo_app::company::BackupDone;
 use nucleo_app::core_ops::{
@@ -15,6 +21,9 @@ use nucleo_app::finance_ops::{
     ExpenseInput, ExpenseSummary, MoneyOverview, MoneyTransferInput, RecurringInput,
 };
 use nucleo_app::gastos_ops::ExpenseInsights;
+use nucleo_app::insight_ops::{
+    AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint,
+};
 use nucleo_app::inventory_ops::{
     AdjustmentInput, InventoryOverview, InventorySettings, ProductInventory, ReorderInput,
     StockDocDone, StockEntryInput, TransferInput,
@@ -1086,6 +1095,151 @@ pub fn money_calendar(state: State<'_, AppState>, days: i64) -> CmdResult<Vec<Ca
 #[tauri::command]
 pub fn dashboard(state: State<'_, AppState>) -> CmdResult<DashboardData> {
     with_session(&state, |s| Ok(s.dashboard()?))
+}
+
+#[tauri::command]
+pub fn ledger_accounts(state: State<'_, AppState>) -> CmdResult<Vec<LedgerAccount>> {
+    with_session(&state, |s| Ok(s.ledger_accounts()?))
+}
+
+#[tauri::command]
+pub fn save_ledger_account(
+    state: State<'_, AppState>,
+    input: LedgerAccountInput,
+) -> CmdResult<Vec<LedgerAccount>> {
+    with_session(&state, |s| Ok(s.save_ledger_account(&input)?))
+}
+
+#[tauri::command]
+pub fn accounting_map(state: State<'_, AppState>) -> CmdResult<AccountingMap> {
+    with_session(&state, |s| Ok(s.accounting_map()?))
+}
+
+#[tauri::command]
+pub fn update_accounting_map(
+    state: State<'_, AppState>,
+    map: AccountingMap,
+) -> CmdResult<AccountingMap> {
+    with_session(&state, |s| Ok(s.update_accounting_map(&map)?))
+}
+
+#[tauri::command]
+pub fn journal(
+    state: State<'_, AppState>,
+    from: String,
+    to: String,
+) -> CmdResult<Vec<JournalEntry>> {
+    with_session(&state, |s| Ok(s.journal(&from, &to)?))
+}
+
+#[tauri::command]
+pub fn accounting_periods(state: State<'_, AppState>) -> CmdResult<Vec<PeriodRow>> {
+    with_session(&state, |s| Ok(s.accounting_periods()?))
+}
+
+#[tauri::command]
+pub fn close_period(state: State<'_, AppState>, period: String) -> CmdResult<Vec<PeriodRow>> {
+    with_session(&state, |s| Ok(s.close_period(&period)?))
+}
+
+#[tauri::command]
+pub fn reopen_period(
+    state: State<'_, AppState>,
+    period: String,
+    reason: String,
+) -> CmdResult<Vec<PeriodRow>> {
+    with_session(&state, |s| Ok(s.reopen_period(&period, &reason)?))
+}
+
+#[tauri::command]
+pub fn add_manual_entry(
+    state: State<'_, AppState>,
+    input: ManualEntryInput,
+) -> CmdResult<JournalEntry> {
+    with_session(&state, |s| Ok(s.add_manual_entry(&input)?))
+}
+
+#[tauri::command]
+pub fn reverse_manual_entry(
+    state: State<'_, AppState>,
+    uid: String,
+    reason: String,
+) -> CmdResult<JournalEntry> {
+    with_session(&state, |s| Ok(s.reverse_manual_entry(&uid, &reason)?))
+}
+
+#[tauri::command]
+pub fn import_bank_statement(
+    state: State<'_, AppState>,
+    input: ImportStatementInput,
+) -> CmdResult<ImportStatementResult> {
+    with_session(&state, |s| Ok(s.import_bank_statement(&input)?))
+}
+
+#[tauri::command]
+pub fn bank_reconciliation(
+    state: State<'_, AppState>,
+    account_uid: String,
+) -> CmdResult<ReconciliationView> {
+    with_session(&state, |s| Ok(s.bank_reconciliation(&account_uid)?))
+}
+
+#[tauri::command]
+pub fn reconcile_bank_line(
+    state: State<'_, AppState>,
+    line_uid: String,
+    action: ReconcileAction,
+) -> CmdResult<ReconciliationView> {
+    with_session(&state, |s| Ok(s.reconcile_bank_line(&line_uid, &action)?))
+}
+
+#[tauri::command]
+pub fn auto_reconcile_bank(
+    state: State<'_, AppState>,
+    account_uid: String,
+) -> CmdResult<ReconciliationView> {
+    with_session(&state, |s| Ok(s.auto_reconcile_bank(&account_uid)?))
+}
+
+#[tauri::command]
+pub fn delete_bank_statement(state: State<'_, AppState>, statement_uid: String) -> CmdResult<()> {
+    with_session(&state, |s| Ok(s.delete_bank_statement(&statement_uid)?))
+}
+
+#[tauri::command]
+pub fn alerts(state: State<'_, AppState>) -> CmdResult<Vec<AlertItem>> {
+    with_session(&state, |s| Ok(s.alerts()?))
+}
+
+#[tauri::command]
+pub fn alert_settings(state: State<'_, AppState>) -> CmdResult<AlertSettings> {
+    with_session(&state, |s| Ok(s.alert_settings()?))
+}
+
+#[tauri::command]
+pub fn update_alert_settings(
+    state: State<'_, AppState>,
+    settings: AlertSettings,
+) -> CmdResult<AlertSettings> {
+    with_session(&state, |s| Ok(s.update_alert_settings(&settings)?))
+}
+
+#[tauri::command]
+pub fn product_insights(
+    state: State<'_, AppState>,
+    window_days: i64,
+) -> CmdResult<ProductInsights> {
+    with_session(&state, |s| Ok(s.product_insights(window_days)?))
+}
+
+#[tauri::command]
+pub fn product_trend(state: State<'_, AppState>, uid: String) -> CmdResult<Vec<TrendPoint>> {
+    with_session(&state, |s| Ok(s.product_trend(&uid)?))
+}
+
+#[tauri::command]
+pub fn customer_insights(state: State<'_, AppState>) -> CmdResult<CustomerInsights> {
+    with_session(&state, |s| Ok(s.customer_insights()?))
 }
 
 /* ───────────────────────────── Fase 9: COMEX ───────────────────────────── */

@@ -4,6 +4,9 @@
 import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "../backend";
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
+  AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint,
+  AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
+  ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput, StatementLineView, BankSuggestion,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollRow, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView, SeveranceForm, SeveranceView, Worker, WorkerInput,
   F29Inputs, F29Source, F29View, RcvImportReport, TaxDocInput, TaxDocLine, TaxProfile,
@@ -25,7 +28,9 @@ import { buildInsights } from "./gastos";
 import { lineTotal } from "../gastos";
 import { DEMO_CATEGORIES, PROJECTION_WEEKS, agingAdd, emptyAging, methodCode, occurrences } from "./money";
 import { DEMO_PERMISSIONS, DEMO_ROLES } from "./roles";
-import { CURRENCY_DIGITS, addDays, daysBetween, todayIso } from "../../lib/format";
+import { CURRENCY_DIGITS, addDays, daysBetween, formatCLP, formatQty, todayIso } from "../../lib/format";
+import { guessCategory } from "../../lib/cartola";
+import { BASE_CHART, CONCEPTS, DEFAULT_GROUPS, accountingReport, buildJournal, resolveMap, type AccFacts } from "./accounting";
 import { computeCostSheet, costSheetUsed, type CostSheet } from "../costing";
 import { REPORT_DEFS, buildReport, reportCatalog, type Facts } from "./reports";
 import { CUSTOM_KIND_PREFIX, REFERENCE_KINDS, normalizeTerms } from "../saleTerms";
@@ -717,8 +722,16 @@ export class DemoBackend implements Backend {
     for (let m = 11; m >= 0; m--) {
       const d = new Date(`${t}T12:00:00`); d.setDate(1); d.setMonth(d.getMonth() - m);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      series.push({ month: key, sales_minor: (this.history[key] ?? 0) + sumBy((s) => s.issue_date.startsWith(key), (s) => s.totals.total_minor) });
+      const hist = this.history[key] ?? 0;
+      series.push({
+        month: key, sales_minor: hist + sumBy((s) => s.issue_date.startsWith(key), (s) => s.totals.total_minor),
+        margin_minor: Math.round(hist / 1.19 * 0.34) + sumBy((s) => s.issue_date.startsWith(key), (s) => s.totals.net_minor + s.totals.exempt_minor - s.cost_minor),
+      });
     }
+    const day = Number(t.slice(8, 10));
+    const prevSame = `${prev}-${String(day).padStart(2, "0")}`;
+    const prevDays = new Date(Number(prev.slice(0, 4)), Number(prev.slice(5, 7)), 0).getDate();
+    const prevSameMinor = Math.round((this.history[prev] ?? 0) * Math.min(day, prevDays) / prevDays) + sumBy((s) => s.issue_date.startsWith(prev) && s.issue_date <= prevSame, (s) => s.totals.total_minor);
     const upcoming: Dashboard["upcoming_payments"] = [...rec, ...pay].filter((d) => d.due_date >= t).sort((x, y) => x.due_date.localeCompare(y.due_date))
       .map((d) => ({ label: `${d.document} · ${d.party}`, date: d.due_date, amount_minor: d.pending_minor, kind: d.kind }));
     return wait({
@@ -730,7 +743,425 @@ export class DemoBackend implements Backend {
       low_stock: this.products.filter((p) => p.kind === "producto" && p.on_hand_milli <= p.min_milli).map((p) => ({ uid: p.uid, name: p.name, on_hand_milli: p.on_hand_milli, min_milli: p.min_milli })),
       pending_documentation: live.filter((s) => s.documentation_state === "pendiente").length,
       upcoming_payments: upcoming.slice(0, 6), series,
+      today_profit_minor: today.reduce((a, s) => a + s.totals.net_minor + s.totals.exempt_minor - s.cost_minor, 0),
+      today_customers: new Set(today.map((s) => s.customer_uid ?? s.uid)).size,
+      month_net_minor: monthNet, month_margin_ppm: monthNet ? Math.round(((monthNet - monthCost) * 1_000_000) / monthNet) : null,
+      month_purchases_minor: this.purchases.filter((c) => c.status === "registrada" && c.issue_date >= ms).reduce((a, c) => a + c.totals.net_minor + c.totals.exempt_minor, 0),
+      month_prev_same_minor: prevSameMinor,
+      alerts: this.demoAlerts(),
     }, 120);
+  }
+
+  /* ───────────── Alertas e inteligencia ───────────── */
+
+  private alertCfg: AlertSettings = { disabled: [], idle_days: 90, due_soon_days: 7, price_rise_pct: 5, low_margin_pct: 10 };
+  async alerts(): Promise<AlertItem[]> { return wait(this.demoAlerts()); }
+  async alertSettings(): Promise<AlertSettings> { return wait({ ...this.alertCfg }); }
+  async updateAlertSettings(x: AlertSettings): Promise<AlertSettings> {
+    this.require("config.editar");
+    if (x.idle_days < 15 || x.idle_days > 730) throw new AppError("valores", "Los días sin vender deben estar entre 15 y 730.");
+    if (x.due_soon_days < 1 || x.due_soon_days > 60) throw new AppError("valores", "El aviso de pagos debe ser entre 1 y 60 días antes.");
+    if (x.price_rise_pct < 1 || x.price_rise_pct > 100) throw new AppError("valores", "El alza de precio debe estar entre 1 % y 100 %.");
+    if (x.low_margin_pct < 0 || x.low_margin_pct > 90) throw new AppError("valores", "El margen bajo debe estar entre 0 % y 90 %.");
+    this.alertCfg = { ...x, disabled: [...new Set(x.disabled)].sort() };
+    this.log("alertas.config", "negocio", "alertas");
+    return wait({ ...this.alertCfg });
+  }
+  private liveSales(): SaleRec[] { return this.sales.filter((s) => s.commercial_state === "efectuada" || s.commercial_state === "cerrada"); }
+  private lineCost(l: Line): number {
+    const e4 = l.unit_cost_e4 ?? this.products.find((p) => p.uid === l.product_uid)?.cost_e4 ?? 0;
+    return Math.round((l.qty_milli * e4) / 10_000_000);
+  }
+  private demoAlerts(): AlertItem[] {
+    const c = this.alertCfg, t = this.today, on = (k: AlertItem["kind"]) => !c.disabled.includes(k);
+    const out: AlertItem[] = [];
+    const $ = (n: number) => formatCLP(n);
+    const { rec, pay } = this.dues();
+    const late = rec.filter((d) => d.due_date < t);
+    if (on("cobros_vencidos") && late.length) {
+      const by = new Map<string, [number, number]>();
+      for (const d of late) { const x = by.get(d.party) ?? [0, 0]; by.set(d.party, [x[0] + d.pending_minor, Math.max(x[1], daysBetween(d.due_date, t))]); }
+      const total = late.reduce((a, d) => a + d.pending_minor, 0);
+      out.push({ kind: "cobros_vencidos", severity: "alta", title: `${by.size} ${by.size === 1 ? "cliente te debe" : "clientes te deben"} dinero atrasado`, detail: `${$(total)} vencido en ${late.length} ${late.length === 1 ? "venta" : "ventas"}.`, count: by.size, amount_minor: total, href: "/dinero?tab=por_cobrar", action: "Ver quién te debe",
+        lines: [...by.entries()].sort((a, b) => b[1][0] - a[1][0]).slice(0, 5).map(([p, [a, d]]) => ({ label: p, value: `${$(a)} · ${d} d`, href: null })) });
+    }
+    const payLate = pay.filter((d) => d.due_date < t), soonTo = addDays(t, c.due_soon_days), soon = pay.filter((d) => d.due_date >= t && d.due_date <= soonTo);
+    const pl = (d: DueRow) => ({ label: `${d.party} · ${d.document}`, value: `${$(d.pending_minor)} · ${d.due_date.split("-").reverse().join("-")}`, href: d.link });
+    if (on("pagos_vencidos") && payLate.length) { const total = payLate.reduce((a, d) => a + d.pending_minor, 0); out.push({ kind: "pagos_vencidos", severity: "alta", title: `${payLate.length} ${payLate.length === 1 ? "pago atrasado" : "pagos atrasados"}`, detail: `Debes ${$(total)} que ya vencieron a proveedores o en gastos.`, count: payLate.length, amount_minor: total, href: "/dinero?tab=por_pagar", action: "Ver qué debes", lines: payLate.slice(0, 5).map(pl) }); }
+    if (on("pagos_proximos") && soon.length) { const total = soon.reduce((a, d) => a + d.pending_minor, 0); out.push({ kind: "pagos_proximos", severity: "media", title: `${soon.length} ${soon.length === 1 ? "pago vence" : "pagos vencen"} en los próximos ${c.due_soon_days} días`, detail: `Necesitas ${$(total)} para cubrirlos.`, count: soon.length, amount_minor: total, href: "/dinero?tab=calendario", action: "Ver el calendario", lines: soon.slice(0, 5).map(pl) }); }
+    const live = this.liveSales(), from90 = addDays(t, -89), from30 = addDays(t, -29);
+    const sold90 = new Map<string, number>(); const m30 = new Map<string, [number, number]>(); const last = new Map<string, string>();
+    for (const s of live) for (const l of s.lines) {
+      if (!l.product_uid) continue;
+      if (s.issue_date >= from90) sold90.set(l.product_uid, (sold90.get(l.product_uid) ?? 0) + l.qty_milli);
+      if (s.issue_date >= from30) { const x = m30.get(l.product_uid) ?? [0, 0]; m30.set(l.product_uid, [x[0] + l.net_minor, x[1] + this.lineCost(l)]); }
+      if ((last.get(l.product_uid) ?? "") < s.issue_date) last.set(l.product_uid, s.issue_date);
+    }
+    const goods = this.products.filter((p) => p.kind === "producto");
+    const out0 = goods.filter((p) => p.on_hand_milli <= 0 && sold90.has(p.uid)).sort((a, b) => sold90.get(b.uid)! - sold90.get(a.uid)!);
+    if (on("sin_stock") && out0.length) out.push({ kind: "sin_stock", severity: "alta", title: `${out0.length} ${out0.length === 1 ? "producto que se vende está" : "productos que se venden están"} sin stock`, detail: "Se vendieron en los últimos 90 días y hoy no tienes unidades: podrías estar perdiendo ventas.", count: out0.length, amount_minor: null, href: "/inventario?filtro=sin_stock", action: "Ver en inventario", lines: out0.slice(0, 5).map((p) => ({ label: p.name, value: `vendió ${formatQty(sold90.get(p.uid)!)} ${p.unit} en 90 d`, href: `/inventario/producto/${p.uid}` })) });
+    const low = goods.filter((p) => p.min_milli > 0 && p.on_hand_milli > 0 && p.on_hand_milli <= p.min_milli);
+    if (on("bajo_minimo") && low.length) out.push({ kind: "bajo_minimo", severity: "media", title: `${low.length} ${low.length === 1 ? "producto está" : "productos están"} por agotarse`, detail: "Quedan en o bajo el stock mínimo que definiste.", count: low.length, amount_minor: null, href: "/inventario?filtro=bajo_minimo", action: "Ver qué reponer", lines: low.slice(0, 5).map((p) => ({ label: p.name, value: `quedan ${formatQty(p.on_hand_milli)} · mín. ${formatQty(p.min_milli)}`, href: `/inventario/producto/${p.uid}` })) });
+    const lowM = [...m30.entries()].filter(([, [n, k]]) => n > 0 && k > 0 && (n - k) * 100 < n * c.low_margin_pct).map(([u, [n, k]]) => ({ p: this.products.find((x) => x.uid === u)!, n, k })).filter((x) => x.p);
+    if (on("margen_bajo") && lowM.length) out.push({ kind: "margen_bajo", severity: lowM.some((x) => x.k > x.n) ? "alta" : "media", title: `${lowM.length} ${lowM.length === 1 ? "producto se vende" : "productos se venden"} con margen bajo`, detail: `En los últimos 30 días dejaron menos de ${c.low_margin_pct} % sobre la venta. Revisa el precio o el costo.`, count: lowM.length, amount_minor: null, href: "/analisis?tab=productos&filtro=margen_bajo", action: "Ver el análisis", lines: lowM.slice(0, 5).map((x) => ({ label: x.p.name, value: `margen ${(((x.n - x.k) / x.n) * 100).toFixed(1).replace(".", ",")} %`, href: `/inventario/producto/${x.p.uid}` })) });
+    const cut = addDays(t, -c.idle_days);
+    const idle = goods.filter((p) => p.on_hand_milli > 0 && (last.get(p.uid) ?? "0000") <= cut).map((p) => ({ p, v: Math.round((p.on_hand_milli * p.cost_e4) / 10_000_000) })).sort((a, b) => b.v - a.v);
+    if (on("detenidos") && idle.length) { const v = idle.reduce((a, x) => a + x.v, 0); out.push({ kind: "detenidos", severity: "info", title: `${idle.length} ${idle.length === 1 ? "producto lleva" : "productos llevan"} más de ${c.idle_days} días sin venderse`, detail: `Tienes ${$(v)} invertido en ese stock detenido. Considera una promoción o liquidarlo.`, count: idle.length, amount_minor: v, href: "/analisis?tab=productos&filtro=detenidos", action: "Ver los productos", lines: idle.slice(0, 5).map((x) => ({ label: x.p.name, value: `${$(x.v)} · ${last.has(x.p.uid) ? `${daysBetween(last.get(x.p.uid)!, t)} d` : "nunca vendido"}`, href: `/inventario/producto/${x.p.uid}` })) }); }
+    const risk = this.demoCustomerRows().filter((r) => r.state === "en_riesgo");
+    if (on("clientes_riesgo") && risk.length) out.push({ kind: "clientes_riesgo", severity: "info", title: `${risk.length} ${risk.length === 1 ? "cliente frecuente dejó" : "clientes frecuentes dejaron"} de comprar`, detail: "Compraban con regularidad y ya pasó más del doble de su tiempo habitual entre compras.", count: risk.length, amount_minor: null, href: "/analisis?tab=clientes&filtro=en_riesgo", action: "Ver los clientes", lines: risk.slice(0, 5).map((r) => ({ label: r.name, value: `hace ${r.days_since} d`, href: `/clientes/${r.uid}` })) });
+    const pend = live.filter((s) => s.documentation_state === "pendiente").length;
+    if (on("documentar") && pend) out.push({ kind: "documentar", severity: "media", title: `${pend} ${pend === 1 ? "venta pendiente" : "ventas pendientes"} de documentar`, detail: "Aún no anotas el documento tributario (boleta o factura) con que las respaldaste.", count: pend, amount_minor: null, href: "/ventas?tab=pendientes_doc", action: "Revisar y marcar", lines: [] });
+    const rank = { alta: 0, media: 1, info: 2 } as const;
+    return out.sort((a, b) => rank[a.severity] - rank[b.severity]);
+  }
+  private abc(values: number[]): ("A" | "B" | "C" | "")[] {
+    const total = values.filter((v) => v > 0).reduce((a, v) => a + v, 0);
+    const idx = values.map((_, i) => i).sort((a, b) => values[b]! - values[a]!);
+    const out: ("A" | "B" | "C" | "")[] = values.map(() => "");
+    let acc = 0;
+    for (const i of idx) { const v = values[i]!; if (v <= 0 || total <= 0) continue; const before = acc; acc += v; out[i] = before * 100 < total * 80 ? "A" : before * 100 < total * 95 ? "B" : "C"; }
+    return out;
+  }
+  async productInsights(windowDays: number): Promise<ProductInsights> {
+    this.require("ventas.ver");
+    const w = [30, 90, 180, 365].includes(windowDays) ? windowDays : 90, t = this.today, c = this.alertCfg;
+    const from = addDays(t, -w + 1), pFrom = addDays(t, -2 * w + 1), pTo = addDays(t, -w), cut = addDays(t, -c.idle_days);
+    type Acc = { q: number; n: number; k: number; cnt: Set<string>; prev: number; last: string | null };
+    const acc = new Map<string, Acc>();
+    for (const s of this.liveSales()) for (const l of s.lines) {
+      if (!l.product_uid) continue;
+      const a = acc.get(l.product_uid) ?? { q: 0, n: 0, k: 0, cnt: new Set(), prev: 0, last: null };
+      if (s.issue_date >= from && s.issue_date <= t) { a.q += l.qty_milli; a.n += l.net_minor; a.k += this.lineCost(l); a.cnt.add(s.uid); }
+      if (s.issue_date >= pFrom && s.issue_date <= pTo) a.prev += l.net_minor;
+      if (!a.last || a.last < s.issue_date) a.last = s.issue_date;
+      acc.set(l.product_uid, a);
+    }
+    const prods = this.products;
+    const base = prods.map((p) => ({ p, a: acc.get(p.uid) ?? { q: 0, n: 0, k: 0, cnt: new Set<string>(), prev: 0, last: null } }));
+    const classes = this.abc(base.map((x) => x.a.n - x.a.k));
+    const sold = base.filter((x) => x.a.n > 0);
+    const med = (v: number[]) => { const s2 = [...v].sort((a, b) => a - b); const n = s2.length; return n === 0 ? 0 : n % 2 ? s2[(n - 1) / 2]! : (s2[n / 2 - 1]! + s2[n / 2]!) / 2; };
+    const mNet = med(sold.map((x) => x.a.n)), mMar = med(sold.map((x) => ((x.a.n - x.a.k) * 1e6) / x.a.n));
+    const $ = (n: number) => formatCLP(n), pct = (ppm: number) => `${(ppm / 10_000).toFixed(1).replace(".", ",")} %`;
+    const rows = base.map(({ p, a }, i) => {
+      const margin = a.n - a.k, mppm = a.n ? Math.round((margin * 1e6) / a.n) : null, growth = a.prev > 0 ? Math.round(((a.n - a.prev) * 1e6) / a.prev) : null;
+      const value = p.kind === "producto" && p.on_hand_milli > 0 ? Math.round((p.on_hand_milli * p.cost_e4) / 10_000_000) : 0;
+      const idle = p.kind === "producto" && p.on_hand_milli > 0 && (a.last ?? "0000") <= cut;
+      const quadrant = a.n <= 0 ? "sin_ventas" : (a.n >= mNet ? (mppm! >= mMar ? "estrella" : "volumen") : (mppm! >= mMar ? "oportunidad" : "revisar"));
+      const why: string[] = [];
+      if (a.n > 0) {
+        why.push(`Vendió ${formatQty(a.q)} ${p.unit} por ${$(a.n)} en ${a.cnt.size} ${a.cnt.size === 1 ? "venta" : "ventas"}`);
+        if (mppm !== null) why.push(`deja ${$(margin)} de margen (${pct(mppm)})`);
+        if (growth !== null) why.push(`${growth >= 0 ? "sube" : "baja"} ${pct(Math.abs(growth))} contra los ${w} días anteriores`); else why.push(`sin ventas en los ${w} días anteriores`);
+      } else why.push(a.last ? `Sin ventas en ${w} días; la última fue hace ${daysBetween(a.last, t)} días` : "Nunca se ha vendido");
+      if (idle) why.push(`tiene ${$(value)} inmovilizado en stock`);
+      return {
+        uid: p.uid, sku: p.sku, name: p.name, category: p.category, unit: p.unit, is_service: p.kind === "servicio",
+        qty_milli: a.q, net_minor: a.n, cost_minor: a.k, margin_minor: margin, margin_ppm: mppm, prev_net_minor: a.prev, growth_ppm: growth,
+        sales_count: a.cnt.size, last_sale: a.last, days_since_sale: a.last ? daysBetween(a.last, t) : null, on_hand_milli: p.on_hand_milli,
+        stock_value_minor: value, abc: classes[i]!, quadrant: quadrant as ProductInsights["rows"][number]["quadrant"], idle,
+        low_margin: mppm !== null && mppm < c.low_margin_pct * 10_000, growing: growth !== null && growth >= 200_000, falling: growth !== null && growth <= -200_000,
+        explanation: `${why.join("; ")}.`,
+      };
+    }).sort((a, b) => b.net_minor - a.net_minor || a.name.localeCompare(b.name, "es"));
+    return wait({
+      from, to: t, window_days: w, costs_visible: true, idle_days: c.idle_days, low_margin_pct: c.low_margin_pct,
+      total_net_minor: rows.reduce((a, r) => a + r.net_minor, 0), total_margin_minor: rows.reduce((a, r) => a + r.margin_minor, 0),
+      idle_value_minor: rows.filter((r) => r.idle).reduce((a, r) => a + r.stock_value_minor, 0), rows,
+    }, 120);
+  }
+  async productTrend(u: string): Promise<TrendPoint[]> {
+    const out: TrendPoint[] = [];
+    for (let m = 11; m >= 0; m--) {
+      const d = new Date(`${this.today}T12:00:00`); d.setDate(1); d.setMonth(d.getMonth() - m);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      let q = 0, n = 0, k = 0;
+      for (const s of this.liveSales()) if (s.issue_date.startsWith(key)) for (const l of s.lines) if (l.product_uid === u) { q += l.qty_milli; n += l.net_minor; k += this.lineCost(l); }
+      out.push({ month: key, qty_milli: q, net_minor: n, cost_minor: k });
+    }
+    return wait(out);
+  }
+  private demoCustomerRows(): CustomerInsights["rows"] {
+    const t = this.today, y = addDays(t, -364);
+    const { rec } = this.dues();
+    const base = this.customers.map((c) => {
+      const mine = this.liveSales().filter((s) => s.customer_uid === c.uid).sort((a, b) => a.issue_date.localeCompare(b.issue_date));
+      const y12 = mine.filter((s) => s.issue_date >= y);
+      const net = y12.reduce((a, s) => a + s.totals.net_minor + s.totals.exempt_minor, 0);
+      const margin = y12.reduce((a, s) => a + s.totals.net_minor + s.totals.exempt_minor - s.cost_minor, 0);
+      const debts = rec.filter((d) => d.party === c.name);
+      return { c, mine, net, margin, n12: y12.length, pending: debts.reduce((a, d) => a + d.pending_minor, 0), overdue: debts.filter((d) => d.due_date < t).reduce((a, d) => a + d.pending_minor, 0) };
+    });
+    const classes = this.abc(base.map((b) => b.net));
+    return base.map((b, i) => {
+      const n = b.mine.length, first = b.mine[0]?.issue_date ?? null, last = b.mine.at(-1)?.issue_date ?? null;
+      const since = last ? daysBetween(last, t) : null;
+      const avg = n >= 2 && first && last ? Math.max(1, Math.floor(daysBetween(first, last) / (n - 1))) : null;
+      let state: CustomerInsights["rows"][number]["state"] = "sin_compras", why = "Aún no tiene compras registradas.";
+      if (n === 1 && since !== null) { state = since <= 30 ? "nuevo" : since > 180 ? "perdido" : "ocasional"; why = since <= 30 ? `Hizo su primera compra hace ${since} días.` : `Compró una sola vez, hace ${since} días.`; }
+      else if (n >= 2 && since !== null && avg !== null) {
+        const risk = Math.max(2 * avg, 30), lost = Math.max(4 * avg, 180), base2 = `Compra cada ${avg} días en promedio (${n} compras); la última fue hace ${since} días`;
+        if (since > lost) { state = "perdido"; why = `${base2}: más de ${lost} días sin volver.`; }
+        else if (since > risk) { state = "en_riesgo"; why = `${base2}: ya pasó más del doble de lo habitual.`; }
+        else { state = first && daysBetween(first, t) <= 30 ? "nuevo" : "activo"; why = `${base2}.`; }
+      }
+      return { uid: b.c.uid, name: b.c.name, rut: b.c.rut, purchases: n, first_purchase: first, last_purchase: last, days_since: since, avg_interval_days: avg,
+        net_12m_minor: b.net, margin_12m_minor: b.margin, purchases_12m: b.n12, avg_ticket_minor: b.n12 ? Math.round(b.net / b.n12) : 0,
+        pending_minor: b.pending, overdue_minor: b.overdue, abc: classes[i]!, state, explanation: why };
+    }).sort((a, b) => b.net_12m_minor - a.net_12m_minor || a.name.localeCompare(b.name, "es"));
+  }
+  /* ───────────── Conciliación bancaria ───────────── */
+
+  private bankLines: (StatementLineInput & { uid: string; acc: string; statement: string; fp: string; status: StatementLineView["status"]; payment: string | null; transfer: string | null; note: string | null })[] = [];
+  private bankStatements: { uid: string; acc: string; file_name: string | null; period_from: string | null; period_to: string | null; lines: number; imported_at: string }[] = [];
+  private bankCandidates(acc: string) {
+    const used = new Set(this.bankLines.flatMap((l) => [l.payment, l.transfer]).filter(Boolean));
+    return this.cashMoves().filter((m) => m.acc === acc && m.status === "vigente" && (m.kind === "cobro" || m.kind === "pago" || m.kind.startsWith("traspaso")))
+      .map((m) => ({ key: m.kind.startsWith("traspaso") ? `${m.kind}:${m.seq}` : m.document, transfer: m.kind.startsWith("traspaso"), date: m.date, amount: m.amount_minor, label: `${m.document} · ${m.detail}`, link: m.link }))
+      .filter((c) => !used.has(c.key));
+  }
+  private bankAutoMatch(acc: string): number {
+    let n = 0;
+    const cands = this.bankCandidates(acc);
+    const pending = this.bankLines.filter((l) => l.acc === acc && l.status === "pendiente");
+    const opts = pending.map((l) => cands.filter((c) => c.amount === l.amount_minor && Math.abs(daysBetween(c.date, l.date)) <= 7));
+    const demand = new Map<string, number>();
+    opts.flat().forEach((c) => demand.set(c.key, (demand.get(c.key) ?? 0) + 1));
+    pending.forEach((l, i) => {
+      const o = opts[i]!;
+      if (o.length === 1 && demand.get(o[0]!.key) === 1) { l.status = "conciliado"; if (o[0]!.transfer) l.transfer = o[0]!.key; else l.payment = o[0]!.key; l.note = "Conciliado automáticamente"; n++; }
+    });
+    return n;
+  }
+  async importBankStatement(accountUid: string, fileName: string | null, lines: StatementLineInput[]): Promise<ImportStatementResult> {
+    this.require("dinero.registrar");
+    if (!this.accs.some((a) => a.uid === accountUid)) throw new AppError("no_encontrado", "No encontramos la cuenta.");
+    if (!lines.length) throw new AppError("validacion", "La cartola no trae movimientos.");
+    const st = uid("cart"), seen = new Map<string, number>();
+    let added = 0, dup = 0;
+    for (const l of lines) {
+      const base = `${l.date}|${l.amount_minor}|${l.description.toLowerCase().trim()}|${l.reference ?? ""}`;
+      const n = seen.get(base) ?? 0; seen.set(base, n + 1);
+      const fp = `${base}|${n}`;
+      if (this.bankLines.some((x) => x.acc === accountUid && x.fp === fp)) { dup++; continue; }
+      this.bankLines.push({ ...l, uid: uid("mov"), acc: accountUid, statement: st, fp, status: "pendiente", payment: null, transfer: null, note: null });
+      added++;
+    }
+    const dates = lines.map((l) => l.date).sort();
+    this.bankStatements.unshift({ uid: st, acc: accountUid, file_name: fileName, period_from: dates[0] ?? null, period_to: dates.at(-1) ?? null, lines: added, imported_at: new Date().toISOString() });
+    const auto = this.bankAutoMatch(accountUid);
+    this.log("banco.cartola", "cuenta", accountUid);
+    return wait({ statement_uid: st, added, duplicates: dup, auto_matched: auto });
+  }
+  async bankReconciliation(accountUid: string): Promise<ReconciliationView> {
+    this.require("dinero.ver");
+    const account = this.accountRows().find((a) => a.uid === accountUid);
+    if (!account) throw new AppError("no_encontrado", "No encontramos la cuenta.");
+    const cands = this.bankCandidates(accountUid);
+    const moves = this.cashMoves();
+    const { rec, pay } = this.dues();
+    const lines: StatementLineView[] = this.bankLines.filter((l) => l.acc === accountUid).sort((a, b) => b.date.localeCompare(a.date)).map((l) => {
+      const m = l.payment ? moves.find((x) => x.document === l.payment) : l.transfer ? moves.find((x) => `${x.kind}:${x.seq}` === l.transfer) : undefined;
+      const sug: BankSuggestion[] = [];
+      if (l.status === "pendiente") {
+        for (const c of cands.filter((c) => c.amount === l.amount_minor && Math.abs(daysBetween(c.date, l.date)) <= 30)) sug.push({ action: c.transfer ? "vincular_traspaso" : "vincular", target_uid: c.key, label: c.label, detail: `Registrado el ${c.date.split("-").reverse().join("-")} · ya está en NÚCLEO`, score: 95 - Math.abs(daysBetween(c.date, l.date)) * 4, category_id: null, category: null });
+        const hit = (name: string) => name.toLowerCase().split(/\s+/).filter((w) => w.length >= 4).some((w) => l.description.toLowerCase().includes(w));
+        if (l.amount_minor > 0) for (const r of rec.filter((r) => r.pending_minor === l.amount_minor)) sug.push({ action: "cobrar", target_uid: r.link.replace("/ventas/", ""), label: `Cobro de ${r.document} · ${r.party}`, detail: `Por cobrar ${formatCLP(r.pending_minor)}`, score: hit(r.party) ? 85 : 60, category_id: null, category: null });
+        else {
+          for (const p of pay.filter((p) => p.pending_minor === -l.amount_minor && !p.link.startsWith("/comex"))) sug.push({ action: p.link.startsWith("/compras") ? "pagar_compra" : "pagar_gasto", target_uid: p.link.split("/").at(-1)!, label: `Pago de ${p.document} · ${p.party}`, detail: `Por pagar ${formatCLP(p.pending_minor)}`, score: hit(p.party) ? 85 : 60, category_id: null, category: null });
+          const g = guessCategory(l.description), cat = g ? this.cats.find((c) => c.name === g) : undefined;
+          sug.push({ action: "gasto", target_uid: null, label: cat ? `Registrar gasto: ${cat.name}` : "Registrar como gasto", detail: cat ? "Categoría sugerida por la descripción del banco" : "Elige la categoría", score: cat ? 55 : 25, category_id: cat?.id ?? null, category: cat?.name ?? null });
+        }
+        const transferLike = /traspaso|deposito efectivo|giro cajero|retiro|cuenta propia/i.test(l.description.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
+        for (const a of this.accs.filter((a) => a.uid !== accountUid && !a.archived)) sug.push({ action: "traspaso", target_uid: a.uid, label: `Traspaso ${l.amount_minor > 0 ? "desde" : "a"} ${a.name}`, detail: "Movimiento entre tus propias cuentas", score: transferLike ? 70 : 15, category_id: null, category: null });
+        sug.sort((a, b) => b.score - a.score);
+      }
+      return { uid: l.uid, date: l.date, description: l.description, reference: l.reference, amount_minor: l.amount_minor, balance_minor: l.balance_minor, status: l.status,
+        matched: m ? { kind: l.transfer ? "traspaso" : "pago", label: `${m.document} · ${m.detail}`, link: m.link } : null, note: l.note, suggestions: sug.slice(0, 6) };
+    });
+    const withBal = this.bankLines.filter((l) => l.acc === accountUid && l.balance_minor !== null).sort((a, b) => b.date.localeCompare(a.date))[0];
+    const balAt = (d: string) => account.opening_minor + moves.filter((m) => m.acc === accountUid && m.status === "vigente" && m.date <= d).reduce((a, m) => a + m.amount_minor, 0);
+    const mine = this.bankLines.filter((l) => l.acc === accountUid).map((l) => l.date).sort();
+    const used = new Set(this.bankLines.flatMap((l) => [l.payment, l.transfer]));
+    const unmatched = mine.length ? moves.filter((m) => m.acc === accountUid && m.status === "vigente" && m.date >= mine[0]! && m.date <= mine.at(-1)! && !used.has(m.kind.startsWith("traspaso") ? `${m.kind}:${m.seq}` : m.document))
+      .map((m) => ({ date: m.date, document: m.document, detail: m.detail, amount_minor: m.amount_minor, link: m.link })) : [];
+    return wait({
+      account, statements: this.bankStatements.filter((x) => x.acc === accountUid).map(({ acc: _a, ...x }) => x), lines,
+      statement_balance_minor: withBal?.balance_minor ?? null, statement_date: withBal?.date ?? null, nucleo_balance_minor: withBal ? balAt(withBal.date) : null,
+      pending: lines.filter((l) => l.status === "pendiente").length, reconciled: lines.filter((l) => l.status === "conciliado").length, ignored: lines.filter((l) => l.status === "ignorado").length, unmatched,
+    }, 90);
+  }
+  async reconcileBankLine(lineUid: string, a: ReconcileAction): Promise<ReconciliationView> {
+    this.require("dinero.registrar");
+    const l = this.bankLines.find((x) => x.uid === lineUid);
+    if (!l) throw new AppError("no_encontrado", "No encontramos el movimiento.");
+    if (a.kind !== "deshacer" && l.status !== "pendiente") throw new AppError("validacion", "Ese movimiento ya está conciliado o ignorado: deshazlo primero.");
+    const abs = Math.abs(l.amount_minor);
+    const before = new Set(this.cashMoves().map((m) => `${m.document}:${m.seq}`));
+    const newest = () => this.cashMoves().filter((m) => !before.has(`${m.document}:${m.seq}`) && m.acc === l.acc).at(-1);
+    switch (a.kind) {
+      case "vincular": l.payment = a.target_uid!; l.status = "conciliado"; break;
+      case "vincular_traspaso": l.transfer = a.target_uid!; l.status = "conciliado"; break;
+      case "cobrar": await this.registerPayment(a.target_uid!, abs, "Transferencia", l.date, l.acc); l.payment = newest()?.document ?? null; l.status = "conciliado"; break;
+      case "pagar_compra": await this.payPurchase(a.target_uid!, abs, "Transferencia", l.date, l.acc); l.payment = newest()?.document ?? null; l.status = "conciliado"; break;
+      case "pagar_gasto": await this.payExpense(a.target_uid!, abs, "Transferencia", l.date, l.acc); l.payment = newest()?.document ?? null; l.status = "conciliado"; break;
+      case "gasto": {
+        if (!a.category_id) throw new AppError("validacion", "Elige la categoría del gasto.");
+        await this.registerExpense({ category_id: a.category_id, supplier_uid: a.supplier_uid ?? null, date: l.date, description: a.description?.trim() || l.description.slice(0, 120), total_minor: abs, tax_included: a.tax_included ?? false, due_date: null, paid_method: "Transferencia", paid_account_uid: l.acc, notes: `Desde la cartola: ${l.description}`, recurring_id: null });
+        l.payment = newest()?.document ?? null; l.status = "conciliado"; break;
+      }
+      case "traspaso": {
+        const other = a.target_uid!;
+        await this.transferMoney(l.amount_minor > 0 ? { from_uid: other, to_uid: l.acc, date: l.date, amount_minor: abs, notes: l.description } : { from_uid: l.acc, to_uid: other, date: l.date, amount_minor: abs, notes: l.description });
+        const m = newest(); l.transfer = m ? `${m.kind}:${m.seq}` : null; l.status = "conciliado"; break;
+      }
+      case "ignorar": if (!a.note?.trim()) throw new AppError("validacion", "Escribe por qué se ignora."); l.status = "ignorado"; l.note = a.note.trim(); break;
+      case "deshacer": l.status = "pendiente"; l.payment = null; l.transfer = null; l.note = null; break;
+    }
+    this.log("banco.conciliar", "cuenta", l.acc);
+    return this.bankReconciliation(l.acc);
+  }
+  async autoReconcileBank(accountUid: string): Promise<ReconciliationView> { this.require("dinero.registrar"); this.bankAutoMatch(accountUid); return this.bankReconciliation(accountUid); }
+  async deleteBankStatement(statementUid: string): Promise<void> {
+    this.require("dinero.registrar");
+    this.bankLines = this.bankLines.filter((l) => l.statement !== statementUid);
+    this.bankStatements = this.bankStatements.filter((s) => s.uid !== statementUid);
+    return wait(undefined);
+  }
+
+  /* ───────────── Contabilidad ───────────── */
+
+  private chart: LedgerAccount[] = structuredClone(BASE_CHART);
+  private accMap: AccountingMap = { concepts: {}, groups: {} };
+  private manualEntries: JournalEntry[] = [];
+  private closedPeriods = new Map<string, { at: string; by: string; entries: JournalEntry[] }>();
+  private accFacts(): AccFacts {
+    const live = this.liveSales();
+    const accKind = (number: string, method: string) => { const uid = this.payAcc[number] ?? this.accountFor(null, method); return this.accs.find((a) => a.uid === uid)?.kind === "caja"; };
+    const stockNet = (lines: PurchaseLine[]) => lines.reduce((a, l) => a + (l.product_uid && this.products.find((x) => x.uid === l.product_uid)?.kind === "producto" ? l.net_minor : 0), 0);
+    return {
+      sales: live.map((x) => ({ uid: x.uid, number: x.number, date: x.issue_date, party: this.customerName(x.customer_uid), total: x.totals.total_minor, tax: x.totals.tax_minor, cost: x.cost_minor })),
+      cobros: this.sales.filter((x) => x.commercial_state !== "anulada").flatMap((x) => x.payments.map((p) => ({ key: p.number, number: p.number, date: p.date, amount: p.amount_minor, cash: accKind(p.number, p.method), party: this.customerName(x.customer_uid) }))),
+      pagos: [
+        ...this.purchases.flatMap((c) => c.payments.map((p) => ({ key: p.number, number: p.number, date: p.date, amount: p.amount_minor, cash: accKind(p.number, p.method), party: this.supplierName(c.supplier_uid), expense: false }))),
+        ...this.gastos.filter((g) => g.status === "registrado").flatMap((g) => g.payments.map((p) => ({ key: p.number, number: p.number, date: p.date, amount: p.amount_minor, cash: accKind(p.number, p.method), party: g.supplier_uid ? this.supplierName(g.supplier_uid) : g.description, expense: true }))),
+      ],
+      purchases: this.purchases.filter((c) => c.status === "registrada").map((c) => ({ uid: c.uid, ref: c.doc_kind && c.doc_number ? `${c.doc_kind} ${c.doc_number}` : c.number, date: c.issue_date, party: this.supplierName(c.supplier_uid), total: c.totals.total_minor, tax: c.totals.tax_minor, stock: stockNet(c.lines) })),
+      expenses: this.gastos.filter((g) => g.status === "registrado").map((g) => { const k = this.cats.find((c) => c.id === g.category_id); return { uid: g.uid, number: g.number, date: g.date, desc: g.description, cat: k?.name ?? "Otros", group: k?.group_name ?? "Otros", total: g.total, tax: g.tax }; }),
+      openings: this.accs.filter((a) => a.opening_minor).map((a) => ({ key: a.uid, date: a.opening_date ?? this.today, name: a.name, cash: a.kind === "caja", amount: a.opening_minor })),
+      transfers: this.transfers.map((t) => ({ key: t.uid, date: t.date, amount: t.amount, fromCash: this.accs.find((a) => a.uid === t.from)?.kind === "caja", toCash: this.accs.find((a) => a.uid === t.to)?.kind === "caja", from: this.accName(t.from), to: this.accName(t.to) })),
+    };
+  }
+  private journalRange(from: string, to: string): JournalEntry[] {
+    const auto = buildJournal(this.accFacts(), this.accMap, this.chart, from, to).filter((e) => !this.closedPeriods.has(e.date.slice(0, 7)));
+    const stored = [...this.closedPeriods.values()].flatMap((c) => c.entries).filter((e) => e.date >= from && e.date <= to);
+    return [...auto, ...stored, ...this.manualEntries.filter((e) => e.date >= from && e.date <= to)].sort((a, b) => a.date.localeCompare(b.date) || a.reference.localeCompare(b.reference));
+  }
+  async ledgerAccounts(): Promise<LedgerAccount[]> { this.require("contabilidad.ver"); return wait(structuredClone(this.chart)); }
+  async saveLedgerAccount(input: LedgerAccountInput): Promise<LedgerAccount[]> {
+    this.require("contabilidad.editar");
+    const name = input.name.trim();
+    if (!name) throw new AppError("nombre", "Escribe el nombre de la cuenta.");
+    if (input.code) {
+      const a = this.chart.find((x) => x.code === input.code);
+      if (!a) throw new AppError("no_encontrado", "No encontramos esa cuenta.");
+      a.name = name; a.simple_name = input.simple_name?.trim() || null;
+    } else {
+      const parent = this.chart.find((x) => x.code === input.parent_code);
+      if (!parent) throw new AppError("validacion", "Elige la cuenta madre.");
+      if (parent.level >= 4) throw new AppError("validacion", "Se permiten hasta 4 niveles de cuentas.");
+      const kids = this.chart.filter((x) => x.parent_code === parent.code).map((x) => Number(x.code.split(".").at(-1))).filter((n) => n < 90);
+      const code = `${parent.code}.${String(Math.max(0, ...kids) + 1).padStart(2, "0")}`;
+      if (parent.postable) {
+        parent.postable = false;
+        for (const k of Object.keys(this.accMap.concepts)) if (this.accMap.concepts[k] === parent.code) this.accMap.concepts[k] = code;
+        for (const [k, def] of CONCEPTS) if (def === parent.code && !this.accMap.concepts[k]) this.accMap.concepts[k] = code;
+      }
+      this.chart.push({ code, name, simple_name: input.simple_name?.trim() || null, nature: parent.nature, postable: true, parent_code: parent.code, archived: false, level: parent.level + 1 });
+      this.chart.sort((a, b) => a.code.localeCompare(b.code, "es", { numeric: true }));
+    }
+    this.log("contabilidad.cuenta", "contabilidad", "plan");
+    return this.ledgerAccounts();
+  }
+  async accountingMap(): Promise<AccountingMap> {
+    this.require("contabilidad.ver");
+    const r = resolveMap(this.accMap, this.chart);
+    const groups = [...new Set([...this.cats.map((c) => c.group_name), ...Object.keys(DEFAULT_GROUPS)])].filter((g) => g !== "Otros").sort();
+    return wait({ concepts: Object.fromEntries(CONCEPTS.map(([k]) => [k, r.concept(k)])), groups: Object.fromEntries(groups.map((g) => [g, r.group(g)])) });
+  }
+  async updateAccountingMap(m: AccountingMap): Promise<AccountingMap> {
+    this.require("contabilidad.editar");
+    for (const code of [...Object.values(m.concepts), ...Object.values(m.groups)]) if (!this.chart.some((a) => a.code === code && a.postable)) throw new AppError("validacion", `La cuenta ${code} no existe o es de agrupación: elige una cuenta de detalle.`);
+    this.accMap = structuredClone(m);
+    this.log("contabilidad.asignacion", "contabilidad", "plan");
+    return this.accountingMap();
+  }
+  async journal(from: string, to: string): Promise<JournalEntry[]> { this.require("contabilidad.ver"); return wait(this.journalRange(from, to), 90); }
+  async accountingPeriods(): Promise<PeriodRow[]> {
+    this.require("contabilidad.ver");
+    const auto = buildJournal(this.accFacts(), this.accMap, this.chart, addDays(this.today, -730), this.today);
+    const by = new Map<string, [number, number]>();
+    for (const e of auto) { const k = e.date.slice(0, 7), x = by.get(k) ?? [0, 0]; by.set(k, [x[0] + 1, x[1] + e.lines.reduce((a, l) => a + l.debit_minor, 0)]); }
+    for (const k of this.closedPeriods.keys()) if (!by.has(k)) by.set(k, [0, 0]);
+    if (!by.has(this.today.slice(0, 7))) by.set(this.today.slice(0, 7), [0, 0]);
+    return wait([...by.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([period, [n, d]]) => {
+      const c = this.closedPeriods.get(period);
+      const sd = c ? c.entries.reduce((a, e) => a + e.lines.reduce((x, l) => x + l.debit_minor, 0), 0) : d;
+      return { period, status: c ? "cerrado" : "abierto", entries: c ? c.entries.length : n, debit_minor: sd, changed: !!c && (sd !== d || c.entries.length !== n), current_debit_minor: d, closed_at: c?.at ?? null, closed_by: c?.by ?? null };
+    }));
+  }
+  async closePeriod(period: string): Promise<PeriodRow[]> {
+    this.require("contabilidad.editar");
+    const [yy, mm] = period.split("-").map(Number);
+    const end = new Date(Date.UTC(yy!, mm!, 0)).toISOString().slice(0, 10);
+    if (period >= this.today.slice(0, 7)) throw new AppError("validacion", "Solo se cierran meses ya terminados.");
+    if (this.closedPeriods.has(period)) throw new AppError("validacion", "Ese mes ya está cerrado.");
+    const entries = buildJournal(this.accFacts(), this.accMap, this.chart, `${period}-01`, end).map((e) => ({ ...e, status: "contabilizado" as const }));
+    this.closedPeriods.set(period, { at: new Date().toISOString(), by: this.me().display_name, entries });
+    this.log("contabilidad.cierre", "periodo", period);
+    return this.accountingPeriods();
+  }
+  async reopenPeriod(period: string, reason: string): Promise<PeriodRow[]> {
+    this.require("contabilidad.editar");
+    if (!reason.trim()) throw new AppError("validacion", "Escribe el motivo para reabrir el mes.");
+    if (!this.closedPeriods.delete(period)) throw new AppError("validacion", "Ese mes no está cerrado.");
+    this.log("contabilidad.reapertura", "periodo", period, reason.trim());
+    return this.accountingPeriods();
+  }
+  async addManualEntry(input: ManualEntryInput): Promise<JournalEntry> {
+    this.require("contabilidad.editar");
+    if (!input.description.trim()) throw new AppError("validacion", "Escribe la glosa del asiento.");
+    if (input.lines.length < 2) throw new AppError("validacion", "Un asiento lleva al menos 2 líneas.");
+    input.lines.forEach((l, i) => {
+      if (!this.chart.some((a) => a.code === l.account_code && a.postable)) throw new AppError("validacion", `Línea ${i + 1}: elige una cuenta de detalle.`);
+      if ((l.debit_minor > 0) === (l.credit_minor > 0)) throw new AppError("validacion", `Línea ${i + 1}: anota el monto en el debe o en el haber.`);
+    });
+    const d = input.lines.reduce((a, l) => a + l.debit_minor, 0), c = input.lines.reduce((a, l) => a + l.credit_minor, 0);
+    if (d !== c) throw new AppError("validacion", `El asiento no cuadra: debe ${formatCLP(d)} y haber ${formatCLP(c)}.`);
+    if (this.closedPeriods.has(input.date.slice(0, 7))) throw new AppError("validacion", "Ese mes está cerrado: reábrelo para agregar asientos.");
+    const e: JournalEntry = { key: uid("as"), date: input.date, reference: `AS-${String(this.manualEntries.filter((x) => !x.reference.endsWith("-R")).length + 1).padStart(6, "0")}`, description: input.description.trim(), origin: "manual", source_type: null, link: null, status: "contabilizado",
+      lines: input.lines.map((l) => ({ account_code: l.account_code, account_name: this.chart.find((a) => a.code === l.account_code)!.name, debit_minor: l.debit_minor, credit_minor: l.credit_minor, memo: l.memo?.trim() || null })) };
+    this.manualEntries.push(e);
+    this.log("contabilidad.asiento", "asiento", e.reference);
+    return wait(structuredClone(e));
+  }
+  async reverseManualEntry(u: string, reason: string): Promise<JournalEntry> {
+    this.require("contabilidad.editar");
+    if (!reason.trim()) throw new AppError("validacion", "Escribe el motivo de la reversa.");
+    const e = this.manualEntries.find((x) => x.key === u);
+    if (!e || e.status !== "contabilizado" || e.reference.endsWith("-R")) throw new AppError("validacion", "Solo se reversan asientos manuales vigentes.");
+    e.status = "reversado";
+    const r: JournalEntry = { ...e, key: uid("as"), date: this.closedPeriods.has(e.date.slice(0, 7)) ? this.today : e.date, reference: `${e.reference}-R`, description: `Reversa de ${e.reference}: ${reason.trim()}`, status: "contabilizado", lines: e.lines.map((l) => ({ ...l, debit_minor: l.credit_minor, credit_minor: l.debit_minor })) };
+    this.manualEntries.push(r);
+    this.log("contabilidad.reversa", "asiento", e.reference, reason.trim());
+    return wait(structuredClone(r));
+  }
+
+  async customerInsights(): Promise<CustomerInsights> {
+    this.require("ventas.ver");
+    const rows = this.demoCustomerRows();
+    const total = rows.reduce((a, r) => a + r.net_12m_minor, 0), top = rows.filter((r) => r.abc === "A").reduce((a, r) => a + r.net_12m_minor, 0);
+    return wait({ costs_visible: true, total_net_12m_minor: total, top_share_ppm: total ? Math.round((top * 1e6) / total) : 0, rows }, 120);
   }
 
   /* ───────────── Clientes y productos ───────────── */
@@ -3167,6 +3598,11 @@ export class DemoBackend implements Backend {
     const to = params.to || this.today;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) throw new AppError("validacion", "Revisa las fechas del período.");
     if (from > to) throw new AppError("validacion", "La fecha «desde» es posterior a «hasta».");
+    if (def.group === "Contabilidad") {
+      const r: Report = { id: def.id, title: def.title, description: def.description, from, to, uses_period: def.uses_period, columns: [], rows: [], totals: null, links: [], kpis: [], notes: [], chart: null };
+      accountingReport(def.id, r, this.journalRange(from, to), this.journalRange("1900-01-01", to), this.chart, from, to);
+      return wait(r, 90);
+    }
     return wait(buildReport(def.id, this.reportFacts(), from, to, params.group ?? null, this.canDo), 90);
   }
   async saveReportFile(reportId: string, fileName: string, bytes: Uint8Array): Promise<boolean> {

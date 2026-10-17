@@ -193,6 +193,46 @@ const DEFS: &[Def] = &[
         perms: &["contabilidad.ver"],
     },
     Def {
+        id: "libro_diario",
+        group: "Contabilidad",
+        title: "Libro diario",
+        description: "Todos los asientos del período, automáticos y manuales, con su debe y haber.",
+        uses_period: true,
+        perms: &["contabilidad.ver"],
+    },
+    Def {
+        id: "libro_mayor",
+        group: "Contabilidad",
+        title: "Libro mayor",
+        description: "Movimientos de cada cuenta con su saldo anterior y su saldo acumulado.",
+        uses_period: true,
+        perms: &["contabilidad.ver"],
+    },
+    Def {
+        id: "balance_comprobacion",
+        group: "Contabilidad",
+        title: "Balance de comprobación y saldos",
+        description: "Sumas y saldos de cada cuenta en 8 columnas, con el resultado del período.",
+        uses_period: true,
+        perms: &["contabilidad.ver"],
+    },
+    Def {
+        id: "estado_resultados",
+        group: "Contabilidad",
+        title: "Estado de resultados",
+        description: "Ventas, costo, margen bruto, gastos y resultado del período.",
+        uses_period: true,
+        perms: &["contabilidad.ver"],
+    },
+    Def {
+        id: "balance_general",
+        group: "Contabilidad",
+        title: "Balance general",
+        description: "Lo que tienes, lo que debes y el patrimonio a la fecha de cierre del período.",
+        uses_period: true,
+        perms: &["contabilidad.ver"],
+    },
+    Def {
         id: "importaciones",
         group: "COMEX",
         title: "Importaciones",
@@ -1278,11 +1318,386 @@ impl CompanySession {
                 ];
                 r.notes.push("El costo final es el último calculado en cada carpeta (estimado hasta que se cierra).".into());
             }
+            "libro_diario"
+            | "libro_mayor"
+            | "balance_comprobacion"
+            | "estado_resultados"
+            | "balance_general" => self.accounting_report(def.id, &from, &to, &mut r)?,
             _ => return Err(AppError::NotFound("el reporte".into())),
         }
         if r.links.len() != r.rows.len() {
             r.links = vec![None; r.rows.len()];
         }
         Ok(r)
+    }
+}
+
+/* ───────────────────────────── Libros contables ───────────────────────────── */
+
+/// Movimiento del mayor: (fecha, documento, glosa, debe, haber, enlace).
+type LedgerMove = (String, String, String, i64, i64, Option<String>);
+
+impl CompanySession {
+    fn accounting_report(&self, id: &str, from: &str, to: &str, r: &mut Report) -> AppResult<()> {
+        let conn = self.db.conn();
+        let label = |code: &str, name: &str| format!("{code} {name}");
+        match id {
+            "libro_diario" => {
+                let entries = self.journal_between(conn, from, to)?;
+                r.columns = vec![
+                    col("fecha", "Fecha", "date"),
+                    col("asiento", "Documento", "text"),
+                    col("glosa", "Glosa", "text"),
+                    col("cuenta", "Cuenta", "text"),
+                    col("debe", "Debe", "money"),
+                    col("haber", "Haber", "money"),
+                ];
+                let (mut d, mut h, mut n) = (0, 0, 0);
+                for e in entries
+                    .iter()
+                    .filter(|e| e.status != "reversado" || e.origin == "manual")
+                {
+                    n += 1;
+                    for l in &e.lines {
+                        d += l.debit_minor;
+                        h += l.credit_minor;
+                        r.rows.push(vec![
+                            e.date.clone().into(),
+                            e.reference.clone().into(),
+                            if e.status == "reversado" {
+                                format!("{} (reversado)", e.description)
+                            } else {
+                                e.description.clone()
+                            }
+                            .into(),
+                            label(&l.account_code, &l.account_name).into(),
+                            if l.debit_minor > 0 {
+                                Cell::Int(l.debit_minor)
+                            } else {
+                                Cell::Null
+                            },
+                            if l.credit_minor > 0 {
+                                Cell::Int(l.credit_minor)
+                            } else {
+                                Cell::Null
+                            },
+                        ]);
+                        r.links.push(e.link.clone());
+                    }
+                }
+                r.totals = Some(vec![
+                    "Total".into(),
+                    Cell::Null,
+                    Cell::Null,
+                    Cell::Null,
+                    d.into(),
+                    h.into(),
+                ]);
+                r.kpis = vec![
+                    kpi("Asientos", n, "int"),
+                    kpi("Total debe", d, "money"),
+                    ReportKpi {
+                        tone: Some(if d == h { "success" } else { "danger" }),
+                        ..kpi("Diferencia debe − haber", d - h, "money")
+                    },
+                ];
+                r.notes.push("Los meses abiertos se calculan desde tus documentos; los cerrados muestran lo guardado al cerrarlos (Impuestos → Contabilidad).".into());
+            }
+            "libro_mayor" => {
+                let before = self.trial_between(
+                    conn,
+                    "1900-01-01",
+                    &crate::inventory_ops::date_str(date_ord(from).unwrap_or(0) - 1),
+                )?;
+                let opening: BTreeMap<String, i64> = before
+                    .into_iter()
+                    .map(|t| (t.code, t.balance_minor))
+                    .collect();
+                let entries = self.journal_between(conn, from, to)?;
+                let mut by: BTreeMap<String, (String, Vec<LedgerMove>)> = BTreeMap::new();
+                for e in entries
+                    .iter()
+                    .filter(|e| e.status != "reversado" || e.origin == "manual")
+                {
+                    for l in &e.lines {
+                        by.entry(l.account_code.clone())
+                            .or_insert_with(|| (l.account_name.clone(), Vec::new()))
+                            .1
+                            .push((
+                                e.date.clone(),
+                                e.reference.clone(),
+                                e.description.clone(),
+                                l.debit_minor,
+                                l.credit_minor,
+                                e.link.clone(),
+                            ));
+                    }
+                }
+                let names: BTreeMap<String, String> = self
+                    .ledger_accounts()?
+                    .into_iter()
+                    .map(|a| (a.code, a.name))
+                    .collect();
+                for (code, bal) in &opening {
+                    if *bal != 0 {
+                        by.entry(code.clone()).or_insert_with(|| {
+                            (names.get(code).cloned().unwrap_or_default(), Vec::new())
+                        });
+                    }
+                }
+                r.columns = vec![
+                    col("cuenta", "Cuenta", "text"),
+                    col("fecha", "Fecha", "date"),
+                    col("documento", "Documento", "text"),
+                    col("glosa", "Glosa", "text"),
+                    col("debe", "Debe", "money"),
+                    col("haber", "Haber", "money"),
+                    col("saldo", "Saldo", "money"),
+                ];
+                for (code, (name, moves)) in by {
+                    let acc = label(&code, &name);
+                    let mut bal = opening.get(&code).copied().unwrap_or(0);
+                    r.rows.push(vec![
+                        acc.clone().into(),
+                        Cell::Null,
+                        Cell::Null,
+                        "Saldo anterior".into(),
+                        Cell::Null,
+                        Cell::Null,
+                        bal.into(),
+                    ]);
+                    r.links.push(None);
+                    for (d, doc, desc, de, ha, link) in moves {
+                        bal += de - ha;
+                        r.rows.push(vec![
+                            acc.clone().into(),
+                            d.into(),
+                            doc.into(),
+                            desc.into(),
+                            if de > 0 { Cell::Int(de) } else { Cell::Null },
+                            if ha > 0 { Cell::Int(ha) } else { Cell::Null },
+                            bal.into(),
+                        ]);
+                        r.links.push(link);
+                    }
+                }
+                r.notes.push(
+                    "Saldo positivo = deudor (debe mayor que haber); negativo = acreedor.".into(),
+                );
+            }
+            "balance_comprobacion" => {
+                let rows = self.trial_between(conn, from, to)?;
+                r.columns = vec![
+                    col("codigo", "Código", "text"),
+                    col("cuenta", "Cuenta", "text"),
+                    col("debitos", "Débitos", "money"),
+                    col("creditos", "Créditos", "money"),
+                    col("deudor", "Saldo deudor", "money"),
+                    col("acreedor", "Saldo acreedor", "money"),
+                    col("activo", "Activo", "money"),
+                    col("pasivo", "Pasivo", "money"),
+                    col("perdidas", "Pérdidas", "money"),
+                    col("ganancias", "Ganancias", "money"),
+                ];
+                let mut t = [0i64; 8];
+                let cell = |v: i64| if v != 0 { Cell::Int(v) } else { Cell::Null };
+                for row in &rows {
+                    let (dr, cr) = (row.balance_minor.max(0), (-row.balance_minor).max(0));
+                    let result = matches!(row.nature.as_str(), "ingreso" | "gasto");
+                    let v = [
+                        row.debit_minor,
+                        row.credit_minor,
+                        dr,
+                        cr,
+                        if result { 0 } else { dr },
+                        if result { 0 } else { cr },
+                        if result { dr } else { 0 },
+                        if result { cr } else { 0 },
+                    ];
+                    for (i, x) in v.iter().enumerate() {
+                        t[i] += x;
+                    }
+                    let mut out: Vec<Cell> = vec![row.code.clone().into(), row.name.clone().into()];
+                    out.extend(v.iter().map(|x| cell(*x)));
+                    r.rows.push(out);
+                    r.links.push(None);
+                }
+                let result = t[7] - t[6];
+                let mut res_row: Vec<Cell> = vec![
+                    Cell::Null,
+                    if result >= 0 {
+                        "Utilidad del período"
+                    } else {
+                        "Pérdida del período"
+                    }
+                    .into(),
+                ];
+                res_row.extend([Cell::Null, Cell::Null, Cell::Null, Cell::Null]);
+                res_row.extend(if result >= 0 {
+                    [Cell::Null, cell(result), cell(result), Cell::Null]
+                } else {
+                    [cell(-result), Cell::Null, Cell::Null, cell(-result)]
+                });
+                r.rows.push(res_row);
+                r.links.push(None);
+                let mut tot: Vec<Cell> = vec!["Total".into(), Cell::Null];
+                tot.extend([t[0], t[1], t[2], t[3]].map(Cell::Int));
+                tot.extend([
+                    Cell::Int(t[4] + (-result).max(0)),
+                    Cell::Int(t[5] + result.max(0)),
+                    Cell::Int(t[6] + result.max(0)),
+                    Cell::Int(t[7] + (-result).max(0)),
+                ]);
+                r.totals = Some(tot);
+                r.kpis = vec![
+                    ReportKpi {
+                        tone: Some(if t[0] == t[1] { "success" } else { "danger" }),
+                        ..kpi("Diferencia débitos − créditos", t[0] - t[1], "money")
+                    },
+                    ReportKpi {
+                        tone: Some(if result >= 0 { "success" } else { "danger" }),
+                        ..kpi(
+                            if result >= 0 {
+                                "Utilidad del período"
+                            } else {
+                                "Pérdida del período"
+                            },
+                            result.abs(),
+                            "money",
+                        )
+                    },
+                ];
+                r.notes.push(
+                    "Sumas del período elegido. Para el balance del año, elige «Este año».".into(),
+                );
+            }
+            "estado_resultados" => {
+                let rows = self.trial_between(conn, from, to)?;
+                let sum = |prefix: &str, sign: i64| -> i64 {
+                    rows.iter()
+                        .filter(|t| t.code.starts_with(prefix))
+                        .map(|t| sign * t.balance_minor)
+                        .sum()
+                };
+                let sales = sum("4.1", -1);
+                let cost = sum("5.1", 1);
+                let other = sum("4.2", -1);
+                let gross = sales - cost;
+                r.columns = vec![
+                    col("concepto", "Concepto", "text"),
+                    col("monto", "Monto", "money"),
+                    col("part", "% de las ventas", "pct"),
+                ];
+                let mut push = |label: String, v: i64| {
+                    r.rows.push(vec![label.into(), v.into(), ppm(v, sales)]);
+                    r.links.push(None);
+                };
+                push("Ingresos de explotación (ventas)".into(), sales);
+                for t in rows
+                    .iter()
+                    .filter(|t| t.code.starts_with("5.1") && t.balance_minor != 0)
+                {
+                    push(format!("  − {}", t.name), -t.balance_minor);
+                }
+                push("= Margen bruto".into(), gross);
+                let mut opex = 0;
+                for t in rows.iter().filter(|t| {
+                    t.code.starts_with("5.") && !t.code.starts_with("5.1") && t.balance_minor != 0
+                }) {
+                    opex += t.balance_minor;
+                    push(format!("  − {}", t.name), -t.balance_minor);
+                }
+                let operational = gross - opex;
+                push("= Resultado operacional".into(), operational);
+                for t in rows
+                    .iter()
+                    .filter(|t| t.code.starts_with("4.2") && t.balance_minor != 0)
+                {
+                    push(format!("  + {}", t.name), -t.balance_minor);
+                }
+                let result = operational + other;
+                push(
+                    format!(
+                        "= {} del período (antes de impuesto)",
+                        if result >= 0 { "Utilidad" } else { "Pérdida" }
+                    ),
+                    result,
+                );
+                r.kpis = vec![
+                    kpi("Ventas", sales, "money"),
+                    kpi("Margen bruto", gross, "money"),
+                    ReportKpi {
+                        tone: Some(if result >= 0 { "success" } else { "danger" }),
+                        ..kpi("Resultado", result, "money")
+                    },
+                ];
+                r.notes.push("Desde los asientos: ventas netas, costo de lo vendido al costo promedio, gastos, remuneraciones y ajustes de inventario. No incluye el impuesto a la renta.".into());
+            }
+            "balance_general" => {
+                let rows = self.trial_between(conn, "1900-01-01", to)?;
+                r.from = to.to_string();
+                r.columns = vec![
+                    col("seccion", "Sección", "text"),
+                    col("cuenta", "Cuenta", "text"),
+                    col("monto", "Monto", "money"),
+                ];
+                let section = |name: &str, nature: &str, sign: i64, r: &mut Report| -> i64 {
+                    let mut total = 0;
+                    for t in rows
+                        .iter()
+                        .filter(|t| t.nature == nature && t.balance_minor != 0)
+                    {
+                        let v = sign * t.balance_minor;
+                        total += v;
+                        r.rows.push(vec![
+                            name.into(),
+                            format!("{} {}", t.code, t.name).into(),
+                            v.into(),
+                        ]);
+                        r.links.push(None);
+                    }
+                    r.rows.push(vec![
+                        name.into(),
+                        format!("Total {}", name.to_lowercase()).into(),
+                        total.into(),
+                    ]);
+                    r.links.push(None);
+                    total
+                };
+                let assets = section("Activo", "activo", 1, r);
+                let liabilities = section("Pasivo", "pasivo", -1, r);
+                let equity = section("Patrimonio", "patrimonio", -1, r);
+                let result: i64 = rows
+                    .iter()
+                    .filter(|t| t.nature == "ingreso" || t.nature == "gasto")
+                    .map(|t| -t.balance_minor)
+                    .sum();
+                r.rows.push(vec![
+                    "Patrimonio".into(),
+                    "Resultado acumulado (utilidad o pérdida)".into(),
+                    result.into(),
+                ]);
+                r.links.push(None);
+                let right = liabilities + equity + result;
+                r.rows.push(vec![
+                    Cell::Null,
+                    "Pasivo + patrimonio + resultado".into(),
+                    right.into(),
+                ]);
+                r.links.push(None);
+                r.kpis = vec![
+                    kpi("Lo que tienes (activo)", assets, "money"),
+                    kpi("Lo que debes (pasivo)", liabilities, "money"),
+                    kpi("Patrimonio y resultado", equity + result, "money"),
+                    ReportKpi {
+                        tone: Some(if assets == right { "success" } else { "danger" }),
+                        ..kpi("Diferencia", assets - right, "money")
+                    },
+                ];
+                r.notes.push(format!("Saldos acumulados desde el inicio hasta el {}. Los montos negativos indican una cuenta con saldo contrario a su naturaleza (por ejemplo, ventas aún no facturadas por el proveedor).", crate::inventory_ops::date_str(date_ord(to).unwrap_or(0)).split('-').rev().collect::<Vec<_>>().join("-")));
+            }
+            _ => return Err(AppError::NotFound("el reporte".into())),
+        }
+        Ok(())
     }
 }

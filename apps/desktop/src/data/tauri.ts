@@ -4,6 +4,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "./backend";
 import type {
+  AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint,
+  AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
+  ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput,
   CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, Shipment, ShipmentInput, WarehouseStockRow,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
@@ -107,6 +110,29 @@ export class TauriBackend implements Backend {
 
   async ruleValue(): Promise<{ value: number; source: string } | null> { return null; }
   dashboard() { return call<Dashboard>("dashboard"); }
+  alerts() { return call<AlertItem[]>("alerts"); }
+  alertSettings() { return call<AlertSettings>("alert_settings"); }
+  updateAlertSettings(settings: AlertSettings) { return call<AlertSettings>("update_alert_settings", { settings }); }
+  productInsights(windowDays: number) { return call<ProductInsights>("product_insights", { windowDays }); }
+  productTrend(uid: string) { return call<TrendPoint[]>("product_trend", { uid }); }
+  customerInsights() { return call<CustomerInsights>("customer_insights"); }
+  importBankStatement(accountUid: string, fileName: string | null, lines: StatementLineInput[]) { return call<ImportStatementResult>("import_bank_statement", { input: { account_uid: accountUid, file_name: fileName, lines } }); }
+  bankReconciliation(accountUid: string) { return call<ReconciliationView>("bank_reconciliation", { accountUid }); }
+  reconcileBankLine(lineUid: string, action: ReconcileAction) {
+    return call<ReconciliationView>("reconcile_bank_line", { lineUid, action: { kind: action.kind, target_uid: action.target_uid ?? null, category_id: action.category_id ?? null, description: action.description ?? null, tax_included: action.tax_included ?? null, supplier_uid: action.supplier_uid ?? null, note: action.note ?? null } });
+  }
+  autoReconcileBank(accountUid: string) { return call<ReconciliationView>("auto_reconcile_bank", { accountUid }); }
+  deleteBankStatement(statementUid: string) { return call<void>("delete_bank_statement", { statementUid }); }
+  ledgerAccounts() { return call<LedgerAccount[]>("ledger_accounts"); }
+  saveLedgerAccount(input: LedgerAccountInput) { return call<LedgerAccount[]>("save_ledger_account", { input: { code: input.code ?? null, parent_code: input.parent_code ?? null, name: input.name, simple_name: input.simple_name ?? null } }); }
+  accountingMap() { return call<AccountingMap>("accounting_map"); }
+  updateAccountingMap(map: AccountingMap) { return call<AccountingMap>("update_accounting_map", { map }); }
+  journal(from: string, to: string) { return call<JournalEntry[]>("journal", { from, to }); }
+  accountingPeriods() { return call<PeriodRow[]>("accounting_periods"); }
+  closePeriod(period: string) { return call<PeriodRow[]>("close_period", { period }); }
+  reopenPeriod(period: string, reason: string) { return call<PeriodRow[]>("reopen_period", { period, reason }); }
+  addManualEntry(input: ManualEntryInput) { return call<JournalEntry>("add_manual_entry", { input: { ...input, lines: input.lines.map((l) => ({ ...l, memo: l.memo ?? null })) } }); }
+  reverseManualEntry(uid: string, reason: string) { return call<JournalEntry>("reverse_manual_entry", { uid, reason }); }
   customer(uid: string) { return call<CustomerDetail>("customer", { uid }); }
   searchProducts(query: string) { return call<Product[]>("search_products", { query }); }
   addProduct(input: NewProduct) { return call<Product>("add_product", { input }); }

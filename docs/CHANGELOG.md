@@ -2,6 +2,28 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [0.7.0] — 2026-10-17
+
+- **Inicio renovado:**
+  - Bloques «Hoy» (ventas, utilidad, clientes y disponible) y «Este mes» (ventas comparadas con el mes anterior a la misma fecha, compras, gastos, utilidad, margen, lo que te deben, lo que debes e IVA estimado).
+  - Gráfico de 12 meses de ventas o de margen.
+- **Requiere tu atención (alertas):**
+  - 13 avisos: caja proyectada negativa, clientes atrasados, pagos atrasados y por vencer, productos agotados que se venden, por agotarse, con margen bajo o pérdida, detenidos, proveedores que subieron precios, clientes que dejaron de comprar, importaciones en camino, gastos sobre el presupuesto y ventas por documentar.
+  - Cada aviso explica por qué aparece, muestra ejemplos y lleva al detalle.
+  - Se configuran en Configuración → Alertas: cuáles ver y sus umbrales. La campana muestra los mismos avisos.
+- **Análisis de productos y clientes** (Análisis y reportes → Productos / Clientes):
+  - Productos: estrellas, que mueven volumen, oportunidades, por revisar, creciendo, cayendo, margen bajo, detenidos y sin ventas; clase ABC, margen, variación y evolución de 12 meses.
+  - Clientes: activos, nuevos, en riesgo, perdidos, ocasionales y con deuda; clase ABC, cada cuánto compran, ticket promedio y explicación de su estado.
+- **Contabilidad automática** (Impuestos y contabilidad → Contabilidad):
+  - Los asientos se arman solos desde ventas, cobros, compras, pagos, gastos, inventario, importaciones, traspasos y remuneraciones.
+  - Plan de cuentas editable con subcuentas, y cuenta asignada a cada movimiento.
+  - Asientos manuales con reversa, y cierre y reapertura de meses.
+  - Nuevos reportes: libro diario, libro mayor, balance de comprobación de 8 columnas, estado de resultados y balance general, exportables a Excel.
+- **Conciliación bancaria** (Dinero → Conciliación bancaria):
+  - Se sube la cartola del banco (CSV o Excel) y lo que ya está registrado se concilia solo.
+  - Para el resto sugiere el cobro de una venta, el pago de una compra o gasto, un gasto nuevo con su categoría (COPEC → Combustible, ENTEL → Internet y telefonía…), un traspaso entre tus cuentas o ignorarlo con una nota.
+  - Compara el saldo del banco con el de NÚCLEO y muestra lo registrado que no aparece en la cartola. Subir la misma cartola dos veces no duplica movimientos.
+
 ## [0.6.2] — 2026-10-15
 
 - **Inventario · Agregar stock:**

@@ -14,9 +14,9 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | 7 | Inventario (incluye stock real y futuro) | ✅ Hito B cumplido (2026-10-06) — ver abajo |
 | 8 | Finanzas | ✅ Hito C cumplido (2026-10-06) — ver abajo |
 | 9 | COMEX (requiere contador colaborador, D-07) | 🟡 Construido (2026-10-06); falta la firma de los casos golden — ver abajo |
-| 10 | Impuestos y contabilidad: A) borrador del F29 ✅ · B) sueldo empresarial, liquidaciones, Previred, LRE y finiquito ✅ · C) F22 Pro Pyme general ✅ (14 D N°8 y 14 A ⏳) · motor de asientos ⏳ | 🚧 |
+| 10 | Impuestos y contabilidad: A) borrador del F29 ✅ · B) sueldo empresarial, liquidaciones, Previred, LRE y finiquito ✅ · C) F22 Pro Pyme general ✅ (14 D N°8 y 14 A ⏳) · contabilidad automática, libros y cierre de meses ✅ (v0.7.0; revisión del contador ⏳) | 🚧 |
 | 11 | Documentación externa e indicadores | ⏳ |
-| 12 | Reportes y dashboard del dueño | 🚧 A) 13 reportes base con exportación a Excel y CSV ✅ (2026-10-10) · B) Inicio completo y alertas ⏳ · C) análisis de productos y clientes ⏳ · D) PDF ⏳ · crédito a clientes con respaldos ✅ (v0.4.0) · promociones, envíos, reservas y despachos, varias empresas ✅ (v0.5.0) |
+| 12 | Reportes y dashboard del dueño | 🚧 A) 13 reportes base con exportación a Excel y CSV ✅ (2026-10-10) · B) Inicio completo y alertas ✅ (v0.7.0) · C) análisis de productos y clientes ✅ (v0.7.0) · D) PDF ⏳ · crédito a clientes con respaldos ✅ (v0.4.0) · promociones, envíos, reservas y despachos, varias empresas ✅ (v0.5.0) |
 | 13 | Seguridad | ⏳ |
 | 14 | Testing | ⏳ |
 | 15 | Instalador → **MVP** | ⏳ |
@@ -108,7 +108,7 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | Recurrentes, calendario de vencimientos y proyección de caja a 13 semanas | ✅ |
 | Cuenta elegible en cobros y pagos | ✅ |
 | Dashboard del dueño con cifras reales | ✅ (versión completa en la Fase 12) |
-| Conciliación bancaria con cartola importada | ⏳ postergado (D-F8-09) |
+| Conciliación bancaria con cartola importada | ✅ v0.7.0 (D-F8-10) |
 
 ## Fase 7 — criterio de salida
 
