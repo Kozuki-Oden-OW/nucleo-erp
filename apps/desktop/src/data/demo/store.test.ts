@@ -48,3 +48,16 @@ describe("demostración: ciclo de venta completo sin re-digitar", () => {
     await expect(b.effectSale(s.uid, { mode: "credito", method: "", due_date: "2026-11-01" })).rejects.toThrow(/cliente/);
   });
 });
+
+describe("demostración: reportes", () => {
+  it("Ventas por producto usa el costo del producto cuando la línea no lo trae", async () => {
+    const b = new DemoBackend();
+    const today = new Date().toISOString().slice(0, 10);
+    const r = await b.report({ id: "ventas_producto", from: `${today.slice(0, 7)}-01`, to: today });
+    const ci = r.columns.findIndex((c) => c.key === "costo");
+    expect(ci).toBeGreaterThan(-1);
+    const withProduct = r.rows.filter((row) => row[0]);
+    expect(withProduct.length).toBeGreaterThan(0);
+    expect(withProduct.every((row) => Number(row[ci]) > 0)).toBe(true);
+  });
+});

@@ -55,7 +55,6 @@
       "intro": "Sabe quién te compra, cada cuánto y cuánto te debe. Habilita crédito con cupo y condiciones y ordena los respaldos que pidas, con consejos de qué revisar en cada uno.",
       "icono": "<path d=\"M16 19v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><path d=\"M22 19v-1a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75\"/>",
       "captura": "clientes",
-      "nuevo": true,
       "puntos": [
         {
           "t": "Ficha completa y opcional",
@@ -144,7 +143,6 @@
       "intro": "Promociones que se aplican solas al vender y que no te hacen perder plata: NÚCLEO te avisa si un pack queda bajo el costo.",
       "icono": "<path d=\"M12 2 3 7v6c0 5 3.8 8.7 9 9 5.2-.3 9-4 9-9V7l-9-5z\"/><path d=\"m9 15 6-6\"/><circle cx=\"9.5\" cy=\"9.5\" r=\".5\"/><circle cx=\"14.5\" cy=\"14.5\" r=\".5\"/>",
       "captura": "promociones",
-      "nuevo": true,
       "puntos": [
         {
           "t": "Packs",
@@ -234,7 +232,6 @@
       "intro": "Cada despacho con su agencia, su número de seguimiento y su estado a la vista. Rojo lo pendiente o con problemas, amarillo lo que va en camino y verde lo entregado.",
       "icono": "<path d=\"M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2\"/><path d=\"M15 18H9M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14\"/><circle cx=\"17\" cy=\"18\" r=\"2\"/><circle cx=\"7\" cy=\"18\" r=\"2\"/>",
       "captura": "envios",
-      "nuevo": true,
       "puntos": [
         {
           "t": "Datos del envío",
@@ -324,7 +321,8 @@
           "d": "13 semanas hacia adelante con aviso si la caja queda en negativo."
         }
       ],
-      "preguntas": []
+      "preguntas": [],
+      "nuevo": true
     },
     {
       "slug": "impuestos",
@@ -358,7 +356,8 @@
           "q": "¿NÚCLEO declara mis impuestos?",
           "a": "No. Prepara un borrador explicado para que lo revises y lo declares tú (o tu contador) en sii.cl."
         }
-      ]
+      ],
+      "nuevo": true
     },
     {
       "slug": "remuneraciones",
@@ -445,7 +444,8 @@
           "d": "Exporta cualquier reporte con un clic."
         }
       ],
-      "preguntas": []
+      "preguntas": [],
+      "nuevo": true
     },
     {
       "slug": "empresas",
@@ -456,7 +456,6 @@
       "intro": "Si tienes más de un negocio, ábrelos lado a lado y reconócelos por su color. Cada empresa guarda sus datos por separado y cifrados.",
       "icono": "<rect x=\"3\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\"/>",
       "captura": "empresas",
-      "nuevo": true,
       "puntos": [
         {
           "t": "Selector de empresas",
@@ -487,37 +486,37 @@
     }
   ],
   "novedades": {
-    "version": "0.5.0",
+    "version": "0.7.1",
     "items": [
       {
-        "slug": "promociones",
-        "t": "Descuentos y promociones",
-        "d": "Packs, por cantidad, 3x2, por cliente y preferenciales."
+        "slug": "reportes",
+        "t": "Inicio y alertas",
+        "d": "Tu negocio en una pantalla y 13 avisos que revisan por ti."
       },
       {
-        "slug": "envios",
-        "t": "Envíos",
-        "d": "Agencia, seguimiento y estado con colores."
+        "slug": "reportes",
+        "t": "Análisis de productos y clientes",
+        "d": "Estrellas, margen bajo, ABC y clientes en riesgo."
+      },
+      {
+        "slug": "impuestos",
+        "t": "Contabilidad automática",
+        "d": "Asientos solos, libros, balance y cierre de meses."
+      },
+      {
+        "slug": "dinero",
+        "t": "Conciliación bancaria",
+        "d": "Sube la cartola y los pagos y gastos se cuadran solos."
       },
       {
         "slug": "inventario",
-        "t": "Reservas y por despachar",
-        "d": "Vende sin stock con reserva y despacha cuando llegue."
-      },
-      {
-        "slug": "inventario",
-        "t": "Inventario en un clic",
-        "d": "Todos los productos, actualizar por fila o completo."
+        "t": "Agregar stock",
+        "d": "Ingresa la mercadería que llegó, con su costo."
       },
       {
         "slug": "empresas",
         "t": "Varias empresas a la vez",
         "d": "Un color por empresa y ventanas separadas."
-      },
-      {
-        "slug": "clientes",
-        "t": "Crédito a clientes",
-        "d": "Cupo, condiciones y documentos de respaldo."
       }
     ]
   }

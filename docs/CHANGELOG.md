@@ -2,6 +2,17 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [0.7.1] — 2026-10-18
+
+- **Conciliación bancaria:** al conciliar varias líneas de la cartola, cada una queda vinculada a su propio cobro o pago (antes podían quedar asociadas al mismo movimiento en la demostración).
+- **Contabilidad → Cierre de meses:** el mes se muestra como «Octubre de 2026» (antes «Octubre De 2026»).
+- **Cotizaciones y ventas:** al aplicar una promoción, el descuento se muestra con dos decimales como máximo (antes podía verse «5,0003 %»).
+- **Demostración en el navegador:**
+  - «Ventas por producto» usa el costo del producto cuando la línea no lo trae (antes mostraba costo $0 y margen 100 %).
+  - Muestra la versión real del programa (antes decía 0.2.0).
+- **Sitio web:** novedades y aviso de portada actualizados a las funciones de la versión 0.7.
+- **Tutoriales en video:** `tools/videos/` graba los 17 tutoriales de YouTube desde la demostración (Chromium + ffmpeg), con versión guía, guion con tiempos y subtítulos.
+
 ## [0.7.0] — 2026-10-17
 
 - **Inicio renovado:**

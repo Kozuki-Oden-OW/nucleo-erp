@@ -101,7 +101,8 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
     return l && c && r.unit_price_minor * (1 - l.discount_ppm / 1_000_000) * 10_000 < c;
   }).map((r) => r.description);
   function applyPromos() {
-    setRows((rs) => rs.map((r, i) => { const l = promo.lines[i]; return l ? { ...r, discount_ppm: l.discount_ppm, discText: String(l.discount_ppm / 10_000).replace(".", ",") } : r; }));
+    setRows((rs) => rs.map((r, i) => { const l = promo.lines[i]; return l ? { ...r, discount_ppm: l.discount_ppm, discText: String(Math.round(l.discount_ppm / 100) / 100).replace(".", ",") } : r; }));
+    // El % exacto (p. ej. 5,0003 %) cuadra el ahorro al peso; en pantalla basta con dos decimales.
     toast("success", `Promociones aplicadas: ahorro ${formatMoney(promo.total_saving_minor)} sin IVA.`);
   }
   const totals = useMemo(() => computeTotals(rows, taxPpm), [rows, taxPpm]);

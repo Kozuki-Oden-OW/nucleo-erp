@@ -64,3 +64,22 @@ describe("demostración: Dinero", () => {
     expect(d.cash_minor).toBe((await b.moneyOverview()).cash_minor);
   });
 });
+
+describe("demostración: conciliación bancaria", () => {
+  it("cada línea conciliada queda vinculada a su propio cobro y no aparece como pendiente en NÚCLEO", async () => {
+    const b = new DemoBackend();
+    const acc = (await b.moneyAccounts()).find((a) => /corriente/i.test(a.name))!;
+    await b.importBankStatement(acc.uid, "cartola.csv", [
+      { date: "2026-10-15", description: "TRANSF DE TOMAS HERRERA", reference: null, amount_minor: 74423, balance_minor: null },
+      { date: "2026-10-17", description: "TRANSF DE CONSTRUCTORA SUR LTDA", reference: null, amount_minor: 155831, balance_minor: null },
+    ]);
+    let v = await b.bankReconciliation(acc.uid);
+    for (const l of v.lines) {
+      const s = l.suggestions[0]!;
+      expect(s.action).toBe("cobrar");
+      v = await b.reconcileBankLine(l.uid, { kind: s.action, target_uid: s.target_uid });
+    }
+    expect(v.lines.map((l) => l.matched?.label)).toEqual([expect.stringContaining("Constructora Sur"), expect.stringContaining("Tomás Herrera")]);
+    expect(v.unmatched.some((m) => /Tomás Herrera|Constructora Sur/.test(m.detail))).toBe(false);
+  });
+});

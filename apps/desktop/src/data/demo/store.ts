@@ -422,7 +422,7 @@ export class DemoBackend implements Backend {
   /* ───────────── Núcleo ───────────── */
 
   async appInfo(): Promise<AppInfo> {
-    return wait({ version: "0.2.0-demo", data_dir: "(memoria del navegador)", backups_dir: "(no disponible en la demostración)", companies: this.allCompanies(), mode: "demo" as const });
+    return wait({ version: `${__APP_VERSION__}-demo`, data_dir: "(memoria del navegador)", backups_dir: "(no disponible en la demostración)", companies: this.allCompanies(), mode: "demo" as const });
   }
   /** En la demostración todas las empresas comparten los datos ficticios; solo cambian nombre y color. */
   private others: { uid: string; name: string; profile: BusinessProfile; created_at: string; accent: string | null }[] = [
@@ -998,7 +998,8 @@ export class DemoBackend implements Backend {
     if (a.kind !== "deshacer" && l.status !== "pendiente") throw new AppError("validacion", "Ese movimiento ya está conciliado o ignorado: deshazlo primero.");
     const abs = Math.abs(l.amount_minor);
     const before = new Set(this.cashMoves().map((m) => `${m.document}:${m.seq}`));
-    const newest = () => this.cashMoves().filter((m) => !before.has(`${m.document}:${m.seq}`) && m.acc === l.acc).at(-1);
+    // El movimiento recién creado: nuevo, en esta cuenta y por el mismo monto de la línea del banco.
+    const newest = () => this.cashMoves().filter((m) => !before.has(`${m.document}:${m.seq}`) && m.acc === l.acc && m.amount_minor === l.amount_minor).at(-1);
     switch (a.kind) {
       case "vincular": l.payment = a.target_uid!; l.status = "conciliado"; break;
       case "vincular_traspaso": l.transfer = a.target_uid!; l.status = "conciliado"; break;
@@ -3561,7 +3562,7 @@ export class DemoBackend implements Backend {
           lines: s.lines.map((l) => {
             const p = prod(l.product_uid);
             return { product_uid: l.product_uid, sku: p?.sku ?? "", name: p?.name ?? l.description, category: p ? this.catName(p.category_uid) : null, unit: p?.unit ?? "",
-              qty: l.qty_milli, net: l.net_minor, cost: Math.round(((l.unit_cost_e4 ?? 0) * l.qty_milli) / 10_000_000) };
+              qty: l.qty_milli, net: l.net_minor, cost: Math.round(((l.unit_cost_e4 ?? p?.cost_e4 ?? 0) * l.qty_milli) / 10_000_000) };
           }),
         };
       }),

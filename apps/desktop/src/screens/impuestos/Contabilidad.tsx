@@ -254,7 +254,7 @@ function Periods() {
           <tbody>
             {rows.map((p) => (
               <tr key={p.period} className="border-b border-line last:border-0">
-                <td className="px-4 py-2.5 font-medium capitalize text-ink">{monthLabel(p.period)}</td>
+                <td className="px-4 py-2.5 font-medium text-ink">{(([c, ...rest]) => (c ?? "").toUpperCase() + rest.join(""))(monthLabel(p.period))}</td>
                 <td className="px-2">
                   <div className="flex flex-wrap items-center gap-1.5">
                     {p.status === "cerrado" ? <Badge tone="neutral" icon={Lock}>Cerrado</Badge> : p.period === current ? <Badge tone="accent">En curso</Badge> : <Badge tone="warning" icon={LockOpen}>Abierto</Badge>}
