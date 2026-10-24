@@ -1,0 +1,20 @@
+/* App móvil: mismos tokens del escritorio, con texto y controles pensados para el dedo. */
+body.movil {
+  font-size: 16px;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.pt-safe { padding-top: max(env(safe-area-inset-top), 0px); }
+.pb-safe { padding-bottom: max(env(safe-area-inset-bottom), 0px); }
+.m-press { transition: transform 80ms ease, background-color 120ms ease; }
+.m-press:active { transform: scale(0.97); }
+.m-sheet { animation: m-sheet-in 180ms ease-out; }
+@keyframes m-sheet-in { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.m-scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.m-scroll::-webkit-scrollbar { display: none; }
+@media (prefers-reduced-motion: reduce) { .m-sheet { animation: none; } .m-press:active { transform: none; } }
+/* Franja de marca: azul marino en ambos temas (en oscuro, un poco más clara que el fondo). */
+.m-hero { background: #001a3c; color: #fff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .m-hero { background: #0d2a4d; } }
+:root[data-theme="dark"] .m-hero { background: #0d2a4d; }

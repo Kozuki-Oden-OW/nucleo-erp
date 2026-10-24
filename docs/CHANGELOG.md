@@ -2,6 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [Sin publicar]
+
+- **App para el celular (vista previa):** inicio con lo que vendiste hoy, disponible, te deben, debes e IVA estimado; venta rápida con carrito y medio de pago (incluido fiado); stock con búsqueda; clientes con deuda, llamada, WhatsApp y correo; gasto con foto de la boleta; cobro de ventas pendientes; y pantalla de sincronización. Funciona en modo demostración (`movil.html`); la versión instalable para Android viene después.
+- **Base de la sincronización (S0):** el escritorio registra cada cambio de categorías, clientes, proveedores y productos con un reloj lógico híbrido, y puede exportar e importar paquetes con otro dispositivo emparejado. Las fichas se fusionan campo a campo, la misma ficha creada en ambos lados no se duplica y las ventas, gastos y cobros del celular se aplican una sola vez.
+
 ## [0.7.1] — 2026-10-18
 
 - **Conciliación bancaria:** al conciliar varias líneas de la cartola, cada una queda vinculada a su propio cobro o pago (antes podían quedar asociadas al mismo movimiento en la demostración).

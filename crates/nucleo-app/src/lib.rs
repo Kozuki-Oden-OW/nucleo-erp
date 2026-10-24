@@ -28,6 +28,7 @@ pub mod report_ops;
 pub mod sale_terms;
 pub mod sales_ops;
 pub mod ship_ops;
+pub mod sync_ops;
 
 pub use company::{CompanySession, NewCustomer};
 pub use error::{AppError, AppResult};

@@ -9,5 +9,10 @@ export default defineConfig({
   clearScreen: false,
   define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   server: { port: 1420, strictPort: true, watch: { ignored: ["**/src-tauri/**"] } },
-  build: { target: "es2022", sourcemap: false },
+  // Dos entradas: el escritorio (index.html) y la app del celular (movil.html), con el mismo código.
+  build: {
+    target: "es2022",
+    sourcemap: false,
+    rollupOptions: { input: { main: "index.html", movil: "movil.html" } },
+  },
 });

@@ -170,6 +170,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "conciliacion_bancaria",
         sql: include_str!("../migrations/0032_conciliacion_bancaria.sql"),
     },
+    Migration {
+        version: 33,
+        name: "sincronizacion",
+        sql: include_str!("../migrations/0033_sincronizacion.sql"),
+    },
 ];
 
 pub fn latest_version() -> i64 {

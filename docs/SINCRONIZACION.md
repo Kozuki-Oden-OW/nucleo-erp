@@ -1,7 +1,9 @@
 # NÚCLEO ERP — Diseño: app móvil y sincronización por cable o WiFi
 
-> Estado: **diseño aprobado para planificar** (2026-10-10, revisado el mismo día con las decisiones del
-> dueño). Se implementa después del MVP de escritorio (fase S, ver `ROADMAP.md`).
+> Estado: **en construcción** (diseño aprobado el 2026-10-10). S0 terminado el 2026-10-24: registro de
+> cambios con reloj lógico híbrido, paquete de sincronización y fusión probados en
+> `crates/nucleo-app/tests/sincronizacion.rs`. Las pantallas de la app (S2) ya funcionan en modo
+> demostración (`apps/desktop/movil.html`); falta empaquetarlas para Android y el transporte (S1).
 >
 > Decisiones del dueño: «solo cobramos a la persona que quiera obtener la app en su celular; que también
 > funcione sin internet y luego se sincronice a través de un cable con el PC o por WiFi de la misma
@@ -84,6 +86,27 @@
   para ese dispositivo.
 - **Sin conexión por días:** ambos lados trabajan normal; los cambios esperan en cola hasta el próximo
   cable o WiFi.
+- **La misma ficha creada en los dos lados** (mismo RUT, mismo SKU o categoría con el mismo nombre) no
+  se duplica: el escritorio conserva su identificador y anota el del celular como alias; el celular
+  adopta el identificador del escritorio. Si los datos difieren, queda un aviso informativo.
+- **Las solicitudes del celular** (venta rápida, gasto, cobro) viajan como operaciones con
+  identificador propio: el escritorio las aplica una sola vez aunque el paquete llegue repetido, y
+  confirma cuáles recibió para que el celular las saque de su cola.
+
+### Cómo está hecho (S0)
+
+- **Migración 33** (`0033_sincronizacion.sql`): `sync_state` (identificador del dispositivo, rol y
+  reloj), `change_log` (un registro por campo cambiado), `sync_peers`, `sync_outbox`, `sync_applied`,
+  `sync_aliases` y `sync_conflicts`. Disparadores en categorías, clientes, proveedores y productos
+  anotan cada cambio con su reloj; las referencias viajan por identificador (`category_uid`,
+  `parent_uid`), nunca por id interno.
+- **Reloj lógico híbrido** como texto ordenable `MMMMMMMMMMMMM-CCCCC-dispositivo` (milisegundos,
+  contador y desempate por dispositivo).
+- **Paquete** (`nucleo-app::sync_ops::SyncPackage`, JSON, formato 1): cambios desde lo último que el
+  otro lado confirmó, operaciones pendientes y los acuses de lo recibido. Solo se aceptan paquetes de
+  dispositivos emparejados y dirigidos a este dispositivo.
+- **Aplicar** es idempotente: un cambio se ignora si el campo ya tiene ese valor o uno más reciente; las
+  violaciones de restricciones quedan en `sync_conflicts` sin detener el resto.
 
 ## 6. Modelo de cobro
 

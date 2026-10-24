@@ -24,6 +24,7 @@ pub mod reports;
 pub mod sales;
 pub mod shipments;
 pub mod suppliers;
+pub mod sync;
 pub mod taxes;
 pub mod users;
 
