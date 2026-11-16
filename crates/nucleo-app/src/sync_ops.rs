@@ -108,7 +108,10 @@ impl CompanySession {
 
     /// Empareja un dispositivo (en la fase S1, tras escanear el QR).
     pub fn sync_pair(&mut self, device_uid: &str, name: &str, role: &str) -> AppResult<()> {
-        let user = self.require("config.editar")?.username.clone();
+        let user = {
+            self.require("config.editar")?;
+            self.actor_name()?
+        };
         let name = name.trim();
         if device_uid.trim().is_empty()
             || name.is_empty()
@@ -136,7 +139,10 @@ impl CompanySession {
 
     /// Quita un dispositivo: deja de aceptarse su información.
     pub fn sync_revoke(&mut self, device_uid: &str) -> AppResult<()> {
-        let user = self.require("config.editar")?.username.clone();
+        let user = {
+            self.require("config.editar")?;
+            self.actor_name()?
+        };
         let conn = self.db.conn();
         if sync::revoke(conn, device_uid)? == 0 {
             return Err(AppError::NotFound("el dispositivo".into()));

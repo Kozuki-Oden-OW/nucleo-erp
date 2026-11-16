@@ -1,0 +1,302 @@
+[
+  {
+    "name": "ver_pantalla",
+    "nivel": "ver",
+    "description": "Muestra lo que está en la pantalla de NÚCLEO ERP como texto: sección, diálogo abierto, contenido (tablas incluidas) y cada botón, campo, lista o pestaña con un identificador como [e12]. Úsalo antes de hacer clic o escribir; los identificadores cambian después de cada acción.",
+    "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+  },
+  {
+    "name": "ir_a",
+    "nivel": "ver",
+    "description": "Abre una sección de NÚCLEO. Acepta un nombre (inicio, ventas, nueva venta, cotizaciones, nueva cotización, clientes, productos, promociones, compras, proveedores, inventario, envíos, gastos, dinero, comex, impuestos, remuneraciones, análisis, documentos, mi negocio, configuración) o una ruta como /ventas?tab=cotizaciones. Devuelve la pantalla nueva.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "destino": { "type": "string", "description": "Nombre de la sección o ruta que empieza con /" } },
+      "required": ["destino"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "desplazar",
+    "nivel": "ver",
+    "description": "Desplaza la pantalla (o el diálogo abierto) hacia arriba o hacia abajo y devuelve lo que se ve.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "direccion": { "type": "string", "enum": ["arriba", "abajo", "inicio", "final"] } },
+      "required": ["direccion"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "clic",
+    "nivel": "completo",
+    "description": "Hace clic en un botón, enlace, pestaña, casilla u opción de la pantalla, usando su identificador de ver_pantalla (por ejemplo «e12»). Devuelve la pantalla después del clic.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "elemento": { "type": "string", "description": "Identificador, como e12" } },
+      "required": ["elemento"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "escribir",
+    "nivel": "completo",
+    "description": "Escribe en un campo de texto o número (reemplaza lo que tenía). Con enter=true presiona Enter al terminar. Devuelve la pantalla.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "elemento": { "type": "string", "description": "Identificador del campo, como e7" },
+        "texto": { "type": "string" },
+        "enter": { "type": "boolean", "default": false }
+      },
+      "required": ["elemento", "texto"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "elegir",
+    "nivel": "completo",
+    "description": "Elige una opción en una lista desplegable por su texto (no hace falta escribirlo completo). Devuelve la pantalla.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "elemento": { "type": "string", "description": "Identificador de la lista, como e9" },
+        "opcion": { "type": "string" }
+      },
+      "required": ["elemento", "opcion"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "tecla",
+    "nivel": "completo",
+    "description": "Presiona una tecla en el elemento activo: Enter, Escape (cierra diálogos), Tab, ArrowDown, ArrowUp. Devuelve la pantalla.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "tecla": { "type": "string", "enum": ["Enter", "Escape", "Tab", "ArrowDown", "ArrowUp"] } },
+      "required": ["tecla"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "resumen_negocio",
+    "nivel": "ver",
+    "description": "Resumen del negocio: ventas de hoy y del mes, utilidad, disponible, lo que te deben y lo que debes, IVA estimado, poco stock, próximos cobros y pagos, y avisos.",
+    "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+  },
+  {
+    "name": "buscar",
+    "nivel": "ver",
+    "description": "Busca en todo NÚCLEO (clientes, proveedores, productos, ventas, compras…) y devuelve coincidencias con su ruta para abrirlas con ir_a.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "texto": { "type": "string" } },
+      "required": ["texto"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "buscar_clientes",
+    "nivel": "ver",
+    "description": "Lista clientes que coinciden con un nombre o RUT (vacío = los primeros).",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "texto": { "type": "string", "default": "" } },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "buscar_productos",
+    "nivel": "ver",
+    "description": "Lista productos y servicios por nombre o SKU, con precio neto, costo, stock y si lleva IVA.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "texto": { "type": "string", "default": "" } },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "buscar_proveedores",
+    "nivel": "ver",
+    "description": "Lista proveedores por nombre o RUT.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "texto": { "type": "string", "default": "" } },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "listar_ventas",
+    "nivel": "ver",
+    "description": "Lista ventas. vista: todas, por_cobrar, borradores, pendientes_doc (sin documento tributario) o anuladas.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "vista": { "type": "string", "enum": ["todas", "por_cobrar", "borradores", "pendientes_doc", "anuladas"], "default": "todas" },
+        "texto": { "type": "string", "default": "" }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "listar_gastos",
+    "nivel": "ver",
+    "description": "Lista gastos entre dos fechas (AAAA-MM-DD), opcionalmente filtrando por texto.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "desde": { "type": "string" },
+        "hasta": { "type": "string" },
+        "texto": { "type": "string", "default": "" }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "datos_de_apoyo",
+    "nivel": "ver",
+    "description": "Categorías de gasto y cuentas de dinero (caja, bancos) con sus identificadores, para registrar gastos y cobros.",
+    "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+  },
+  {
+    "name": "crear_cliente",
+    "nivel": "borradores",
+    "description": "Crea un cliente. Si el RUT ya existe, devuelve el cliente existente sin duplicarlo.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "nombre": { "type": "string" },
+        "rut": { "type": "string" },
+        "correo": { "type": "string" },
+        "telefono": { "type": "string" },
+        "direccion": { "type": "string" },
+        "comuna": { "type": "string" },
+        "giro": { "type": "string" }
+      },
+      "required": ["nombre"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "crear_proveedor",
+    "nivel": "borradores",
+    "description": "Crea un proveedor. Si el RUT ya existe, devuelve el existente.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "nombre": { "type": "string" },
+        "rut": { "type": "string" },
+        "correo": { "type": "string" },
+        "telefono": { "type": "string" },
+        "dias_pago": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["nombre"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "crear_producto",
+    "nivel": "borradores",
+    "description": "Crea un producto o servicio. precio_neto y costo en pesos sin IVA. Si el SKU ya existe, devuelve el existente.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "nombre": { "type": "string" },
+        "tipo": { "type": "string", "enum": ["producto", "servicio"], "default": "producto" },
+        "sku": { "type": "string" },
+        "unidad": { "type": "string", "default": "un" },
+        "precio_neto": { "type": "number", "minimum": 0 },
+        "costo": { "type": "number", "minimum": 0 },
+        "afecto_iva": { "type": "boolean", "default": true },
+        "stock_inicial": { "type": "number", "minimum": 0 }
+      },
+      "required": ["nombre", "precio_neto"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "crear_venta_borrador",
+    "nivel": "borradores",
+    "description": "Crea una venta en borrador (no mueve stock ni dinero hasta confirmarla). Cada línea indica un producto por SKU o nombre, o una descripción libre con precio. precio_neto es por unidad, sin IVA; si se omite se usa el precio del producto. descuento en %.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "cliente": { "type": "string", "description": "Nombre o RUT de un cliente existente (opcional)" },
+        "tipo": { "type": "string", "enum": ["VEN", "FV"], "default": "VEN", "description": "VEN = venta con boleta, FV = factura" },
+        "fecha": { "type": "string", "description": "AAAA-MM-DD; vacío = hoy" },
+        "lineas": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "producto": { "type": "string", "description": "SKU o nombre del producto" },
+              "descripcion": { "type": "string" },
+              "cantidad": { "type": "number", "exclusiveMinimum": 0, "default": 1 },
+              "precio_neto": { "type": "number", "minimum": 0 },
+              "descuento": { "type": "number", "minimum": 0, "maximum": 100 },
+              "afecto_iva": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "notas": { "type": "string" }
+      },
+      "required": ["lineas"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "registrar_gasto",
+    "nivel": "borradores",
+    "description": "Registra un gasto. total en pesos; con_iva indica si el total incluye IVA recuperable. Sin acceso completo queda por pagar; con acceso completo se puede indicar medio de pago (efectivo, transferencia, tarjeta) para marcarlo pagado.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "descripcion": { "type": "string" },
+        "total": { "type": "number", "exclusiveMinimum": 0 },
+        "categoria": { "type": "string", "description": "Nombre de la categoría de gasto (ver datos_de_apoyo)" },
+        "fecha": { "type": "string", "description": "AAAA-MM-DD; vacío = hoy" },
+        "con_iva": { "type": "boolean", "default": false },
+        "proveedor": { "type": "string", "description": "Nombre o RUT de un proveedor existente (opcional)" },
+        "vencimiento": { "type": "string" },
+        "pagado_con": { "type": "string", "enum": ["efectivo", "transferencia", "tarjeta"] },
+        "notas": { "type": "string" }
+      },
+      "required": ["descripcion", "total", "categoria"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "confirmar_venta",
+    "nivel": "completo",
+    "description": "Confirma una venta en borrador: le asigna número, descuenta stock y registra el cobro (contado) o la deja por cobrar (crédito).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "venta": { "type": "string", "description": "Número (por ejemplo VEN-000123) o identificador de la venta" },
+        "modo": { "type": "string", "enum": ["contado", "credito"] },
+        "medio": { "type": "string", "enum": ["efectivo", "transferencia", "tarjeta", "credito"], "default": "efectivo" },
+        "vencimiento": { "type": "string", "description": "AAAA-MM-DD, para crédito" }
+      },
+      "required": ["venta", "modo"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "registrar_cobro",
+    "nivel": "completo",
+    "description": "Registra un pago recibido de una venta por cobrar.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "venta": { "type": "string", "description": "Número o identificador de la venta" },
+        "monto": { "type": "number", "exclusiveMinimum": 0 },
+        "medio": { "type": "string", "enum": ["efectivo", "transferencia", "tarjeta", "cheque"], "default": "transferencia" },
+        "fecha": { "type": "string", "description": "AAAA-MM-DD; vacío = hoy" }
+      },
+      "required": ["venta", "monto"],
+      "additionalProperties": false
+    }
+  }
+]

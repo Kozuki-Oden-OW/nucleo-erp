@@ -55,6 +55,15 @@ fn line(
 
 const HOY: &str = "2026-10-06";
 
+fn in_30_days() -> String {
+    rusqlite::Connection::open_in_memory()
+        .unwrap()
+        .query_row("SELECT date('now', 'localtime', '+30 day')", [], |r| {
+            r.get(0)
+        })
+        .unwrap()
+}
+
 #[test]
 fn ciclo_completo_cotizacion_a_venta_cerrada() {
     let (_d, _app, mut s) = session(BusinessProfile::Negocio);
@@ -138,7 +147,8 @@ fn ciclo_completo_cotizacion_a_venta_cerrada() {
             &EffectInput {
                 mode: "credito".into(),
                 method: "".into(),
-                due_date: Some("2026-11-05".into()),
+                // Relativa a hoy: efectuar fija la fecha de la venta en el día actual.
+                due_date: Some(in_30_days()),
                 account_uid: None,
             },
         )

@@ -4,6 +4,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+- **Claude en NÚCLEO** (Configuración → Claude): permite que Claude, el asistente de Anthropic, use NÚCLEO por ti. Ve la pantalla, la recorre con su propio cursor (tu mouse queda libre), consulta el resumen, ventas, clientes, productos y gastos, y puede crear clientes, productos, ventas en borrador y gastos, confirmar ventas y registrar cobros según el nivel que elijas (Solo ver, Crear borradores o Acceso completo). Viene apagado, se detiene con un clic y todo queda en la auditoría marcado «(Claude)». El botón «Conectar con Claude» lo agrega a la app de Claude del computador. Detalle en `docs/AGENTE_CLAUDE.md`.
+- **Pruebas:** las pruebas de ventas y dinero ya no dependen de la fecha del día.
 - **App para el celular (vista previa):** inicio con lo que vendiste hoy, disponible, te deben, debes e IVA estimado; venta rápida con carrito y medio de pago (incluido fiado); stock con búsqueda; clientes con deuda, llamada, WhatsApp y correo; gasto con foto de la boleta; cobro de ventas pendientes; y pantalla de sincronización. Funciona en modo demostración (`movil.html`); la versión instalable para Android viene después.
 - **Base de la sincronización (S0):** el escritorio registra cada cambio de categorías, clientes, proveedores y productos con un reloj lógico híbrido, y puede exportar e importar paquetes con otro dispositivo emparejado. Las fichas se fusionan campo a campo, la misma ficha creada en ambos lados no se duplica y las ventas, gastos y cobros del celular se aplican una sola vez.
 

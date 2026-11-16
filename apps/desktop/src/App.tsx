@@ -46,6 +46,7 @@ import { SaleView } from "./screens/ventas/SaleView";
 import { SalesList } from "./screens/ventas/SalesList";
 import { Button, Notice, Spinner } from "./ui/kit";
 import { ToastProvider } from "./ui/overlay";
+import { AgentHost } from "./agent/host";
 
 export function App() {
   const [backend, setBackend] = useState<Backend>(defaultBackend);
@@ -53,6 +54,7 @@ export function App() {
     <PrefsProvider>
       <BackendProvider backend={backend}>
         <ToastProvider>
+          <AgentHost key={`agent-${backend.kind}`} />
           <Root key={backend.kind} onDemo={backend.kind === "tauri" ? () => setBackend(createDemoBackend()) : undefined} />
         </ToastProvider>
       </BackendProvider>
@@ -68,6 +70,13 @@ function Root({ onDemo }: { onDemo?: () => void }) {
   const [pendingKey, setPendingKey] = useState<CreatedCompany | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
+  // Cuando Claude crea o cambia datos, las listas se recargan (un formulario a medio llenar no se toca).
+  const [dataVersion, setDataVersion] = useState(0);
+  useEffect(() => {
+    const on = () => { if (!/\/(nueva|editar|ajuste|ingreso|transferencia)\b/.test(window.location.hash)) setDataVersion((v) => v + 1); };
+    window.addEventListener("nucleo:datos", on);
+    return () => window.removeEventListener("nucleo:datos", on);
+  }, []);
 
   const load = useCallback(async (openUid?: string) => {
     try {
@@ -99,7 +108,7 @@ function Root({ onDemo }: { onDemo?: () => void }) {
     <SessionProvider session={session} setSession={setSession}>
       <InactivityLock session={session} onLocked={(s) => { setLocked(true); setSession(s); }} />
       <AppShell info={info} session={session} route={route} onSwitch={(uid) => { navigate("/inicio", { replace: true }); void load(uid); }} onCreated={setPendingKey}>
-        <Screen route={route} info={info} session={session} reload={() => void load()} />
+        <Screen key={dataVersion} route={route} info={info} session={session} reload={() => void load()} />
       </AppShell>
     </SessionProvider>
   );

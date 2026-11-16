@@ -67,6 +67,25 @@ impl Ipc {
 
 const HOY: &str = "2026-10-06";
 
+/// Fecha de hoy + `days` (AAAA-MM-DD, UTC): para lo que el programa fecha con el día actual.
+fn date_from_today(days: i64) -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+    // Algoritmo de días civiles (Howard Hinnant).
+    let z = secs.div_euclid(86_400) + days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + i64::from(m <= 2);
+    format!("{y:04}-{m:02}-{d:02}")
+}
+
 #[test]
 fn ciclo_de_venta_por_ipc() {
     let ipc = Ipc::new();
@@ -127,7 +146,7 @@ fn ciclo_de_venta_por_ipc() {
     let v = ipc.ok("convert_quote", json!({ "uid": quid }));
     let vuid = v["uid"].as_str().unwrap().to_string();
     assert_eq!(v["quote_number"], "COT-000001");
-    let v = ipc.ok("effect_sale", json!({ "uid": vuid, "input": { "mode": "credito", "method": "Efectivo", "due_date": "2026-11-05" } }));
+    let v = ipc.ok("effect_sale", json!({ "uid": vuid, "input": { "mode": "credito", "method": "Efectivo", "due_date": date_from_today(30) } }));
     assert_eq!(v["commercial_state"], "efectuada");
     let v = ipc.ok(
         "register_payment",
@@ -661,7 +680,7 @@ fn dinero_por_ipc() {
         .find(|c| c["name"] == "Combustible")
         .unwrap()["id"]
         .clone();
-    let b = ipc.ok("register_expense", json!({ "input": { "category_id": comb, "supplier_uid": null, "date": HOY, "description": "Bencina 93", "total_minor": 0, "quantity_milli": 40000, "unit_minor": 1290, "tax_included": false, "due_date": null, "paid_method": "Efectivo", "paid_account_uid": null, "recurring_id": null } }));
+    let b = ipc.ok("register_expense", json!({ "input": { "category_id": comb, "supplier_uid": null, "date": date_from_today(0), "description": "Bencina 93", "total_minor": 0, "quantity_milli": 40000, "unit_minor": 1290, "tax_included": false, "due_date": null, "paid_method": "Efectivo", "paid_account_uid": null, "recurring_id": null } }));
     assert_eq!(b["total_minor"], 51600);
     assert_eq!(b["quantity_milli"], 40000);
     let all = ipc.ok("save_expense_category", json!({ "input": { "id": comb, "name": "Combustible", "fixed": false, "group_name": "Vehículo y transporte", "monthly_budget_minor": 80000, "archived": false } }));

@@ -28,7 +28,7 @@ const HIT_ICON: Record<SearchHit["kind"], LucideIcon> = {
 const HIT_GROUP: Record<SearchHit["kind"], string> = {
   cliente: "Clientes", proveedor: "Proveedores", producto: "Productos", venta: "Ventas", cotizacion: "Cotizaciones", orden_compra: "Órdenes de compra", documento: "Documentos",
 };
-function hitHref(h: SearchHit): string {
+export function hitHref(h: SearchHit): string {
   switch (h.kind) {
     case "cliente": return `/clientes/${h.uid}`;
     case "producto": return `/productos?ver=${h.uid}`;

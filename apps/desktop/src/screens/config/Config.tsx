@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { open as openFile } from "@tauri-apps/plugin-dialog";
-import { Bell, Building2, Check, Coins, DatabaseBackup, Hash, Lock, Palette, ShieldCheck, Users } from "lucide-react";
+import { Bell, Bot, Building2, Check, Coins, DatabaseBackup, Hash, Lock, Palette, ShieldCheck, Users } from "lucide-react";
 import { useBackend, errorMessage, type AppInfo, type BackupDone, type BusinessProfile, type BusinessSettings, type SessionInfo } from "../../data";
 import { formatBytes, formatPpm, parsePercent } from "../../lib/format";
 import { navigate, type Route } from "../../lib/router";
@@ -12,9 +12,10 @@ import { CurrenciesSection, NumberingSection, SecuritySection } from "./Catalogs
 import { UsersSection } from "./Users";
 import { LogoCard } from "./LogoCard";
 import { AlertsSection } from "./AlertsSection";
+import { ClaudeSection } from "./ClaudeSection";
 import { ACCENTS, applyAccent } from "../../lib/accent";
 
-type Section = "negocio" | "usuarios" | "numeracion" | "monedas" | "alertas" | "respaldos" | "seguridad" | "apariencia";
+type Section = "negocio" | "usuarios" | "numeracion" | "monedas" | "alertas" | "respaldos" | "seguridad" | "apariencia" | "claude";
 const SECTIONS: { id: Section; label: string; icon: typeof Building2; feature?: string }[] = [
   { id: "negocio", label: "Mi negocio", icon: Building2, feature: "negocio" },
   { id: "usuarios", label: "Usuarios y roles", icon: Users, feature: "usuarios" },
@@ -24,6 +25,7 @@ const SECTIONS: { id: Section; label: string; icon: typeof Building2; feature?: 
   { id: "respaldos", label: "Respaldos", icon: DatabaseBackup },
   { id: "seguridad", label: "Seguridad y auditoría", icon: ShieldCheck },
   { id: "apariencia", label: "Apariencia", icon: Palette },
+  { id: "claude", label: "Claude", icon: Bot },
 ];
 
 export function Config({ route, info, session, onChanged }: { route: Route; info: AppInfo; session: SessionInfo; onChanged: () => void }) {
@@ -56,6 +58,7 @@ export function Config({ route, info, session, onChanged }: { route: Route; info
           {section === "respaldos" && <BackupsSection info={info} onRestored={onChanged} />}
           {section === "seguridad" && <SecuritySection session={session} />}
           {section === "apariencia" && <AppearanceSection />}
+          {section === "claude" && <ClaudeSection />}
         </div>
       </div>
     </div>

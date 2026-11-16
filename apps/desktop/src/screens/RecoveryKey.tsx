@@ -15,7 +15,7 @@ export function RecoveryKey({ recoveryKey, onDone }: { recoveryKey: string; onDo
         Tus datos están cifrados. Si reinstalas Windows o cambias de computador sin un respaldo, esta clave es la
         única forma de volver a abrirlos. Guárdala como guardarías las llaves de tu oficina: impresa o anotada, fuera de este computador.
       </p>
-      <div aria-label="Clave de recuperación" className="flex select-all flex-wrap justify-center gap-x-3 gap-y-2 rounded-xl border border-line bg-surface p-5 font-mono text-lg tracking-wider shadow-card">
+      <div aria-label="Clave de recuperación" data-agent-secret className="flex select-all flex-wrap justify-center gap-x-3 gap-y-2 rounded-xl border border-line bg-surface p-5 font-mono text-lg tracking-wider shadow-card">
         {recoveryKey.split("-").map((group, i) => <span key={i}>{group}</span>)}
       </div>
       <div className="flex flex-wrap gap-3">
@@ -23,7 +23,7 @@ export function RecoveryKey({ recoveryKey, onDone }: { recoveryKey: string; onDo
         <Button variant="secondary" icon={Printer} onClick={() => window.print()}>Imprimir</Button>
       </div>
       <Notice tone="info">NÚCLEO no guarda una copia de esta clave en ningún servidor. Nadie más puede recuperarla por ti.</Notice>
-      <Checkbox label="Ya guardé mi clave de recuperación en un lugar seguro." checked={saved} onChange={setSaved} />
+      <div data-agent-human><Checkbox label="Ya guardé mi clave de recuperación en un lugar seguro." checked={saved} onChange={setSaved} /></div>
       <div><Button size="lg" disabled={!saved} onClick={onDone}>Continuar</Button></div>
     </main>
   );

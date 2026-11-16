@@ -378,7 +378,10 @@ impl CompanySession {
     /// Copia descifrada de los documentos del cliente en `dir/<Cliente (RUT)>/`, con los de crédito
     /// en la subcarpeta «Crédito». Devuelve la carpeta creada y cuántos archivos se copiaron.
     pub fn export_customer_folder(&mut self, uid: &str, dir: &Path) -> AppResult<(String, usize)> {
-        let by = self.require("documentos.ver")?.username.clone();
+        let by = {
+            self.require("documentos.ver")?;
+            self.actor_name()?
+        };
         let c = self.customer_row(uid)?;
         let folder_name = match &c.rut {
             Some(r) => safe_name(&format!("{} ({})", c.name, r)),

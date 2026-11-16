@@ -19,6 +19,8 @@ pub struct CompanySession {
     pub(crate) key: DataKey,
     /// Quién opera. `None` = falta iniciar sesión (hay usuarios con contraseña).
     pub(crate) actor: Option<Actor>,
+    /// La acción la pide Claude a través del acceso para agentes: la auditoría lo anota.
+    pub(crate) via_agent: bool,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -205,6 +207,7 @@ impl CompanySession {
             db,
             key,
             actor: None,
+            via_agent: false,
         };
         s.auto_login()?;
         Ok(s)
@@ -225,7 +228,10 @@ impl CompanySession {
 
     /// Agrega un cliente. Valida el RUT (opcional) y audita en la misma transacción.
     pub fn add_customer(&mut self, input: &NewCustomer) -> AppResult<CustomerRow> {
-        let user = self.require("clientes.editar")?.username.clone();
+        let user = {
+            self.require("clientes.editar")?;
+            self.actor_name()?
+        };
         let user = user.as_str();
         let (name, rut, email, phone) = validate_customer(input)?;
         let profile = validate_profile(&input.profile)?;
@@ -279,7 +285,10 @@ impl CompanySession {
 
     /// Crea un respaldo `.erpbackup` en `dest_dir`, lo **verifica** reabriéndolo y lo audita.
     pub fn create_backup(&mut self, dest_dir: &Path, password: &str) -> AppResult<BackupDone> {
-        let user = self.require("respaldos.crear")?.username.clone();
+        let user = {
+            self.require("respaldos.crear")?;
+            self.actor_name()?
+        };
         let user = user.as_str();
         std::fs::create_dir_all(dest_dir)?;
         let tmp = tempfile::tempdir()?;

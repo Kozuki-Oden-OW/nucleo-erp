@@ -1,6 +1,7 @@
 // Sin consola extra en Windows en modo release.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod agent;
 mod commands;
 #[cfg(test)]
 mod ipc_tests;
@@ -218,10 +219,19 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         commands::severance,
         commands::f22,
         commands::save_f22_inputs,
+        agent::agent_settings,
+        agent::agent_update,
+        agent::agent_reply,
+        agent::agent_connect_claude,
     ])
 }
 
 fn main() {
+    // `nucleo-erp --mcp`: puente para la app de Claude (no abre ventana).
+    if std::env::args().any(|a| a == "--mcp") {
+        agent::bridge::run();
+        return;
+    }
     with_commands(tauri::Builder::default())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
@@ -234,6 +244,9 @@ fn main() {
                 .join("NUCLEO ERP Respaldos");
             let service = AppService::open(&data_dir, key_store())
                 .map_err(|e| Box::<dyn std::error::Error>::from(e.to_string()))?;
+            let agent = std::sync::Arc::new(agent::AgentState::load(&data_dir));
+            agent.apply(app.handle());
+            app.manage(agent);
             app.manage(commands::AppState {
                 service: Mutex::new(service),
                 session: Mutex::new(None),

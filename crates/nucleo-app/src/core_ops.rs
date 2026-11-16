@@ -343,7 +343,17 @@ impl CompanySession {
 
     /// Nombre de usuario de quien opera (para auditoría).
     pub fn actor_name(&self) -> AppResult<String> {
-        Ok(self.actor()?.username.clone())
+        let name = self.actor()?.username.clone();
+        Ok(if self.via_agent {
+            format!("{name} (Claude)")
+        } else {
+            name
+        })
+    }
+
+    /// Marca que las próximas acciones las pide Claude (acceso para agentes) o vuelve a lo normal.
+    pub fn set_via_agent(&mut self, on: bool) {
+        self.via_agent = on;
     }
 
     pub fn can(&self, perm: &str) -> bool {

@@ -2221,6 +2221,8 @@ name = "nucleo-desktop"
 version = "0.7.1"
 dependencies = [
  "data-encoding",
+ "getrandom 0.3.4",
+ "hex",
  "nucleo-app",
  "serde",
  "serde_json",
