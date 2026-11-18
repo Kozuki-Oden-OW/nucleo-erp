@@ -1,0 +1,134 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/mcpb/main/schemas/mcpb-manifest-v0.4.schema.json",
+  "manifest_version": "0.4",
+  "name": "nucleo-erp",
+  "display_name": "NÚCLEO ERP",
+  "version": "0.7.1",
+  "description": "Permite que Claude use NÚCLEO ERP en este computador: ve la pantalla, la recorre con su propio cursor y registra ventas, gastos, clientes y cobros.",
+  "long_description": "Conecta Claude con NÚCLEO ERP, el sistema de gestión local y gratuito para pymes chilenas. NÚCLEO debe estar abierto con Configuración → Claude activado; ahí eliges si Claude solo mira, crea borradores o tiene acceso completo. La extensión solo se comunica con NÚCLEO dentro del mismo computador (127.0.0.1): los datos del negocio siguen guardados solo en tu equipo.",
+  "author": {
+    "name": "FAVOR SpA",
+    "url": "https://www.nucleoerp.cl"
+  },
+  "homepage": "https://www.nucleoerp.cl",
+  "icon": "icon.png",
+  "license": "AGPL-3.0-or-later",
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server/index.js"
+      ]
+    }
+  },
+  "tools": [
+    {
+      "name": "ver_pantalla",
+      "description": "Muestra lo que está en la pantalla de NÚCLEO ERP como texto: sección, diálogo abierto, contenido (tablas incluidas) y cada botón, campo, lista o pestaña con un identificador como [e12]. Úsalo antes de"
+    },
+    {
+      "name": "ir_a",
+      "description": "Abre una sección de NÚCLEO. Acepta un nombre (inicio, ventas, nueva venta, cotizaciones, nueva cotización, clientes, productos, promociones, compras, proveedores, inventario, envíos, gastos, dinero, c"
+    },
+    {
+      "name": "desplazar",
+      "description": "Desplaza la pantalla (o el diálogo abierto) hacia arriba o hacia abajo y devuelve lo que se ve."
+    },
+    {
+      "name": "clic",
+      "description": "Hace clic en un botón, enlace, pestaña, casilla u opción de la pantalla, usando su identificador de ver_pantalla (por ejemplo «e12»). Devuelve la pantalla después del clic."
+    },
+    {
+      "name": "escribir",
+      "description": "Escribe en un campo de texto o número (reemplaza lo que tenía). Con enter=true presiona Enter al terminar. Devuelve la pantalla."
+    },
+    {
+      "name": "elegir",
+      "description": "Elige una opción en una lista desplegable por su texto (no hace falta escribirlo completo). Devuelve la pantalla."
+    },
+    {
+      "name": "tecla",
+      "description": "Presiona una tecla en el elemento activo: Enter, Escape (cierra diálogos), Tab, ArrowDown, ArrowUp. Devuelve la pantalla."
+    },
+    {
+      "name": "resumen_negocio",
+      "description": "Resumen del negocio: ventas de hoy y del mes, utilidad, disponible, lo que te deben y lo que debes, IVA estimado, poco stock, próximos cobros y pagos, y avisos."
+    },
+    {
+      "name": "buscar",
+      "description": "Busca en todo NÚCLEO (clientes, proveedores, productos, ventas, compras…) y devuelve coincidencias con su ruta para abrirlas con ir_a."
+    },
+    {
+      "name": "buscar_clientes",
+      "description": "Lista clientes que coinciden con un nombre o RUT (vacío = los primeros)."
+    },
+    {
+      "name": "buscar_productos",
+      "description": "Lista productos y servicios por nombre o SKU, con precio neto, costo, stock y si lleva IVA."
+    },
+    {
+      "name": "buscar_proveedores",
+      "description": "Lista proveedores por nombre o RUT."
+    },
+    {
+      "name": "listar_ventas",
+      "description": "Lista ventas. vista: todas, por_cobrar, borradores, pendientes_doc (sin documento tributario) o anuladas."
+    },
+    {
+      "name": "listar_gastos",
+      "description": "Lista gastos entre dos fechas (AAAA-MM-DD), opcionalmente filtrando por texto."
+    },
+    {
+      "name": "datos_de_apoyo",
+      "description": "Categorías de gasto y cuentas de dinero (caja, bancos) con sus identificadores, para registrar gastos y cobros."
+    },
+    {
+      "name": "crear_cliente",
+      "description": "Crea un cliente. Si el RUT ya existe, devuelve el cliente existente sin duplicarlo."
+    },
+    {
+      "name": "crear_proveedor",
+      "description": "Crea un proveedor. Si el RUT ya existe, devuelve el existente."
+    },
+    {
+      "name": "crear_producto",
+      "description": "Crea un producto o servicio. precio_neto y costo en pesos sin IVA. Si el SKU ya existe, devuelve el existente."
+    },
+    {
+      "name": "crear_venta_borrador",
+      "description": "Crea una venta en borrador (no mueve stock ni dinero hasta confirmarla). Cada línea indica un producto por SKU o nombre, o una descripción libre con precio. precio_neto es por unidad, sin IVA; si se o"
+    },
+    {
+      "name": "registrar_gasto",
+      "description": "Registra un gasto. total en pesos; con_iva indica si el total incluye IVA recuperable. Sin acceso completo queda por pagar; con acceso completo se puede indicar medio de pago (efectivo, transferencia,"
+    },
+    {
+      "name": "confirmar_venta",
+      "description": "Confirma una venta en borrador: le asigna número, descuenta stock y registra el cobro (contado) o la deja por cobrar (crédito)."
+    },
+    {
+      "name": "registrar_cobro",
+      "description": "Registra un pago recibido de una venta por cobrar."
+    }
+  ],
+  "keywords": [
+    "erp",
+    "pyme",
+    "chile",
+    "ventas",
+    "inventario",
+    "contabilidad"
+  ],
+  "compatibility": {
+    "platforms": [
+      "win32",
+      "darwin",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}

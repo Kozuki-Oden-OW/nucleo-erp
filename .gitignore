@@ -19,3 +19,4 @@ dist-demo/
 
 # Archivos temporales de sincronización
 _sync*.tgz
+dist-extension/
