@@ -305,6 +305,63 @@
     }
   },
   {
+    "name": "importar_clientes",
+    "nivel": "borradores",
+    "description": "Agrega varios clientes de una vez (hasta 200), por ejemplo contactos para campañas por correo. Si el RUT ya existe no lo duplica: completa correo, teléfono y persona de contacto si estaban vacíos y agrega las notas nuevas.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "clientes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 200,
+          "items": {
+            "type": "object",
+            "properties": {
+              "nombre": {
+                "type": "string"
+              },
+              "rut": {
+                "type": "string"
+              },
+              "correo": {
+                "type": "string"
+              },
+              "telefono": {
+                "type": "string"
+              },
+              "contacto": {
+                "type": "string",
+                "description": "Persona de contacto"
+              },
+              "direccion": {
+                "type": "string"
+              },
+              "comuna": {
+                "type": "string"
+              },
+              "giro": {
+                "type": "string"
+              },
+              "notas": {
+                "type": "string",
+                "description": "Se agrega a las notas de la ficha (otros contactos, origen del dato…)"
+              }
+            },
+            "required": [
+              "nombre"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "clientes"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "crear_proveedor",
     "nivel": "borradores",
     "description": "Crea un proveedor. Si el RUT ya existe, devuelve el existente.",

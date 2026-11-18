@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "nucleo-erp",
   "display_name": "NÚCLEO ERP",
-  "version": "0.7.5",
+  "version": "0.7.6",
   "description": "Permite que Claude use NÚCLEO ERP en este computador: ve la pantalla, la recorre con su propio cursor y registra ventas, gastos, clientes y cobros.",
   "long_description": "Conecta Claude con NÚCLEO ERP, el sistema de gestión local y gratuito para pymes chilenas. NÚCLEO debe estar abierto con Configuración → Claude activado; ahí eliges si Claude solo mira, crea borradores o tiene acceso completo. La extensión solo se comunica con NÚCLEO dentro del mismo computador (127.0.0.1): los datos del negocio siguen guardados solo en tu equipo.",
   "author": {
@@ -87,6 +87,10 @@
     {
       "name": "crear_cliente",
       "description": "Crea un cliente. Si el RUT ya existe, devuelve el cliente existente sin duplicarlo."
+    },
+    {
+      "name": "importar_clientes",
+      "description": "Agrega varios clientes de una vez (hasta 200), por ejemplo contactos para campañas por correo. Si el RUT ya existe no lo duplica: completa correo, teléfono y persona de contacto si estaban vacíos y ag"
     },
     {
       "name": "crear_proveedor",

@@ -199,6 +199,51 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
       dataChanged();
       return text(`Cliente creado: ${customerLine(c).slice(2)}`);
     }
+    case "importar_clientes": {
+      const list = Array.isArray(a.clientes) ? (a.clientes as Args[]) : [];
+      if (!list.length || list.length > 200) throw new Error("Envía entre 1 y 200 clientes.");
+      let created = 0, updated = 0, same = 0;
+      const errors: string[] = [];
+      for (const c of list) {
+        const name = str(c, "nombre");
+        const rut = str(c, "rut");
+        try {
+          const found = rut ? (await searchBoth((q) => backend.searchCustomers(q), rut)).find((x) => rutKey(x.rut) === rutKey(rut)) : undefined;
+          const notes = str(c, "notas");
+          if (!found) {
+            await backend.addCustomer({
+              name, rut: rut || undefined, email: str(c, "correo") || undefined, phone: str(c, "telefono") || undefined,
+              kind: rut && Number(rutKey(rut).slice(0, -1)) >= 50_000_000 ? "empresa" : "persona",
+              contact_name: str(c, "contacto") || null, address: str(c, "direccion") || null, commune: str(c, "comuna") || null,
+              business_activity: str(c, "giro") || null, notes: notes || null,
+            });
+            created++;
+            continue;
+          }
+          const d = await backend.customer(found.uid);
+          const patch = {
+            email: d.email || str(c, "correo") || null, phone: d.phone || str(c, "telefono") || null,
+            contact_name: d.contact_name || str(c, "contacto") || null, address: d.address || str(c, "direccion") || null,
+            commune: d.commune || str(c, "comuna") || null, business_activity: d.business_activity || str(c, "giro") || null,
+            notes: notes && !(d.notes ?? "").includes(notes) ? [d.notes, notes].filter(Boolean).join("\n") : d.notes,
+          };
+          const changed = (Object.keys(patch) as (keyof typeof patch)[]).some((k) => (patch[k] ?? null) !== ((d as unknown as Record<string, unknown>)[k] ?? null));
+          if (!changed) { same++; continue; }
+          await backend.updateCustomer(found.uid, {
+            name: d.name, rut: d.rut ?? undefined, email: patch.email ?? undefined, phone: patch.phone ?? undefined,
+            kind: d.kind, trade_name: d.trade_name, business_activity: patch.business_activity, address: patch.address, commune: patch.commune,
+            city: d.city, region: d.region, contact_name: patch.contact_name, invoice_email: d.invoice_email, payment_terms_days: d.payment_terms_days,
+            credit_limit_minor: d.credit_limit_minor, notes: patch.notes ?? null, credit_enabled: d.credit_enabled, credit_conditions: d.credit_conditions,
+            preferred: d.preferred,
+          });
+          updated++;
+        } catch (e) {
+          errors.push(`${name}${rut ? ` (${rut})` : ""}: ${errorMessage(e)}`);
+        }
+      }
+      if (created || updated) dataChanged();
+      return text([`Clientes nuevos ${created} · completados ${updated} · sin cambios ${same} · con error ${errors.length}.`, ...errors.map((x) => `- ${x}`)].join("\n"), created + updated + same === 0);
+    }
     case "crear_proveedor": {
       const rut = str(a, "rut");
       if (rut) {

@@ -71,4 +71,19 @@ describe("herramientas de Claude", () => {
     expect(sales[0]?.payment_state).toBe("pagada");
     expect((await runTool(b, "borradores", "importar_ventas_historicas", { documentos: [doc] })).isError).toBe(true);
   });
+
+  it("importa clientes sin duplicar y completa los que ya existen", async () => {
+    const b = new DemoBackend();
+    const r = await runTool(b, "borradores", "importar_clientes", { clientes: [
+      { nombre: "Hospital de Coquimbo", rut: "61.606.403-7", correo: "ingrid.seida@redsalud.gob.cl", contacto: "Ingrid Seida", notas: "Origen: OC Insumos Pardo" },
+      { nombre: "Hospital de Coquimbo", rut: "61606403-7", correo: "otra@redsalud.gob.cl", notas: "Otro contacto: otra@redsalud.gob.cl" },
+    ] });
+    expect(txt(r)).toMatch(/nuevos 1 · completados 1/);
+    const [c] = await b.searchCustomers("61606403");
+    const d = await b.customer(c!.uid);
+    expect(d.email).toBe("ingrid.seida@redsalud.gob.cl");
+    expect(d.contact_name).toBe("Ingrid Seida");
+    expect(d.notes).toMatch(/Otro contacto/);
+    expect(txt(await runTool(b, "borradores", "importar_clientes", { clientes: [{ nombre: "Hospital de Coquimbo", rut: "61.606.403-7", notas: "Origen: OC Insumos Pardo" }] }))).toMatch(/sin cambios 1/);
+  });
 });
