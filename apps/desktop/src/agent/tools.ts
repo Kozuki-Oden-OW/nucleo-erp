@@ -50,9 +50,15 @@ function pickOne<T extends { name: string }>(items: T[], q: string, keyOf: (x: T
 async function searchBoth<T extends { uid: string }>(search: (q: string) => Promise<T[]>, q: string): Promise<T[]> {
   const a = await search(q);
   const k = rutKey(q);
-  if (!/^\d{6,9}[0-9K]$/.test(k) || k === q) return a;
-  const b = await search(k);
-  return [...a, ...b.filter((x) => !a.some((y) => y.uid === x.uid))];
+  if (!/^\d{6,9}[0-9K]$/.test(k)) return a;
+  // La búsqueda compara texto: un RUT con puntos no encuentra uno guardado sin puntos (y al revés).
+  // Probamos también «cuerpo-dv» y el cuerpo solo.
+  const out = [...a];
+  for (const v of [`${k.slice(0, -1)}-${k.slice(-1)}`, k.slice(0, -1)]) {
+    if (v === q) continue;
+    for (const x of await search(v)) if (!out.some((y) => y.uid === x.uid)) out.push(x);
+  }
+  return out;
 }
 
 const METHOD: Record<string, string> = { efectivo: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta de débito", cheque: "Cheque", credito: "" };

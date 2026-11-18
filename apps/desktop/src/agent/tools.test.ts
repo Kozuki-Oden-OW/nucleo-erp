@@ -85,5 +85,9 @@ describe("herramientas de Claude", () => {
     expect(d.contact_name).toBe("Ingrid Seida");
     expect(d.notes).toMatch(/Otro contacto/);
     expect(txt(await runTool(b, "borradores", "importar_clientes", { clientes: [{ nombre: "Hospital de Coquimbo", rut: "61.606.403-7", notas: "Origen: OC Insumos Pardo" }] }))).toMatch(/sin cambios 1/);
+    // Guardado sin puntos, importado con puntos: completa, no choca con «ya existe».
+    await b.addCustomer({ name: "Hospital de Curicó", rut: "61606903-9", kind: "empresa" });
+    const r2 = await runTool(b, "borradores", "importar_clientes", { clientes: [{ nombre: "Hospital de Curicó", rut: "61.606.903-9", correo: "compras@hospitalcurico.cl" }] });
+    expect(txt(r2)).toMatch(/nuevos 0 · completados 1/);
   });
 });
