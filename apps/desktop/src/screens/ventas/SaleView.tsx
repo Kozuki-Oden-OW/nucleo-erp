@@ -115,6 +115,7 @@ export function SaleView({ uid }: { uid: string }) {
           </Notice>
         </div>
       )}
+      {s.historical && <div className="mb-6"><Notice tone="info" title="Venta histórica">Importada desde un documento ya emitido ({s.external_ref?.doc_kind ?? "documento"} Nº {s.external_ref?.external_number ?? s.number}). Sirve para reportes y análisis: no movió stock, no registró cobros en NÚCLEO y no genera asientos contables.</Notice></div>}
       {s.commercial_state === "anulada" && <div className="mb-6"><Notice tone="danger" icon={Ban} title="Venta anulada">{s.void_reason}</Notice></div>}
       {editable && (
         <div className="mb-6">

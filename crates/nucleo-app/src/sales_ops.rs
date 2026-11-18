@@ -152,6 +152,8 @@ pub struct SaleSummary {
     pub documentation_state: String,
     pub total_minor: i64,
     pub paid_minor: i64,
+    /// Importada como historial: no movió stock ni dinero en NÚCLEO.
+    pub historical: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1744,6 +1746,7 @@ fn sale_summary(s: &SaleRow) -> SaleSummary {
         documentation_state: s.documentation_state.clone(),
         total_minor: s.totals.total_minor,
         paid_minor: s.paid_minor,
+        historical: s.historical,
     }
 }
 

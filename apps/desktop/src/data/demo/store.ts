@@ -4,7 +4,7 @@
 import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "../backend";
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
-  AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint,
+  AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput, StatementLineView, BankSuggestion,
   F22Inputs, F22View,
@@ -61,6 +61,8 @@ interface SaleRec {
   lines: Line[]; totals: Totals; cost_minor: number; payment_method: string | null; notes: string | null;
   quote_uid: string | null; payments: Payment[]; external_ref: ExternalRef | null; void_reason: string | null;
   timeline: { at: string; text: string }[]; terms: SaleTerms | null;
+  /** Importada como historial: se considera pagada y no movió stock ni dinero. */
+  historical?: boolean;
 }
 interface PoRec {
   uid: string; number: string; supplier_uid: string; issue_date: string; expected_date: string | null; status: PoStatus;
@@ -361,7 +363,10 @@ export class DemoBackend implements Backend {
     };
   }
 
-  private paid(s: SaleRec): number { return s.payments.reduce((a, p) => a + p.amount_minor, 0); }
+  private paid(s: SaleRec): number {
+    if (s.historical) return s.commercial_state === "anulada" ? 0 : s.totals.total_minor;
+    return s.payments.reduce((a, p) => a + p.amount_minor, 0);
+  }
   private payState(s: SaleRec): SaleSummary["payment_state"] {
     const p = this.paid(s);
     return p <= 0 ? "sin_pago" : p < s.totals.total_minor ? "abonada" : "pagada";
@@ -380,7 +385,7 @@ export class DemoBackend implements Backend {
     return {
       uid: s.uid, doc_type: s.doc_type, number: s.number, customer_name: this.customerName(s.customer_uid), issue_date: s.issue_date,
       due_date: s.due_date, commercial_state: s.commercial_state, payment_state: this.payState(s), documentation_state: s.documentation_state,
-      total_minor: s.totals.total_minor, paid_minor: this.paid(s),
+      total_minor: s.totals.total_minor, paid_minor: this.paid(s), historical: !!s.historical,
     };
   }
   private detail(s: SaleRec): SaleDetail {
@@ -1559,6 +1564,58 @@ export class DemoBackend implements Backend {
     this.autoClose(s);
     this.log("venta.documentar", "venta", s.number);
     return wait(this.detail(s));
+  }
+  async importHistoricalSales(items: HistoricalSale[]): Promise<HistoricalReport> {
+    this.require("ventas.crear");
+    if (items.length > 100) throw new AppError("validacion", "Se importan hasta 100 documentos por vez.");
+    const rep: HistoricalReport = { imported: 0, skipped: 0, errors: 0, customers_created: 0, results: [] };
+    const key = (r: string | null | undefined) => (r ?? "").replace(/[.\s]/g, "").toUpperCase();
+    for (const it of items) {
+      const kind = it.doc_kind.trim();
+      const folio = it.number.trim();
+      const dup = this.sales.find((x) => x.external_ref?.doc_kind?.toLowerCase() === kind.toLowerCase() && x.external_ref?.external_number === folio);
+      if (dup) { rep.skipped++; rep.results.push({ number: folio, status: "ya_existia", sale_uid: dup.uid, sale_number: dup.number, message: null }); continue; }
+      const sum = it.lines.reduce((a, l) => a + l.net_minor, 0);
+      const exempt = it.exempt_minor ?? 0;
+      if (!it.lines.length || Math.abs(sum - (it.net_minor + exempt)) > 5 || Math.abs(it.net_minor + exempt + it.tax_minor - it.total_minor) > 5) {
+        rep.errors++; rep.results.push({ number: folio, status: "error", sale_uid: null, sale_number: null, message: `los montos no cuadran (líneas ${sum}, neto ${it.net_minor}, IVA ${it.tax_minor}, total ${it.total_minor})` }); continue;
+      }
+      let customer_uid: string | null = null;
+      if (it.customer?.name) {
+        const found = it.customer.rut ? this.customers.find((c) => key(c.rut) === key(it.customer!.rut)) : this.customers.find((c) => !c.rut && c.name.toLowerCase() === it.customer!.name.toLowerCase());
+        if (found) customer_uid = found.uid;
+        else {
+          const c: Customer = { id: this.customers.length + 1, uid: uid("cli"), ...this.customerFields({ name: it.customer.name, rut: it.customer.rut ?? undefined, email: it.customer.email ?? undefined, business_activity: it.customer.business_activity ?? null, address: it.customer.address ?? null, commune: it.customer.commune ?? null, city: it.customer.city ?? null }), created_at: now() };
+          this.customers.push(c); customer_uid = c.uid; rep.customers_created++;
+        }
+      }
+      let cost = 0;
+      const lines: Line[] = it.lines.map((l, i) => {
+        const p = l.product_sku ? this.products.find((x) => x.sku === l.product_sku) : undefined;
+        const gross = Math.round((l.qty_milli * l.unit_price_minor) / 1000);
+        const unitCost = p ? p.cost_e4 : null;
+        if (unitCost !== null) cost += Math.round((unitCost * l.qty_milli) / 10_000_000);
+        return { line_no: i + 1, product_uid: p?.uid ?? null, description: l.description, qty_milli: l.qty_milli, unit_price_minor: l.unit_price_minor,
+          discount_ppm: gross > 0 ? Math.round(((gross - l.net_minor) * 1_000_000) / gross) : 0, taxable: l.taxable !== false, net_minor: l.net_minor,
+          discount_minor: Math.max(0, gross - l.net_minor), unit_cost_e4: unitCost };
+      });
+      const voided = it.void_reason?.trim() || null;
+      const documented = it.documented !== false;
+      const prefix = /gu/i.test(kind) ? "GD" : /bolet/i.test(kind) ? "BE" : "FE";
+      const s: SaleRec = {
+        uid: uid("ven"), doc_type: "VEN", number: `${prefix}-${folio}`, customer_uid, issue_date: it.issue_date, due_date: null,
+        commercial_state: voided ? "anulada" : documented ? "cerrada" : "efectuada", documentation_state: documented ? "documentada" : "pendiente",
+        lines, totals: { net_minor: it.net_minor, exempt_minor: exempt, discount_minor: lines.reduce((a, l) => a + l.discount_minor, 0), tax_minor: it.tax_minor, total_minor: it.total_minor },
+        cost_minor: voided ? 0 : cost, payment_method: it.payment_terms ?? null,
+        notes: `Importada como historial desde ${kind} Nº ${folio}: no movió stock ni dinero en NÚCLEO.${it.payment_terms ? ` Forma de pago: ${it.payment_terms}.` : ""}`,
+        quote_uid: null, payments: [], external_ref: { doc_kind: kind, external_number: folio, issue_date: it.issue_date, observation: it.references ?? null, marked_at: now() },
+        void_reason: voided, timeline: [{ at: now(), text: `Importada como historial: ${kind} Nº ${folio}` }], terms: null, historical: true,
+      };
+      this.sales.push(s);
+      this.log("venta.historial", "venta", s.number);
+      rep.imported++; rep.results.push({ number: folio, status: "importada", sale_uid: s.uid, sale_number: s.number, message: null });
+    }
+    return wait(rep);
   }
   async setDocumentationNotApplicable(u: string): Promise<SaleDetail> {
     const s = this.findSale(u);

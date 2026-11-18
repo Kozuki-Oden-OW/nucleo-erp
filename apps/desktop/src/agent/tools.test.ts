@@ -53,4 +53,22 @@ describe("herramientas de Claude", () => {
     expect(txt(v)).toMatch(/precio_neto/);
     expect(txt(await runTool(b, "ver", "no_existe", {}))).toMatch(/No existe/);
   });
+
+  it("importa ventas históricas sin duplicar", async () => {
+    const b = new DemoBackend();
+    const doc = {
+      tipo_documento: "Factura electrónica", folio: "437", fecha: "2026-09-29",
+      cliente: { nombre: "Tratamientos Médicos de Avanzada SpA", rut: "76.911.593-5", comuna: "Providencia" },
+      lineas: [{ descripcion: "RCW-360 PLUS 4G", cantidad: 1, precio_unitario: 194580, valor_neto: 194580 }, { descripcion: "Verificación refrigerado", cantidad: 1, precio_unitario: 15000, valor_neto: 15000 }],
+      neto: 209580, iva: 39820, total: 249400, forma_pago: "Contado",
+    };
+    const r = await runTool(b, "completo", "importar_ventas_historicas", { documentos: [doc] });
+    expect(txt(r)).toMatch(/Importadas 1 .* clientes nuevos 1/);
+    const again = await runTool(b, "completo", "importar_ventas_historicas", { documentos: [doc] });
+    expect(txt(again)).toMatch(/Importadas 0 · ya estaban 1/);
+    const sales = await b.listSales({ view: "todas", query: "FE-437" });
+    expect(sales[0]?.historical).toBe(true);
+    expect(sales[0]?.payment_state).toBe("pagada");
+    expect((await runTool(b, "borradores", "importar_ventas_historicas", { documentos: [doc] })).isError).toBe(true);
+  });
 });

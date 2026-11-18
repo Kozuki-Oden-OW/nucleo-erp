@@ -3,7 +3,7 @@
 // valen las mismas reglas, permisos y auditoría.
 import type { Backend } from "../data";
 import { errorMessage } from "../data";
-import type { Customer, LineInput, Product, SaleSummary, Supplier } from "../data/types";
+import type { Customer, HistoricalSale, LineInput, Product, SaleSummary, Supplier } from "../data/types";
 import { EMPTY_TERMS } from "../data/saleTerms";
 import { formatMoney, todayIso } from "../lib/format";
 import { navigate } from "../lib/router";
@@ -301,6 +301,29 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
         : { mode: "contado", method: METHOD[str(a, "medio") || "efectivo"] ?? "Efectivo", due_date: null });
       dataChanged();
       return text(`Venta ${done.number} confirmada · total ${pesos(done.total_minor)} · ${credito ? `por cobrar hasta ${done.due_date ?? ""}` : `pagada (${done.payment_method ?? ""})`}.`);
+    }
+    case "importar_ventas_historicas": {
+      const docs = Array.isArray(a.documentos) ? (a.documentos as Args[]) : [];
+      if (!docs.length) throw new Error("No hay documentos para importar.");
+      const items: HistoricalSale[] = docs.map((d) => {
+        const c = (d.cliente ?? null) as Args | null;
+        const lines = (Array.isArray(d.lineas) ? d.lineas : []) as Args[];
+        return {
+          doc_kind: str(d, "tipo_documento"), number: str(d, "folio"), issue_date: str(d, "fecha"),
+          customer: c && str(c, "nombre") ? { name: str(c, "nombre"), rut: str(c, "rut") || null, business_activity: str(c, "giro") || null, address: str(c, "direccion") || null, commune: str(c, "comuna") || null, city: str(c, "ciudad") || null, email: str(c, "correo") || null } : null,
+          lines: lines.map((l) => ({ product_sku: str(l, "sku") || null, description: str(l, "descripcion"), qty_milli: Math.round((num(l, "cantidad") ?? 0) * 1000), unit_price_minor: Math.round(num(l, "precio_unitario") ?? 0), net_minor: Math.round(num(l, "valor_neto") ?? 0), taxable: l.afecto_iva !== false })),
+          net_minor: Math.round(num(d, "neto") ?? 0), exempt_minor: Math.round(num(d, "exento") ?? 0), tax_minor: Math.round(num(d, "iva") ?? 0), total_minor: Math.round(num(d, "total") ?? 0),
+          payment_terms: str(d, "forma_pago") || null, references: str(d, "referencias") || null, void_reason: str(d, "anulada_por") || null,
+          documented: d.documentada !== false, notes: str(d, "notas") || null,
+        };
+      });
+      const r = await backend.importHistoricalSales(items);
+      if (r.imported) dataChanged();
+      const errs = r.results.filter((x) => x.status === "error");
+      return text([
+        `Importadas ${r.imported} · ya estaban ${r.skipped} · con error ${r.errors} · clientes nuevos ${r.customers_created}.`,
+        ...errs.map((x) => `- Folio ${x.number}: ${x.message}`),
+      ].join("\n"), r.imported === 0 && r.errors > 0);
     }
     case "registrar_cobro": {
       const s = await findSale(backend, str(a, "venta"), "por_cobrar");

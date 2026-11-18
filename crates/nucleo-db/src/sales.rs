@@ -265,12 +265,14 @@ pub struct SaleRow {
     pub notes: Option<String>,
     pub void_reason: Option<String>,
     pub warehouse_id: Option<i64>,
+    /// Importada como historial (no movió stock ni dinero en NÚCLEO).
+    pub historical: bool,
 }
 
 const SALE_SELECT: &str = "SELECT s.id, s.uid, s.doc_type, s.number, s.customer_id, c.uid,
         coalesce(c.name, 'Cliente ocasional'), s.issue_date, s.due_date, s.commercial_state, s.payment_state,
         s.documentation_state, s.net_minor, s.exempt_minor, s.discount_minor, s.tax_minor, s.total_minor,
-        s.paid_minor, s.cost_minor, s.payment_method, s.notes, s.void_reason, s.warehouse_id
+        s.paid_minor, s.cost_minor, s.payment_method, s.notes, s.void_reason, s.warehouse_id, s.historical
     FROM sales s LEFT JOIN customers c ON c.id = s.customer_id";
 
 fn map_sale(r: &Row<'_>) -> rusqlite::Result<SaleRow> {
@@ -294,7 +296,113 @@ fn map_sale(r: &Row<'_>) -> rusqlite::Result<SaleRow> {
         notes: r.get(20)?,
         void_reason: r.get(21)?,
         warehouse_id: r.get(22)?,
+        historical: r.get::<_, i64>(23)? == 1,
     })
+}
+
+/// Venta histórica ya completa (documento emitido fuera de NÚCLEO). Se inserta con su estado final y
+/// sin movimientos de stock, cobros ni cuentas por cobrar.
+pub struct HistoricalWrite<'a> {
+    pub uid: &'a str,
+    pub number: &'a str,
+    pub customer_id: Option<i64>,
+    pub issue_date: &'a str,
+    pub commercial_state: &'a str,
+    pub documentation_state: &'a str,
+    pub totals: Totals,
+    pub cost_minor: i64,
+    pub payment_method: Option<&'a str>,
+    pub notes: Option<&'a str>,
+    pub void_reason: Option<&'a str>,
+}
+
+pub fn insert_historical_sale(
+    conn: &Connection,
+    w: &HistoricalWrite<'_>,
+    created_by: Option<i64>,
+    now: &str,
+) -> DbResult<i64> {
+    let paid = if w.commercial_state == "anulada" {
+        0
+    } else {
+        w.totals.total_minor
+    };
+    conn.execute(
+        "INSERT INTO sales (uid, doc_type, number, customer_id, issue_date, issued_at, commercial_state, payment_state,
+            paid_minor, documentation_state, net_minor, exempt_minor, discount_minor, tax_minor, total_minor, cost_minor,
+            payment_method, void_reason, notes, historical, created_by, created_at)
+         VALUES (?1, 'VEN', ?2, ?3, ?4, ?4, 'borrador', ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, 1, ?18, ?19)",
+        rusqlite::params![
+            w.uid,
+            w.number,
+            w.customer_id,
+            w.issue_date,
+            w.commercial_state,
+            if paid > 0 { "pagada" } else { "sin_pago" },
+            paid,
+            w.documentation_state,
+            w.totals.net_minor,
+            w.totals.exempt_minor,
+            w.totals.discount_minor,
+            w.totals.tax_minor,
+            w.totals.total_minor,
+            w.cost_minor,
+            w.payment_method,
+            w.void_reason,
+            w.notes,
+            created_by,
+            now
+        ],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
+/// Lleva la venta histórica (insertada como borrador para poder cargar sus líneas) a su estado final,
+/// respetando el flujo de estados.
+pub fn finish_historical_sale(conn: &Connection, id: i64, state: &str) -> DbResult<()> {
+    let steps: &[&str] = match state {
+        "anulada" => &["anulada"],
+        "cerrada" => &["efectuada", "cerrada"],
+        _ => &["efectuada"],
+    };
+    for st in steps {
+        conn.execute(
+            "UPDATE sales SET commercial_state = ?2 WHERE id = ?1",
+            rusqlite::params![id, st],
+        )?;
+    }
+    Ok(())
+}
+
+/// Costos de las líneas de una venta histórica (costo promedio del producto al importar).
+pub fn set_item_costs(
+    conn: &Connection,
+    sale_id: i64,
+    costs: &[(i64, Option<i64>, Option<i64>)],
+) -> DbResult<()> {
+    let mut stmt = conn.prepare(
+        "UPDATE sale_items SET unit_cost_e4 = ?3, cost_minor = ?4 WHERE sale_id = ?1 AND line_no = ?2",
+    )?;
+    for (line_no, unit, cost) in costs {
+        stmt.execute(rusqlite::params![sale_id, line_no, unit, cost])?;
+    }
+    Ok(())
+}
+
+/// Venta que ya tiene anotado ese documento externo (tipo y número), si existe.
+pub fn sale_with_external(
+    conn: &Connection,
+    doc_kind: &str,
+    number: &str,
+) -> DbResult<Option<String>> {
+    Ok(conn
+        .query_row(
+            "SELECT s.uid FROM external_doc_refs x JOIN sales s ON s.id = x.sale_id
+             WHERE lower(x.doc_kind) = lower(?1) AND x.external_number = ?2 LIMIT 1",
+            [doc_kind, number],
+            |r| r.get(0),
+        )
+        .optional()?)
 }
 
 pub struct SaleWrite<'a> {

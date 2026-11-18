@@ -52,6 +52,7 @@ fn salida_con_campos_de_types_ts() {
         documentation_state: "pendiente".into(),
         total_minor: 100,
         paid_minor: 100,
+        historical: false,
     };
     let v = serde_json::to_value(&s).unwrap();
     for k in [

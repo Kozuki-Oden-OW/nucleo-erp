@@ -73,6 +73,7 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         commands::effect_sale,
         commands::register_payment,
         commands::mark_documented,
+        commands::import_historical_sales,
         commands::set_documentation_not_applicable,
         commands::void_sale,
         commands::update_product,

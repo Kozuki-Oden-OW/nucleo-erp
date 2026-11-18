@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "./backend";
 import type {
-  AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint,
+  AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput,
   CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, Shipment, ShipmentInput, WarehouseStockRow,
@@ -175,6 +175,7 @@ export class TauriBackend implements Backend {
     return call<SaleDetail>("register_payment", { uid, amountMinor: amount_minor, method, date, accountUid: accountUid ?? null });
   }
   markDocumented(uid: string, ref: ExternalRefInput) { return call<SaleDetail>("mark_documented", { uid, reference: ref }); }
+  importHistoricalSales(items: HistoricalSale[]) { return call<HistoricalReport>("import_historical_sales", { items }); }
   setDocumentationNotApplicable(uid: string) { return call<SaleDetail>("set_documentation_not_applicable", { uid }); }
   voidSale(uid: string, reason: string) { return call<SaleDetail>("void_sale", { uid, reason }); }
   searchSuppliers(query: string) { return call<Supplier[]>("search_suppliers", { query }); }

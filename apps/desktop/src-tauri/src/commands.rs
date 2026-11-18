@@ -629,6 +629,14 @@ pub fn mark_documented(
 }
 
 #[tauri::command]
+pub fn import_historical_sales(
+    state: State<'_, AppState>,
+    items: Vec<nucleo_app::history_ops::HistoricalSale>,
+) -> CmdResult<nucleo_app::history_ops::HistoricalReport> {
+    with_session(&state, |s| Ok(s.import_historical_sales(&items)?))
+}
+
+#[tauri::command]
 pub fn set_documentation_not_applicable(
     state: State<'_, AppState>,
     uid: String,

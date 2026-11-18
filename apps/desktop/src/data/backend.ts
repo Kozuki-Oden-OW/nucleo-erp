@@ -4,7 +4,7 @@
 // Las pantallas solo conocen esta interfaz; así un prototipo de la Fase 3 se convierte en pantalla
 // real cuando el comando Rust correspondiente existe.
 import type {
-  AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint,
+  AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput,
   CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, Shipment, ShipmentInput, WarehouseStockRow,
@@ -170,6 +170,8 @@ export interface Backend {
   effectSale(uid: string, input: EffectInput): Promise<SaleDetail>;
   registerPayment(uid: string, amount_minor: number, method: string, date: string, accountUid?: string): Promise<SaleDetail>;
   markDocumented(uid: string, ref: ExternalRefInput): Promise<SaleDetail>;
+  /** Importa documentos ya emitidos (facturas, guías) como historial: sin stock, dinero ni asientos. */
+  importHistoricalSales(items: HistoricalSale[]): Promise<HistoricalReport>;
   setDocumentationNotApplicable(uid: string): Promise<SaleDetail>;
   voidSale(uid: string, reason: string): Promise<SaleDetail>;
 

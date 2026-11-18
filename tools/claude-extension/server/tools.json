@@ -3,7 +3,11 @@
     "name": "ver_pantalla",
     "nivel": "ver",
     "description": "Muestra lo que está en la pantalla de NÚCLEO ERP como texto: sección, diálogo abierto, contenido (tablas incluidas) y cada botón, campo, lista o pestaña con un identificador como [e12]. Úsalo antes de hacer clic o escribir; los identificadores cambian después de cada acción.",
-    "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    }
   },
   {
     "name": "ir_a",
@@ -11,8 +15,15 @@
     "description": "Abre una sección de NÚCLEO. Acepta un nombre (inicio, ventas, nueva venta, cotizaciones, nueva cotización, clientes, productos, promociones, compras, proveedores, inventario, envíos, gastos, dinero, comex, impuestos, remuneraciones, análisis, documentos, mi negocio, configuración) o una ruta como /ventas?tab=cotizaciones. Devuelve la pantalla nueva.",
     "inputSchema": {
       "type": "object",
-      "properties": { "destino": { "type": "string", "description": "Nombre de la sección o ruta que empieza con /" } },
-      "required": ["destino"],
+      "properties": {
+        "destino": {
+          "type": "string",
+          "description": "Nombre de la sección o ruta que empieza con /"
+        }
+      },
+      "required": [
+        "destino"
+      ],
       "additionalProperties": false
     }
   },
@@ -22,8 +33,20 @@
     "description": "Desplaza la pantalla (o el diálogo abierto) hacia arriba o hacia abajo y devuelve lo que se ve.",
     "inputSchema": {
       "type": "object",
-      "properties": { "direccion": { "type": "string", "enum": ["arriba", "abajo", "inicio", "final"] } },
-      "required": ["direccion"],
+      "properties": {
+        "direccion": {
+          "type": "string",
+          "enum": [
+            "arriba",
+            "abajo",
+            "inicio",
+            "final"
+          ]
+        }
+      },
+      "required": [
+        "direccion"
+      ],
       "additionalProperties": false
     }
   },
@@ -33,8 +56,15 @@
     "description": "Hace clic en un botón, enlace, pestaña, casilla u opción de la pantalla, usando su identificador de ver_pantalla (por ejemplo «e12»). Devuelve la pantalla después del clic.",
     "inputSchema": {
       "type": "object",
-      "properties": { "elemento": { "type": "string", "description": "Identificador, como e12" } },
-      "required": ["elemento"],
+      "properties": {
+        "elemento": {
+          "type": "string",
+          "description": "Identificador, como e12"
+        }
+      },
+      "required": [
+        "elemento"
+      ],
       "additionalProperties": false
     }
   },
@@ -45,11 +75,22 @@
     "inputSchema": {
       "type": "object",
       "properties": {
-        "elemento": { "type": "string", "description": "Identificador del campo, como e7" },
-        "texto": { "type": "string" },
-        "enter": { "type": "boolean", "default": false }
+        "elemento": {
+          "type": "string",
+          "description": "Identificador del campo, como e7"
+        },
+        "texto": {
+          "type": "string"
+        },
+        "enter": {
+          "type": "boolean",
+          "default": false
+        }
       },
-      "required": ["elemento", "texto"],
+      "required": [
+        "elemento",
+        "texto"
+      ],
       "additionalProperties": false
     }
   },
@@ -60,10 +101,18 @@
     "inputSchema": {
       "type": "object",
       "properties": {
-        "elemento": { "type": "string", "description": "Identificador de la lista, como e9" },
-        "opcion": { "type": "string" }
+        "elemento": {
+          "type": "string",
+          "description": "Identificador de la lista, como e9"
+        },
+        "opcion": {
+          "type": "string"
+        }
       },
-      "required": ["elemento", "opcion"],
+      "required": [
+        "elemento",
+        "opcion"
+      ],
       "additionalProperties": false
     }
   },
@@ -73,8 +122,21 @@
     "description": "Presiona una tecla en el elemento activo: Enter, Escape (cierra diálogos), Tab, ArrowDown, ArrowUp. Devuelve la pantalla.",
     "inputSchema": {
       "type": "object",
-      "properties": { "tecla": { "type": "string", "enum": ["Enter", "Escape", "Tab", "ArrowDown", "ArrowUp"] } },
-      "required": ["tecla"],
+      "properties": {
+        "tecla": {
+          "type": "string",
+          "enum": [
+            "Enter",
+            "Escape",
+            "Tab",
+            "ArrowDown",
+            "ArrowUp"
+          ]
+        }
+      },
+      "required": [
+        "tecla"
+      ],
       "additionalProperties": false
     }
   },
@@ -82,7 +144,11 @@
     "name": "resumen_negocio",
     "nivel": "ver",
     "description": "Resumen del negocio: ventas de hoy y del mes, utilidad, disponible, lo que te deben y lo que debes, IVA estimado, poco stock, próximos cobros y pagos, y avisos.",
-    "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    }
   },
   {
     "name": "buscar",
@@ -90,8 +156,14 @@
     "description": "Busca en todo NÚCLEO (clientes, proveedores, productos, ventas, compras…) y devuelve coincidencias con su ruta para abrirlas con ir_a.",
     "inputSchema": {
       "type": "object",
-      "properties": { "texto": { "type": "string" } },
-      "required": ["texto"],
+      "properties": {
+        "texto": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "texto"
+      ],
       "additionalProperties": false
     }
   },
@@ -101,7 +173,12 @@
     "description": "Lista clientes que coinciden con un nombre o RUT (vacío = los primeros).",
     "inputSchema": {
       "type": "object",
-      "properties": { "texto": { "type": "string", "default": "" } },
+      "properties": {
+        "texto": {
+          "type": "string",
+          "default": ""
+        }
+      },
       "additionalProperties": false
     }
   },
@@ -111,7 +188,12 @@
     "description": "Lista productos y servicios por nombre o SKU, con precio neto, costo, stock y si lleva IVA.",
     "inputSchema": {
       "type": "object",
-      "properties": { "texto": { "type": "string", "default": "" } },
+      "properties": {
+        "texto": {
+          "type": "string",
+          "default": ""
+        }
+      },
       "additionalProperties": false
     }
   },
@@ -121,7 +203,12 @@
     "description": "Lista proveedores por nombre o RUT.",
     "inputSchema": {
       "type": "object",
-      "properties": { "texto": { "type": "string", "default": "" } },
+      "properties": {
+        "texto": {
+          "type": "string",
+          "default": ""
+        }
+      },
       "additionalProperties": false
     }
   },
@@ -132,8 +219,21 @@
     "inputSchema": {
       "type": "object",
       "properties": {
-        "vista": { "type": "string", "enum": ["todas", "por_cobrar", "borradores", "pendientes_doc", "anuladas"], "default": "todas" },
-        "texto": { "type": "string", "default": "" }
+        "vista": {
+          "type": "string",
+          "enum": [
+            "todas",
+            "por_cobrar",
+            "borradores",
+            "pendientes_doc",
+            "anuladas"
+          ],
+          "default": "todas"
+        },
+        "texto": {
+          "type": "string",
+          "default": ""
+        }
       },
       "additionalProperties": false
     }
@@ -145,9 +245,16 @@
     "inputSchema": {
       "type": "object",
       "properties": {
-        "desde": { "type": "string" },
-        "hasta": { "type": "string" },
-        "texto": { "type": "string", "default": "" }
+        "desde": {
+          "type": "string"
+        },
+        "hasta": {
+          "type": "string"
+        },
+        "texto": {
+          "type": "string",
+          "default": ""
+        }
       },
       "additionalProperties": false
     }
@@ -156,7 +263,11 @@
     "name": "datos_de_apoyo",
     "nivel": "ver",
     "description": "Categorías de gasto y cuentas de dinero (caja, bancos) con sus identificadores, para registrar gastos y cobros.",
-    "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    }
   },
   {
     "name": "crear_cliente",
@@ -165,15 +276,31 @@
     "inputSchema": {
       "type": "object",
       "properties": {
-        "nombre": { "type": "string" },
-        "rut": { "type": "string" },
-        "correo": { "type": "string" },
-        "telefono": { "type": "string" },
-        "direccion": { "type": "string" },
-        "comuna": { "type": "string" },
-        "giro": { "type": "string" }
+        "nombre": {
+          "type": "string"
+        },
+        "rut": {
+          "type": "string"
+        },
+        "correo": {
+          "type": "string"
+        },
+        "telefono": {
+          "type": "string"
+        },
+        "direccion": {
+          "type": "string"
+        },
+        "comuna": {
+          "type": "string"
+        },
+        "giro": {
+          "type": "string"
+        }
       },
-      "required": ["nombre"],
+      "required": [
+        "nombre"
+      ],
       "additionalProperties": false
     }
   },
@@ -184,13 +311,26 @@
     "inputSchema": {
       "type": "object",
       "properties": {
-        "nombre": { "type": "string" },
-        "rut": { "type": "string" },
-        "correo": { "type": "string" },
-        "telefono": { "type": "string" },
-        "dias_pago": { "type": "integer", "minimum": 0 }
+        "nombre": {
+          "type": "string"
+        },
+        "rut": {
+          "type": "string"
+        },
+        "correo": {
+          "type": "string"
+        },
+        "telefono": {
+          "type": "string"
+        },
+        "dias_pago": {
+          "type": "integer",
+          "minimum": 0
+        }
       },
-      "required": ["nombre"],
+      "required": [
+        "nombre"
+      ],
       "additionalProperties": false
     }
   },
@@ -201,16 +341,45 @@
     "inputSchema": {
       "type": "object",
       "properties": {
-        "nombre": { "type": "string" },
-        "tipo": { "type": "string", "enum": ["producto", "servicio"], "default": "producto" },
-        "sku": { "type": "string" },
-        "unidad": { "type": "string", "default": "un" },
-        "precio_neto": { "type": "number", "minimum": 0 },
-        "costo": { "type": "number", "minimum": 0 },
-        "afecto_iva": { "type": "boolean", "default": true },
-        "stock_inicial": { "type": "number", "minimum": 0 }
+        "nombre": {
+          "type": "string"
+        },
+        "tipo": {
+          "type": "string",
+          "enum": [
+            "producto",
+            "servicio"
+          ],
+          "default": "producto"
+        },
+        "sku": {
+          "type": "string"
+        },
+        "unidad": {
+          "type": "string",
+          "default": "un"
+        },
+        "precio_neto": {
+          "type": "number",
+          "minimum": 0
+        },
+        "costo": {
+          "type": "number",
+          "minimum": 0
+        },
+        "afecto_iva": {
+          "type": "boolean",
+          "default": true
+        },
+        "stock_inicial": {
+          "type": "number",
+          "minimum": 0
+        }
       },
-      "required": ["nombre", "precio_neto"],
+      "required": [
+        "nombre",
+        "precio_neto"
+      ],
       "additionalProperties": false
     }
   },
@@ -221,28 +390,64 @@
     "inputSchema": {
       "type": "object",
       "properties": {
-        "cliente": { "type": "string", "description": "Nombre o RUT de un cliente existente (opcional)" },
-        "tipo": { "type": "string", "enum": ["VEN", "FV"], "default": "VEN", "description": "VEN = venta con boleta, FV = factura" },
-        "fecha": { "type": "string", "description": "AAAA-MM-DD; vacío = hoy" },
+        "cliente": {
+          "type": "string",
+          "description": "Nombre o RUT de un cliente existente (opcional)"
+        },
+        "tipo": {
+          "type": "string",
+          "enum": [
+            "VEN",
+            "FV"
+          ],
+          "default": "VEN",
+          "description": "VEN = venta con boleta, FV = factura"
+        },
+        "fecha": {
+          "type": "string",
+          "description": "AAAA-MM-DD; vacío = hoy"
+        },
         "lineas": {
           "type": "array",
           "minItems": 1,
           "items": {
             "type": "object",
             "properties": {
-              "producto": { "type": "string", "description": "SKU o nombre del producto" },
-              "descripcion": { "type": "string" },
-              "cantidad": { "type": "number", "exclusiveMinimum": 0, "default": 1 },
-              "precio_neto": { "type": "number", "minimum": 0 },
-              "descuento": { "type": "number", "minimum": 0, "maximum": 100 },
-              "afecto_iva": { "type": "boolean" }
+              "producto": {
+                "type": "string",
+                "description": "SKU o nombre del producto"
+              },
+              "descripcion": {
+                "type": "string"
+              },
+              "cantidad": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 1
+              },
+              "precio_neto": {
+                "type": "number",
+                "minimum": 0
+              },
+              "descuento": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "afecto_iva": {
+                "type": "boolean"
+              }
             },
             "additionalProperties": false
           }
         },
-        "notas": { "type": "string" }
+        "notas": {
+          "type": "string"
+        }
       },
-      "required": ["lineas"],
+      "required": [
+        "lineas"
+      ],
       "additionalProperties": false
     }
   },
@@ -253,17 +458,49 @@
     "inputSchema": {
       "type": "object",
       "properties": {
-        "descripcion": { "type": "string" },
-        "total": { "type": "number", "exclusiveMinimum": 0 },
-        "categoria": { "type": "string", "description": "Nombre de la categoría de gasto (ver datos_de_apoyo)" },
-        "fecha": { "type": "string", "description": "AAAA-MM-DD; vacío = hoy" },
-        "con_iva": { "type": "boolean", "default": false },
-        "proveedor": { "type": "string", "description": "Nombre o RUT de un proveedor existente (opcional)" },
-        "vencimiento": { "type": "string" },
-        "pagado_con": { "type": "string", "enum": ["efectivo", "transferencia", "tarjeta"] },
-        "notas": { "type": "string" }
+        "descripcion": {
+          "type": "string"
+        },
+        "total": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "categoria": {
+          "type": "string",
+          "description": "Nombre de la categoría de gasto (ver datos_de_apoyo)"
+        },
+        "fecha": {
+          "type": "string",
+          "description": "AAAA-MM-DD; vacío = hoy"
+        },
+        "con_iva": {
+          "type": "boolean",
+          "default": false
+        },
+        "proveedor": {
+          "type": "string",
+          "description": "Nombre o RUT de un proveedor existente (opcional)"
+        },
+        "vencimiento": {
+          "type": "string"
+        },
+        "pagado_con": {
+          "type": "string",
+          "enum": [
+            "efectivo",
+            "transferencia",
+            "tarjeta"
+          ]
+        },
+        "notas": {
+          "type": "string"
+        }
       },
-      "required": ["descripcion", "total", "categoria"],
+      "required": [
+        "descripcion",
+        "total",
+        "categoria"
+      ],
       "additionalProperties": false
     }
   },
@@ -274,12 +511,36 @@
     "inputSchema": {
       "type": "object",
       "properties": {
-        "venta": { "type": "string", "description": "Número (por ejemplo VEN-000123) o identificador de la venta" },
-        "modo": { "type": "string", "enum": ["contado", "credito"] },
-        "medio": { "type": "string", "enum": ["efectivo", "transferencia", "tarjeta", "credito"], "default": "efectivo" },
-        "vencimiento": { "type": "string", "description": "AAAA-MM-DD, para crédito" }
+        "venta": {
+          "type": "string",
+          "description": "Número (por ejemplo VEN-000123) o identificador de la venta"
+        },
+        "modo": {
+          "type": "string",
+          "enum": [
+            "contado",
+            "credito"
+          ]
+        },
+        "medio": {
+          "type": "string",
+          "enum": [
+            "efectivo",
+            "transferencia",
+            "tarjeta",
+            "credito"
+          ],
+          "default": "efectivo"
+        },
+        "vencimiento": {
+          "type": "string",
+          "description": "AAAA-MM-DD, para crédito"
+        }
       },
-      "required": ["venta", "modo"],
+      "required": [
+        "venta",
+        "modo"
+      ],
       "additionalProperties": false
     }
   },
@@ -290,12 +551,178 @@
     "inputSchema": {
       "type": "object",
       "properties": {
-        "venta": { "type": "string", "description": "Número o identificador de la venta" },
-        "monto": { "type": "number", "exclusiveMinimum": 0 },
-        "medio": { "type": "string", "enum": ["efectivo", "transferencia", "tarjeta", "cheque"], "default": "transferencia" },
-        "fecha": { "type": "string", "description": "AAAA-MM-DD; vacío = hoy" }
+        "venta": {
+          "type": "string",
+          "description": "Número o identificador de la venta"
+        },
+        "monto": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "medio": {
+          "type": "string",
+          "enum": [
+            "efectivo",
+            "transferencia",
+            "tarjeta",
+            "cheque"
+          ],
+          "default": "transferencia"
+        },
+        "fecha": {
+          "type": "string",
+          "description": "AAAA-MM-DD; vacío = hoy"
+        }
       },
-      "required": ["venta", "monto"],
+      "required": [
+        "venta",
+        "monto"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "importar_ventas_historicas",
+    "nivel": "completo",
+    "description": "Importa como historial documentos de venta ya emitidos fuera de NÚCLEO (facturas electrónicas, guías de despacho que constituyen venta): quedan cerradas y documentadas con su folio para reportes y análisis, sin descontar stock, sin registrar cobros y sin asientos contables. Crea el cliente por RUT si no existe. Un documento ya importado se omite (no duplica). Hasta 100 por llamada; montos en pesos; precio_unitario y valor_neto sin IVA.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentos": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "properties": {
+              "tipo_documento": {
+                "type": "string",
+                "description": "Ej. «Factura electrónica» o «Guía de despacho»"
+              },
+              "folio": {
+                "type": "string"
+              },
+              "fecha": {
+                "type": "string",
+                "description": "AAAA-MM-DD"
+              },
+              "cliente": {
+                "type": "object",
+                "properties": {
+                  "nombre": {
+                    "type": "string"
+                  },
+                  "rut": {
+                    "type": "string"
+                  },
+                  "giro": {
+                    "type": "string"
+                  },
+                  "direccion": {
+                    "type": "string"
+                  },
+                  "comuna": {
+                    "type": "string"
+                  },
+                  "ciudad": {
+                    "type": "string"
+                  },
+                  "correo": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "nombre"
+                ],
+                "additionalProperties": false
+              },
+              "lineas": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "sku": {
+                      "type": "string",
+                      "description": "SKU de un producto de NÚCLEO, para enlazar la línea (opcional)"
+                    },
+                    "descripcion": {
+                      "type": "string"
+                    },
+                    "cantidad": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "precio_unitario": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "valor_neto": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "afecto_iva": {
+                      "type": "boolean",
+                      "default": true
+                    }
+                  },
+                  "required": [
+                    "descripcion",
+                    "cantidad",
+                    "precio_unitario",
+                    "valor_neto"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "neto": {
+                "type": "number"
+              },
+              "exento": {
+                "type": "number",
+                "default": 0
+              },
+              "iva": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number"
+              },
+              "forma_pago": {
+                "type": "string"
+              },
+              "referencias": {
+                "type": "string"
+              },
+              "anulada_por": {
+                "type": "string",
+                "description": "Si una nota de crédito la anuló: el motivo (ej. «Nota de crédito Nº 4 del 2025-08-25»)"
+              },
+              "documentada": {
+                "type": "boolean",
+                "default": true,
+                "description": "Falso para una guía que constituye venta sin factura"
+              },
+              "notas": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "tipo_documento",
+              "folio",
+              "fecha",
+              "lineas",
+              "neto",
+              "iva",
+              "total"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "documentos"
+      ],
       "additionalProperties": false
     }
   }

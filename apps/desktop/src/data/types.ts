@@ -362,6 +362,8 @@ export interface SaleSummary {
   documentation_state: DocumentationState;
   total_minor: number;
   paid_minor: number;
+  /** Importada como historial: no movió stock ni dinero en NÚCLEO. */
+  historical?: boolean;
 }
 export interface Payment {
   number: string;
@@ -1439,3 +1441,15 @@ export interface CreditDocInput {
   verified_on?: string | null;
   note?: string | null;
 }
+
+/* ───── Ventas históricas (documentos ya emitidos fuera de NÚCLEO) ───── */
+
+export interface HistoricalCustomer { name: string; rut?: string | null; business_activity?: string | null; address?: string | null; commune?: string | null; city?: string | null; email?: string | null }
+export interface HistoricalLine { product_sku?: string | null; description: string; qty_milli: number; unit_price_minor: number; net_minor: number; taxable?: boolean }
+export interface HistoricalSale {
+  doc_kind: string; number: string; issue_date: string; customer?: HistoricalCustomer | null; lines: HistoricalLine[];
+  net_minor: number; exempt_minor?: number; tax_minor: number; total_minor: number; payment_terms?: string | null;
+  references?: string | null; void_reason?: string | null; documented?: boolean; notes?: string | null;
+}
+export interface HistoricalResult { number: string; status: "importada" | "ya_existia" | "error"; sale_uid: string | null; sale_number: string | null; message: string | null }
+export interface HistoricalReport { imported: number; skipped: number; errors: number; customers_created: number; results: HistoricalResult[] }
