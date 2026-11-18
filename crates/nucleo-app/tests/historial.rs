@@ -56,6 +56,8 @@ fn invoice(
         void_reason: None,
         documented: true,
         notes: None,
+        due_date: None,
+        terms: None,
     }
 }
 
@@ -188,4 +190,109 @@ fn historial_sin_stock_ni_dinero_y_sin_duplicar() {
     let again = s.import_historical_sales(&[valid, voided, guide]).unwrap();
     assert_eq!((again.imported, again.skipped), (0, 3));
     assert_eq!(s.search_customers("", 50).unwrap().len(), 2);
+}
+
+#[test]
+fn factura_a_credito_queda_por_cobrar_y_se_puede_cobrar() {
+    let (_d, _app, mut s) = session();
+    s.add_product(&NewProduct {
+        sku: Some("RC17".into()),
+        name: "RC-17N".into(),
+        unit: None,
+        kind: "producto".into(),
+        price_minor: 9_900,
+        cost_minor: Some(5_000),
+        taxable: Some(true),
+        initial_stock_milli: Some(50_000),
+        category_uid: None,
+        extra_category_uids: None,
+        cost_sheet: None,
+        stock_policy: None,
+    })
+    .unwrap();
+
+    // Nueva: trae vencimiento y la orden de compra estructurada.
+    let mut credit = invoice(
+        "521",
+        "2026-11-18",
+        "76.716.680-K",
+        vec![(Some("RC17"), "RC-17N", 200, 4_790, 958_000)],
+    );
+    credit.due_date = Some("2026-12-18".into());
+    credit.terms = Some(nucleo_app::sale_terms::SaleTerms {
+        references: vec![nucleo_app::sale_terms::SaleReference {
+            kind: "801".into(),
+            folio: "22.112".into(),
+            date: Some("2026-11-18".into()),
+            note: None,
+        }],
+        ..Default::default()
+    });
+    // Ya importada como pagada: al reimportar con vencimiento queda por cobrar.
+    let paid_first = invoice(
+        "522",
+        "2026-11-18",
+        "77.471.270-4",
+        vec![(None, "RCW-360 4G", 5, 204_580, 1_022_900)],
+    );
+    let r = s
+        .import_historical_sales(&[credit.clone(), paid_first.clone()])
+        .unwrap();
+    assert_eq!((r.imported, r.errors), (2, 0));
+
+    let mut again = paid_first.clone();
+    again.due_date = Some("2026-12-18".into());
+    let r2 = s
+        .import_historical_sales(&[again.clone(), credit.clone()])
+        .unwrap();
+    assert_eq!(
+        (r2.updated, r2.skipped, r2.errors),
+        (1, 1, 0),
+        "{:?}",
+        r2.results
+    );
+    // Una tercera vez ya no cambia nada.
+    let r3 = s.import_historical_sales(&[again]).unwrap();
+    assert_eq!((r3.updated, r3.skipped), (0, 1));
+
+    let open = s
+        .list_sales(&SaleFilter {
+            query: None,
+            view: Some("por_cobrar".into()),
+        })
+        .unwrap();
+    assert_eq!(open.len(), 2);
+    let fe521 = open.iter().find(|x| x.number == "FE-521").unwrap();
+    assert_eq!(fe521.commercial_state, "efectuada");
+    assert_eq!(fe521.documentation_state, "documentada");
+    let det = s.sale(&fe521.uid).unwrap();
+    let terms = det.terms.clone().unwrap();
+    assert_eq!(terms.payment, "credito");
+    assert_eq!(terms.due_date.as_deref(), Some("2026-12-18"));
+    assert_eq!(terms.references[0].folio, "22.112");
+    // No movió stock.
+    assert_eq!(
+        s.search_products("RC17", 5).unwrap()[0].on_hand_milli,
+        50_000
+    );
+
+    // Cobro total: queda cerrada (pagada y documentada).
+    let paid = s
+        .register_payment(
+            &fe521.uid,
+            fe521.total_minor,
+            "transferencia",
+            "2026-12-18",
+            None,
+        )
+        .unwrap();
+    assert_eq!(paid.summary.commercial_state, "cerrada");
+
+    // Anular una venta histórica no devuelve stock que nunca salió.
+    let fe522 = open.iter().find(|x| x.number == "FE-522").unwrap();
+    s.void_sale(&fe522.uid, "prueba").unwrap();
+    assert_eq!(
+        s.search_products("RC17", 5).unwrap()[0].on_hand_milli,
+        50_000
+    );
 }

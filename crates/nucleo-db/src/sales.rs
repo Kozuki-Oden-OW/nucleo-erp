@@ -311,6 +311,9 @@ pub struct HistoricalWrite<'a> {
     pub documentation_state: &'a str,
     pub totals: Totals,
     pub cost_minor: i64,
+    /// Factura a crédito aún no pagada: queda sin pago y con este vencimiento (la cuenta por cobrar la
+    /// crea la aplicación).
+    pub due_date: Option<&'a str>,
     pub payment_method: Option<&'a str>,
     pub notes: Option<&'a str>,
     pub void_reason: Option<&'a str>,
@@ -322,7 +325,7 @@ pub fn insert_historical_sale(
     created_by: Option<i64>,
     now: &str,
 ) -> DbResult<i64> {
-    let paid = if w.commercial_state == "anulada" {
+    let paid = if w.commercial_state == "anulada" || w.due_date.is_some() {
         0
     } else {
         w.totals.total_minor
@@ -330,8 +333,8 @@ pub fn insert_historical_sale(
     conn.execute(
         "INSERT INTO sales (uid, doc_type, number, customer_id, issue_date, issued_at, commercial_state, payment_state,
             paid_minor, documentation_state, net_minor, exempt_minor, discount_minor, tax_minor, total_minor, cost_minor,
-            payment_method, void_reason, notes, historical, created_by, created_at)
-         VALUES (?1, 'VEN', ?2, ?3, ?4, ?4, 'borrador', ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, 1, ?18, ?19)",
+            payment_method, void_reason, notes, historical, created_by, created_at, due_date)
+         VALUES (?1, 'VEN', ?2, ?3, ?4, ?4, 'borrador', ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, 1, ?18, ?19, ?20)",
         rusqlite::params![
             w.uid,
             w.number,
@@ -351,7 +354,8 @@ pub fn insert_historical_sale(
             w.void_reason,
             w.notes,
             created_by,
-            now
+            now,
+            w.due_date
         ],
     )?;
     Ok(conn.last_insert_rowid())

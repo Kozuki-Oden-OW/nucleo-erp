@@ -115,7 +115,7 @@ export function SaleView({ uid }: { uid: string }) {
           </Notice>
         </div>
       )}
-      {s.historical && <div className="mb-6"><Notice tone="info" title="Venta histórica">Importada desde un documento ya emitido ({s.external_ref?.doc_kind ?? "documento"} Nº {s.external_ref?.external_number ?? s.number}). Sirve para reportes y análisis: no movió stock, no registró cobros en NÚCLEO y no genera asientos contables.</Notice></div>}
+      {s.historical && <div className="mb-6"><Notice tone="info" title="Venta histórica">Importada desde un documento ya emitido ({s.external_ref?.doc_kind ?? "documento"} Nº {s.external_ref?.external_number ?? s.number}).{s.commercial_state === "efectuada" && s.paid_minor < s.total_minor ? " Es una factura a crédito por cobrar: no movió stock; registra el cobro cuando llegue el pago." : " Sirve para reportes y análisis: no movió stock, no registró cobros en NÚCLEO y no genera asientos contables."}</Notice></div>}
       {s.commercial_state === "anulada" && <div className="mb-6"><Notice tone="danger" icon={Ban} title="Venta anulada">{s.void_reason}</Notice></div>}
       {editable && (
         <div className="mb-6">

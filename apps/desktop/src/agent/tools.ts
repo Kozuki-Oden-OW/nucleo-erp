@@ -3,7 +3,7 @@
 // valen las mismas reglas, permisos y auditoría.
 import type { Backend } from "../data";
 import { errorMessage } from "../data";
-import type { Customer, HistoricalSale, LineInput, Product, SaleSummary, Supplier } from "../data/types";
+import type { Customer, HistoricalSale, LineInput, Product, SaleSummary, SaleTerms, Supplier } from "../data/types";
 import { EMPTY_TERMS } from "../data/saleTerms";
 import { formatMoney, todayIso } from "../lib/format";
 import { navigate } from "../lib/router";
@@ -62,6 +62,42 @@ async function searchBoth<T extends { uid: string }>(search: (q: string) => Prom
 }
 
 const METHOD: Record<string, string> = { efectivo: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta de débito", cheque: "Cheque", credito: "" };
+
+/** Tipos de referencia del texto de una factura del SII → códigos de las condiciones de venta. */
+const REF_KINDS: [RegExp, string][] = [
+  [/orden\s+(de\s+)?compra/i, "801"],
+  [/gu[ií]a\s+(de\s+)?despacho/i, "52"],
+  [/\bHES\b/i, "HES"],
+  [/\bHEM\b/i, "HEM"],
+  [/nota\s+(de\s+)?pedido/i, "802"],
+  [/nota\s+(de\s+)?venta/i, "NV"],
+  [/contrato/i, "803"],
+];
+
+/**
+ * Condiciones de una venta histórica a partir de la factura: forma de pago (crédito con la fecha de
+ * «Pagos:») y referencias («Orden Compra N° 22.112 del 2026-11-18», guía, HES, nota de pedido…).
+ */
+export function historicalTerms(formaPago: string, referencias: string, ordenCompra = ""): SaleTerms | null {
+  const references: SaleTerms["references"] = [];
+  const re = /([A-Za-zÁÉÍÓÚáéíóúñÑ.]+(?:\s+[A-Za-zÁÉÍÓÚáéíóúñÑ.]+){0,3})\s+N[°º]\s*(.+?)\s+del\s+(\d{4}-\d{2}-\d{2})/g;
+  for (const m of referencias.matchAll(re)) {
+    const label = m[1] ?? "";
+    const kind = REF_KINDS.find(([k]) => k.test(label))?.[1];
+    const folio = (m[2] ?? "").replace(/^[-\s]+|[-\s]+$/g, "").slice(0, 40);
+    if (!kind || !folio || references.some((r) => r.kind === kind && r.folio === folio)) continue;
+    references.push({ kind, folio, date: m[3] ?? null, note: null });
+  }
+  const oc = ordenCompra.trim();
+  if (oc && !references.some((r) => r.kind === "801" && r.folio === oc)) references.unshift({ kind: "801", folio: oc.slice(0, 40), date: null, note: null });
+  const credit = /cr[eé]dito/i.test(formaPago);
+  const due = credit ? /Pagos:\s*(\d{4}-\d{2}-\d{2})/i.exec(referencias)?.[1] ?? null : null;
+  if (!credit && !references.length) return null;
+  return {
+    payment: credit ? "credito" : "", card: null, credit_days: null, due_date: due, bank: null, transfer_date: null,
+    operation: null, references, receiver: null,
+  } as SaleTerms;
+}
 
 async function findSale(backend: Backend, ref: string, view: "borradores" | "por_cobrar"): Promise<SaleSummary> {
   const label = view === "borradores" ? "en borrador" : "por cobrar";
@@ -379,13 +415,16 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
           net_minor: Math.round(num(d, "neto") ?? 0), exempt_minor: Math.round(num(d, "exento") ?? 0), tax_minor: Math.round(num(d, "iva") ?? 0), total_minor: Math.round(num(d, "total") ?? 0),
           payment_terms: str(d, "forma_pago") || null, references: str(d, "referencias") || null, void_reason: str(d, "anulada_por") || null,
           documented: d.documentada !== false, notes: str(d, "notas") || null,
+          due_date: str(d, "vencimiento") || null,
+          terms: historicalTerms(str(d, "forma_pago"), str(d, "referencias"), str(d, "orden_compra")),
         };
       });
       const r = await backend.importHistoricalSales(items);
-      if (r.imported) dataChanged();
+      if (r.imported || r.updated) dataChanged();
       const errs = r.results.filter((x) => x.status === "error");
       return text([
-        `Importadas ${r.imported} · ya estaban ${r.skipped} · con error ${r.errors} · clientes nuevos ${r.customers_created}.`,
+        `Importadas ${r.imported} · actualizadas ${r.updated ?? 0} · ya estaban ${r.skipped} · con error ${r.errors} · clientes nuevos ${r.customers_created}.`,
+        ...r.results.filter((x) => x.status === "actualizada").map((x) => `- Folio ${x.number}: ${x.message ?? "actualizada"}`),
         ...errs.map((x) => `- Folio ${x.number}: ${x.message}`),
       ].join("\n"), r.imported === 0 && r.errors > 0);
     }

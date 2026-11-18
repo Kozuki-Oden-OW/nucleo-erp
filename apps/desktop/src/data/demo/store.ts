@@ -33,7 +33,7 @@ import { guessCategory } from "../../lib/cartola";
 import { BASE_CHART, CONCEPTS, DEFAULT_GROUPS, accountingReport, buildJournal, resolveMap, type AccFacts } from "./accounting";
 import { computeCostSheet, costSheetUsed, type CostSheet } from "../costing";
 import { REPORT_DEFS, buildReport, reportCatalog, type Facts } from "./reports";
-import { CUSTOM_KIND_PREFIX, REFERENCE_KINDS, normalizeTerms } from "../saleTerms";
+import { CUSTOM_KIND_PREFIX, EMPTY_TERMS, REFERENCE_KINDS, normalizeTerms } from "../saleTerms";
 import { DOC_KINDS, buildCredit, type CreditDocRowLike } from "../credit";
 import { EMPTY_RULE } from "../promos";
 import { CUSTOMER_NAMES, DEMO_ACTIVITIES, DEMO_COMMUNES, DEMO_COMPANY, DEMO_PRODUCT_CATEGORIES, DEMO_STREETS, EMPTY_PROFILE, PAYMENT_METHODS, PRODUCT_ROWS, SUPPLIER_NAMES, rng, rutDv } from "./seed";
@@ -63,6 +63,8 @@ interface SaleRec {
   timeline: { at: string; text: string }[]; terms: SaleTerms | null;
   /** Importada como historial: se considera pagada y no movió stock ni dinero. */
   historical?: boolean;
+  /** Histórica a crédito por cobrar: sus cobros se registran como los de cualquier venta. */
+  receivable?: boolean;
 }
 interface PoRec {
   uid: string; number: string; supplier_uid: string; issue_date: string; expected_date: string | null; status: PoStatus;
@@ -364,7 +366,7 @@ export class DemoBackend implements Backend {
   }
 
   private paid(s: SaleRec): number {
-    if (s.historical) return s.commercial_state === "anulada" ? 0 : s.totals.total_minor;
+    if (s.historical && !s.receivable) return s.commercial_state === "anulada" ? 0 : s.totals.total_minor;
     return s.payments.reduce((a, p) => a + p.amount_minor, 0);
   }
   private payState(s: SaleRec): SaleSummary["payment_state"] {
@@ -1568,13 +1570,28 @@ export class DemoBackend implements Backend {
   async importHistoricalSales(items: HistoricalSale[]): Promise<HistoricalReport> {
     this.require("ventas.crear");
     if (items.length > 100) throw new AppError("validacion", "Se importan hasta 100 documentos por vez.");
-    const rep: HistoricalReport = { imported: 0, skipped: 0, errors: 0, customers_created: 0, results: [] };
+    const rep: HistoricalReport = { imported: 0, updated: 0, skipped: 0, errors: 0, customers_created: 0, results: [] };
     const key = (r: string | null | undefined) => (r ?? "").replace(/[.\s]/g, "").toUpperCase();
     for (const it of items) {
       const kind = it.doc_kind.trim();
       const folio = it.number.trim();
       const dup = this.sales.find((x) => x.external_ref?.doc_kind?.toLowerCase() === kind.toLowerCase() && x.external_ref?.external_number === folio);
-      if (dup) { rep.skipped++; rep.results.push({ number: folio, status: "ya_existia", sale_uid: dup.uid, sale_number: dup.number, message: null }); continue; }
+      if (dup) {
+        const reopen = !!it.due_date && dup.historical && !dup.receivable && dup.commercial_state !== "anulada" && !it.void_reason;
+        const fill = !dup.terms && !!it.terms;
+        if (reopen || fill) {
+          if (it.terms) dup.terms = it.terms;
+          if (reopen) {
+            dup.receivable = true; dup.commercial_state = "efectuada"; dup.due_date = it.due_date ?? null;
+            dup.terms = { ...(dup.terms ?? it.terms ?? EMPTY_TERMS), payment: "credito", due_date: it.due_date ?? null };
+          }
+          rep.updated = (rep.updated ?? 0) + 1;
+          rep.results.push({ number: folio, status: "actualizada", sale_uid: dup.uid, sale_number: dup.number, message: reopen ? `queda por cobrar, vence el ${it.due_date}` : "condiciones completadas" });
+        } else {
+          rep.skipped++; rep.results.push({ number: folio, status: "ya_existia", sale_uid: dup.uid, sale_number: dup.number, message: null });
+        }
+        continue;
+      }
       const sum = it.lines.reduce((a, l) => a + l.net_minor, 0);
       const exempt = it.exempt_minor ?? 0;
       if (!it.lines.length || Math.abs(sum - (it.net_minor + exempt)) > 5 || Math.abs(it.net_minor + exempt + it.tax_minor - it.total_minor) > 5) {
@@ -1601,15 +1618,17 @@ export class DemoBackend implements Backend {
       });
       const voided = it.void_reason?.trim() || null;
       const documented = it.documented !== false;
+      const due = !voided && it.due_date ? it.due_date : null;
       const prefix = /gu/i.test(kind) ? "GD" : /bolet/i.test(kind) ? "BE" : "FE";
       const s: SaleRec = {
-        uid: uid("ven"), doc_type: "VEN", number: `${prefix}-${folio}`, customer_uid, issue_date: it.issue_date, due_date: null,
-        commercial_state: voided ? "anulada" : documented ? "cerrada" : "efectuada", documentation_state: documented ? "documentada" : "pendiente",
+        uid: uid("ven"), doc_type: "VEN", number: `${prefix}-${folio}`, customer_uid, issue_date: it.issue_date, due_date: due,
+        commercial_state: voided ? "anulada" : documented && !due ? "cerrada" : "efectuada", documentation_state: documented ? "documentada" : "pendiente",
         lines, totals: { net_minor: it.net_minor, exempt_minor: exempt, discount_minor: lines.reduce((a, l) => a + l.discount_minor, 0), tax_minor: it.tax_minor, total_minor: it.total_minor },
         cost_minor: voided ? 0 : cost, payment_method: it.payment_terms ?? null,
         notes: `Importada como historial desde ${kind} Nº ${folio}: no movió stock ni dinero en NÚCLEO.${it.payment_terms ? ` Forma de pago: ${it.payment_terms}.` : ""}`,
         quote_uid: null, payments: [], external_ref: { doc_kind: kind, external_number: folio, issue_date: it.issue_date, observation: it.references ?? null, marked_at: now() },
-        void_reason: voided, timeline: [{ at: now(), text: `Importada como historial: ${kind} Nº ${folio}` }], terms: null, historical: true,
+        void_reason: voided, timeline: [{ at: now(), text: `Importada como historial: ${kind} Nº ${folio}` }],
+        terms: due ? { ...(it.terms ?? EMPTY_TERMS), payment: "credito", due_date: due } : it.terms ?? null, historical: true, receivable: !!due,
       };
       this.sales.push(s);
       this.log("venta.historial", "venta", s.number);
@@ -1631,7 +1650,8 @@ export class DemoBackend implements Backend {
     if (s.commercial_state === "anulada") throw new AppError("estado", "La venta ya está anulada.");
     if (s.commercial_state === "efectuada" || s.commercial_state === "cerrada") {
       const open = this.resv.filter((r) => r.sale_uid === s.uid && r.status === "activa");
-      for (const l of s.lines) {
+      // Una venta histórica nunca sacó stock: anularla no devuelve nada.
+      for (const l of s.historical ? [] : s.lines) {
         const p = this.products.find((x) => x.uid === l.product_uid);
         const pending = open.filter((r) => r.line_no === l.line_no).reduce((a, r) => a + r.qty - r.dispatched, 0);
         const back = l.qty_milli - pending;

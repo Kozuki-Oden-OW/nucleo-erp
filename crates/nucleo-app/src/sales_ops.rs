@@ -1073,7 +1073,7 @@ impl CompanySession {
 
     /* ───────────── Ventas ───────────── */
 
-    fn sale_row(&self, uid: &str) -> AppResult<SaleRow> {
+    pub(crate) fn sale_row(&self, uid: &str) -> AppResult<SaleRow> {
         db::sale_by_uid(self.db.conn(), uid)?.ok_or_else(|| AppError::NotFound("esa venta".into()))
     }
 
@@ -1617,7 +1617,8 @@ impl CompanySession {
             if !pending.is_empty() {
                 texts.push("Reservas por despachar liberadas".into());
             }
-            for l in &lines {
+            // Una venta histórica nunca sacó stock: anularla no devuelve nada a bodega.
+            for l in lines.iter().filter(|_| !s.historical) {
                 let (Some(pid), Some(cost)) = (l.product_id, l.unit_cost_e4) else {
                     continue;
                 };

@@ -667,9 +667,10 @@ impl CompanySession {
         {
             let mut stmt = conn.prepare(
                 "SELECT s.id, s.uid, s.number, s.issue_date, coalesce(c.name, 'Cliente ocasional'), s.tax_minor, s.total_minor,
-                    s.cost_minor, s.currency_code, s.rate_e6, s.doc_type
+                    CASE WHEN s.historical = 1 THEN 0 ELSE s.cost_minor END, s.currency_code, s.rate_e6, s.doc_type
                  FROM sales s LEFT JOIN customers c ON c.id = s.customer_id
-                 WHERE s.commercial_state IN ('efectuada', 'cerrada') AND s.historical = 0 AND s.issue_date BETWEEN ?1 AND ?2",
+                 WHERE s.commercial_state IN ('efectuada', 'cerrada') AND s.issue_date BETWEEN ?1 AND ?2
+                   AND (s.historical = 0 OR EXISTS (SELECT 1 FROM receivables r WHERE r.sale_id = s.id AND r.status <> 'anulada'))",
             )?;
             type Row = (
                 i64,

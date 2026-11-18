@@ -675,7 +675,7 @@
   {
     "name": "importar_ventas_historicas",
     "nivel": "completo",
-    "description": "Importa como historial documentos de venta ya emitidos fuera de NÚCLEO (facturas electrónicas, guías de despacho que constituyen venta): quedan cerradas y documentadas con su folio para reportes y análisis, sin descontar stock, sin registrar cobros y sin asientos contables. Crea el cliente por RUT si no existe. Un documento ya importado se omite (no duplica). Hasta 100 por llamada; montos en pesos; precio_unitario y valor_neto sin IVA.",
+    "description": "Importa como historial documentos de venta ya emitidos fuera de NÚCLEO (facturas electrónicas, guías de despacho que constituyen venta): quedan documentadas con su folio para reportes y análisis, sin descontar stock. Por defecto quedan cerradas y pagadas (sin cobros ni asientos). Una factura a crédito que todavía no se paga se importa con «vencimiento» (la fecha de «Pagos:» de la factura): queda por cobrar con ese vencimiento y después se le registra el cobro. Las referencias (orden de compra, guía, HES, nota de pedido) y la forma de pago se leen del texto «referencias» y quedan en las condiciones de la venta. Crea el cliente por RUT si no existe. Un documento ya importado no se duplica: si se vuelve a enviar con «vencimiento», o la venta no tenía referencias, se actualiza. Hasta 100 por llamada; montos en pesos; precio_unitario y valor_neto sin IVA.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -780,10 +780,20 @@
                 "type": "number"
               },
               "forma_pago": {
-                "type": "string"
+                "type": "string",
+                "description": "«Contado» o «Crédito», tal como figura en la factura"
               },
               "referencias": {
-                "type": "string"
+                "type": "string",
+                "description": "Texto de referencias de la factura (ej. «- Orden Compra N° 22.112 del 2026-11-18 Pagos: 2026-12-18 $ 1.140.020»)"
+              },
+              "orden_compra": {
+                "type": "string",
+                "description": "N.º de la orden de compra si no viene en «referencias» (opcional)"
+              },
+              "vencimiento": {
+                "type": "string",
+                "description": "AAAA-MM-DD. Solo para facturas a crédito aún no pagadas (fecha de «Pagos:»): la venta queda por cobrar"
               },
               "anulada_por": {
                 "type": "string",

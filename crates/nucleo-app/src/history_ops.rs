@@ -2,11 +2,18 @@
 //! constituyen venta) para tener el historial de clientes, productos y ventas desde el primer día.
 //!
 //! Una venta histórica queda con su estado final (cerrada, o anulada si una nota de crédito la anuló),
-//! anotada con su documento externo y marcada `historical`: **no mueve stock, no registra cobros ni
-//! cuentas por cobrar y no genera asientos contables**, porque el stock y el dinero de hoy ya están en
-//! NÚCLEO. Se puede importar de nuevo sin duplicar: un documento que ya está anotado se omite.
+//! anotada con su documento externo y marcada `historical`: **no mueve stock, no registra cobros y no
+//! genera asientos contables**, porque el stock y el dinero de hoy ya están en NÚCLEO. Se puede
+//! importar de nuevo sin duplicar: un documento que ya está anotado se omite.
+//!
+//! Excepción: una factura a crédito que todavía no se paga (trae `due_date`) queda **por cobrar**:
+//! efectuada y documentada, con su vencimiento en cuentas por cobrar, para registrar el cobro cuando
+//! llegue. Esa venta sí genera su asiento de venta (clientes contra ventas e IVA, sin costo porque no
+//! movió stock), para que el cobro cuadre. Importar de nuevo un documento ya anotado con `due_date`
+//! (o con condiciones nuevas) actualiza la venta histórica en vez de omitirla.
 
 use crate::company::{CompanySession, NewCustomer};
+use crate::sale_terms::SaleTerms;
 use crate::sales_ops::log;
 use crate::{AppError, AppResult};
 use nucleo_db::customers::CustomerProfile;
@@ -75,12 +82,18 @@ pub struct HistoricalSale {
     pub documented: bool,
     /// Texto libre que se agrega a las notas de la venta.
     pub notes: Option<String>,
+    /// Vencimiento (AAAA-MM-DD) de una factura a crédito aún no pagada: la venta queda por cobrar.
+    #[serde(default)]
+    pub due_date: Option<String>,
+    /// Condiciones del documento (forma de pago, referencias como la orden de compra…).
+    #[serde(default)]
+    pub terms: Option<SaleTerms>,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct HistoricalResult {
     pub number: String,
-    /// «importada», «ya_existia» o «error».
+    /// «importada», «actualizada», «ya_existia» o «error».
     pub status: String,
     pub sale_uid: Option<String>,
     pub sale_number: Option<String>,
@@ -90,6 +103,9 @@ pub struct HistoricalResult {
 #[derive(Debug, Clone, Serialize)]
 pub struct HistoricalReport {
     pub imported: usize,
+    /// Ya estaban y se actualizaron (quedaron por cobrar o se completaron sus condiciones).
+    #[serde(default)]
+    pub updated: usize,
     pub skipped: usize,
     pub errors: usize,
     pub customers_created: usize,
@@ -110,6 +126,7 @@ impl CompanySession {
         }
         let mut report = HistoricalReport {
             imported: 0,
+            updated: 0,
             skipped: 0,
             errors: 0,
             customers_created: 0,
@@ -128,18 +145,42 @@ impl CompanySession {
                     }
                 }
                 Ok(None) => {
-                    report.skipped += 1;
                     let uid = db::sale_with_external(
                         self.db.conn(),
                         it.doc_kind.trim(),
                         it.number.trim(),
                     )?;
-                    HistoricalResult {
-                        number: it.number.clone(),
-                        status: "ya_existia".into(),
-                        sale_uid: uid,
-                        sale_number: None,
-                        message: None,
+                    match uid.as_deref().map(|u| self.update_existing(u, it)) {
+                        Some(Ok(Some(msg))) => {
+                            report.updated += 1;
+                            HistoricalResult {
+                                number: it.number.clone(),
+                                status: "actualizada".into(),
+                                sale_uid: uid,
+                                sale_number: None,
+                                message: Some(msg),
+                            }
+                        }
+                        Some(Err(e)) => {
+                            report.errors += 1;
+                            HistoricalResult {
+                                number: it.number.clone(),
+                                status: "error".into(),
+                                sale_uid: uid,
+                                sale_number: None,
+                                message: Some(e.to_string()),
+                            }
+                        }
+                        _ => {
+                            report.skipped += 1;
+                            HistoricalResult {
+                                number: it.number.clone(),
+                                status: "ya_existia".into(),
+                                sale_uid: uid,
+                                sale_number: None,
+                                message: None,
+                            }
+                        }
                     }
                 }
                 Err(e) => {
@@ -259,14 +300,30 @@ impl CompanySession {
             .as_deref()
             .map(str::trim)
             .filter(|r| !r.is_empty());
-        let state = match (voided, it.documented) {
-            (Some(_), _) => "anulada",
-            (None, true) => "cerrada",
-            (None, false) => "efectuada",
+        let due = match (
+            voided,
+            it.due_date
+                .as_deref()
+                .map(str::trim)
+                .filter(|d| !d.is_empty()),
+        ) {
+            (None, Some(d)) => Some(historical_due(&issue, d)?),
+            _ => None,
         };
-        let mut notes = format!(
-            "Importada como historial desde {kind} Nº {folio}: no movió stock ni dinero en NÚCLEO."
-        );
+        let terms = historical_terms(it, &issue, due.as_deref())?;
+        let state = match (voided, it.documented, &due) {
+            (Some(_), _, _) => "anulada",
+            (None, true, None) => "cerrada",
+            _ => "efectuada",
+        };
+        let mut notes = match &due {
+            Some(d) => format!(
+                "Importada como historial desde {kind} Nº {folio}: no movió stock. Factura a crédito por cobrar, vence el {d}."
+            ),
+            None => format!(
+                "Importada como historial desde {kind} Nº {folio}: no movió stock ni dinero en NÚCLEO."
+            ),
+        };
         if let Some(p) = it.payment_terms.as_deref().filter(|p| !p.trim().is_empty()) {
             notes.push_str(&format!(" Forma de pago: {}.", p.trim()));
         }
@@ -309,6 +366,7 @@ impl CompanySession {
                     total_minor: it.total_minor,
                 },
                 cost_minor: if voided.is_some() { 0 } else { cost_total },
+                due_date: due.as_deref(),
                 payment_method: it
                     .payment_terms
                     .as_deref()
@@ -331,6 +389,16 @@ impl CompanySession {
         db::replace_sale_items(&tx, id, &lines)?;
         db::set_item_costs(&tx, id, &costs)?;
         db::finish_historical_sale(&tx, id, state)?;
+        if let Some(d) = &due {
+            db::insert_receivable(&tx, id, customer_id, d, it.total_minor)?;
+        }
+        if let Some(t) = &terms {
+            db::set_sale_terms(
+                &tx,
+                id,
+                Some(&serde_json::to_string(t).map_err(|e| AppError::Validation(e.to_string()))?),
+            )?;
+        }
         if it.documented {
             db::upsert_external_ref(
                 &tx,
@@ -374,6 +442,111 @@ impl CompanySession {
         )?;
         tx.commit()?;
         Ok(Some((uid, number)))
+    }
+
+    /// Documento ya importado: si trae vencimiento y la venta histórica figura pagada sin cobros
+    /// registrados, la deja por cobrar; si trae condiciones (orden de compra, forma de pago) y la venta
+    /// no tenía, las completa. `None` si no había nada que cambiar.
+    fn update_existing(&mut self, uid: &str, it: &HistoricalSale) -> AppResult<Option<String>> {
+        let s = self.sale_row(uid)?;
+        if !s.historical
+            || s.commercial_state == "anulada"
+            || it
+                .void_reason
+                .as_deref()
+                .is_some_and(|r| !r.trim().is_empty())
+        {
+            return Ok(None);
+        }
+        let due = match it
+            .due_date
+            .as_deref()
+            .map(str::trim)
+            .filter(|d| !d.is_empty())
+        {
+            Some(d) => Some(historical_due(&s.issue_date, d)?),
+            None => None,
+        };
+        let conn = self.db.conn();
+        let has_terms = db::sale_terms(conn, s.id)?.is_some_and(|j| !j.trim().is_empty());
+        let payments: i64 = conn.query_row(
+            "SELECT count(*) FROM payment_allocations a JOIN receivables r ON r.id = a.receivable_id WHERE r.sale_id = ?1",
+            [s.id],
+            |r| r.get(0),
+        )?;
+        let receivables: i64 = conn.query_row(
+            "SELECT count(*) FROM receivables WHERE sale_id = ?1 AND status <> 'anulada'",
+            [s.id],
+            |r| r.get(0),
+        )?;
+        let reopen = due.is_some() && payments == 0 && receivables == 0;
+        let terms = if reopen || !has_terms {
+            historical_terms(it, &s.issue_date, due.as_deref())?
+        } else {
+            None
+        };
+        if !reopen && terms.is_none() {
+            return Ok(None);
+        }
+        let now = now_utc();
+        let user = self.actor_name()?;
+        let customer_id = s.customer_id;
+        let tx = self.db.conn_mut().transaction()?;
+        let mut done = Vec::new();
+        if let (true, Some(d)) = (reopen, &due) {
+            // Vuelve de «cerrada» a «efectuada» (solo se permite en ventas históricas) y sin pagos.
+            tx.execute(
+                "UPDATE sales SET commercial_state = 'efectuada', paid_minor = 0, payment_state = 'sin_pago', due_date = ?3, updated_at = ?2 WHERE id = ?1",
+                rusqlite::params![s.id, now, d],
+            )?;
+            db::insert_receivable(&tx, s.id, customer_id, d, s.totals.total_minor)?;
+            let note: String = format!(
+                "{} Factura a crédito por cobrar, vence el {d}.",
+                s.notes.as_deref().unwrap_or("").trim()
+            )
+            .trim()
+            .chars()
+            .take(2000)
+            .collect();
+            tx.execute(
+                "UPDATE sales SET notes = ?2 WHERE id = ?1",
+                rusqlite::params![s.id, note],
+            )?;
+            done.push(format!("queda por cobrar, vence el {d}"));
+        }
+        if let Some(t) = &terms {
+            db::set_sale_terms(
+                &tx,
+                s.id,
+                Some(&serde_json::to_string(t).map_err(|e| AppError::Validation(e.to_string()))?),
+            )?;
+            if !t.references.is_empty() {
+                done.push(format!(
+                    "referencias: {}",
+                    t.references
+                        .iter()
+                        .map(|r| r.folio.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+        }
+        let msg = if done.is_empty() {
+            "condiciones completadas".to_string()
+        } else {
+            done.join(" · ")
+        };
+        log(
+            &tx,
+            &user,
+            "venta.historial",
+            "venta",
+            uid,
+            &format!("Historial actualizado: {msg}"),
+            None,
+        )?;
+        tx.commit()?;
+        Ok(Some(msg))
     }
 
     /// Cliente por RUT (o por nombre exacto si no trae RUT); si no existe, se crea con su ficha.
@@ -443,4 +616,35 @@ impl CompanySession {
         *created += 1;
         Ok(row.id)
     }
+}
+
+/// Vencimiento válido: fecha AAAA-MM-DD no anterior a la emisión.
+fn historical_due(issue: &str, due: &str) -> AppResult<String> {
+    let d = crate::sales_ops::parse_date("el vencimiento", due)?;
+    if d.as_str() < issue {
+        return Err(AppError::Validation(
+            "el vencimiento no puede ser anterior a la emisión".into(),
+        ));
+    }
+    Ok(d)
+}
+
+/// Condiciones validadas de la venta histórica. Con vencimiento, la forma de pago es crédito.
+fn historical_terms(
+    it: &HistoricalSale,
+    issue: &str,
+    due: Option<&str>,
+) -> AppResult<Option<SaleTerms>> {
+    let mut t = it.terms.clone().unwrap_or_default();
+    if let Some(d) = due {
+        t.payment = "credito".into();
+        t.due_date = Some(d.to_string());
+        let days = crate::inventory_ops::date_ord(d).unwrap_or(0)
+            - crate::inventory_ops::date_ord(issue).unwrap_or(0);
+        t.credit_days = Some(days.clamp(1, 365));
+    }
+    if t == SaleTerms::default() {
+        return Ok(None);
+    }
+    Ok(Some(t.validated(issue)?))
 }

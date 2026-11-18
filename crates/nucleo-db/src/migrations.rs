@@ -180,6 +180,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "ventas_historicas",
         sql: include_str!("../migrations/0034_ventas_historicas.sql"),
     },
+    Migration {
+        version: 35,
+        name: "historial_por_cobrar",
+        sql: include_str!("../migrations/0035_historial_por_cobrar.sql"),
+    },
 ];
 
 pub fn latest_version() -> i64 {

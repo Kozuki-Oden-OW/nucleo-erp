@@ -1450,6 +1450,10 @@ export interface HistoricalSale {
   doc_kind: string; number: string; issue_date: string; customer?: HistoricalCustomer | null; lines: HistoricalLine[];
   net_minor: number; exempt_minor?: number; tax_minor: number; total_minor: number; payment_terms?: string | null;
   references?: string | null; void_reason?: string | null; documented?: boolean; notes?: string | null;
+  /** Factura a crédito aún no pagada: queda por cobrar con este vencimiento. */
+  due_date?: string | null;
+  /** Condiciones del documento (forma de pago, orden de compra…). */
+  terms?: SaleTerms | null;
 }
-export interface HistoricalResult { number: string; status: "importada" | "ya_existia" | "error"; sale_uid: string | null; sale_number: string | null; message: string | null }
-export interface HistoricalReport { imported: number; skipped: number; errors: number; customers_created: number; results: HistoricalResult[] }
+export interface HistoricalResult { number: string; status: "importada" | "actualizada" | "ya_existia" | "error"; sale_uid: string | null; sale_number: string | null; message: string | null }
+export interface HistoricalReport { imported: number; updated?: number; skipped: number; errors: number; customers_created: number; results: HistoricalResult[] }

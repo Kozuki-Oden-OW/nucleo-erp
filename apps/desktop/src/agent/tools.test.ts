@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DemoBackend } from "../data/demo/store";
-import { runTool, TOOL_DEFS } from "./tools";
+import { historicalTerms, runTool, TOOL_DEFS } from "./tools";
 
 const txt = (r: { content: { text: string }[] }) => r.content.map((c) => c.text).join("\n");
 
@@ -65,7 +65,7 @@ describe("herramientas de Claude", () => {
     const r = await runTool(b, "completo", "importar_ventas_historicas", { documentos: [doc] });
     expect(txt(r)).toMatch(/Importadas 1 .* clientes nuevos 1/);
     const again = await runTool(b, "completo", "importar_ventas_historicas", { documentos: [doc] });
-    expect(txt(again)).toMatch(/Importadas 0 · ya estaban 1/);
+    expect(txt(again)).toMatch(/Importadas 0 · actualizadas 0 · ya estaban 1/);
     const sales = await b.listSales({ view: "todas", query: "FE-437" });
     expect(sales[0]?.historical).toBe(true);
     expect(sales[0]?.payment_state).toBe("pagada");
@@ -89,5 +89,32 @@ describe("herramientas de Claude", () => {
     await b.addCustomer({ name: "Hospital de Curicó", rut: "61606903-9", kind: "empresa" });
     const r2 = await runTool(b, "borradores", "importar_clientes", { clientes: [{ nombre: "Hospital de Curicó", rut: "61.606.903-9", correo: "compras@hospitalcurico.cl" }] });
     expect(txt(r2)).toMatch(/nuevos 0 · completados 1/);
+  });
+});
+
+describe("historial a crédito", () => {
+  it("lee la orden de compra y la fecha de pago de la factura", () => {
+    const t = historicalTerms("Crédito", "- Guia Despacho Electrónica N° 22 del 2026-09-01 - Orden Compra N° 22.112 del 2026-11-18 - TipoDoc.HES N° 6005 del 2026-11-18 Pagos: 2026-12-18      $ 1.140.020 OC N° 22.112 Forma de Pago:Crédito");
+    expect(t?.payment).toBe("credito");
+    expect(t?.due_date).toBe("2026-12-18");
+    expect(t?.references.map((r) => `${r.kind}:${r.folio}:${r.date}`)).toEqual(["52:22:2026-09-01", "801:22.112:2026-11-18", "HES:6005:2026-11-18"]);
+    expect(historicalTerms("Contado", "")).toBeNull();
+    expect(historicalTerms("Contado", "", "4464-504-AG26")?.references[0]?.folio).toBe("4464-504-AG26");
+  });
+
+  it("una factura ya importada queda por cobrar al enviarla con vencimiento", async () => {
+    const b = new DemoBackend();
+    const doc = { tipo_documento: "Factura electrónica", folio: "521", fecha: "2026-11-18", cliente: { nombre: "Lácteos del Sur", rut: "76716680-K" },
+      lineas: [{ descripcion: "RC-17N", cantidad: 200, precio_unitario: 4790, valor_neto: 958000 }], neto: 958000, iva: 182020, total: 1140020,
+      forma_pago: "Crédito", referencias: "- Orden Compra N° 22.112 del 2026-11-18 Pagos: 2026-12-18 $ 1.140.020" };
+    await runTool(b, "completo", "importar_ventas_historicas", { documentos: [doc] });
+    const r = await runTool(b, "completo", "importar_ventas_historicas", { documentos: [{ ...doc, vencimiento: "2026-12-18" }] });
+    expect(txt(r)).toMatch(/actualizadas 1/);
+    const [s] = await b.listSales({ view: "por_cobrar", query: "FE-521" });
+    expect(s?.total_minor).toBe(1140020);
+    const d = await b.sale(s!.uid);
+    expect(d.terms?.references[0]?.folio).toBe("22.112");
+    expect(d.terms?.due_date).toBe("2026-12-18");
+    expect(txt(await runTool(b, "completo", "registrar_cobro", { venta: "FE-521", monto: 1140020, fecha: "2026-12-18" }))).toMatch(/Queda por cobrar \$0/);
   });
 });
