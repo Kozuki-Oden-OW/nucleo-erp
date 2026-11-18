@@ -103,18 +103,15 @@ impl AgentState {
     fn view(&self) -> AgentView {
         let c = self.config();
         let exe = current_exe();
-        let claude = claude_config_path();
+        let paths = claude_config_paths();
         AgentView {
             enabled: c.enabled,
             level: c.level,
             running: self.server.lock().map(|s| s.is_some()).unwrap_or(false),
             calls: self.calls.load(Ordering::Relaxed),
             last_call: self.last_call.lock().ok().and_then(|l| l.clone()),
-            claude_configured: claude
-                .as_deref()
-                .map(|p| claude_has_entry(p, &exe))
-                .unwrap_or(false),
-            claude_config_path: claude.map(|p| p.display().to_string()),
+            claude_configured: paths.iter().any(|p| claude_has_entry(p, &exe)),
+            claude_config_path: paths.first().map(|p| p.display().to_string()),
             exe_path: exe,
         }
     }
@@ -408,7 +405,45 @@ fn current_exe() -> String {
 
 /* ───────────── Configuración de la app de Claude ───────────── */
 
-/// Archivo de configuración de la app de Claude para el computador.
+/// Archivos de configuración de la app de Claude, el que usa primero. En Windows, la versión de la
+/// Microsoft Store guarda su configuración en una carpeta virtualizada del paquete
+/// (`%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude`) y no lee la de `%APPDATA%`.
+pub fn claude_config_paths() -> Vec<PathBuf> {
+    let mut out = store_config_paths();
+    out.extend(claude_config_path());
+    out
+}
+
+#[cfg(target_os = "windows")]
+fn store_config_paths() -> Vec<PathBuf> {
+    let Some(local) = std::env::var_os("LOCALAPPDATA") else {
+        return Vec::new();
+    };
+    let Ok(entries) = std::fs::read_dir(PathBuf::from(local).join("Packages")) else {
+        return Vec::new();
+    };
+    entries
+        .flatten()
+        .filter(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            name.starts_with("Claude_") || name.starts_with("AnthropicClaude")
+        })
+        .map(|e| {
+            e.path()
+                .join("LocalCache")
+                .join("Roaming")
+                .join("Claude")
+                .join("claude_desktop_config.json")
+        })
+        .collect()
+}
+
+#[cfg(not(target_os = "windows"))]
+fn store_config_paths() -> Vec<PathBuf> {
+    Vec::new()
+}
+
+/// Archivo de configuración de la app de Claude instalada de la forma habitual.
 pub fn claude_config_path() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     let base = std::env::var_os("APPDATA").map(PathBuf::from);
@@ -506,9 +541,23 @@ pub fn agent_reply(agent: State<'_, Arc<AgentState>>, id: u64, result: String) {
 
 #[tauri::command]
 pub fn agent_connect_claude(agent: State<'_, Arc<AgentState>>) -> Result<AgentView, String> {
-    let path =
-        claude_config_path().ok_or("No se encontró la carpeta de configuración de Claude.")?;
-    write_claude_entry(&path, &current_exe())?;
+    let paths = claude_config_paths();
+    if paths.is_empty() {
+        return Err("No se encontró la carpeta de configuración de Claude.".into());
+    }
+    // Se escribe en todas: la de la Store (si existe) y la habitual.
+    let exe = current_exe();
+    let mut errors = Vec::new();
+    let mut ok = 0;
+    for p in &paths {
+        match write_claude_entry(p, &exe) {
+            Ok(()) => ok += 1,
+            Err(e) => errors.push(e),
+        }
+    }
+    if ok == 0 {
+        return Err(errors.join(" · "));
+    }
     Ok(agent.view())
 }
 
