@@ -254,6 +254,14 @@ fn main() {
             });
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("no se pudo iniciar NÚCLEO ERP");
+        .build(tauri::generate_context!())
+        .expect("no se pudo iniciar NÚCLEO ERP")
+        .run(|app, event| {
+            // Al cerrar: apaga el acceso para Claude y borra su archivo de conexión.
+            if let tauri::RunEvent::Exit = event
+                && let Some(agent) = app.try_state::<std::sync::Arc<agent::AgentState>>()
+            {
+                agent.shutdown();
+            }
+        });
 }

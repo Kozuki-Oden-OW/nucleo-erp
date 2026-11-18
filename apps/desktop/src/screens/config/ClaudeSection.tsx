@@ -42,7 +42,7 @@ export function ClaudeSection() {
     setBusy(true);
     try {
       setV(await connectClaude(backend));
-      toast("success", "Listo. Cierra y vuelve a abrir la app de Claude para que vea NÚCLEO.");
+      toast("success", "Se abrió la app de Claude: en la ventana «NÚCLEO ERP» presiona Instalar.");
     } catch (e) { toast("danger", errorMessage(e)); } finally { setBusy(false); }
   };
   const snippet = JSON.stringify({ mcpServers: { "nucleo-erp": { command: v.exe_path || "C:\\…\\nucleo-erp.exe", args: ["--mcp"] } } }, null, 2);
@@ -91,19 +91,18 @@ export function ClaudeSection() {
 
       <Card
         title="Conectar con la app de Claude"
-        subtitle="Agrega NÚCLEO a la app de Claude de este computador. Se hace una sola vez."
+        subtitle="Instala la extensión de NÚCLEO en la app de Claude de este computador. Se hace una sola vez."
         actions={v.claude_configured ? <Badge tone="success" icon={CheckCircle2}>Conectado</Badge> : undefined}
       >
         <div className="flex flex-col gap-4">
           <ol className="grid list-decimal gap-1.5 pl-5 text-sm">
             <li>Activa «Permitir que Claude use NÚCLEO» arriba.</li>
-            <li>Presiona «Conectar con Claude».</li>
-            <li>Cierra y vuelve a abrir la app de Claude. NÚCLEO aparece en sus conectores como «nucleo-erp».</li>
+            <li>Presiona «Instalar en Claude»: se abre la app de Claude con la extensión «NÚCLEO ERP». Presiona Instalar.</li>
+            <li>Si no se abre, arrastra el archivo NucleoERP.mcpb a Claude → Configuración → Extensiones.</li>
             <li>Pídele a Claude, por ejemplo: «En NÚCLEO, registra un gasto de $25.000 en combustible».</li>
           </ol>
           <div className="flex flex-wrap items-center gap-2">
-            <Button icon={PlugZap} onClick={() => void connect()} disabled={demo || busy || !editable}>{v.claude_configured ? "Volver a conectar" : "Conectar con Claude"}</Button>
-            {v.claude_config_path && <span className="text-xs text-muted">Se agrega a {v.claude_config_path}</span>}
+            <Button icon={PlugZap} onClick={() => void connect()} disabled={demo || busy || !editable}>{v.claude_configured ? "Volver a instalar" : "Instalar en Claude"}</Button>
           </div>
           <details className="rounded-lg border border-line p-3">
             <summary className="cursor-pointer text-sm font-medium">Configurarlo a mano</summary>

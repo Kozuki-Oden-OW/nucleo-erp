@@ -23,21 +23,35 @@ const INSTRUCTIONS =
 const CLOSED =
   "NÚCLEO no está abierto o el acceso para Claude está desactivado. Abre NÚCLEO ERP y activa Configuración → Claude → «Permitir que Claude use NÚCLEO».";
 
-/** Carpeta de datos de NÚCLEO (la misma que usa la ventana). */
-function dataDir() {
+/** Carpetas donde puede estar la carpeta de datos de NÚCLEO (la misma que usa la ventana). */
+function dataDirs() {
+  const dirs = [];
   if (process.platform === "win32") {
-    return path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "NucleoERP");
+    if (process.env.LOCALAPPDATA) dirs.push(path.join(process.env.LOCALAPPDATA, "NucleoERP"));
+    if (process.env.USERPROFILE) dirs.push(path.join(process.env.USERPROFILE, "AppData", "Local", "NucleoERP"));
+    dirs.push(path.join(os.homedir(), "AppData", "Local", "NucleoERP"));
+  } else if (process.platform === "darwin") {
+    dirs.push(path.join(os.homedir(), "Library", "Application Support", "NucleoERP"));
+  } else {
+    dirs.push(path.join(process.env.XDG_DATA_HOME || path.join(os.homedir(), ".local", "share"), "NucleoERP"));
   }
-  if (process.platform === "darwin") return path.join(os.homedir(), "Library", "Application Support", "NucleoERP");
-  return path.join(process.env.XDG_DATA_HOME || path.join(os.homedir(), ".local", "share"), "NucleoERP");
+  return [...new Set(dirs)];
 }
 
-function endpoint() {
-  try {
-    return JSON.parse(fs.readFileSync(path.join(dataDir(), "agent-endpoint.json"), "utf8"));
-  } catch {
-    return null;
+/** Datos de conexión que deja NÚCLEO al activar el acceso (todos los que haya), y lo que se revisó. */
+function endpoints() {
+  const found = [];
+  const tried = [];
+  for (const dir of dataDirs()) {
+    const file = path.join(dir, "agent-endpoint.json");
+    try {
+      const ep = JSON.parse(fs.readFileSync(file, "utf8"));
+      if (!found.some((x) => x.port === ep.port && x.token === ep.token)) found.push(ep);
+    } catch (e) {
+      tried.push(`${file}: ${e.code || e.message}`);
+    }
   }
+  return { found, tried };
 }
 
 const toolError = (text) => ({ content: [{ type: "text", text }], isError: true });
@@ -72,18 +86,23 @@ function post(ep, body) {
 }
 
 async function callTool(name, args) {
-  const ep = endpoint();
-  if (!ep) return toolError(CLOSED);
-  try {
-    const r = await post(ep, { name, arguments: args || {} });
-    if (r.status === 200) {
-      try { return JSON.parse(r.body); } catch { return toolError("Respuesta inválida de NÚCLEO."); }
+  const { found, tried } = endpoints();
+  if (!found.length) return toolError(`${CLOSED}\n\nDetalle técnico: no se encontró el archivo de conexión (${tried.join(" · ")}).`);
+  const failures = [];
+  // Si quedó un archivo de una sesión anterior, se prueba el siguiente.
+  for (const ep of found) {
+    try {
+      const r = await post(ep, { name, arguments: args || {} });
+      if (r.status === 200) {
+        try { return JSON.parse(r.body); } catch { return toolError("Respuesta inválida de NÚCLEO."); }
+      }
+      if (r.status === 401) { failures.push(`${ep.port}: llave antigua`); continue; }
+      return toolError(`NÚCLEO respondió ${r.status}: ${r.body}`);
+    } catch (e) {
+      failures.push(`${ep.port}: ${e.code || e.message}`);
     }
-    if (r.status === 401) return toolError("NÚCLEO se reinició; vuelve a intentarlo.");
-    return toolError(`NÚCLEO respondió ${r.status}: ${r.body}`);
-  } catch {
-    return toolError(CLOSED);
   }
+  return toolError(`${CLOSED} Si NÚCLEO está abierto, ciérralo y vuelve a abrirlo.\n\nDetalle técnico: ${failures.join(" · ")}.`);
 }
 
 async function answer(msg) {

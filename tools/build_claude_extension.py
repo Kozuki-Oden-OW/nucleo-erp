@@ -19,10 +19,12 @@ EXT = ROOT / "tools" / "claude-extension"
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(ROOT / "dist-extension"))
-    out = pathlib.Path(ap.parse_args().out)
+    ap.add_argument("--version", help="versión de la extensión (por defecto, la de package.json)")
+    args = ap.parse_args()
+    out = pathlib.Path(args.out)
 
     tools = json.loads((ROOT / "apps/desktop/src/agent/tools.json").read_text(encoding="utf-8"))
-    version = json.loads((ROOT / "apps/desktop/package.json").read_text(encoding="utf-8"))["version"]
+    version = args.version or json.loads((ROOT / "apps/desktop/package.json").read_text(encoding="utf-8"))["version"]
     shutil.copy(ROOT / "apps/desktop/src/agent/tools.json", EXT / "server" / "tools.json")
     shutil.copy(ROOT / "apps/desktop/src-tauri/icons/icon.png", EXT / "icon.png")
 

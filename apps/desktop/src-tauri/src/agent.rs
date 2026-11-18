@@ -110,7 +110,8 @@ impl AgentState {
             running: self.server.lock().map(|s| s.is_some()).unwrap_or(false),
             calls: self.calls.load(Ordering::Relaxed),
             last_call: self.last_call.lock().ok().and_then(|l| l.clone()),
-            claude_configured: paths.iter().any(|p| claude_has_entry(p, &exe)),
+            claude_configured: extension_installed(&paths)
+                || paths.iter().any(|p| claude_has_entry(p, &exe)),
             claude_config_path: paths.first().map(|p| p.display().to_string()),
             exe_path: exe,
         }
@@ -154,6 +155,19 @@ impl AgentState {
             }
             _ => {}
         }
+    }
+}
+
+impl AgentState {
+    /// Al cerrar NÚCLEO: apaga el servidor y borra el archivo de conexión, para que Claude no intente
+    /// un puerto que ya no existe.
+    pub fn shutdown(&self) {
+        if let Ok(mut g) = self.server.lock()
+            && let Some(s) = g.take()
+        {
+            s.stop.store(true, Ordering::SeqCst);
+        }
+        let _ = std::fs::remove_file(self.data_dir.join(ENDPOINT_FILE));
     }
 }
 
@@ -471,39 +485,6 @@ fn claude_has_entry(path: &Path, exe: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// Agrega (o actualiza) NÚCLEO en la configuración de Claude sin tocar el resto. Guarda una copia del
-/// archivo anterior junto a él.
-pub fn write_claude_entry(path: &Path, exe: &str) -> Result<(), String> {
-    let mut root: Value = match std::fs::read(path) {
-        Ok(b) if !b.iter().all(u8::is_ascii_whitespace) => serde_json::from_slice(&b)
-            .map_err(|e| format!("El archivo de configuración de Claude no es JSON válido ({e}); revísalo antes de conectar."))?,
-        _ => json!({}),
-    };
-    if !root.is_object() {
-        return Err("El archivo de configuración de Claude tiene un formato inesperado.".into());
-    }
-    if path.exists() {
-        let _ = std::fs::copy(path, path.with_extension("json.bak"));
-    }
-    let servers = root
-        .as_object_mut()
-        .expect("objeto")
-        .entry("mcpServers")
-        .or_insert_with(|| json!({}));
-    if !servers.is_object() {
-        *servers = json!({});
-    }
-    servers.as_object_mut().expect("objeto").insert(
-        SERVER_NAME.into(),
-        json!({ "command": exe, "args": ["--mcp"] }),
-    );
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-    }
-    let text = serde_json::to_string_pretty(&root).map_err(|e| e.to_string())?;
-    std::fs::write(path, text).map_err(|e| format!("No se pudo escribir {}: {e}", path.display()))
-}
-
 /* ───────────── Comandos IPC ───────────── */
 
 #[tauri::command]
@@ -541,24 +522,43 @@ pub fn agent_reply(agent: State<'_, Arc<AgentState>>, id: u64, result: String) {
 
 #[tauri::command]
 pub fn agent_connect_claude(agent: State<'_, Arc<AgentState>>) -> Result<AgentView, String> {
-    let paths = claude_config_paths();
-    if paths.is_empty() {
-        return Err("No se encontró la carpeta de configuración de Claude.".into());
-    }
-    // Se escribe en todas: la de la Store (si existe) y la habitual.
-    let exe = current_exe();
-    let mut errors = Vec::new();
-    let mut ok = 0;
-    for p in &paths {
-        match write_claude_entry(p, &exe) {
-            Ok(()) => ok += 1,
-            Err(e) => errors.push(e),
-        }
-    }
-    if ok == 0 {
-        return Err(errors.join(" · "));
-    }
+    // La extensión se instala con la ventana de la propia app de Claude: funciona con cualquier forma de
+    // instalación de Claude (también la de la Microsoft Store, que ignora el archivo de configuración).
+    let file = agent.data_dir.join("NucleoERP.mcpb");
+    std::fs::create_dir_all(&agent.data_dir).map_err(|e| e.to_string())?;
+    std::fs::write(&file, EXTENSION)
+        .map_err(|e| format!("No se pudo preparar la extensión: {e}"))?;
+    open_with_system(&file)?;
     Ok(agent.view())
+}
+
+/// Extensión para la app de Claude (`tools/build_claude_extension.py`).
+const EXTENSION: &[u8] = include_bytes!("../resources/NucleoERP.mcpb");
+
+/// Abre el archivo con el programa asociado (la app de Claude para los .mcpb).
+fn open_with_system(path: &Path) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    let mut cmd = std::process::Command::new("explorer.exe");
+    #[cfg(target_os = "macos")]
+    let mut cmd = std::process::Command::new("open");
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let mut cmd = std::process::Command::new("xdg-open");
+    cmd.arg(path)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("No se pudo abrir la extensión ({e}). Arrástrala a Claude → Configuración → Extensiones: {}", path.display()))
+}
+
+/// ¿La extensión de NÚCLEO está instalada en la app de Claude?
+fn extension_installed(config_paths: &[PathBuf]) -> bool {
+    config_paths.iter().filter_map(|p| p.parent()).any(|dir| {
+        std::fs::read_dir(dir.join("Claude Extensions"))
+            .map(|it| {
+                it.flatten()
+                    .any(|e| e.file_name().to_string_lossy().contains(SERVER_NAME))
+            })
+            .unwrap_or(false)
+    })
 }
 
 /* ───────────── Puente MCP (nucleo-erp.exe --mcp) ───────────── */
@@ -732,6 +732,44 @@ No inventes RUT ni datos de clientes: si falta algo, pregúntalo. Nunca escribas
 mod tests {
     use super::*;
 
+    fn listening(port: u16) -> bool {
+        TcpStream::connect_timeout(&([127, 0, 0, 1], port).into(), Duration::from_millis(500))
+            .is_ok()
+    }
+
+    fn endpoint_in(dir: &Path) -> Option<Endpoint> {
+        serde_json::from_slice(&std::fs::read(dir.join(ENDPOINT_FILE)).ok()?).ok()
+    }
+
+    #[test]
+    fn activar_desactivar_y_volver_a_activar() {
+        let app = tauri::test::mock_app();
+        let dir = tempfile::tempdir().unwrap();
+        let st = Arc::new(AgentState::load(dir.path()));
+        assert!(endpoint_in(dir.path()).is_none(), "apagado por defecto");
+
+        st.config.lock().unwrap().enabled = true;
+        st.apply(app.handle());
+        let a = endpoint_in(dir.path()).expect("archivo de conexión");
+        assert!(listening(a.port), "escucha al activar");
+
+        st.config.lock().unwrap().enabled = false;
+        st.apply(app.handle());
+        assert!(endpoint_in(dir.path()).is_none(), "se borra al desactivar");
+        std::thread::sleep(Duration::from_millis(200));
+        assert!(!listening(a.port), "deja de escuchar al desactivar");
+
+        st.config.lock().unwrap().enabled = true;
+        st.apply(app.handle());
+        let b = endpoint_in(dir.path()).expect("archivo nuevo");
+        assert_ne!(a.token, b.token, "llave nueva");
+        assert!(listening(b.port), "vuelve a escuchar");
+
+        // Al cerrar NÚCLEO el archivo no queda apuntando a un puerto muerto.
+        st.shutdown();
+        assert!(endpoint_in(dir.path()).is_none());
+    }
+
     #[test]
     fn tools_list_has_every_tool_with_schema() {
         let list = bridge::tools_list();
@@ -755,29 +793,6 @@ mod tests {
         );
         let unknown = bridge::answer(&json!({"jsonrpc":"2.0","id":2,"method":"x/y"})).unwrap();
         assert_eq!(unknown["error"]["code"], -32601);
-    }
-
-    #[test]
-    fn claude_config_is_merged_and_backed_up() {
-        let dir = tempfile::tempdir().unwrap();
-        let p = dir.path().join("Claude").join("claude_desktop_config.json");
-        std::fs::create_dir_all(p.parent().unwrap()).unwrap();
-        std::fs::write(
-            &p,
-            r#"{"mcpServers":{"otro":{"command":"x"}},"theme":"dark"}"#,
-        )
-        .unwrap();
-        write_claude_entry(&p, "C:\\NucleoERP\\nucleo-erp.exe").unwrap();
-        let v: Value = serde_json::from_slice(&std::fs::read(&p).unwrap()).unwrap();
-        assert_eq!(v["theme"], "dark");
-        assert_eq!(v["mcpServers"]["otro"]["command"], "x");
-        assert_eq!(v["mcpServers"][SERVER_NAME]["args"][0], "--mcp");
-        assert!(claude_has_entry(&p, "C:\\NucleoERP\\nucleo-erp.exe"));
-        assert!(p.with_extension("json.bak").exists());
-        // Un archivo dañado no se pisa.
-        std::fs::write(&p, "{ roto").unwrap();
-        assert!(write_claude_entry(&p, "x").is_err());
-        assert_eq!(std::fs::read_to_string(&p).unwrap(), "{ roto");
     }
 
     #[test]

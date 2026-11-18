@@ -26,6 +26,8 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev
       - name: Sin valores normativos en el código
         run: python3 tools/check_normativa.py
+      - name: Extensión de Claude al día con las herramientas
+        run: cmp apps/desktop/src/agent/tools.json tools/claude-extension/server/tools.json
       - name: Sitio web se construye sin marcadores pendientes
         run: python3 tools/build_web.py --out dist-web
       - uses: pnpm/action-setup@v4

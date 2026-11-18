@@ -18,30 +18,37 @@ con las mismas reglas, permisos y auditoría del programa.
    | Acceso completo | Lo anterior + `clic`, `escribir`, `elegir`, `tecla`, `confirmar_venta`, `registrar_cobro` y gastos pagados |
 
    Siempre valen además los permisos del usuario con que está abierta la sesión.
-3. «Conectar con Claude» agrega NÚCLEO a `claude_desktop_config.json` sin tocar el resto del archivo y
-   guarda una copia `.json.bak`. Luego se cierra y se vuelve a abrir la app de Claude.
+3. «Instalar en Claude» abre en la app de Claude la extensión **NucleoERP.mcpb** (formato MCPB) y la
+   persona presiona Instalar. Si no se abre, se arrastra el archivo a Claude → Configuración →
+   Extensiones.
 
-   En Windows, la app de Claude se instala como paquete MSIX (Microsoft Store, WinGet y también el
-   instalador `claude-setup.exe`) y lee su configuración desde la carpeta virtualizada
-   `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\`, no desde
-   `%APPDATA%\Claude\`. Además, su botón «Editar configuración» abre el archivo equivocado (error
-   conocido de Claude). Por eso NÚCLEO escribe en ambas carpetas.
+   Se usa una extensión y no el archivo `claude_desktop_config.json` porque en Windows la app de Claude
+   se instala como paquete MSIX (Microsoft Store, WinGet y también `claude-setup.exe`): lee su
+   configuración desde `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\`, su
+   botón «Editar configuración» abre otro archivo y, según la versión, ignora los servidores de ese
+   archivo. Las extensiones se instalan desde la propia app y funcionan siempre.
 
 ## 2. Arquitectura
 
 ```
-App de Claude ──stdio (MCP)──▶ nucleo-erp.exe --mcp ──HTTP 127.0.0.1 + llave──▶ ventana de NÚCLEO
-                               (puente, sin ventana)                            (servidor en Rust → evento
-                                                                                 a la interfaz → herramienta)
+App de Claude ──stdio (MCP)──▶ extensión NucleoERP.mcpb ──HTTP 127.0.0.1 + llave──▶ ventana de NÚCLEO
+                               (Node.js integrado de Claude)                       (servidor en Rust → evento
+                                                                                    a la interfaz → herramienta)
 ```
 
-- **Puente** (`agent.rs::bridge`): el mismo ejecutable con `--mcp`. Habla MCP (JSON-RPC, un mensaje por
+- **Extensión** (`tools/claude-extension/`, armada con `tools/build_claude_extension.py` y guardada en
+  `apps/desktop/src-tauri/resources/`): `server/index.js` sin dependencias, con la misma lista de
+  herramientas (`tools.json`, el CI verifica que esté al día). Busca el archivo de conexión en las
+  carpetas posibles y, si uno quedó de una sesión anterior, prueba el siguiente.
+
+- **Puente alternativo** (`agent.rs::bridge`): el mismo ejecutable con `--mcp`, para otros clientes MCP. Habla MCP (JSON-RPC, un mensaje por
   línea), responde `initialize` y `tools/list` por sí mismo —Claude conoce las herramientas aunque
   NÚCLEO esté cerrado— y reenvía `tools/call`. Si NÚCLEO está cerrado o el acceso apagado, devuelve un
   error que explica qué hacer.
 - **Servidor local** (`agent.rs`): solo existe con el acceso activado. Escucha en `127.0.0.1` en un
   puerto al azar, exige una llave de 192 bits nueva en cada arranque y la deja, con el puerto, en
-  `%LOCALAPPDATA%\NucleoERP\agent-endpoint.json` (carpeta del usuario). Atiende una llamada a la vez.
+  `%LOCALAPPDATA%\NucleoERP\agent-endpoint.json` (carpeta del usuario), que se borra al desactivar
+  el acceso y al cerrar NÚCLEO. Atiende una llamada a la vez.
 - **Interfaz** (`src/agent/`): `tools.json` (lista compartida con Rust), `tools.ts` (ejecución, niveles),
   `dom.ts` (lectura de la pantalla y acciones), `cursor.ts` (cursor y aviso), `host.tsx` (recibe el
   evento `agent://call` y responde con `agent_reply`).
@@ -73,6 +80,6 @@ los avisos, el contenido —las tablas como filas «celda | celda»— y cada co
 
 ## 6. Pendientes
 
-- Probar en Windows el puente con el subsistema gráfico (la app de Claude lo lanza con tuberías).
+- Probado en Windows con la extensión (2026-11-18): resumen y lectura de pantalla desde Claude.
 - Captura de imagen de la ventana como herramienta opcional (hoy la pantalla se entrega como texto).
 - Herramientas para compras, inventario e importaciones.
