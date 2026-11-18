@@ -85,7 +85,7 @@ CREATE TABLE sync_conflicts (
 
 
 CREATE TRIGGER sync_categories_ai AFTER INSERT ON categories
-WHEN (SELECT applying FROM sync_state WHERE id = 1) = 0
+WHEN (SELECT applying FROM sync_state WHERE id = 1) = 0 AND NEW.uid IS NOT NULL
 BEGIN
     UPDATE sync_state SET
         hlc_counter = CASE WHEN max(CAST(unixepoch('subsec') * 1000 AS INTEGER), hlc_ms) = hlc_ms THEN hlc_counter + 1 ELSE 0 END,
@@ -100,7 +100,7 @@ BEGIN
 END;
 
 CREATE TRIGGER sync_categories_au AFTER UPDATE ON categories
-WHEN (SELECT applying FROM sync_state WHERE id = 1) = 0
+WHEN (SELECT applying FROM sync_state WHERE id = 1) = 0 AND NEW.uid IS NOT NULL
 BEGIN
     UPDATE sync_state SET
         hlc_counter = CASE WHEN max(CAST(unixepoch('subsec') * 1000 AS INTEGER), hlc_ms) = hlc_ms THEN hlc_counter + 1 ELSE 0 END,
@@ -118,7 +118,7 @@ BEGIN
 END;
 
 CREATE TRIGGER sync_customers_ai AFTER INSERT ON customers
-WHEN (SELECT applying FROM sync_state WHERE id = 1) = 0
+WHEN (SELECT applying FROM sync_state WHERE id = 1) = 0 AND NEW.uid IS NOT NULL
 BEGIN
     UPDATE sync_state SET
         hlc_counter = CASE WHEN max(CAST(unixepoch('subsec') * 1000 AS INTEGER), hlc_ms) = hlc_ms THEN hlc_counter + 1 ELSE 0 END,
@@ -169,7 +169,7 @@ BEGIN
 END;
 
 CREATE TRIGGER sync_customers_au AFTER UPDATE ON customers
-WHEN (SELECT applying FROM sync_state WHERE id = 1) = 0
+WHEN (SELECT applying FROM sync_state WHERE id = 1) = 0 AND NEW.uid IS NOT NULL
 BEGIN
     UPDATE sync_state SET
         hlc_counter = CASE WHEN max(CAST(unixepoch('subsec') * 1000 AS INTEGER), hlc_ms) = hlc_ms THEN hlc_counter + 1 ELSE 0 END,
@@ -241,7 +241,7 @@ BEGIN
 END;
 
 CREATE TRIGGER sync_suppliers_ai AFTER INSERT ON suppliers
-WHEN (SELECT applying FROM sync_state WHERE id = 1) = 0
+WHEN (SELECT applying FROM sync_state WHERE id = 1) = 0 AND NEW.uid IS NOT NULL
 BEGIN
     UPDATE sync_state SET
         hlc_counter = CASE WHEN max(CAST(unixepoch('subsec') * 1000 AS INTEGER), hlc_ms) = hlc_ms THEN hlc_counter + 1 ELSE 0 END,
@@ -286,7 +286,7 @@ BEGIN
 END;
 
 CREATE TRIGGER sync_suppliers_au AFTER UPDATE ON suppliers
-WHEN (SELECT applying FROM sync_state WHERE id = 1) = 0
+WHEN (SELECT applying FROM sync_state WHERE id = 1) = 0 AND NEW.uid IS NOT NULL
 BEGIN
     UPDATE sync_state SET
         hlc_counter = CASE WHEN max(CAST(unixepoch('subsec') * 1000 AS INTEGER), hlc_ms) = hlc_ms THEN hlc_counter + 1 ELSE 0 END,
@@ -349,7 +349,7 @@ BEGIN
 END;
 
 CREATE TRIGGER sync_products_ai AFTER INSERT ON products
-WHEN (SELECT applying FROM sync_state WHERE id = 1) = 0
+WHEN (SELECT applying FROM sync_state WHERE id = 1) = 0 AND NEW.uid IS NOT NULL
 BEGIN
     UPDATE sync_state SET
         hlc_counter = CASE WHEN max(CAST(unixepoch('subsec') * 1000 AS INTEGER), hlc_ms) = hlc_ms THEN hlc_counter + 1 ELSE 0 END,
@@ -394,7 +394,7 @@ BEGIN
 END;
 
 CREATE TRIGGER sync_products_au AFTER UPDATE ON products
-WHEN (SELECT applying FROM sync_state WHERE id = 1) = 0
+WHEN (SELECT applying FROM sync_state WHERE id = 1) = 0 AND NEW.uid IS NOT NULL
 BEGIN
     UPDATE sync_state SET
         hlc_counter = CASE WHEN max(CAST(unixepoch('subsec') * 1000 AS INTEGER), hlc_ms) = hlc_ms THEN hlc_counter + 1 ELSE 0 END,

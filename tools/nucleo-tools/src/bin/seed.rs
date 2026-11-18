@@ -182,8 +182,8 @@ fn base(tx: &Transaction) {
     .unwrap();
     for i in 0..50 {
         tx.execute(
-            "INSERT INTO categories (name) VALUES (?1)",
-            [format!("Categoría {i:02}")],
+            "INSERT INTO categories (uid, name, created_at) VALUES (?2, ?1, datetime())",
+            [format!("Categoría {i:02}"), format!("cat-{i:02}")],
         )
         .unwrap();
     }

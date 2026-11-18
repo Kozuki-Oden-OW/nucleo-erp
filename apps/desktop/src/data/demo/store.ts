@@ -725,7 +725,7 @@ export class DemoBackend implements Backend {
       const hist = this.history[key] ?? 0;
       series.push({
         month: key, sales_minor: hist + sumBy((s) => s.issue_date.startsWith(key), (s) => s.totals.total_minor),
-        margin_minor: Math.round(hist / 1.19 * 0.34) + sumBy((s) => s.issue_date.startsWith(key), (s) => s.totals.net_minor + s.totals.exempt_minor - s.cost_minor),
+        margin_minor: Math.round(((hist * 1_000_000) / (1_000_000 + (this.taxPpm() ?? 0))) * 0.34) + sumBy((s) => s.issue_date.startsWith(key), (s) => s.totals.net_minor + s.totals.exempt_minor - s.cost_minor),
       });
     }
     const day = Number(t.slice(8, 10));

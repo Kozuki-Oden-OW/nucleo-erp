@@ -15,7 +15,6 @@ import { ProductPicker, SupplierPicker, type ProductPickerHandle } from "../vent
 interface Current { qty: number; avg_e4: number }
 interface Row { key: number; product: Product; qty: string; cost: string; current: Current | null }
 let seq = 0;
-const IVA = 1.19;
 
 export function StockEntryEditor() {
   const backend = useBackend();
@@ -23,6 +22,9 @@ export function StockEntryEditor() {
   const route = useRoute();
   const { can } = useSession();
   const costs = can("costos.ver");
+  // Tasa de IVA desde las reglas vigentes (nucleo-rules), para pasar costos con IVA a neto.
+  const [vatPpm, setVatPpm] = useState<number | null>(null);
+  useEffect(() => { backend.ruleValue("IVA_TASA_GENERAL_PPM").then((r) => setVatPpm(r?.value ?? null)).catch(() => {}); }, [backend]);
   const [whs, setWhs] = useState<Warehouse[] | null>(null);
   const [wh, setWh] = useState("");
   const [date, setDate] = useState(todayIso());
@@ -83,7 +85,7 @@ export function StockEntryEditor() {
   const netCost = (r: Row): number | null => {
     const v = parseMoney(r.cost);
     if (v === null) return null;
-    return withIva ? Math.round(v / IVA) : v;
+    return withIva && vatPpm !== null ? Math.round((v * 1_000_000) / (1_000_000 + vatPpm)) : v;
   };
   const lineCost = (r: Row) => netCost(r) ?? (r.current ? Math.round(r.current.avg_e4 / 10_000) : Math.round(r.product.cost_e4 / 10_000));
   const total = rows.reduce((a, r) => a + Math.round(((parseQty(r.qty) ?? 0) * lineCost(r)) / 1000), 0);
