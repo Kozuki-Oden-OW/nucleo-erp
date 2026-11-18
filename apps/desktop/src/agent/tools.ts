@@ -302,6 +302,19 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
       dataChanged();
       return text(`Venta ${done.number} confirmada · total ${pesos(done.total_minor)} · ${credito ? `por cobrar hasta ${done.due_date ?? ""}` : `pagada (${done.payment_method ?? ""})`}.`);
     }
+    case "documentar_venta": {
+      const ref = str(a, "venta");
+      const list = await backend.listSales({ view: "todas", query: ref });
+      const s = list.find((x) => x.uid === ref || norm(x.number) === norm(ref)) ?? (list.length === 1 ? list[0] : undefined)
+        ?? (await backend.listSales({ view: "todas" })).find((x) => x.uid === ref);
+      if (!s) throw new Error(`No encontré la venta «${ref}».`);
+      const done = await backend.markDocumented(s.uid, {
+        doc_kind: str(a, "tipo_documento") || "Factura electrónica", external_number: str(a, "folio"),
+        issue_date: str(a, "fecha") || undefined, observation: str(a, "referencias") || undefined,
+      });
+      dataChanged();
+      return text(`Venta ${done.number} documentada con ${str(a, "tipo_documento") || "Factura electrónica"} Nº ${str(a, "folio")} · estado ${done.commercial_state}.`);
+    }
     case "importar_ventas_historicas": {
       const docs = Array.isArray(a.documentos) ? (a.documentos as Args[]) : [];
       if (!docs.length) throw new Error("No hay documentos para importar.");

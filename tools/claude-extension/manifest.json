@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "nucleo-erp",
   "display_name": "NÚCLEO ERP",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "description": "Permite que Claude use NÚCLEO ERP en este computador: ve la pantalla, la recorre con su propio cursor y registra ventas, gastos, clientes y cobros.",
   "long_description": "Conecta Claude con NÚCLEO ERP, el sistema de gestión local y gratuito para pymes chilenas. NÚCLEO debe estar abierto con Configuración → Claude activado; ahí eliges si Claude solo mira, crea borradores o tiene acceso completo. La extensión solo se comunica con NÚCLEO dentro del mismo computador (127.0.0.1): los datos del negocio siguen guardados solo en tu equipo.",
   "author": {
@@ -107,6 +107,10 @@
     {
       "name": "confirmar_venta",
       "description": "Confirma una venta en borrador: le asigna número, descuenta stock y registra el cobro (contado) o la deja por cobrar (crédito)."
+    },
+    {
+      "name": "documentar_venta",
+      "description": "Anota en una venta efectuada el documento tributario con que se respaldó (factura, boleta o guía emitida en el SII): tipo, folio, fecha y referencias. Si además está pagada, la venta queda cerrada."
     },
     {
       "name": "registrar_cobro",

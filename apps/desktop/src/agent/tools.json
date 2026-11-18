@@ -545,6 +545,40 @@
     }
   },
   {
+    "name": "documentar_venta",
+    "nivel": "completo",
+    "description": "Anota en una venta efectuada el documento tributario con que se respaldó (factura, boleta o guía emitida en el SII): tipo, folio, fecha y referencias. Si además está pagada, la venta queda cerrada.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "venta": {
+          "type": "string",
+          "description": "Número (VEN-000123) o identificador de la venta"
+        },
+        "tipo_documento": {
+          "type": "string",
+          "default": "Factura electrónica"
+        },
+        "folio": {
+          "type": "string"
+        },
+        "fecha": {
+          "type": "string",
+          "description": "AAAA-MM-DD"
+        },
+        "referencias": {
+          "type": "string",
+          "description": "Orden de compra, HES, guía… (opcional)"
+        }
+      },
+      "required": [
+        "venta",
+        "folio"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "registrar_cobro",
     "nivel": "completo",
     "description": "Registra un pago recibido de una venta por cobrar.",
