@@ -18,9 +18,14 @@ con las mismas reglas, permisos y auditoría del programa.
    | Acceso completo | Lo anterior + `clic`, `escribir`, `elegir`, `tecla`, `confirmar_venta`, `registrar_cobro` y gastos pagados |
 
    Siempre valen además los permisos del usuario con que está abierta la sesión.
-3. «Conectar con Claude» agrega NÚCLEO a `claude_desktop_config.json` (en Windows,
-   `%APPDATA%\Claude\`) sin tocar el resto del archivo y guarda una copia `.json.bak`. Luego se cierra y
-   se vuelve a abrir la app de Claude.
+3. «Conectar con Claude» agrega NÚCLEO a `claude_desktop_config.json` sin tocar el resto del archivo y
+   guarda una copia `.json.bak`. Luego se cierra y se vuelve a abrir la app de Claude.
+
+   En Windows, la app de Claude se instala como paquete MSIX (Microsoft Store, WinGet y también el
+   instalador `claude-setup.exe`) y lee su configuración desde la carpeta virtualizada
+   `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\`, no desde
+   `%APPDATA%\Claude\`. Además, su botón «Editar configuración» abre el archivo equivocado (error
+   conocido de Claude). Por eso NÚCLEO escribe en ambas carpetas.
 
 ## 2. Arquitectura
 
