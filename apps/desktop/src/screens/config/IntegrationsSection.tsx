@@ -38,8 +38,8 @@ export function IntegrationsSection() {
       </Card>
       <Card title="Bancos (solo lectura)" subtitle="Saldos y movimientos para cuadrar cobros y pagos solos. NÚCLEO nunca mueve dinero." actions={<Badge icon={Landmark}>Próximamente</Badge>}>
         <p className="text-sm text-muted">
-          Se conecta con Fintoc (Banco de Chile, Santander, BCI, BancoEstado, Itaú, Scotiabank, BICE, Security): la clave del banco se escribe en la ventana de
-          Fintoc, no en NÚCLEO. Mientras tanto, importa la cartola en Dinero → Conciliación.
+          Gratis y sin la clave del banco: NÚCLEO leerá en tu correo los avisos de transferencia que envían los bancos (Banco de Chile, BCI, Scotiabank,
+          Itaú, Mach…) para saber quién pagó, y la cartola que descargas para saldos, ingresos, egresos y glosas. Hoy: importa la cartola en Dinero → Conciliación.
         </p>
       </Card>
     </div>

@@ -92,25 +92,94 @@ empresa) y sumar Envíame si se quiere comparar precios entre couriers sin pedir
   la API REST de Woo con el método de envío de Bluexpress y el plugin emite la OT; el plugin queda fuera
   de las zonas de envío de la web para que no aparezca en el checkout.
 
+### Proceso para activar cada courier (empezamos por Data Logger)
+
+Lo que hay que pedir a cada ejecutivo (se anota la respuesta aquí y se repite igual con cada cliente
+de NÚCLEO):
+
+1. ¿La empresa tiene **cuenta corriente** (cliente empresa con contrato)? Si no, abrirla.
+2. ¿Hay **API o servicios web** para emitir OT, etiqueta, seguimiento y retiro? Documentación,
+   ambiente de pruebas y credenciales (llave, código de cliente, usuario de servicios web).
+3. **Cómo se paga:** factura mensual con crédito (cuántos días), prepago/saldo cargado, o tarjeta
+   inscrita en su portal. ¿Qué pasa si una OT se emite y no se usa (se anula sin costo)?
+4. Tarifas pactadas por peso/tamaño/destino y si la API las devuelve al cotizar.
+5. Retiro en bodega (horario, costo) o entrega en sucursal/Punto.
+
+| Courier | Prioridad | Estado para Data Logger | Lo que falta |
+|---|---|---|---|
+| Bluexpress | 1 (el más usado) | Cuenta empresa | Documentación y llave de la API por el ejecutivo, o plugin de Woo |
+| Starken | 2 | Por confirmar | Cuenta corriente pyme y credenciales de servicios web |
+| Chilexpress | 3 | Por confirmar | Cuenta corriente y llave de API |
+| Correos de Chile | 4 | Por confirmar | «Código cliente» (ejecutivo) + credencial de servicios web (formulario en developers.correos.cl) |
+| Envíame | Opcional | — | Solo si se quiere comparar couriers con una llave; tiene costo |
+
+### Cómo se pagan los envíos automáticos
+
+- Lo normal con API es la **cuenta corriente con factura mensual**: cada OT emitida por NÚCLEO se
+  carga a la cuenta y el courier factura a fin de mes con el crédito pactado. No hace falta tarjeta.
+- Si un courier solo acepta **prepago o tarjeta inscrita**, la tarjeta (ej. una prepago empresa con
+  saldo acotado) se inscribe **en el portal del courier**, por la persona. NÚCLEO no guarda ni usa
+  tarjetas ni mueve dinero (regla del proyecto).
+- NÚCLEO guarda el costo de cada OT; cuando llega la factura del courier, la cuadra contra las OT del
+  mes (qué envío se cobró, cuál se cobró dos veces, cuál faltó) y la deja como compra por pagar.
+
+## Catálogo de extensiones (para vender después)
+
+Idea del dueño (22-11-2026): NÚCLEO tendrá una página de **integraciones o extensiones**; si más
+adelante se vende NÚCLEO como servicio (con la facturación SII), las extensiones se pueden vender.
+
+- Primero se prueban en Data Logger y cada una queda documentada aquí con su proceso de activación.
+- Cada empresa usa **sus propias** cuentas y credenciales (su contrato con Bluexpress, su casilla de
+  correo, su app de Mercado Libre, su certificado SII). FAVOR SpA vende el software y el soporte,
+  nunca intermedia envíos, pagos ni datos.
+- Cada extensión es un módulo que se activa en Configuración → Integraciones, con estado, «Probar» y
+  «Desconectar», y su propia página en el sitio (qué hace, qué pide, cómo se activa).
+- Pendiente de decidir: cómo se cobra (licencia por extensión, plan mensual, o soporte/instalación)
+  sabiendo que el código de NÚCLEO es abierto.
+
+| Extensión | Estado |
+|---|---|
+| Facturación SII propia | En certificación (F2 en código) |
+| Correo de la empresa | Lista (falta probar con la casilla real) |
+| Mercado Libre | Lista (falta el permiso de Mercado Libre para crear la app) |
+| Avisos de pago por correo (bancos) | Propuesta (ver I4) |
+| Bluexpress / Starken / Chilexpress / Correos | Esperando credenciales |
+| WooCommerce | Esperando llave REST |
+
 ## I4 · Bancos (solo lectura: saldos y movimientos)
 
 Objetivo: que NÚCLEO vea los saldos y movimientos de las cuentas de la empresa para **cuadrar solo**:
 qué cliente pagó (y qué venta queda pagada), qué gasto salió, quién debe y quién está atrasado. NÚCLEO
 nunca mueve dinero: sin transferencias ni pagos.
 
-### Cómo conectarse hoy
+### Cómo conectarse gratis (plan del dueño: todo propio, sin agregadores pagados)
 
-- **Finanzas abiertas (Ley Fintec 21.521):** obligará a los bancos a entregar APIs de información de
-  cuentas, pero la CMF postergó su entrada en vigencia a 2027. Cuando esté, NÚCLEO se conecta directo
-  al banco con autorización del cliente (sin claves en NÚCLEO).
-- **Mientras tanto, Fintoc (agregador chileno):** su producto *Movements* lee movimientos de cuentas
-  empresa de Banco de Chile, Santander (Office Banking), Itaú, BICE, Scotiabank, BCI y BCI 360,
-  BancoEstado y Security (6 a 24 meses de historia según el banco). La conexión se hace en el **widget
-  de Fintoc**: la persona escribe ahí la clave del banco; NÚCLEO guarda solo el token del enlace (en la
-  base cifrada) y la llave secreta de la cuenta Fintoc de la empresa. Ojo: Santander necesita una
-  excepción si pide segundo factor; en cuentas empresa con permisos (Santander) el usuario debe tener
-  permiso de saldos/movimientos y cartolas. Costo: según plan de Fintoc (confirmar).
-- **Siempre disponible:** importar la cartola (Excel/CSV) del banco, como ya hace Dinero → Conciliación.
+Lo que se averiguó (22-11-2026):
+
+- **Ningún banco chileno ofrece hoy una API gratuita y de autoservicio** para que una pyme lea sus
+  propios saldos y movimientos. BCI tiene **API Market**, pero en producción exige pedir ser
+  «partner», con análisis y aprobación del banco y un posible costo; el cliente autoriza con su
+  login Bci. **360 Connect** de BCI muestra saldos de otros bancos dentro de su web (se contrata con
+  el banquero, sin API). Los conectores de terceros (Fintoc, Emisso) cobran y piden la clave del banco.
+- Las **finanzas abiertas** obligarán a los bancos a entregar estos datos por API, pero se
+  postergaron a 2027; para usarlas, FAVOR tendría que registrarse ante la CMF como proveedor.
+
+Plan gratis y hecho por nosotros, en capas:
+
+1. **Avisos de transferencia por correo (quién pagó).** Los bancos del que paga ya envían a
+   ventas@datalogger.cl un aviso con nombre, monto y fecha: en oct-2026 llegaron de Banco de Chile
+   (`serviciodetransferencias@bancochile.cl`), BCI (`transferencias@bci.cl`), Scotiabank
+   (`avisos.empresa.info@scotiabank.cl`), Itaú (`info@itau.cl`) y Mach (`noreply@somosmach.com`).
+   NÚCLEO lee la casilla (IMAP, solo lectura, con la misma cuenta de I5), reconoce esos remitentes,
+   saca pagador, RUT si viene, monto, fecha y n.º de operación, y propone el cobro de la venta que
+   calza. Gratis, sin clave del banco, sin tocar el banco.
+2. **Cartola del banco (saldo, ingresos, egresos y glosa).** La cartola en Excel/CSV que se descarga de
+   la web del banco ya se importa en Dinero → Conciliación. Se agrega: carpeta vigilada (se descarga la
+   cartola a «Cartolas» y NÚCLEO la importa sola, sin duplicar movimientos) y formatos de los bancos
+   que usa Data Logger.
+3. **BCI API Market:** FAVOR SpA pide ser partner solo para el producto de cuentas (lectura). Si BCI
+   aprueba sin costo, se conecta directo con el consentimiento de la empresa; si no, sigue con 1 y 2.
+4. **Finanzas abiertas (2027):** cuando rijan, conexión oficial con todos los bancos.
 
 ### Por qué no «usuario y clave del banco dentro de NÚCLEO»
 
@@ -121,7 +190,7 @@ abiertas existen justamente para leer sin esa clave. Decisión D-INT-05.
 
 ### Qué hace NÚCLEO con los movimientos
 
-1. Trae los movimientos nuevos (Fintoc o cartola) a Dinero → Conciliación.
+1. Trae los movimientos nuevos (avisos de transferencia del correo y cartola) a Dinero → Conciliación.
 2. Abono con RUT/nombre/monto que calza con una venta por cobrar → propone «cobro de la venta X».
 3. Cargo que calza con una compra o gasto por pagar → propone el pago.
 4. Lo que no calza queda por revisar (como los depósitos no identificados de hoy).
@@ -146,7 +215,7 @@ envío de la factura/cotización en PDF y promociones a clientes que aceptaron r
 
 ## I6 · Una sola pantalla de conexiones
 
-**Configuración → Integraciones** reúne todo: Mercado Libre, WooCommerce, couriers, Fintoc, correo y
+**Configuración → Integraciones** reúne todo: Mercado Libre, WooCommerce, couriers, bancos, correo y
 SII. Cada conexión muestra estado (conectada / falta algo / error), última sincronización, botón
 «Probar» y «Desconectar». Las credenciales (usuario y clave de correo, llaves de API, tokens) se
 escriben en NÚCLEO por la persona, se guardan en la base cifrada de la empresa y nunca se muestran de
@@ -154,10 +223,11 @@ vuelta (solo «guardada»). La tabla `integrations` se abre a nuevos proveedores
 
 ### Orden de trabajo propuesto
 
-1. **Correo (I5):** no depende de nadie; sirve para avisos de cobro y envío desde ya.
-2. **Bluexpress (I2)** directo o por Woo, apenas estén la documentación/llave o el plugin.
-3. **Fintoc (I4)** cuando la empresa abra su cuenta Fintoc; conciliación automática de abonos.
-4. Chilexpress, Starken, Correos de Chile o Envíame, según cuál se use más.
+1. **Correo (I5):** listo; sirve para avisos de cobro y envío.
+2. **Avisos de transferencia por correo (I4, capa 1)** y cartola en carpeta vigilada (capa 2): gratis.
+3. **Bluexpress (I2)** directo o por Woo, apenas estén la documentación/llave o el plugin.
+4. Starken, Chilexpress y Correos de Chile, en ese orden, a medida que lleguen las credenciales.
+5. Solicitud de partner en BCI API Market (FAVOR SpA).
 
 ## I3 · NÚCLEO en línea (cifrado de extremo a extremo)
 
