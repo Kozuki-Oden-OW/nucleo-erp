@@ -6,6 +6,7 @@ mod commands;
 #[cfg(test)]
 mod ipc_tests;
 mod ml;
+mod sii;
 
 use nucleo_app::AppService;
 use nucleo_app::keys::OsKeyStore;
@@ -107,6 +108,16 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         ml::ml_sync,
         ml::ml_orders,
         ml::ml_link_item,
+        sii::sii_status,
+        sii::sii_save_setup,
+        sii::sii_load_certificate,
+        sii::sii_load_caf,
+        sii::sii_test_connection,
+        sii::sii_issue,
+        sii::sii_documents,
+        sii::sii_send,
+        sii::sii_check,
+        sii::sii_export_xml,
         commands::pending_dispatches,
         commands::dispatch_items,
         commands::warehouse_stock,

@@ -190,6 +190,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "integraciones",
         sql: include_str!("../migrations/0036_integraciones.sql"),
     },
+    Migration {
+        version: 37,
+        name: "sii_dte",
+        sql: include_str!("../migrations/0037_sii_dte.sql"),
+    },
 ];
 
 pub fn latest_version() -> i64 {

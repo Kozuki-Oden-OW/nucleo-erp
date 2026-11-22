@@ -1513,3 +1513,64 @@ export interface MlSyncReport {
   to_invoice: number;
   messages: string[];
 }
+
+/* ───────── Facturación electrónica propia (SII) ───────── */
+
+export type SiiAmbiente = "certificacion" | "produccion";
+
+export interface SiiEmisor {
+  giro: string;
+  actecos: number[];
+  direccion: string;
+  comuna: string;
+  ciudad: string;
+  sucursal: number | null;
+  rut_envia: string;
+}
+
+export interface SiiSetup {
+  ambiente: SiiAmbiente;
+  emisor: SiiEmisor;
+  resolucion_fecha: string | null;
+  resolucion_numero: number | null;
+}
+
+export interface SiiFolios {
+  id: number;
+  ambiente: SiiAmbiente;
+  tipo: number;
+  tipo_nombre: string;
+  desde: number;
+  hasta: number;
+  siguiente: number;
+  restantes: number;
+  autorizado: string;
+}
+
+export interface SiiStatus {
+  ambiente: SiiAmbiente;
+  rut: string | null;
+  razon_social: string | null;
+  emisor: SiiEmisor;
+  resolucion_fecha: string | null;
+  resolucion_numero: number | null;
+  certificado: { nombre: string | null; rut: string | null; vence: string | null } | null;
+  folios: SiiFolios[];
+  faltantes: string[];
+}
+
+export interface SiiDocument {
+  id: number;
+  ambiente: SiiAmbiente;
+  tipo: number;
+  tipo_nombre: string;
+  folio: number;
+  fecha: string;
+  receptor_rut: string;
+  receptor: string;
+  total_minor: number;
+  estado: "firmado" | "enviado" | "aceptado" | "reparos" | "rechazado";
+  track_id: string | null;
+  glosa: string | null;
+  created_at: string;
+}

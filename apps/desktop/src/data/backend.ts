@@ -22,6 +22,7 @@ import type {
   PermissionRow, PriceHistoryRow, Product, ProductCategory, ProductPatch, PurchaseDetail, PurchaseInput, PurchaseOrderDetail, PurchaseOrderInput,
   PurchaseOrderSummary, PurchaseSummary, ReceiveLine, NewSupplier, Supplier, SupplierDetail, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow,
   SaleDetail, SaleInput, SaleSummary, SearchHit, SecuritySettings, SequenceRow, SessionInfo, UserPatch, UserRow,
+  SiiDocument, SiiSetup, SiiStatus,
 } from "./types";
 
 /** Archivo elegido para adjuntar: ruta en el escritorio o archivo del navegador en la demostración. */
@@ -150,6 +151,15 @@ export interface Backend {
   mlSync(from?: string | null): Promise<MlSyncReport>;
   mlOrders(limit?: number): Promise<MlOrderRow[]>;
   mlLinkItem(itemId: string, variationId: string | null, productUid: string, title?: string | null): Promise<void>;
+  /** Facturación electrónica propia con el SII: estado, datos del emisor, certificado y folios. */
+  siiStatus(): Promise<SiiStatus>;
+  siiSaveSetup(setup: SiiSetup): Promise<SiiStatus>;
+  /** `path`: archivo .pfx/.p12 elegido por la persona; la clave la escribe ella. */
+  siiLoadCertificate(path: string, password: string): Promise<SiiStatus>;
+  siiLoadCaf(path: string): Promise<SiiStatus>;
+  /** Pide semilla y token al SII con el certificado (no emite nada). */
+  siiTestConnection(): Promise<string>;
+  siiDocuments(limit?: number): Promise<SiiDocument[]>;
   pendingDispatches(): Promise<PendingDispatch[]>;
   dispatchItems(id: number, qtyMilli: number, date?: string | null): Promise<PendingDispatch[]>;
   warehouseStock(warehouseUid: string): Promise<WarehouseStockRow[]>;

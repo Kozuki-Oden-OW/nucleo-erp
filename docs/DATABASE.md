@@ -63,6 +63,7 @@ Todo es entero: las sumas y los reportes se hacen en SQL sin perder exactitud y 
 | 34 | `0034_ventas_historicas.sql` | `sales.historical`: ventas importadas como historial (documentos ya emitidos) |
 | 35 | `0035_historial_por_cobrar.sql` | Una venta histórica cerrada puede volver a efectuada para quedar por cobrar |
 | 36 | `0036_integraciones.sql` | `integrations` (configuración y tokens por proveedor), `ml_orders` (pedido de Mercado Libre → venta, estado, total, comisión, envío, facturación, aviso) y `ml_item_links` (publicación y variación → producto) |
+| 37 | `0037_sii_dte.sql` | `sii_config` (ambiente, datos del emisor ante el SII, resolución, certificado .pfx con su clave), `sii_cafs` (rangos de folios con el XML del CAF y el siguiente folio) y `sii_documents` (documentos timbrados y firmados, XML enviado, estado y número de seguimiento del SII) |
 
 Las migraciones son transaccionales y versionadas con `PRAGMA user_version`. **Pre-1.0:** se pueden
 reescribir (en la Fase 2 se reemplazó la tabla mínima de clientes de la Fase 1); desde la primera beta

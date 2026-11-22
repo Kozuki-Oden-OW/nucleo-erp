@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { open as openFile } from "@tauri-apps/plugin-dialog";
-import { Bell, Bot, Building2, Plug, Check, Coins, DatabaseBackup, Hash, Lock, Palette, ShieldCheck, Users } from "lucide-react";
+import { Bell, Bot, Building2, FileCheck2, Plug, Check, Coins, DatabaseBackup, Hash, Lock, Palette, ShieldCheck, Users } from "lucide-react";
 import { useBackend, errorMessage, type AppInfo, type BackupDone, type BusinessProfile, type BusinessSettings, type SessionInfo } from "../../data";
 import { formatBytes, formatPpm, parsePercent } from "../../lib/format";
 import { navigate, type Route } from "../../lib/router";
@@ -14,9 +14,10 @@ import { LogoCard } from "./LogoCard";
 import { AlertsSection } from "./AlertsSection";
 import { ClaudeSection } from "./ClaudeSection";
 import { IntegrationsSection } from "./IntegrationsSection";
+import { SiiSection } from "./SiiSection";
 import { ACCENTS, applyAccent } from "../../lib/accent";
 
-type Section = "negocio" | "usuarios" | "numeracion" | "monedas" | "alertas" | "respaldos" | "seguridad" | "apariencia" | "claude" | "integraciones";
+type Section = "negocio" | "usuarios" | "numeracion" | "monedas" | "alertas" | "respaldos" | "seguridad" | "apariencia" | "claude" | "integraciones" | "facturacion";
 const SECTIONS: { id: Section; label: string; icon: typeof Building2; feature?: string }[] = [
   { id: "negocio", label: "Mi negocio", icon: Building2, feature: "negocio" },
   { id: "usuarios", label: "Usuarios y roles", icon: Users, feature: "usuarios" },
@@ -28,6 +29,7 @@ const SECTIONS: { id: Section; label: string; icon: typeof Building2; feature?: 
   { id: "apariencia", label: "Apariencia", icon: Palette },
   { id: "claude", label: "Claude", icon: Bot },
   { id: "integraciones", label: "Integraciones", icon: Plug },
+  { id: "facturacion", label: "Facturación SII", icon: FileCheck2 },
 ];
 
 export function Config({ route, info, session, onChanged }: { route: Route; info: AppInfo; session: SessionInfo; onChanged: () => void }) {
@@ -62,6 +64,7 @@ export function Config({ route, info, session, onChanged }: { route: Route; info
           {section === "apariencia" && <AppearanceSection />}
           {section === "claude" && <ClaudeSection />}
           {section === "integraciones" && <IntegrationsSection />}
+          {section === "facturacion" && <SiiSection />}
         </div>
       </div>
     </div>

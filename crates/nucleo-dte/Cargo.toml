@@ -1,0 +1,17 @@
+[package]
+name = "nucleo-dte"
+description = "Documentos tributarios electrónicos del SII (Chile): XML, timbre, firma y sobre de envío."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+openssl = { workspace = true }
+roxmltree = { workspace = true }
+data-encoding.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

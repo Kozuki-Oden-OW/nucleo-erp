@@ -23,6 +23,7 @@ import type {
   PurchaseSummary, ReceiveLine, NewSupplier, Supplier, SupplierDetail, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow, SaleDetail, SaleInput,
   SaleSummary, SearchHit,
   SecuritySettings, SequenceRow, SessionInfo, UserPatch, UserRow,
+  SiiDocument, SiiSetup, SiiStatus,
 } from "./types";
 
 interface CommandError { code: string; message: string }
@@ -153,6 +154,12 @@ export class TauriBackend implements Backend {
   mlSync(from?: string | null) { return call<MlSyncReport>("ml_sync", { from: from ?? null }); }
   mlOrders(limit?: number) { return call<MlOrderRow[]>("ml_orders", { limit: limit ?? null }); }
   async mlLinkItem(itemId: string, variationId: string | null, productUid: string, title?: string | null) { await call<null>("ml_link_item", { itemId, variationId, productUid, title: title ?? null }); }
+  siiStatus() { return call<SiiStatus>("sii_status"); }
+  siiSaveSetup(setup: SiiSetup) { return call<SiiStatus>("sii_save_setup", { setup }); }
+  siiLoadCertificate(path: string, password: string) { return call<SiiStatus>("sii_load_certificate", { path, password }); }
+  siiLoadCaf(path: string) { return call<SiiStatus>("sii_load_caf", { path }); }
+  siiTestConnection() { return call<string>("sii_test_connection"); }
+  siiDocuments(limit?: number) { return call<SiiDocument[]>("sii_documents", { limit: limit ?? null }); }
   pendingDispatches() { return call<PendingDispatch[]>("pending_dispatches"); }
   dispatchItems(id: number, qtyMilli: number, date?: string | null) { return call<PendingDispatch[]>("dispatch_items", { id, qtyMilli, date: date ?? null }); }
   warehouseStock(warehouseUid: string) { return call<WarehouseStockRow[]>("warehouse_stock", { warehouseUid }); }

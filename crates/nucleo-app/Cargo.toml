@@ -16,6 +16,7 @@ os-keyring = ["dep:keyring"]
 nucleo-domain.workspace = true
 nucleo-db.workspace = true
 nucleo-io.workspace = true
+nucleo-dte.workspace = true
 rusqlite.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -32,3 +33,5 @@ ureq.workspace = true
 keyring = { workspace = true, optional = true, features = ["windows-native", "apple-native", "linux-native"] }
 
 [dev-dependencies]
+openssl.workspace = true
+data-encoding.workspace = true

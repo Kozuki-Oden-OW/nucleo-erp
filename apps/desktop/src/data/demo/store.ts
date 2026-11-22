@@ -4,6 +4,7 @@
 import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "../backend";
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
+  SiiDocument, SiiSetup, SiiStatus,
   MlBilling, MlOrderRow, MlStatus, MlSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput, StatementLineView, BankSuggestion,
@@ -1831,6 +1832,52 @@ export class DemoBackend implements Backend {
     this.ml.links.set(`${itemId.trim().toUpperCase()}|${variationId ?? ""}`, productUid);
     return wait(undefined);
   }
+  /* Facturación electrónica propia (simulada: no hay SII en la demostración). */
+  private sii = {
+    setup: { ambiente: "certificacion", emisor: { giro: "", actecos: [], direccion: "", comuna: "", ciudad: "", sucursal: null, rut_envia: "" }, resolucion_fecha: null, resolucion_numero: null } as SiiSetup,
+    cert: null as SiiStatus["certificado"],
+    folios: [] as SiiStatus["folios"],
+  };
+  async siiStatus(): Promise<SiiStatus> {
+    const b = await this.business();
+    const { setup, cert, folios } = this.sii;
+    const e = setup.emisor;
+    const falt: string[] = [];
+    if (!b.rut) falt.push("el RUT de la empresa (Configuración → Mi negocio)");
+    if (!e.giro.trim()) falt.push("el giro como está en el SII");
+    if (!e.actecos.length) falt.push("al menos un código de actividad económica");
+    if (!(e.direccion || b.address) || !e.comuna) falt.push("la dirección y comuna de la casa matriz");
+    if (!setup.resolucion_fecha) falt.push("la fecha de resolución del SII");
+    if (!cert) falt.push("el certificado digital (.pfx)");
+    if (!folios.some((f) => f.ambiente === setup.ambiente && f.restantes > 0)) falt.push(`folios (CAF) del ambiente de ${setup.ambiente === "certificacion" ? "certificación" : "producción"}`);
+    return wait({ ambiente: setup.ambiente, rut: b.rut, razon_social: b.legal_name ?? b.name, emisor: e, resolucion_fecha: setup.resolucion_fecha, resolucion_numero: setup.resolucion_numero, certificado: cert, folios, faltantes: falt });
+  }
+  async siiSaveSetup(setup: SiiSetup): Promise<SiiStatus> {
+    this.require("config.editar");
+    if (setup.emisor.actecos.length > 4) throw new AppError("validacion", "El SII admite hasta 4 actividades económicas por documento.");
+    if (setup.resolucion_fecha && !/^\d{4}-\d{2}-\d{2}$/.test(setup.resolucion_fecha)) throw new AppError("validacion", "La fecha de resolución va como AAAA-MM-DD.");
+    if (setup.ambiente === "produccion" && (!setup.resolucion_fecha || !setup.resolucion_numero)) throw new AppError("validacion", "Para emitir documentos reales se necesita la resolución que entrega el SII al terminar la certificación.");
+    this.sii.setup = structuredClone(setup);
+    return this.siiStatus();
+  }
+  async siiLoadCertificate(_path: string, password: string): Promise<SiiStatus> {
+    this.require("config.editar");
+    if (!password) throw new AppError("validacion", "La clave del certificado no es correcta.");
+    this.sii.cert = { nombre: "PERSONA DE DEMOSTRACIÓN", rut: "11111111-1", vence: "Nov 22 12:00:00 2027 GMT" };
+    return this.siiStatus();
+  }
+  async siiLoadCaf(_path: string): Promise<SiiStatus> {
+    this.require("config.editar");
+    const n = this.sii.folios.length;
+    const desde = n * 50 + 1;
+    this.sii.folios.push({ id: n + 1, ambiente: this.sii.setup.ambiente, tipo: 33, tipo_nombre: "Factura electrónica", desde, hasta: desde + 49, siguiente: desde, restantes: 50, autorizado: this.today });
+    return this.siiStatus();
+  }
+  async siiTestConnection(): Promise<string> {
+    if (!this.sii.cert) throw new AppError("validacion", "Carga primero el certificado digital.");
+    return wait("Demostración: en el escritorio NÚCLEO pide semilla y token al SII con tu certificado.");
+  }
+  async siiDocuments(): Promise<SiiDocument[]> { return wait([]); }
   /** Pedidos de ejemplo: uno con SKU conocido y otro de una publicación sin enlazar que pide factura. */
   async mlSync(): Promise<MlSyncReport> {
     if (!this.ml.connected) throw new AppError("validacion", "Mercado Libre no está conectado: Configuración → Integraciones.");
