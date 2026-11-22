@@ -4,7 +4,7 @@
 import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "../backend";
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
-  SiiDocument, SiiSetup, SiiStatus,
+  SiiDocument, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
   MlBilling, MlOrderRow, MlStatus, MlSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput, StatementLineView, BankSuggestion,
@@ -1831,6 +1831,92 @@ export class DemoBackend implements Backend {
     if (!this.products.some((p) => p.uid === productUid)) throw new AppError("no_encontrado", "No encontramos el producto.");
     this.ml.links.set(`${itemId.trim().toUpperCase()}|${variationId ?? ""}`, productUid);
     return wait(undefined);
+  }
+  /* Correo de la empresa (simulado: en la demostración no sale ningún correo). */
+  private mail = {
+    cfg: null as (MailSetup & { password: string }) | null,
+    lastTest: null as string | null,
+    log: [] as MailLogRow[],
+    templates: {
+      envio: { subject: "Tu pedido va en camino — {empresa}", body: "Hola {cliente}:\n\nTu pedido {venta} fue despachado por {courier}.\nNúmero de seguimiento: {seguimiento}\nDestino: {destino}\n\nSaludos,\n{firma}" },
+      cobro: { subject: "Documentos pendientes de pago — {empresa}", body: "Hola {cliente}:\n\nTe recordamos los documentos pendientes de pago:\n\n{detalle}\n\nTotal pendiente: {total}{vencido}\n\nSaludos,\n{firma}" },
+      promocion: { subject: "Novedades de {empresa}", body: "Hola {cliente}:\n\n(escribe aquí la promoción)\n\nSaludos,\n{firma}\n\nSi no quieres recibir más promociones, responde este correo con la palabra BAJA." },
+    } as MailTemplates,
+  };
+  async mailStatus(): Promise<MailStatus> {
+    const c = this.mail.cfg;
+    return wait({
+      configured: !!c, host: c?.host ?? "", port: c?.port ?? 465, security: c?.security ?? "tls", username: c?.username ?? "", has_password: !!c?.password,
+      from_name: c?.from_name ?? "", from_email: c?.from_email ?? "", reply_to: c?.reply_to ?? "", bcc_self: c?.bcc_self ?? false, last_test_at: this.mail.lastTest,
+    });
+  }
+  async mailPresets(): Promise<MailPreset[]> {
+    return wait([
+      { name: "Titan (Hostinger)", host: "smtp.titan.email", port: 465, security: "tls", note: "Usuario: la dirección completa; clave: la de la casilla." },
+      { name: "Gmail / Google Workspace", host: "smtp.gmail.com", port: 465, security: "tls", note: "Requiere verificación en dos pasos y una «contraseña de aplicación»." },
+      { name: "Outlook / Microsoft 365", host: "smtp.office365.com", port: 587, security: "starttls", note: "El administrador debe permitir SMTP autenticado en la casilla." },
+    ]);
+  }
+  async mailSave(setup: MailSetup): Promise<MailStatus> {
+    this.require("config.editar");
+    if (!setup.host.trim() || /[/: ]/.test(setup.host.trim())) throw new AppError("validacion", "Escribe el servidor SMTP sin «https://» ni puerto (ej. smtp.titan.email).");
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(setup.from_email.trim())) throw new AppError("validacion", "La dirección del remitente no es válida.");
+    const password = setup.password || this.mail.cfg?.password || "";
+    if (!password) throw new AppError("validacion", "Falta la clave de la casilla (o la contraseña de aplicación).");
+    this.mail.cfg = { ...setup, port: setup.port ?? (setup.security === "starttls" ? 587 : 465), from_email: setup.from_email.trim().toLowerCase(), password };
+    return this.mailStatus();
+  }
+  async mailDisconnect(): Promise<MailStatus> { this.mail.cfg = null; return this.mailStatus(); }
+  async mailTemplates(): Promise<MailTemplates> { return wait(structuredClone(this.mail.templates)); }
+  async mailSaveTemplates(t: MailTemplates): Promise<MailTemplates> {
+    for (const m of [t.envio, t.cobro, t.promocion]) if (!m.subject.trim() || !m.body.trim()) throw new AppError("validacion", "Cada plantilla necesita asunto y texto.");
+    this.mail.templates = structuredClone(t);
+    return this.mailTemplates();
+  }
+  async mailDraft(kind: "envio" | "cobro" | "promocion", reference: string): Promise<MailDraft> {
+    const b = await this.business();
+    const firma = [b.name, b.phone, b.email].filter(Boolean).join("\n");
+    const fill = (txt: string, v: Record<string, string>) => txt.replace(/\{(\w+)\}/g, (m, k: string) => v[k] ?? m);
+    const t = this.mail.templates[kind];
+    if (kind === "envio") {
+      const sh = this.ships.find((x) => x.uid === reference);
+      if (!sh) throw new AppError("no_encontrado", "No encontramos el envío.");
+      const c = this.customers.find((x) => x.uid === sh.customer_uid);
+      const v = { cliente: c?.name ?? [sh.first_name, sh.last_name].filter(Boolean).join(" "), empresa: b.legal_name ?? b.name, venta: sh.number, courier: sh.carrier ?? "el courier", seguimiento: sh.tracking ?? "(por informar)", destino: [sh.address, sh.commune, sh.city].filter(Boolean).join(", ") || "—", firma };
+      return wait({ kind, to: c?.email ?? "", subject: fill(t.subject, v), body: fill(t.body, v), customer_uid: sh.customer_uid, reference: sh.number });
+    }
+    const c = this.customers.find((x) => x.uid === reference);
+    if (!c) throw new AppError("no_encontrado", "No encontramos ese cliente.");
+    let detalle = "", total = 0, vencido = 0;
+    if (kind === "cobro") {
+      const own = this.sales.filter((s) => s.customer_uid === c.uid && (s.commercial_state === "efectuada" || s.commercial_state === "cerrada") && s.totals.total_minor > this.paid(s));
+      if (!own.length) throw new AppError("validacion", `${c.name} no tiene documentos pendientes de pago.`);
+      detalle = own.map((s) => {
+        const saldo = s.totals.total_minor - this.paid(s);
+        total += saldo;
+        const late = !!s.due_date && s.due_date < this.today;
+        if (late) vencido += saldo;
+        return `• ${s.number} del ${s.issue_date.split("-").reverse().join("-")} — ${formatCLP(saldo)}${s.due_date ? (late ? ` (venció el ${s.due_date.split("-").reverse().join("-")})` : ` (vence el ${s.due_date.split("-").reverse().join("-")})`) : ""}`;
+      }).join("\n");
+    }
+    const v = { cliente: c.name, empresa: b.legal_name ?? b.name, detalle, total: formatCLP(total), vencido: vencido ? ` (vencido: ${formatCLP(vencido)})` : "", firma };
+    return wait({ kind, to: c.email ?? "", subject: fill(t.subject, v), body: fill(t.body, v), customer_uid: c.uid, reference: null });
+  }
+  async mailSend(d: MailDraft): Promise<MailLogRow> {
+    if (!this.mail.cfg) throw new AppError("validacion", "Configura primero el correo de la empresa (Configuración → Integraciones → Correo).");
+    if (!d.to.trim()) throw new AppError("validacion", "Falta el destinatario (el cliente no tiene correo en su ficha).");
+    const row: MailLogRow = { id: this.mail.log.length + 1, kind: d.kind, to_addr: d.to, subject: d.subject, customer_name: this.customers.find((c) => c.uid === d.customer_uid)?.name ?? null, reference: d.reference, status: "enviado", error: null, user_name: "demo", sent_at: new Date().toISOString() };
+    this.mail.log.unshift(row);
+    return wait(row);
+  }
+  async mailTest(to?: string | null): Promise<MailLogRow> {
+    if (!this.mail.cfg) throw new AppError("validacion", "Configura primero el correo de la empresa.");
+    this.mail.lastTest = new Date().toISOString();
+    return this.mailSend({ kind: "prueba", to: to || this.mail.cfg.from_email, subject: "Prueba de correo desde NÚCLEO", body: "Demostración: no se envió ningún correo.", customer_uid: null, reference: null });
+  }
+  async mailLog(customerUid?: string | null): Promise<MailLogRow[]> {
+    const name = customerUid ? this.customers.find((c) => c.uid === customerUid)?.name : null;
+    return wait(customerUid ? this.mail.log.filter((r) => r.customer_name === name) : [...this.mail.log]);
   }
   /* Facturación electrónica propia (simulada: no hay SII en la demostración). */
   private sii = {

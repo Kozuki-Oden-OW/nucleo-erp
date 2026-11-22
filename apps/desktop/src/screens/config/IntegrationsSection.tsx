@@ -1,7 +1,8 @@
-// Configuración → Integraciones: Mercado Libre (ventas, stock, facturación y lo que cobra) y, cuando
-// lleguen las credenciales, Bluexpress (órdenes de transporte desde Envíos).
+// Configuración → Integraciones: correo de la empresa, Mercado Libre (ventas, stock, facturación y lo que
+// cobra) y, cuando lleguen las credenciales, couriers y bancos (docs/INTEGRACIONES.md).
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, ExternalLink, Link2, RefreshCw, ShoppingBag, Truck, Unplug } from "lucide-react";
+import { CheckCircle2, ExternalLink, Landmark, Link2, RefreshCw, ShoppingBag, Truck, Unplug } from "lucide-react";
+import { MailCard } from "./MailCard";
 import { errorMessage, useBackend, type MlOrderRow, type MlStatus, type MlSyncReport, type Product } from "../../data";
 import { formatCLP, formatDate } from "../../lib/format";
 import { navigate } from "../../lib/router";
@@ -26,11 +27,19 @@ function itemsOf(issue: string | null): { id: string; title: string }[] {
 export function IntegrationsSection() {
   return (
     <div className="flex flex-col gap-5">
+      <MailCard />
       <MercadoLibreCard />
-      <Card title="Bluexpress" subtitle="Crear órdenes de transporte desde Envíos, con la etiqueta y el seguimiento." actions={<Badge icon={Truck}>Próximamente</Badge>}>
+      <Card title="Couriers" subtitle="Crear órdenes de transporte desde Envíos con la etiqueta y el seguimiento, y avisar al cliente por correo." actions={<Badge icon={Truck}>Próximamente</Badge>}>
+        <ul className="flex flex-col gap-1.5 text-sm text-muted">
+          <li><strong className="text-ink">Bluexpress:</strong> pide a tu ejecutivo la documentación de la API y la llave de tu cuenta empresa (o instala su plugin en WooCommerce).</li>
+          <li><strong className="text-ink">Chilexpress, Starken y Correos de Chile:</strong> con la cuenta empresa de cada uno (llave de API o credencial de servicios web).</li>
+          <li><strong className="text-ink">Envíame:</strong> una sola llave para cotizar y emitir con varios couriers.</li>
+        </ul>
+      </Card>
+      <Card title="Bancos (solo lectura)" subtitle="Saldos y movimientos para cuadrar cobros y pagos solos. NÚCLEO nunca mueve dinero." actions={<Badge icon={Landmark}>Próximamente</Badge>}>
         <p className="text-sm text-muted">
-          Se activa cuando Bluexpress entregue la documentación de su API y las credenciales de tu cuenta empresa (llave de API, código de cliente y de
-          usuario). Pídeselas a tu ejecutivo de Bluexpress.
+          Se conecta con Fintoc (Banco de Chile, Santander, BCI, BancoEstado, Itaú, Scotiabank, BICE, Security): la clave del banco se escribe en la ventana de
+          Fintoc, no en NÚCLEO. Mientras tanto, importa la cartola en Dinero → Conciliación.
         </p>
       </Card>
     </div>

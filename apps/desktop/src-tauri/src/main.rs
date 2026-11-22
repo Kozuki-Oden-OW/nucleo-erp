@@ -5,6 +5,7 @@ mod agent;
 mod commands;
 #[cfg(test)]
 mod ipc_tests;
+mod mail;
 mod ml;
 mod sii;
 
@@ -108,6 +109,16 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         ml::ml_sync,
         ml::ml_orders,
         ml::ml_link_item,
+        mail::mail_status,
+        mail::mail_presets,
+        mail::mail_save,
+        mail::mail_disconnect,
+        mail::mail_templates,
+        mail::mail_save_templates,
+        mail::mail_draft,
+        mail::mail_send,
+        mail::mail_test,
+        mail::mail_log,
         sii::sii_status,
         sii::sii_save_setup,
         sii::sii_load_certificate,

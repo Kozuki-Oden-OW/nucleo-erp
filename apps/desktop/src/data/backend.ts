@@ -22,7 +22,7 @@ import type {
   PermissionRow, PriceHistoryRow, Product, ProductCategory, ProductPatch, PurchaseDetail, PurchaseInput, PurchaseOrderDetail, PurchaseOrderInput,
   PurchaseOrderSummary, PurchaseSummary, ReceiveLine, NewSupplier, Supplier, SupplierDetail, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow,
   SaleDetail, SaleInput, SaleSummary, SearchHit, SecuritySettings, SequenceRow, SessionInfo, UserPatch, UserRow,
-  SiiDocument, SiiSetup, SiiStatus,
+  SiiDocument, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
 } from "./types";
 
 /** Archivo elegido para adjuntar: ruta en el escritorio o archivo del navegador en la demostración. */
@@ -151,6 +151,19 @@ export interface Backend {
   mlSync(from?: string | null): Promise<MlSyncReport>;
   mlOrders(limit?: number): Promise<MlOrderRow[]>;
   mlLinkItem(itemId: string, variationId: string | null, productUid: string, title?: string | null): Promise<void>;
+  /** Correo de la empresa (SMTP): la clave la escribe la persona y nunca vuelve a la interfaz. */
+  mailStatus(): Promise<MailStatus>;
+  mailPresets(): Promise<MailPreset[]>;
+  mailSave(setup: MailSetup): Promise<MailStatus>;
+  mailDisconnect(): Promise<MailStatus>;
+  mailTemplates(): Promise<MailTemplates>;
+  mailSaveTemplates(t: MailTemplates): Promise<MailTemplates>;
+  /** Borrador con plantilla y datos: envío (`reference` = uid del envío), cobro o promoción (uid del cliente). */
+  mailDraft(kind: "envio" | "cobro" | "promocion", reference: string): Promise<MailDraft>;
+  /** Envía el correo revisado por la persona. */
+  mailSend(draft: MailDraft): Promise<MailLogRow>;
+  mailTest(to?: string | null): Promise<MailLogRow>;
+  mailLog(customerUid?: string | null, limit?: number): Promise<MailLogRow[]>;
   /** Facturación electrónica propia con el SII: estado, datos del emisor, certificado y folios. */
   siiStatus(): Promise<SiiStatus>;
   siiSaveSetup(setup: SiiSetup): Promise<SiiStatus>;

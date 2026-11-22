@@ -1514,6 +1514,62 @@ export interface MlSyncReport {
   messages: string[];
 }
 
+/* ───────── Correo de la empresa (SMTP) ───────── */
+
+export interface MailStatus {
+  configured: boolean;
+  host: string;
+  port: number;
+  security: "tls" | "starttls" | "ninguna" | string;
+  username: string;
+  has_password: boolean;
+  from_name: string;
+  from_email: string;
+  reply_to: string;
+  bcc_self: boolean;
+  last_test_at: string | null;
+}
+
+export interface MailSetup {
+  host: string;
+  port: number | null;
+  security: string;
+  username: string;
+  /** Vacía = conserva la guardada. */
+  password: string;
+  from_name: string;
+  from_email: string;
+  reply_to: string;
+  bcc_self: boolean;
+}
+
+export interface MailPreset { name: string; host: string; port: number; security: string; note: string }
+export interface MailTemplate { subject: string; body: string }
+export interface MailTemplates { envio: MailTemplate; cobro: MailTemplate; promocion: MailTemplate }
+export type MailKind = "prueba" | "envio" | "cobro" | "promocion" | "otro";
+
+export interface MailDraft {
+  kind: MailKind;
+  to: string;
+  subject: string;
+  body: string;
+  customer_uid: string | null;
+  reference: string | null;
+}
+
+export interface MailLogRow {
+  id: number;
+  kind: MailKind;
+  to_addr: string;
+  subject: string;
+  customer_name: string | null;
+  reference: string | null;
+  status: "enviado" | "fallido";
+  error: string | null;
+  user_name: string;
+  sent_at: string;
+}
+
 /* ───────── Facturación electrónica propia (SII) ───────── */
 
 export type SiiAmbiente = "certificacion" | "produccion";

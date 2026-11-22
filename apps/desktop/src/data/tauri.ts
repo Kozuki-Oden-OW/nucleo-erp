@@ -23,7 +23,7 @@ import type {
   PurchaseSummary, ReceiveLine, NewSupplier, Supplier, SupplierDetail, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow, SaleDetail, SaleInput,
   SaleSummary, SearchHit,
   SecuritySettings, SequenceRow, SessionInfo, UserPatch, UserRow,
-  SiiDocument, SiiSetup, SiiStatus,
+  SiiDocument, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
 } from "./types";
 
 interface CommandError { code: string; message: string }
@@ -154,6 +154,16 @@ export class TauriBackend implements Backend {
   mlSync(from?: string | null) { return call<MlSyncReport>("ml_sync", { from: from ?? null }); }
   mlOrders(limit?: number) { return call<MlOrderRow[]>("ml_orders", { limit: limit ?? null }); }
   async mlLinkItem(itemId: string, variationId: string | null, productUid: string, title?: string | null) { await call<null>("ml_link_item", { itemId, variationId, productUid, title: title ?? null }); }
+  mailStatus() { return call<MailStatus>("mail_status"); }
+  mailPresets() { return call<MailPreset[]>("mail_presets"); }
+  mailSave(setup: MailSetup) { return call<MailStatus>("mail_save", { setup }); }
+  mailDisconnect() { return call<MailStatus>("mail_disconnect"); }
+  mailTemplates() { return call<MailTemplates>("mail_templates"); }
+  mailSaveTemplates(templates: MailTemplates) { return call<MailTemplates>("mail_save_templates", { templates }); }
+  mailDraft(kind: "envio" | "cobro" | "promocion", reference: string) { return call<MailDraft>("mail_draft", { kind, reference }); }
+  mailSend(draft: MailDraft) { return call<MailLogRow>("mail_send", { draft }); }
+  mailTest(to?: string | null) { return call<MailLogRow>("mail_test", { to: to ?? null }); }
+  mailLog(customerUid?: string | null, limit?: number) { return call<MailLogRow[]>("mail_log", { customerUid: customerUid ?? null, limit: limit ?? null }); }
   siiStatus() { return call<SiiStatus>("sii_status"); }
   siiSaveSetup(setup: SiiSetup) { return call<SiiStatus>("sii_save_setup", { setup }); }
   siiLoadCertificate(path: string, password: string) { return call<SiiStatus>("sii_load_certificate", { path, password }); }

@@ -1,7 +1,8 @@
 // Envíos: agencia, número de orden de transporte o seguimiento, destinatario, dirección, fechas y
 // estado con color (no despachado y no entregado en rojo, en camino en amarillo, entregado en verde).
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Copy, PackageX, Plus, Search, Truck, XCircle, Clock3 } from "lucide-react";
+import { CheckCircle2, Copy, Mail, PackageX, Plus, Search, Truck, XCircle, Clock3 } from "lucide-react";
+import { MailComposer } from "../../ui/MailComposer";
 import { useBackend, errorMessage, type Customer, type Shipment, type ShipmentInput, type ShipmentStatus } from "../../data";
 import { REGIONS } from "../../data/lre";
 import { formatDate } from "../../lib/format";
@@ -107,6 +108,7 @@ export function ShipmentDrawer({ shipment, preset, onClose, onSaved }: {
   const [f, setF] = useState<ShipmentInput>(init);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [mailing, setMailing] = useState(false);
   const set = (patch: Partial<ShipmentInput>) => setF((x) => ({ ...x, ...patch }));
   const editable = can("ventas.crear");
   const saleNumber = shipment?.sale_number ?? preset?.sale_number;
@@ -175,9 +177,13 @@ export function ShipmentDrawer({ shipment, preset, onClose, onSaved }: {
           </div>
         </fieldset>
         <TextArea label="Notas" optional rows={2} value={f.notes ?? ""} onChange={(e) => set({ notes: e.target.value })} placeholder="Ej. dejar en conserjería; problema: dirección incompleta…" />
-        {shipment?.sale_uid && <Button variant="ghost" icon={Clock3} className="self-start" onClick={() => navigate(`/ventas/${shipment.sale_uid}`)}>Ver la venta {shipment.sale_number}</Button>}
+        <div className="flex flex-wrap gap-2">
+          {shipment?.sale_uid && <Button variant="ghost" icon={Clock3} onClick={() => navigate(`/ventas/${shipment.sale_uid}`)}>Ver la venta {shipment.sale_number}</Button>}
+          {shipment && <Button variant="secondary" icon={Mail} onClick={() => setMailing(true)}>Avisar al cliente por correo</Button>}
+        </div>
         {err && <Notice tone="danger">{err}</Notice>}
       </div>
+      {mailing && shipment && <MailComposer kind="envio" reference={shipment.uid} onClose={() => setMailing(false)} />}
     </Drawer>
   );
 }

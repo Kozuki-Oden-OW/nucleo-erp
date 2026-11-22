@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Crown, FilePlus2, Pencil, Plus, Search, ShoppingBag, UserPlus, Users } from "lucide-react";
+import { Crown, FilePlus2, Mail, Pencil, Plus, Search, ShoppingBag, UserPlus, Users } from "lucide-react";
+import { MailComposer } from "../../ui/MailComposer";
 import { useBackend, errorMessage, type Customer, type CustomerDetail, type NewCustomer } from "../../data";
 import { REGIONS } from "../../data/lre";
 import { formatDate, formatMoney, formatRut } from "../../lib/format";
@@ -193,6 +194,7 @@ function CustomerDrawer({ uid, onClose, onChanged }: { uid: string; onClose: () 
   const [editing, setEditing] = useState(false);
   const [version, setVersion] = useState(0);
   const [files, setFiles] = useState(0);
+  const [mailing, setMailing] = useState<"cobro" | "promocion" | null>(null);
   useEffect(() => { backend.customer(uid).then(setC).catch((e) => setErr(errorMessage(e))); }, [backend, uid, version]);
   if (editing && c) {
     return <NewCustomerDrawer open editing={c} onClose={() => setEditing(false)} onCreated={() => { setEditing(false); setVersion((v) => v + 1); onChanged(); }} />;
@@ -207,6 +209,9 @@ function CustomerDrawer({ uid, onClose, onChanged }: { uid: string; onClose: () 
       footer={c && (
         <>
           {can("clientes.editar") && <Button variant="ghost" icon={Pencil} onClick={() => setEditing(true)}>Editar</Button>}
+          {c.receivable_minor > 0
+            ? <Button variant="ghost" icon={Mail} onClick={() => setMailing("cobro")}>Recordar cobro</Button>
+            : <Button variant="ghost" icon={Mail} onClick={() => setMailing("promocion")}>Enviar correo</Button>}
           <Button variant="secondary" icon={FilePlus2} onClick={() => navigate(`/cotizaciones/nueva?cliente=${c.uid}`)}>Cotizar</Button>
           <Button icon={ShoppingBag} onClick={() => navigate(`/ventas/nueva?cliente=${c.uid}`)}>Vender</Button>
         </>
@@ -254,6 +259,7 @@ function CustomerDrawer({ uid, onClose, onChanged }: { uid: string; onClose: () 
           </div>
         </div>
       )}
+      {mailing && c && <MailComposer kind={mailing} reference={c.uid} onClose={() => setMailing(null)} />}
     </Drawer>
   );
 }

@@ -21,6 +21,7 @@ pub mod history_ops;
 pub mod insight_ops;
 pub mod inventory_ops;
 pub mod keys;
+pub mod mail_ops;
 pub mod ml_ops;
 pub mod payroll_ops;
 pub mod promo_ops;
