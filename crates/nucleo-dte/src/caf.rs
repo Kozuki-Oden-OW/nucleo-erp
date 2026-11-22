@@ -40,7 +40,8 @@ impl Caf {
             .children()
             .find(|n| n.has_tag_name("CAF"))
             .ok_or_else(|| DteError::Caf("el archivo no trae el nodo CAF".into()))?;
-        let node = from_rox(caf_node);
+        let mut node = from_rox(caf_node);
+        node.strip_ws();
         let da = node
             .find("DA")
             .ok_or_else(|| DteError::Caf("el CAF no trae DA".into()))?;

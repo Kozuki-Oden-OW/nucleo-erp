@@ -91,7 +91,10 @@ impl Certificate {
         let rsa = self.key.rsa()?;
         Ok(El::new("KeyValue").child(
             El::new("RSAKeyValue")
-                .child(El::text("Modulus", BASE64.encode(&rsa.n().to_vec())))
+                .child(El::text(
+                    "Modulus",
+                    wrap64(&BASE64.encode(&rsa.n().to_vec())),
+                ))
                 .child(El::text("Exponent", BASE64.encode(&rsa.e().to_vec()))),
         ))
     }
@@ -120,23 +123,33 @@ impl Certificate {
         let reference = reference
             .child(El::new("DigestMethod").attr("Algorithm", SHA1))
             .child(El::text("DigestValue", digest));
-        let signed_info = El::new("SignedInfo")
+        let mut signed_info = El::new("SignedInfo")
             .child(El::new("CanonicalizationMethod").attr("Algorithm", C14N))
             .child(El::new("SignatureMethod").attr("Algorithm", RSA_SHA1))
             .child(reference);
+        signed_info.break_lines(&[]);
         let mut si_scope = sig_inherited.clone();
         si_scope.insert(String::new(), NS_DSIG.into());
         let value = self.sign_sha1_b64(signed_info.canonical(&si_scope).as_bytes())?;
-        Ok(El::new("Signature")
+        let mut sig = El::new("Signature")
             .ns("", NS_DSIG)
             .child(signed_info)
-            .child(El::text("SignatureValue", value))
-            .child(
-                El::new("KeyInfo").child(self.rsa_key_value()?).child(
-                    El::new("X509Data").child(El::text("X509Certificate", self.cert_b64()?)),
-                ),
-            ))
+            .child(El::text("SignatureValue", wrap64(&value)))
+            .child(El::new("KeyInfo").child(self.rsa_key_value()?).child(
+                El::new("X509Data").child(El::text("X509Certificate", wrap64(&self.cert_b64()?))),
+            ));
+        sig.break_lines(&[]);
+        Ok(sig)
     }
+}
+
+/// Base64 en líneas de 76 caracteres (los espacios no cambian el valor en base64Binary).
+fn wrap64(b64: &str) -> String {
+    b64.as_bytes()
+        .chunks(76)
+        .map(|c| std::str::from_utf8(c).unwrap_or_default())
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 pub fn rsa_sha1(key: &PKey<Private>, data: &[u8]) -> DteResult<Vec<u8>> {

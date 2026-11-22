@@ -461,14 +461,18 @@ impl Dte {
         }
         doc.push(self.ted(&t, caf, timestamp)?);
         doc.push(El::text("TmstFirma", timestamp));
+        // Un elemento por línea: el SII rechaza líneas de más de 4090 caracteres. El timbre (TED) va
+        // sin saltos porque su DD se firma «aplanado».
+        doc.break_lines(&["TED"]);
         let scope = dte_scope();
         let sig = cert.xml_signature(&doc, &format!("#{}", self.id()), &scope, &scope, false)?;
-        let dte = El::new("DTE")
+        let mut dte = El::new("DTE")
             .ns("", NS_SII)
             .ns("xsi", NS_XSI)
             .attr("version", "1.0")
             .child(doc)
             .child(sig);
+        dte.break_lines(&["TED"]);
         Ok(SignedDte {
             tipo: self.tipo,
             folio: self.folio,

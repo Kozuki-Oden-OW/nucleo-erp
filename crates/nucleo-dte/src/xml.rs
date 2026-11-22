@@ -72,6 +72,44 @@ impl El {
             _ => None,
         })
     }
+    /// Quita los textos que son solo espacios entre elementos («aplana»), como pide el SII para el
+    /// CAF dentro del timbre: el DD se firma sin saltos de línea entre etiquetas.
+    pub fn strip_ws(&mut self) {
+        let has_el = self.kids.iter().any(|k| matches!(k, Node::El(_)));
+        if has_el {
+            self.kids
+                .retain(|k| !matches!(k, Node::Text(t) if t.trim().is_empty()));
+        }
+        for k in &mut self.kids {
+            if let Node::El(e) = k {
+                e.strip_ws();
+            }
+        }
+    }
+
+    /// Pone un salto de línea entre los elementos hijos (el SII rechaza archivos con líneas de más de
+    /// 4090 caracteres: «CHR-00002: Line too long»). Se aplica antes de firmar, así la firma cubre los
+    /// saltos; es idempotente. Los elementos en `skip` (el timbre) quedan tal cual.
+    pub fn break_lines(&mut self, skip: &[&str]) {
+        if skip.contains(&self.name.as_str()) || !self.kids.iter().any(|k| matches!(k, Node::El(_)))
+        {
+            return;
+        }
+        let kids = std::mem::take(&mut self.kids);
+        self.kids.push(Node::Text("\n".into()));
+        for k in kids {
+            match k {
+                Node::El(mut e) => {
+                    e.break_lines(skip);
+                    self.kids.push(Node::El(e));
+                    self.kids.push(Node::Text("\n".into()));
+                }
+                Node::Text(t) if t.trim().is_empty() => {}
+                t => self.kids.push(t),
+            }
+        }
+    }
+
     pub fn text_content(&self) -> String {
         self.kids
             .iter()
@@ -275,8 +313,9 @@ pub fn from_rox(n: roxmltree::Node<'_, '_>) -> El {
         if c.is_element() {
             e.kids.push(Node::El(from_rox(c)));
         } else if c.is_text() {
+            // Se conservan también los saltos entre elementos: lo firmado debe leerse tal cual.
             let t = c.text().unwrap_or("");
-            if !t.trim().is_empty() {
+            if !t.is_empty() {
                 e.kids.push(Node::Text(t.to_string()));
             }
         }

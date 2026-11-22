@@ -303,7 +303,7 @@ fn emite_envia_y_consulta() {
         })
         .unwrap();
     assert_eq!((libro.documentos, libro.estado.as_str()), (2, "firmado"));
-    let xml = String::from_utf8_lossy(&s.sii_libro_xml(libro.id).unwrap()).to_string();
+    let xml = String::from_utf8_lossy(&s.sii_libro_xml(libro.id).unwrap()).replace('\n', "");
     assert!(xml.contains("<TipoOperacion>VENTA</TipoOperacion>"));
     assert!(xml.contains("<TotDoc>2</TotDoc><TotMntExe>0</TotMntExe><TotMntNeto>40000</TotMntNeto><TotMntIVA>7600</TotMntIVA><TotMntTotal>47600</TotMntTotal>"));
     assert!(xml.contains("<FolioNotificacion>5198397</FolioNotificacion>"));

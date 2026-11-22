@@ -83,9 +83,11 @@ pub fn envio_el(
     for d in dtes {
         set.push(d.el.clone());
     }
+    // Los DTE ya vienen con sus saltos desde la firma: no se tocan (cambiaría lo firmado).
+    set.break_lines(&["DTE"]);
     let scope = dte_scope();
     let sig = cert.xml_signature(&set, "#SetDoc", &scope, &scope, false)?;
-    Ok(El::new("EnvioDTE")
+    let mut envio = El::new("EnvioDTE")
         .ns("", NS_SII)
         .ns("xsi", NS_XSI)
         .attr(
@@ -94,5 +96,7 @@ pub fn envio_el(
         )
         .attr("version", "1.0")
         .child(set)
-        .child(sig))
+        .child(sig);
+    envio.break_lines(&["DTE"]);
+    Ok(envio)
 }

@@ -71,6 +71,21 @@
 Tiempo estimado: F1–F2 de 3 a 6 semanas de desarrollo; F3–F5 depende de las revisiones del SII
 (1 a 3 meses en total).
 
+## Lecciones del primer envío (22-11-2026, FAVOR)
+
+1. **«106 Usuario sin permiso de envío»** (y «el RUT … no está autorizado por la empresa … para consultar»): el
+   usuario administrador nombrado en la postulación parte solo con el perfil de administrador. Hay que darle
+   los perfiles en **Mantención de usuarios** del ambiente de certificación
+   (`www2c.sii.cl/sii-muyd-inter/`, «Actualización de datos del contribuyente», con certificado y verificación
+   en dos pasos): Solicitar folios, Anular folios, Firmar documentos, Enviar documentos y Consulta y registro.
+   En producción pasa lo mismo con cada empresa: revisarlo antes del primer envío.
+2. **«RSC – Rechazado por Error en Schema: (ENV-3-0) CHR-00002: Line too long (4090)»**: el SII no acepta
+   líneas de más de 4090 caracteres. NÚCLEO ahora escribe un elemento por línea (firmado así) y parte el
+   base64 de la firma en líneas de 76. El detalle del rechazo llega al «mail contacto SII» como
+   `DTEMAIL<track>.txt/.xml`.
+3. Un documento ya enviado no se reenvía con el mismo folio desde NÚCLEO: se firma de nuevo con el folio
+   siguiente (en certificación sobran folios).
+
 ## Diseño técnico
 
 - **Dónde vive:** crate `nucleo-dte` (armado del XML, timbre, firma, sobre y mensajes de los

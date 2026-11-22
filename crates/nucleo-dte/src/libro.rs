@@ -259,9 +259,10 @@ pub fn libro_el(
         envio.push(d);
     }
     envio.push(El::text("TmstFirma", timestamp));
+    envio.break_lines(&[]);
     let scope = dte_scope();
     let sig = cert.xml_signature(&envio, &format!("#{id}"), &scope, &scope, false)?;
-    Ok(El::new("LibroCompraVenta")
+    let mut libro = El::new("LibroCompraVenta")
         .ns("", NS_SII)
         .ns("xsi", NS_XSI)
         .attr(
@@ -270,5 +271,7 @@ pub fn libro_el(
         )
         .attr("version", "1.0")
         .child(envio)
-        .child(sig))
+        .child(sig);
+    libro.break_lines(&[]);
+    Ok(libro)
 }

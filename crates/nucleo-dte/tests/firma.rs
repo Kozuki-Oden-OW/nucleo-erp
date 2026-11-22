@@ -161,6 +161,7 @@ fn check_signature(parent: &El, signed: &El, scope: &BTreeMap<String, String>, p
             sig.find("SignatureValue")
                 .unwrap()
                 .text_content()
+                .replace('\n', "")
                 .as_bytes(),
         )
         .unwrap();
@@ -400,7 +401,7 @@ fn descuento_global_set_basico() {
         (t.neto, t.exento, t.iva, t.total),
         (246_813, 13_542, 46_894, 307_249)
     );
-    let xml = from_latin1(&s.to_document());
+    let xml = from_latin1(&s.to_document()).replace('\n', "");
     let (d, r) = (
         xml.find("<DscRcgGlobal>").unwrap(),
         xml.find("<Referencia>").unwrap(),
@@ -518,7 +519,7 @@ fn libro_de_compras_set() {
         folio_notificacion: Some(5_198_398),
     };
     let bytes = libro_cv(&car, &lineas, Some(0.6), &cert, "2026-11-22T13:00:00").unwrap();
-    let xml = from_latin1(&bytes);
+    let xml = from_latin1(&bytes).replace('\n', "");
     assert!(xml.contains("<TotIVAUsoComun>5744</TotIVAUsoComun><FctProp>0.6</FctProp><TotCredIVAUsoComun>3446</TotCredIVAUsoComun>"));
     assert!(xml.contains(
         "<IVANoRec><CodIVANoRec>4</CodIVANoRec><MntIVANoRec>2367</MntIVANoRec></IVANoRec>"
@@ -531,4 +532,202 @@ fn libro_de_compras_set() {
     .unwrap();
     // Sin factor de proporcionalidad no se puede declarar IVA de uso común.
     assert!(libro_cv(&car, &lineas, None, &cert, "2026-11-22T13:00:00").is_err());
+}
+
+/// Set básico del SII completo (4 facturas, 3 notas de crédito y 1 nota de débito) en un solo sobre,
+/// con los datos tal como los arma NÚCLEO (notas sin montos, referencias SET y al documento).
+#[test]
+fn set_basico_completo() {
+    let (cert, _) = certificado();
+    let (caf33, _) = caf(33, 1, 10);
+    let (caf61, _) = caf(61, 1, 10);
+    let (caf56, _) = caf(56, 1, 10);
+    let mut em = emisor();
+    em.giro = "Desarrollo y operación de app marketplace de servicios entre usuarios".into();
+    em.actecos = vec![620100];
+    let rec = Receptor {
+        rut: "77334963-0".into(),
+        razon_social: "DATA LOGGER CHILE SPA".into(),
+        giro: Some("Importación y exportación".into()),
+        direccion: Some("Guardia Vieja 202 of 403".into()),
+        comuna: Some("Providencia".into()),
+        ciudad: Some("Santiago".into()),
+        ..Default::default()
+    };
+    let l = |n: &str, q: i64, p: i64, pct: f64, exento: bool| {
+        let bruto = q * p;
+        let desc = (bruto as f64 * pct / 100.0).round() as i64;
+        Detalle {
+            nombre: n.into(),
+            cantidad_milli: Some(q * 1000),
+            precio: Some(p),
+            descuento_pct: (pct > 0.0).then_some(pct),
+            descuento_monto: (desc > 0).then_some(desc),
+            monto: bruto - desc,
+            exento,
+            ..Default::default()
+        }
+    };
+    let texto = |n: &str| Detalle {
+        nombre: n.into(),
+        ..Default::default()
+    };
+    let r = |tipo: &str, folio: &str, codigo: Option<u8>, razon: &str| Referencia {
+        tipo: tipo.into(),
+        folio: folio.into(),
+        fecha: "2026-11-22".into(),
+        codigo,
+        razon: Some(razon.into()),
+    };
+    let doc =
+        |tipo: TipoDte, folio: u64, detalle: Vec<Detalle>, referencias: Vec<Referencia>| Dte {
+            tipo,
+            folio,
+            fecha: "2026-11-22".into(),
+            forma_pago: Some(1),
+            vencimiento: None,
+            ind_traslado: None,
+            tipo_despacho: None,
+            emisor: em.clone(),
+            receptor: rec.clone(),
+            detalle,
+            referencias,
+            descuentos_globales: vec![],
+            tasa_iva_ppm: 190_000,
+        };
+    let c3 = || {
+        vec![
+            l("Pintura B&W AFECTO", 25, 2244, 0.0, false),
+            l("ITEM 2 AFECTO", 153, 3011, 0.0, false),
+            l("ITEM 3 SERVICIO EXENTO", 1, 34738, 0.0, true),
+        ]
+    };
+    let mut c4 = doc(
+        TipoDte::Factura,
+        4,
+        vec![
+            l("ITEM 1 AFECTO", 100, 1910, 0.0, false),
+            l("ITEM 2 AFECTO", 43, 1730, 0.0, false),
+            l("ITEM 3 SERVICIO EXENTO", 2, 6771, 0.0, true),
+        ],
+        vec![r("SET", "4", None, "CASO 5198396-4")],
+    );
+    c4.descuentos_globales = vec![DescuentoGlobal {
+        glosa: Some("Descuento global".into()),
+        porcentaje: Some(7.0),
+        ..Default::default()
+    }];
+    let docs = vec![
+        (
+            doc(
+                TipoDte::Factura,
+                1,
+                vec![
+                    l("Cajón AFECTO", 126, 1067, 0.0, false),
+                    l("Relleno AFECTO", 54, 1717, 0.0, false),
+                ],
+                vec![r("SET", "1", None, "CASO 5198396-1")],
+            ),
+            &caf33,
+            270_320,
+        ),
+        (
+            doc(
+                TipoDte::Factura,
+                2,
+                vec![
+                    l("Pañuelo AFECTO", 264, 2147, 4.0, false),
+                    l("ITEM 2 AFECTO", 192, 1211, 6.0, false),
+                ],
+                vec![r("SET", "2", None, "CASO 5198396-2")],
+            ),
+            &caf33,
+            907_609,
+        ),
+        (
+            doc(
+                TipoDte::Factura,
+                3,
+                c3(),
+                vec![r("SET", "3", None, "CASO 5198396-3")],
+            ),
+            &caf33,
+            649_710,
+        ),
+        (c4, &caf33, 307_249),
+        (
+            doc(
+                TipoDte::NotaCredito,
+                1,
+                vec![texto("CORRIGE GIRO DEL RECEPTOR")],
+                vec![
+                    r("SET", "1", None, "CASO 5198396-5"),
+                    r("33", "1", Some(2), "CORRIGE GIRO DEL RECEPTOR"),
+                ],
+            ),
+            &caf61,
+            0,
+        ),
+        (
+            doc(
+                TipoDte::NotaCredito,
+                2,
+                vec![
+                    l("Pañuelo AFECTO", 97, 2147, 4.0, false),
+                    l("ITEM 2 AFECTO", 130, 1211, 6.0, false),
+                ],
+                vec![
+                    r("SET", "2", None, "CASO 5198396-6"),
+                    r("33", "2", Some(3), "DEVOLUCION DE MERCADERIAS"),
+                ],
+            ),
+            &caf61,
+            414_016,
+        ),
+        (
+            doc(
+                TipoDte::NotaCredito,
+                3,
+                c3(),
+                vec![
+                    r("SET", "3", None, "CASO 5198396-7"),
+                    r("33", "3", Some(1), "ANULA FACTURA"),
+                ],
+            ),
+            &caf61,
+            649_710,
+        ),
+        (
+            doc(
+                TipoDte::NotaDebito,
+                1,
+                vec![texto("ANULA NOTA DE CREDITO ELECTRONICA")],
+                vec![
+                    r("SET", "1", None, "CASO 5198396-8"),
+                    r("61", "1", Some(1), "ANULA NOTA DE CREDITO ELECTRONICA"),
+                ],
+            ),
+            &caf56,
+            0,
+        ),
+    ];
+    let mut firmados = Vec::new();
+    for (i, (d, c, total)) in docs.into_iter().enumerate() {
+        let s = d
+            .sign(c, &cert, &format!("2026-11-22T14:00:{i:02}"))
+            .unwrap();
+        assert_eq!(s.totales.total, total, "documento {i}");
+        firmados.push(s);
+    }
+    let car = Caratula::al_sii(RUT, "11111111-1", "2026-11-22", 0);
+    let bytes = envio_dte(&car, &firmados, &cert, "2026-11-22T14:01:00").unwrap();
+    std::fs::create_dir_all(concat!(env!("CARGO_TARGET_TMPDIR"), "/dte")).unwrap();
+    std::fs::write(
+        concat!(env!("CARGO_TARGET_TMPDIR"), "/dte/envio_set_basico.xml"),
+        &bytes,
+    )
+    .unwrap();
+    // El SII rechaza líneas de más de 4090 caracteres («CHR-00002: Line too long»).
+    let largo = from_latin1(&bytes).lines().map(|l| l.len()).max().unwrap();
+    assert!(largo < 1000, "línea de {largo} caracteres");
 }
