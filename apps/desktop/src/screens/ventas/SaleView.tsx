@@ -176,7 +176,12 @@ export function SaleView({ uid }: { uid: string }) {
             <Card title="Envíos" subtitle="Agencia, seguimiento y estado del despacho al cliente." padded={false}
               actions={<Button size="sm" variant="secondary" icon={Truck} onClick={async () => {
                 const c = s.customer_uid ? await backend.customer(s.customer_uid).catch(() => null) : null;
-                setShipping({ status: "no_despachado", sale_uid: s.uid, sale_number: s.number, ...recipientFromCustomer(c) });
+                const goods = s.lines.filter((l) => !/env[ií]o|despacho/i.test(l.description));
+                setShipping({
+                  status: "no_despachado", sale_uid: s.uid, sale_number: s.number, ...recipientFromCustomer(c),
+                  content: goods.map((l) => l.description).join(", ").slice(0, 200) || null,
+                  declared_value_minor: goods.reduce((a, l) => a + Math.round(l.net_minor * (l.taxable && taxPpm ? 1 + taxPpm / 1_000_000 : 1)), 0) || null,
+                });
               }}>Crear envío</Button>}>
               {ships.length === 0 ? <p className="px-5 py-4 text-sm text-muted">Sin envíos registrados.</p> : (
                 <ul className="divide-y divide-line">

@@ -28,6 +28,28 @@ pub struct ShipmentRow {
     /// "no_despachado", "en_camino", "entregado" o "no_entregado".
     pub status: String,
     pub notes: Option<String>,
+    pub email: Option<String>,
+    pub street: Option<String>,
+    pub street_number: Option<String>,
+    pub unit: Option<String>,
+    pub reference: Option<String>,
+    /// "domicilio" o "punto" (retiro en un punto del courier).
+    pub delivery_mode: Option<String>,
+    pub origin_point: Option<String>,
+    pub service: Option<String>,
+    pub content: Option<String>,
+    pub declared_value_minor: Option<i64>,
+    /// Talla del courier: XS, S, M o L.
+    pub size: Option<String>,
+    pub weight_g: Option<i64>,
+    pub length_cm: Option<i64>,
+    pub width_cm: Option<i64>,
+    pub height_cm: Option<i64>,
+    /// Se declaró que no contiene mercancías peligrosas.
+    pub no_dangerous: bool,
+    /// Lo que cobró el courier y el n.º de transacción del pago.
+    pub cost_minor: Option<i64>,
+    pub payment_ref: Option<String>,
     pub created_at: String,
     pub updated_at: Option<String>,
 }
@@ -49,12 +71,32 @@ pub struct ShipmentWrite<'a> {
     pub delivered_on: Option<&'a str>,
     pub status: &'a str,
     pub notes: Option<&'a str>,
+    pub email: Option<&'a str>,
+    pub street: Option<&'a str>,
+    pub street_number: Option<&'a str>,
+    pub unit: Option<&'a str>,
+    pub reference: Option<&'a str>,
+    pub delivery_mode: Option<&'a str>,
+    pub origin_point: Option<&'a str>,
+    pub service: Option<&'a str>,
+    pub content: Option<&'a str>,
+    pub declared_value_minor: Option<i64>,
+    pub size: Option<&'a str>,
+    pub weight_g: Option<i64>,
+    pub length_cm: Option<i64>,
+    pub width_cm: Option<i64>,
+    pub height_cm: Option<i64>,
+    pub no_dangerous: bool,
+    pub cost_minor: Option<i64>,
+    pub payment_ref: Option<&'a str>,
     pub now: &'a str,
 }
 
 const SELECT: &str = "SELECT e.id, e.uid, e.number, s.uid, s.number, c.uid, c.name, e.carrier, e.tracking, e.first_name,
         e.last_name, e.phone, e.address, e.commune, e.city, e.region, e.shipped_on, e.delivered_on, e.status, e.notes,
-        e.created_at, e.updated_at
+        e.created_at, e.updated_at, e.email, e.street, e.street_number, e.unit, e.reference, e.delivery_mode,
+        e.origin_point, e.service, e.content, e.declared_value_minor, e.size, e.weight_g, e.length_cm, e.width_cm,
+        e.height_cm, e.no_dangerous, e.cost_minor, e.payment_ref
     FROM shipments e LEFT JOIN sales s ON s.id = e.sale_id LEFT JOIN customers c ON c.id = e.customer_id";
 
 fn map(r: &Row<'_>) -> rusqlite::Result<ShipmentRow> {
@@ -81,6 +123,24 @@ fn map(r: &Row<'_>) -> rusqlite::Result<ShipmentRow> {
         notes: r.get(19)?,
         created_at: r.get(20)?,
         updated_at: r.get(21)?,
+        email: r.get(22)?,
+        street: r.get(23)?,
+        street_number: r.get(24)?,
+        unit: r.get(25)?,
+        reference: r.get(26)?,
+        delivery_mode: r.get(27)?,
+        origin_point: r.get(28)?,
+        service: r.get(29)?,
+        content: r.get(30)?,
+        declared_value_minor: r.get(31)?,
+        size: r.get(32)?,
+        weight_g: r.get(33)?,
+        length_cm: r.get(34)?,
+        width_cm: r.get(35)?,
+        height_cm: r.get(36)?,
+        no_dangerous: r.get::<_, i64>(37)? != 0,
+        cost_minor: r.get(38)?,
+        payment_ref: r.get(39)?,
     })
 }
 
@@ -100,6 +160,29 @@ pub fn by_uid(conn: &Connection, uid: &str) -> DbResult<Option<ShipmentRow>> {
         .optional()?)
 }
 
+/// Datos del courier (columnas de la migración 39).
+fn write_courier(
+    conn: &Connection,
+    id_sql: &str,
+    key: &dyn rusqlite::ToSql,
+    w: &ShipmentWrite<'_>,
+) -> DbResult<()> {
+    conn.execute(
+        &format!(
+            "UPDATE shipments SET email = ?2, street = ?3, street_number = ?4, unit = ?5, reference = ?6,
+                delivery_mode = ?7, origin_point = ?8, service = ?9, content = ?10, declared_value_minor = ?11,
+                size = ?12, weight_g = ?13, length_cm = ?14, width_cm = ?15, height_cm = ?16, no_dangerous = ?17,
+                cost_minor = ?18, payment_ref = ?19 WHERE {id_sql} = ?1"
+        ),
+        rusqlite::params![
+            key, w.email, w.street, w.street_number, w.unit, w.reference, w.delivery_mode, w.origin_point,
+            w.service, w.content, w.declared_value_minor, w.size, w.weight_g, w.length_cm, w.width_cm, w.height_cm,
+            w.no_dangerous as i64, w.cost_minor, w.payment_ref
+        ],
+    )?;
+    Ok(())
+}
+
 pub fn insert(conn: &Connection, uid: &str, number: &str, w: &ShipmentWrite<'_>) -> DbResult<()> {
     conn.execute(
         "INSERT INTO shipments (uid, number, sale_id, customer_id, carrier, tracking, first_name, last_name, phone,
@@ -110,7 +193,7 @@ pub fn insert(conn: &Connection, uid: &str, number: &str, w: &ShipmentWrite<'_>)
             w.address, w.commune, w.city, w.region, w.shipped_on, w.delivered_on, w.status, w.notes, w.now
         ],
     )?;
-    Ok(())
+    write_courier(conn, "uid", &uid, w)
 }
 
 pub fn update(conn: &Connection, id: i64, w: &ShipmentWrite<'_>) -> DbResult<()> {
@@ -123,5 +206,5 @@ pub fn update(conn: &Connection, id: i64, w: &ShipmentWrite<'_>) -> DbResult<()>
             w.commune, w.city, w.region, w.shipped_on, w.delivered_on, w.status, w.notes, w.now
         ],
     )?;
-    Ok(())
+    write_courier(conn, "id", &id, w)
 }

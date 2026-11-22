@@ -141,3 +141,22 @@ describe("Mercado Libre (demostración)", () => {
     expect((await runTool(b, "borradores", "sincronizar_mercadolibre", {})).isError).toBe(true);
   });
 });
+
+describe("Envíos con datos del courier (demostración)", () => {
+  it("registra un envío unido a la venta y lo actualiza por seguimiento", async () => {
+    const b = new DemoBackend();
+    const [sale] = (await b.listSales({ view: "todas" })).filter((s) => s.commercial_state === "efectuada" || s.commercial_state === "cerrada");
+    const r = await runTool(b, "borradores", "registrar_envio", {
+      venta: sale!.number, agencia: "Bluexpress", seguimiento: "2480522914", nombre: "Clinica Rauquen", apellido: "SpA",
+      correo: "recepcion@clinicarauquen.cl", region: "Región del Maule", comuna: "Curicó", calle: "Avenida Lyon", numero: "1801",
+      tipo_entrega: "domicilio", punto_origen: "Punto Blue Express Market Plaza Ñuñoa", contenido: "Registrador RC-5+", valor_declarado: 27900,
+      talla: "S", sin_mercancias_peligrosas: true, costo: 3920, transaccion: "MWS6REU73M5A0M4X5F3",
+    });
+    expect(txt(r)).toMatch(new RegExp(`creado y unido a la venta ${sale!.number}.*Avenida Lyon 1801, Curicó.*talla S.*3\\.920`));
+    const upd = await runTool(b, "borradores", "registrar_envio", { seguimiento: "2480522914", estado: "en_camino" });
+    expect(txt(upd)).toMatch(/actualizado.*en_camino/);
+    const list = await runTool(b, "ver", "listar_envios", { texto: "2480522914" });
+    expect(txt(list)).toMatch(/1 envíos:.*Bluexpress 2480522914 · en_camino/s);
+    expect((await runTool(b, "ver", "registrar_envio", { agencia: "X" })).isError).toBe(true);
+  });
+});

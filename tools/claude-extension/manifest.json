@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "nucleo-erp",
   "display_name": "NÚCLEO ERP",
-  "version": "0.7.8",
+  "version": "0.7.9",
   "description": "Permite que Claude use NÚCLEO ERP en este computador: ve la pantalla, la recorre con su propio cursor y registra ventas, gastos, clientes y cobros.",
   "long_description": "Conecta Claude con NÚCLEO ERP, el sistema de gestión local y gratuito para pymes chilenas. NÚCLEO debe estar abierto con Configuración → Claude activado; ahí eliges si Claude solo mira, crea borradores o tiene acceso completo. La extensión solo se comunica con NÚCLEO dentro del mismo computador (127.0.0.1): los datos del negocio siguen guardados solo en tu equipo.",
   "author": {
@@ -131,6 +131,14 @@
     {
       "name": "pedidos_mercadolibre",
       "description": "Lista los pedidos de Mercado Libre ya vistos por NÚCLEO: fecha, comprador, total, comisión, envío, neto a recibir de Mercado Pago, estado (importada, por revisar, cancelada), si pide factura y la vent"
+    },
+    {
+      "name": "listar_envios",
+      "description": "Lista los envíos registrados en NÚCLEO (de una venta si se indica): número ENV, venta, cliente, agencia, n.º de seguimiento, estado, destino, talla, costo pagado al courier."
+    },
+    {
+      "name": "registrar_envio",
+      "description": "Crea o actualiza un envío con los datos que pide el courier (Bluexpress u otro): destinatario, dirección por partes, paquete (contenido, valor declarado, talla XS/S/M/L, peso y medidas, declaración de"
     }
   ],
   "keywords": [

@@ -88,7 +88,7 @@ export interface AttachmentRow {
   created_at: string;
   links: string[];
 }
-export interface EntityRef { entity: "cliente" | "proveedor" | "producto" | "cotizacion" | "venta" | "orden_compra" | "compra" | "gasto" | "importacion"; uid: string }
+export interface EntityRef { entity: "cliente" | "proveedor" | "producto" | "cotizacion" | "venta" | "orden_compra" | "compra" | "gasto" | "importacion" | "envio"; uid: string }
 export interface AuditRow {
   id: number;
   ts_utc: string;
@@ -1377,9 +1377,31 @@ export interface Shipment {
   delivered_on: string | null;
   status: ShipmentStatus;
   notes: string | null;
+  email: string | null;
+  street: string | null;
+  street_number: string | null;
+  unit: string | null;
+  reference: string | null;
+  /** "domicilio" o "punto" (retiro en un punto del courier). */
+  delivery_mode: "domicilio" | "punto" | null;
+  origin_point: string | null;
+  service: string | null;
+  content: string | null;
+  declared_value_minor: number | null;
+  size: ShipmentSize | null;
+  weight_g: number | null;
+  length_cm: number | null;
+  width_cm: number | null;
+  height_cm: number | null;
+  /** Se declaró que no contiene mercancías peligrosas. */
+  no_dangerous: boolean;
+  /** Lo que cobró el courier y el n.º de transacción. */
+  cost_minor: number | null;
+  payment_ref: string | null;
   created_at: string;
   updated_at: string | null;
 }
+export type ShipmentSize = "XS" | "S" | "M" | "L";
 export interface ShipmentInput {
   sale_uid?: string | null;
   customer_uid?: string | null;
@@ -1396,6 +1418,27 @@ export interface ShipmentInput {
   delivered_on?: string | null;
   status: ShipmentStatus;
   notes?: string | null;
+  email?: string | null;
+  street?: string | null;
+  street_number?: string | null;
+  unit?: string | null;
+  reference?: string | null;
+  /** "domicilio" o "punto" (retiro en un punto del courier). */
+  delivery_mode?: "domicilio" | "punto" | null;
+  origin_point?: string | null;
+  service?: string | null;
+  content?: string | null;
+  declared_value_minor?: number | null;
+  size?: ShipmentSize | null;
+  weight_g?: number | null;
+  length_cm?: number | null;
+  width_cm?: number | null;
+  height_cm?: number | null;
+  /** Se declaró que no contiene mercancías peligrosas. */
+  no_dangerous?: boolean;
+  /** Lo que cobró el courier y el n.º de transacción. */
+  cost_minor?: number | null;
+  payment_ref?: string | null;
 }
 
 /* ───── Crédito a clientes ───── */

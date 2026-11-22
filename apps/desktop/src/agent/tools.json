@@ -854,5 +854,152 @@
         }
       }
     }
+  },
+  {
+    "name": "listar_envios",
+    "nivel": "ver",
+    "description": "Lista los envíos registrados en NÚCLEO (de una venta si se indica): número ENV, venta, cliente, agencia, n.º de seguimiento, estado, destino, talla, costo pagado al courier.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "venta": {
+          "type": "string",
+          "description": "Número de la venta (ej. VEN-000123 o FE-530) para ver solo sus envíos"
+        },
+        "texto": {
+          "type": "string",
+          "description": "Filtra por seguimiento, agencia, cliente o comuna"
+        }
+      }
+    }
+  },
+  {
+    "name": "registrar_envio",
+    "nivel": "borradores",
+    "description": "Crea o actualiza un envío con los datos que pide el courier (Bluexpress u otro): destinatario, dirección por partes, paquete (contenido, valor declarado, talla XS/S/M/L, peso y medidas, declaración de que no contiene mercancías peligrosas), agencia, n.º de seguimiento, servicio, punto de origen, costo pagado y n.º de transacción. Si se indica la venta, queda unido a ella (la factura se ve desde la venta). Para actualizar, indica envio (ENV-…) o el seguimiento ya registrado.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "envio": {
+          "type": "string",
+          "description": "Número ENV-… de un envío existente para actualizarlo"
+        },
+        "venta": {
+          "type": "string",
+          "description": "Número de la venta a la que pertenece (VEN-…, FV-… o folio FE-…)"
+        },
+        "agencia": {
+          "type": "string",
+          "description": "Ej. Bluexpress"
+        },
+        "seguimiento": {
+          "type": "string"
+        },
+        "estado": {
+          "type": "string",
+          "enum": [
+            "no_despachado",
+            "en_camino",
+            "entregado",
+            "no_entregado"
+          ]
+        },
+        "nombre": {
+          "type": "string"
+        },
+        "apellido": {
+          "type": "string"
+        },
+        "telefono": {
+          "type": "string"
+        },
+        "correo": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string",
+          "description": "Ej. Región del Maule"
+        },
+        "comuna": {
+          "type": "string"
+        },
+        "ciudad": {
+          "type": "string"
+        },
+        "calle": {
+          "type": "string"
+        },
+        "numero": {
+          "type": "string"
+        },
+        "depto": {
+          "type": "string"
+        },
+        "referencia": {
+          "type": "string"
+        },
+        "tipo_entrega": {
+          "type": "string",
+          "enum": [
+            "domicilio",
+            "punto"
+          ]
+        },
+        "punto_origen": {
+          "type": "string"
+        },
+        "servicio": {
+          "type": "string",
+          "description": "Ej. 48 horas"
+        },
+        "contenido": {
+          "type": "string"
+        },
+        "valor_declarado": {
+          "type": "number",
+          "description": "Pesos"
+        },
+        "talla": {
+          "type": "string",
+          "enum": [
+            "XS",
+            "S",
+            "M",
+            "L"
+          ]
+        },
+        "peso_g": {
+          "type": "number"
+        },
+        "largo_cm": {
+          "type": "number"
+        },
+        "ancho_cm": {
+          "type": "number"
+        },
+        "alto_cm": {
+          "type": "number"
+        },
+        "sin_mercancias_peligrosas": {
+          "type": "boolean"
+        },
+        "costo": {
+          "type": "number",
+          "description": "Lo que se pagó al courier, en pesos"
+        },
+        "transaccion": {
+          "type": "string",
+          "description": "N.º de transacción del pago al courier"
+        },
+        "fecha_envio": {
+          "type": "string",
+          "description": "AAAA-MM-DD"
+        },
+        "notas": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
   }
 ]

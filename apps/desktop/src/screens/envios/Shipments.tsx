@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Copy, Mail, PackageX, Plus, Search, Truck, XCircle, Clock3 } from "lucide-react";
 import { MailComposer } from "../../ui/MailComposer";
-import { useBackend, errorMessage, type Customer, type Shipment, type ShipmentInput, type ShipmentStatus } from "../../data";
+import { useBackend, errorMessage, type Customer, type Shipment, type ShipmentInput, type ShipmentSize, type ShipmentStatus } from "../../data";
+import { AttachmentsPanel } from "../documentos/Documents";
 import { REGIONS } from "../../data/lre";
 import { formatDate } from "../../lib/format";
 import { navigate, type Route } from "../../lib/router";
 import { useSession } from "../../lib/session";
-import { Badge, Button, EmptyState, Field, Kpi, Notice, PageHeader, Select, Spinner, Tabs, TextArea, cx, type Tone } from "../../ui/kit";
+import { Badge, Button, Checkbox, EmptyState, Field, Kpi, Notice, PageHeader, Select, Spinner, Tabs, TextArea, cx, type Tone } from "../../ui/kit";
 import { Drawer, useToast } from "../../ui/overlay";
 import { DataTable, type Column } from "../../ui/table";
 
@@ -18,7 +19,7 @@ export const SHIP_STATUS: Record<ShipmentStatus, { tone: Tone; label: string; ic
   entregado: { tone: "success", label: "Entregado", icon: CheckCircle2 },
   no_entregado: { tone: "danger", label: "No entregado (problemas)", icon: XCircle },
 };
-export const CARRIERS = ["Starken", "Chilexpress", "Correos de Chile", "Blue Express", "Shipit", "99 Minutos", "Envíame", "Despacho propio", "Retiro en tienda"];
+export const CARRIERS = ["Starken", "Chilexpress", "Correos de Chile", "Bluexpress", "Shipit", "99 Minutos", "Envíame", "Despacho propio", "Retiro en tienda"];
 
 export function ShipStatusBadge({ status }: { status: ShipmentStatus }) {
   const s = SHIP_STATUS[status];
@@ -95,7 +96,10 @@ export function recipientFromCustomer(c: Customer | null): Partial<ShipmentInput
   if (!c) return {};
   const person = c.contact_name || (c.kind === "persona" ? c.name : "");
   const [first, ...rest] = person.split(" ");
-  return { first_name: first || null, last_name: rest.join(" ") || (c.kind === "empresa" ? c.name : null), phone: c.phone, address: c.address, commune: c.commune, city: c.city, region: c.region };
+  return {
+    first_name: first || (c.kind === "empresa" ? c.name : null), last_name: rest.join(" ") || null, phone: c.phone, email: c.email,
+    address: c.address, commune: c.commune, city: c.city, region: c.region, delivery_mode: "domicilio",
+  };
 }
 
 export function ShipmentDrawer({ shipment, preset, onClose, onSaved }: {
@@ -112,6 +116,8 @@ export function ShipmentDrawer({ shipment, preset, onClose, onSaved }: {
   const set = (patch: Partial<ShipmentInput>) => setF((x) => ({ ...x, ...patch }));
   const editable = can("ventas.crear");
   const saleNumber = shipment?.sale_number ?? preset?.sale_number;
+  const num = (v: string): number | null => { const d = v.replace(/\D/g, ""); return d ? Number(d) : null; };
+  const suggested = suggestSize(f.weight_g ?? null, f.length_cm && f.width_cm && f.height_cm ? [f.length_cm, f.width_cm, f.height_cm] : null);
 
   async function save() {
     setBusy(true); setErr(null);
@@ -146,34 +152,77 @@ export function ShipmentDrawer({ shipment, preset, onClose, onSaved }: {
         </fieldset>
 
         <fieldset className="flex flex-col gap-3">
+          <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Destinatario</legend>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Nombre" optional value={f.first_name ?? ""} onChange={(e) => set({ first_name: e.target.value })} />
+            <Field label="Apellido" optional value={f.last_name ?? ""} onChange={(e) => set({ last_name: e.target.value })} hint="Empresa: la razón social en nombre y «SpA», «Ltda.»… en apellido." />
+            <Field label="Celular" optional inputMode="tel" value={f.phone ?? ""} onChange={(e) => set({ phone: e.target.value })} placeholder="+56 9 1234 5678" />
+            <Field label="Correo" optional type="email" value={f.email ?? ""} onChange={(e) => set({ email: e.target.value })} placeholder="cliente@empresa.cl" />
+          </div>
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-3">
+          <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Entrega</legend>
+          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Tipo de entrega">
+            {([["domicilio", "A domicilio"], ["punto", "Retiro en punto del courier"]] as const).map(([k, l]) => (
+              <button key={k} type="button" role="radio" aria-checked={f.delivery_mode === k} disabled={!editable} onClick={() => set({ delivery_mode: k })}
+                className={cx("rounded-lg border px-3 py-2 text-sm font-medium transition-colors", f.delivery_mode === k ? "border-accent bg-accent-soft text-accent" : "border-line text-muted hover:text-ink")}>{l}</button>
+            ))}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Select label="Región" optional value={f.region ?? ""} onChange={(e) => set({ region: e.target.value })}
+              options={[{ value: "", label: "—" }, ...REGIONS.map(([, n]) => ({ value: n, label: n })), ...(f.region && !REGIONS.some(([, n]) => n === f.region) ? [{ value: f.region, label: f.region }] : [])]} />
+            <Field label="Comuna" optional value={f.commune ?? ""} onChange={(e) => set({ commune: e.target.value })} />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+            <Field label="Calle" optional value={f.street ?? ""} onChange={(e) => set({ street: e.target.value })} placeholder="Avenida Lyon" />
+            <Field label="Número" optional value={f.street_number ?? ""} onChange={(e) => set({ street_number: e.target.value })} placeholder="1801 o S/N" />
+            <Field label="Depto / oficina" optional value={f.unit ?? ""} onChange={(e) => set({ unit: e.target.value })} />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Referencia" optional value={f.reference ?? ""} onChange={(e) => set({ reference: e.target.value })} placeholder="Ej. recepción, entre calles…" />
+            <Field label="Ciudad" optional value={f.city ?? ""} onChange={(e) => set({ city: e.target.value })} />
+          </div>
+          {f.address && !f.street && <p className="text-xs text-muted">Dirección guardada: {f.address}</p>}
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-3">
+          <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Paquete</legend>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Contenido" optional value={f.content ?? ""} onChange={(e) => set({ content: e.target.value })} placeholder="Ej. Registrador de temperatura RC-5+" />
+            <Field label="Valor declarado" optional inputMode="numeric" leading="$" value={f.declared_value_minor ?? ""} onChange={(e) => set({ declared_value_minor: num(e.target.value) })} />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-4">
+            <Field label="Peso (g)" optional inputMode="numeric" value={f.weight_g ?? ""} onChange={(e) => set({ weight_g: num(e.target.value) })} />
+            <Field label="Largo (cm)" optional inputMode="numeric" value={f.length_cm ?? ""} onChange={(e) => set({ length_cm: num(e.target.value) })} />
+            <Field label="Ancho (cm)" optional inputMode="numeric" value={f.width_cm ?? ""} onChange={(e) => set({ width_cm: num(e.target.value) })} />
+            <Field label="Alto (cm)" optional inputMode="numeric" value={f.height_cm ?? ""} onChange={(e) => set({ height_cm: num(e.target.value) })} />
+          </div>
+          <div className="flex flex-wrap items-end gap-3">
+            <Select label="Talla" optional value={f.size ?? ""} onChange={(e) => set({ size: (e.target.value || null) as ShipmentSize | null })}
+              options={[{ value: "", label: "—" }, { value: "XS", label: "XS · hasta 0,5 kg" }, { value: "S", label: "S · hasta 3 kg o 20×20×30" }, { value: "M", label: "M · hasta 6 kg o 30×30×25" }, { value: "L", label: "L · hasta 20 kg o 70×70×70" }]} />
+            {suggested && suggested !== f.size && <Button size="sm" variant="ghost" onClick={() => set({ size: suggested })}>Usar talla sugerida: {suggested}</Button>}
+          </div>
+          <Checkbox label="No contiene mercancías peligrosas" hint="Ácidos, alcoholes, combustibles, explosivos, material radiactivo o aerosoles." checked={!!f.no_dangerous} onChange={(v) => set({ no_dangerous: v })} />
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-3">
           <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Transporte</legend>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex flex-col">
-              <Field label="Agencia" optional list="nucleo-agencias" value={f.carrier ?? ""} onChange={(e) => set({ carrier: e.target.value })} placeholder="Ej. Starken" />
+              <Field label="Agencia" optional list="nucleo-agencias" value={f.carrier ?? ""} onChange={(e) => set({ carrier: e.target.value })} placeholder="Ej. Bluexpress" />
               <datalist id="nucleo-agencias">{CARRIERS.map((c) => <option key={c} value={c} />)}</datalist>
             </div>
             <Field label="N.º de orden de transporte o seguimiento" optional value={f.tracking ?? ""} onChange={(e) => set({ tracking: e.target.value })}
               suffix={f.tracking ? <button type="button" aria-label="Copiar número" className="text-muted hover:text-ink" onClick={async () => {
                 try { await navigator.clipboard.writeText(f.tracking!); toast("success", "Número copiado: pégalo en el sitio de la agencia."); } catch { /* sin portapapeles */ }
               }}><Copy size={14} /></button> : undefined} />
+            <Field label="Servicio" optional value={f.service ?? ""} onChange={(e) => set({ service: e.target.value })} placeholder="Ej. 48 horas, express" />
+            <Field label="Punto de origen" optional value={f.origin_point ?? ""} onChange={(e) => set({ origin_point: e.target.value })} placeholder="Ej. Punto Blue Express Market Plaza Ñuñoa" />
+            <Field label="Costo pagado al courier" optional inputMode="numeric" leading="$" value={f.cost_minor ?? ""} onChange={(e) => set({ cost_minor: num(e.target.value) })} />
+            <Field label="N.º de transacción del pago" optional value={f.payment_ref ?? ""} onChange={(e) => set({ payment_ref: e.target.value })} />
             <Field label="Cuándo se envió" type="date" optional value={f.shipped_on ?? ""} onChange={(e) => set({ shipped_on: e.target.value || null })} hint="Vacío: hoy, al marcarlo en camino." />
             <Field label="Cuándo se recibió" type="date" optional value={f.delivered_on ?? ""} onChange={(e) => set({ delivered_on: e.target.value || null })} hint="Vacío: hoy, al marcarlo entregado." />
-          </div>
-        </fieldset>
-
-        <fieldset className="flex flex-col gap-3">
-          <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Destinatario</legend>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Nombre" optional value={f.first_name ?? ""} onChange={(e) => set({ first_name: e.target.value })} />
-            <Field label="Apellido" optional value={f.last_name ?? ""} onChange={(e) => set({ last_name: e.target.value })} />
-            <Field label="Celular" optional inputMode="tel" value={f.phone ?? ""} onChange={(e) => set({ phone: e.target.value })} placeholder="+56 9 1234 5678" />
-          </div>
-          <Field label="Dirección" optional value={f.address ?? ""} onChange={(e) => set({ address: e.target.value })} placeholder="Calle, número, depto." />
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Field label="Comuna" optional value={f.commune ?? ""} onChange={(e) => set({ commune: e.target.value })} />
-            <Field label="Ciudad" optional value={f.city ?? ""} onChange={(e) => set({ city: e.target.value })} />
-            <Select label="Región" optional value={f.region ?? ""} onChange={(e) => set({ region: e.target.value })}
-              options={[{ value: "", label: "—" }, ...REGIONS.map(([, n]) => ({ value: n, label: n })), ...(f.region && !REGIONS.some(([, n]) => n === f.region) ? [{ value: f.region, label: f.region }] : [])]} />
           </div>
         </fieldset>
         <TextArea label="Notas" optional rows={2} value={f.notes ?? ""} onChange={(e) => set({ notes: e.target.value })} placeholder="Ej. dejar en conserjería; problema: dirección incompleta…" />
@@ -181,9 +230,28 @@ export function ShipmentDrawer({ shipment, preset, onClose, onSaved }: {
           {shipment?.sale_uid && <Button variant="ghost" icon={Clock3} onClick={() => navigate(`/ventas/${shipment.sale_uid}`)}>Ver la venta {shipment.sale_number}</Button>}
           {shipment && <Button variant="secondary" icon={Mail} onClick={() => setMailing(true)}>Avisar al cliente por correo</Button>}
         </div>
+        {shipment && (
+          <section className="flex flex-col gap-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Etiqueta y comprobantes del envío</h3>
+            <AttachmentsPanel link={{ entity: "envio", uid: shipment.uid }} />
+            {shipment.sale_uid && <p className="text-xs text-muted">La factura o boleta queda en la venta {shipment.sale_number}; desde ahí se ve este envío.</p>}
+          </section>
+        )}
         {err && <Notice tone="danger">{err}</Notice>}
       </div>
       {mailing && shipment && <MailComposer kind="envio" reference={shipment.uid} onClose={() => setMailing(false)} />}
     </Drawer>
   );
+}
+
+/** Talla sugerida con los límites de Bluexpress (igual que `ship_ops::suggest_size`). */
+export function suggestSize(weightG: number | null, dims: [number, number, number] | null): ShipmentSize | null {
+  if (weightG == null && !dims) return null;
+  const sorted = (d: number[]) => [...d].sort((x, y) => x - y);
+  const fits = (max: [number, number, number]) => !dims || sorted(dims).every((x, i) => x <= sorted(max)[i]!);
+  const w = weightG ?? 0;
+  if (w <= 500 && (!dims || (Math.max(...dims) <= 25 && Math.min(...dims) <= 10))) return "XS";
+  const sizes: [ShipmentSize, number, [number, number, number]][] = [["S", 3000, [20, 20, 30]], ["M", 6000, [30, 30, 25]], ["L", 20000, [70, 70, 70]]];
+  for (const [n, kg, d] of sizes) if (w <= kg && fits(d)) return n;
+  return null;
 }

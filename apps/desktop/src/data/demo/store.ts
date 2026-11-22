@@ -1694,6 +1694,9 @@ export class DemoBackend implements Backend {
         first_name: c.kind === "persona" ? c.name.split(" ")[0]! : "Recepción", last_name: c.kind === "persona" ? c.name.split(" ").slice(1).join(" ") : c.name, phone: c.phone, address: c.address, commune: c.commune, city: c.city, region: c.region,
         shipped_on: status === "no_despachado" ? null : addDays(s.issue_date, 1), delivered_on: status === "entregado" ? addDays(s.issue_date, 3) : null,
         status, notes: status === "no_entregado" ? "Dirección incompleta: llamar al cliente para reprogramar." : null, created_at: now(), updated_at: null,
+        email: c.email, street: null, street_number: null, unit: null, reference: null, delivery_mode: "domicilio", origin_point: null,
+        service: null, content: "Productos de ferretería", declared_value_minor: s.totals.total_minor, size: "S", weight_g: 2_000,
+        length_cm: null, width_cm: null, height_cm: null, no_dangerous: true, cost_minor: status === "no_despachado" ? null : 4_990, payment_ref: null,
       });
     });
   }
@@ -2033,7 +2036,13 @@ export class DemoBackend implements Backend {
       sale_uid: sale?.uid ?? null, customer_uid: input.customer_uid || sale?.customer_uid || null, carrier: t(input.carrier), tracking: t(input.tracking),
       first_name: t(input.first_name), last_name: t(input.last_name), phone: t(input.phone), address: t(input.address), commune: t(input.commune),
       city: t(input.city), region: t(input.region), shipped_on: shipped, delivered_on: delivered, status, notes: t(input.notes),
+      email: t(input.email), street: t(input.street), street_number: t(input.street_number), unit: t(input.unit), reference: t(input.reference),
+      delivery_mode: input.delivery_mode ?? null, origin_point: t(input.origin_point), service: t(input.service), content: t(input.content),
+      declared_value_minor: input.declared_value_minor ?? null, size: input.size ?? null, weight_g: input.weight_g ?? null,
+      length_cm: input.length_cm ?? null, width_cm: input.width_cm ?? null, height_cm: input.height_cm ?? null,
+      no_dangerous: !!input.no_dangerous, cost_minor: input.cost_minor ?? null, payment_ref: t(input.payment_ref),
     };
+    if (!data.address && data.street) data.address = [data.street, data.street_number].filter(Boolean).join(" ") + (data.unit ? `, ${data.unit}` : "");
     const label = (s: string) => ({ no_despachado: "No despachado", en_camino: "En camino", entregado: "Entregado", no_entregado: "No entregado (problemas)" } as Record<string, string>)[s]!;
     let e = u ? this.ships.find((x) => x.uid === u) : undefined;
     let text: string;

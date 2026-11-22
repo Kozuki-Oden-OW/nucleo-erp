@@ -3,7 +3,7 @@
 // valen las mismas reglas, permisos y auditoría.
 import type { Backend } from "../data";
 import { errorMessage } from "../data";
-import type { Customer, HistoricalSale, LineInput, Product, SaleSummary, SaleTerms, Supplier } from "../data/types";
+import type { Customer, HistoricalSale, LineInput, Product, SaleSummary, SaleTerms, ShipmentInput, ShipmentSize, Supplier } from "../data/types";
 import { EMPTY_TERMS } from "../data/saleTerms";
 import { formatMoney, todayIso } from "../lib/format";
 import { navigate } from "../lib/router";
@@ -223,6 +223,21 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
         ? `${r.length} pedidos de Mercado Libre:\n${r.map((o) => `- ${o.date_created} · ${o.pack_id ?? o.order_id} · ${o.buyer ?? "—"} · total ${pesos(o.total_minor)} · comisión ${pesos(o.sale_fee_minor)} · envío ${pesos(o.shipping_cost_minor)} · a recibir ${pesos(o.net_minor)} · ${o.status}${o.needs_invoice ? " · por facturar" : ""}${o.sale_number ? ` · ${o.sale_number}` : ""}${o.issue ? ` · ${o.issue}` : ""}`).join("\n")}`
         : "Aún no hay pedidos de Mercado Libre en NÚCLEO.");
     }
+    case "listar_envios": {
+      let saleUid: string | null = null;
+      const ref = str(a, "venta");
+      if (ref) {
+        const list = await backend.listSales({ view: "todas", query: ref });
+        const s = list.find((x) => norm(x.number) === norm(ref)) ?? (list.length === 1 ? list[0] : undefined);
+        if (!s) throw new Error(`No encontré la venta «${ref}».`);
+        saleUid = s.uid;
+      }
+      const q = norm(str(a, "texto"));
+      const r = (await backend.shipments(saleUid)).filter((e) => !q || norm([e.tracking, e.carrier, e.customer_name, e.commune, e.number, e.sale_number].join(" ")).includes(q));
+      return text(r.length
+        ? `${r.length} envíos:\n${r.slice(0, 50).map((e) => `- ${e.number}${e.sale_number ? ` · venta ${e.sale_number}` : ""} · ${e.customer_name ?? [e.first_name, e.last_name].filter(Boolean).join(" ")} · ${e.carrier ?? "sin agencia"} ${e.tracking ?? "sin seguimiento"} · ${e.status} · ${[e.address, e.commune].filter(Boolean).join(", ")}${e.size ? ` · talla ${e.size}` : ""}${e.cost_minor != null ? ` · costo ${pesos(e.cost_minor)}` : ""}`).join("\n")}`
+        : "No hay envíos que coincidan.");
+    }
     case "listar_gastos": {
       const r = await backend.listExpenses({ from: str(a, "desde") || undefined, to: str(a, "hasta") || undefined, query: str(a, "texto") || undefined });
       return text(r.length
@@ -401,6 +416,44 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
         : { mode: "contado", method: METHOD[str(a, "medio") || "efectivo"] ?? "Efectivo", due_date: null });
       dataChanged();
       return text(`Venta ${done.number} confirmada · total ${pesos(done.total_minor)} · ${credito ? `por cobrar hasta ${done.due_date ?? ""}` : `pagada (${done.payment_method ?? ""})`}.`);
+    }
+    case "registrar_envio": {
+      let saleUid: string | null = null;
+      const ref = str(a, "venta");
+      if (ref) {
+        const list = await backend.listSales({ view: "todas", query: ref });
+        const s = list.find((x) => norm(x.number) === norm(ref)) ?? (list.length === 1 ? list[0] : undefined);
+        if (!s) throw new Error(`No encontré la venta «${ref}».`);
+        saleUid = s.uid;
+      }
+      const all = await backend.shipments(null);
+      const envRef = str(a, "envio");
+      const existing = envRef ? all.find((e) => norm(e.number) === norm(envRef))
+        : str(a, "seguimiento") ? all.find((e) => e.tracking && norm(e.tracking) === norm(str(a, "seguimiento"))) : undefined;
+      if (envRef && !existing) throw new Error(`No encontré el envío «${envRef}».`);
+      const pick = <T,>(key: string, cur: T | null | undefined, conv: (v: unknown) => T): T | null => (a[key] === undefined || a[key] === "" ? (cur ?? null) : conv(a[key]));
+      const s2 = (v: unknown) => String(v).trim();
+      const n2 = (v: unknown) => Math.round(Number(v));
+      const e = existing;
+      const input: ShipmentInput = {
+        sale_uid: saleUid ?? e?.sale_uid ?? null, customer_uid: e?.customer_uid ?? null,
+        status: (str(a, "estado") || e?.status || "no_despachado") as ShipmentInput["status"],
+        carrier: pick("agencia", e?.carrier, s2), tracking: pick("seguimiento", e?.tracking, s2),
+        first_name: pick("nombre", e?.first_name, s2), last_name: pick("apellido", e?.last_name, s2), phone: pick("telefono", e?.phone, s2), email: pick("correo", e?.email, s2),
+        region: pick("region", e?.region, s2), commune: pick("comuna", e?.commune, s2), city: pick("ciudad", e?.city, s2),
+        street: pick("calle", e?.street, s2), street_number: pick("numero", e?.street_number, s2), unit: pick("depto", e?.unit, s2), reference: pick("referencia", e?.reference, s2),
+        address: a.calle !== undefined ? null : (e?.address ?? null),
+        delivery_mode: pick("tipo_entrega", e?.delivery_mode, (v) => s2(v) as "domicilio" | "punto"), origin_point: pick("punto_origen", e?.origin_point, s2), service: pick("servicio", e?.service, s2),
+        content: pick("contenido", e?.content, s2), declared_value_minor: pick("valor_declarado", e?.declared_value_minor, n2),
+        size: pick("talla", e?.size, (v) => s2(v).toUpperCase() as ShipmentSize), weight_g: pick("peso_g", e?.weight_g, n2),
+        length_cm: pick("largo_cm", e?.length_cm, n2), width_cm: pick("ancho_cm", e?.width_cm, n2), height_cm: pick("alto_cm", e?.height_cm, n2),
+        no_dangerous: a.sin_mercancias_peligrosas === undefined ? !!e?.no_dangerous : a.sin_mercancias_peligrosas === true,
+        cost_minor: pick("costo", e?.cost_minor, n2), payment_ref: pick("transaccion", e?.payment_ref, s2),
+        shipped_on: pick("fecha_envio", e?.shipped_on, s2), delivered_on: e?.delivered_on ?? null, notes: pick("notas", e?.notes, s2),
+      };
+      const saved = await backend.saveShipment(e?.uid ?? null, input);
+      dataChanged();
+      return text(`Envío ${saved.number} ${e ? "actualizado" : "creado"}${saved.sale_number ? ` y unido a la venta ${saved.sale_number}` : ""}: ${saved.carrier ?? "sin agencia"} ${saved.tracking ?? ""} · ${saved.status} · ${[saved.address, saved.commune].filter(Boolean).join(", ")}${saved.size ? ` · talla ${saved.size}` : ""}${saved.cost_minor != null ? ` · costo ${pesos(saved.cost_minor)}` : ""}.`);
     }
     case "documentar_venta": {
       const ref = str(a, "venta");

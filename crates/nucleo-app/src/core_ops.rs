@@ -221,6 +221,7 @@ fn entity_table(entity: &str) -> AppResult<&'static str> {
         "compra" => "purchases",
         "gasto" => "expenses",
         "importacion" => "imports",
+        "envio" => "shipments",
         _ => {
             return Err(AppError::Validation(format!(
                 "no se pueden adjuntar documentos a «{entity}»"

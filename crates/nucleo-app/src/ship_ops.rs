@@ -38,6 +38,61 @@ pub struct ShipmentInput {
     pub delivered_on: Option<String>,
     pub status: String,
     pub notes: Option<String>,
+    pub email: Option<String>,
+    pub street: Option<String>,
+    pub street_number: Option<String>,
+    pub unit: Option<String>,
+    pub reference: Option<String>,
+    pub delivery_mode: Option<String>,
+    pub origin_point: Option<String>,
+    pub service: Option<String>,
+    pub content: Option<String>,
+    pub declared_value_minor: Option<i64>,
+    pub size: Option<String>,
+    pub weight_g: Option<i64>,
+    pub length_cm: Option<i64>,
+    pub width_cm: Option<i64>,
+    pub height_cm: Option<i64>,
+    pub no_dangerous: bool,
+    pub cost_minor: Option<i64>,
+    pub payment_ref: Option<String>,
+}
+
+pub const SIZES: &[&str] = &["XS", "S", "M", "L"];
+
+/// Talla sugerida con los límites de Bluexpress: XS hasta 0,5 kg; S hasta 3 kg o 20×20×30 cm; M hasta
+/// 6 kg o 30×30×25 cm; L hasta 20 kg o 70×70×70 cm. `None` si no hay datos o supera L.
+pub fn suggest_size(
+    weight_g: Option<i64>,
+    dims_cm: Option<(i64, i64, i64)>,
+) -> Option<&'static str> {
+    if weight_g.is_none() && dims_cm.is_none() {
+        return None;
+    }
+    let fits = |max: (i64, i64, i64)| match dims_cm {
+        None => true,
+        Some((a, b, c)) => {
+            let mut d = [a, b, c];
+            d.sort_unstable();
+            let mut m = [max.0, max.1, max.2];
+            m.sort_unstable();
+            d.iter().zip(m.iter()).all(|(x, y)| x <= y)
+        }
+    };
+    let w = weight_g.unwrap_or(0);
+    if w <= 500 && dims_cm.is_none_or(|(a, b, c)| a.max(b).max(c) <= 25 && a.min(b).min(c) <= 10) {
+        return Some("XS");
+    }
+    for (name, kg, dims) in [
+        ("S", 3_000, (20, 20, 30)),
+        ("M", 6_000, (30, 30, 25)),
+        ("L", 20_000, (70, 70, 70)),
+    ] {
+        if w <= kg && fits(dims) {
+            return Some(name);
+        }
+    }
+    None
 }
 
 impl CompanySession {
@@ -122,6 +177,72 @@ impl CompanySession {
         let city = opt_text(&input.city, 80, "la ciudad")?;
         let region = opt_text(&input.region, 80, "la región")?;
         let notes = opt_text(&input.notes, 1000, "las notas")?;
+        let email = opt_text(&input.email, 120, "el correo")?;
+        if let Some(e) = &email
+            && (!e.contains('@') || e.contains(' '))
+        {
+            return Err(AppError::Validation(
+                "el correo del destinatario no es válido".into(),
+            ));
+        }
+        let street = opt_text(&input.street, 120, "la calle")?;
+        let street_number = opt_text(&input.street_number, 20, "el número")?;
+        let unit = opt_text(&input.unit, 40, "el depto u oficina")?;
+        let reference = opt_text(&input.reference, 200, "la referencia")?;
+        let delivery_mode = opt_text(&input.delivery_mode, 20, "el tipo de entrega")?;
+        if let Some(m) = &delivery_mode
+            && m != "domicilio"
+            && m != "punto"
+        {
+            return Err(AppError::Validation(
+                "el tipo de entrega es «domicilio» o «punto»".into(),
+            ));
+        }
+        let origin_point = opt_text(&input.origin_point, 120, "el punto de origen")?;
+        let service = opt_text(&input.service, 60, "el servicio")?;
+        let content = opt_text(&input.content, 200, "el contenido")?;
+        let size = opt_text(&input.size, 4, "la talla")?.map(|x| x.to_uppercase());
+        if let Some(z) = &size
+            && !SIZES.contains(&z.as_str())
+        {
+            return Err(AppError::Validation("la talla es XS, S, M o L".into()));
+        }
+        let payment_ref = opt_text(&input.payment_ref, 80, "el n.º de transacción")?;
+        let pos = |v: Option<i64>, l: &str| -> AppResult<Option<i64>> {
+            match v {
+                Some(x) if x <= 0 => {
+                    Err(AppError::Validation(format!("{l} debe ser mayor que cero")))
+                }
+                o => Ok(o),
+            }
+        };
+        let weight_g = pos(input.weight_g, "el peso")?;
+        let length_cm = pos(input.length_cm, "el largo")?;
+        let width_cm = pos(input.width_cm, "el ancho")?;
+        let height_cm = pos(input.height_cm, "el alto")?;
+        for (v, l) in [
+            (input.declared_value_minor, "el valor declarado"),
+            (input.cost_minor, "el costo del envío"),
+        ] {
+            if v.is_some_and(|x| x < 0) {
+                return Err(AppError::Validation(format!("{l} no puede ser negativo")));
+            }
+        }
+        // Dirección completa a partir de las partes, si no se escribió.
+        let address = address.or_else(|| {
+            street.as_ref().map(|st| {
+                let mut a = st.clone();
+                if let Some(n) = &street_number {
+                    a.push(' ');
+                    a.push_str(n);
+                }
+                if let Some(u) = &unit {
+                    a.push_str(", ");
+                    a.push_str(u);
+                }
+                a
+            })
+        });
         let now = now_utc();
         let user = self.actor_name()?;
         let w = ShipmentWrite {
@@ -140,6 +261,24 @@ impl CompanySession {
             delivered_on: delivered.as_deref(),
             status,
             notes: notes.as_deref(),
+            email: email.as_deref(),
+            street: street.as_deref(),
+            street_number: street_number.as_deref(),
+            unit: unit.as_deref(),
+            reference: reference.as_deref(),
+            delivery_mode: delivery_mode.as_deref(),
+            origin_point: origin_point.as_deref(),
+            service: service.as_deref(),
+            content: content.as_deref(),
+            declared_value_minor: input.declared_value_minor,
+            size: size.as_deref(),
+            weight_g,
+            length_cm,
+            width_cm,
+            height_cm,
+            no_dangerous: input.no_dangerous,
+            cost_minor: input.cost_minor,
+            payment_ref: payment_ref.as_deref(),
             now: &now,
         };
         let tx = self.db.conn_mut().transaction()?;
@@ -170,5 +309,20 @@ impl CompanySession {
         }
         tx.commit()?;
         db::by_uid(self.db.conn(), &uid)?.ok_or_else(|| AppError::NotFound("el envío".into()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::suggest_size;
+
+    #[test]
+    fn tallas_bluexpress() {
+        assert_eq!(suggest_size(Some(300), Some((15, 10, 5))), Some("XS"));
+        assert_eq!(suggest_size(Some(1_200), Some((25, 18, 12))), Some("S"));
+        assert_eq!(suggest_size(Some(4_000), None), Some("M"));
+        assert_eq!(suggest_size(Some(2_000), Some((40, 30, 30))), Some("L"));
+        assert_eq!(suggest_size(Some(25_000), None), None);
+        assert_eq!(suggest_size(None, None), None);
     }
 }

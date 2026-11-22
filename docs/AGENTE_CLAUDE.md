@@ -14,7 +14,7 @@ con las mismas reglas, permisos y auditoría del programa.
    | Nivel | Puede |
    |---|---|
    | Solo ver | `ver_pantalla`, `ir_a`, `desplazar` y las consultas (`resumen_negocio`, `buscar*`, `listar_*`, `datos_de_apoyo`) |
-   | Crear borradores | Lo anterior + `crear_cliente`, `crear_proveedor`, `crear_producto`, `crear_venta_borrador`, `registrar_gasto` (queda por pagar) |
+   | Crear borradores | Lo anterior + `crear_cliente`, `crear_proveedor`, `crear_producto`, `crear_venta_borrador`, `registrar_gasto` (queda por pagar), `registrar_envio` |
    | Acceso completo | Lo anterior + `clic`, `escribir`, `elegir`, `tecla`, `confirmar_venta`, `registrar_cobro` y gastos pagados |
 
    Siempre valen además los permisos del usuario con que está abierta la sesión.
