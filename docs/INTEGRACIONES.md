@@ -180,13 +180,15 @@ Plan gratis y hecho por nosotros, en capas:
 3. **BCI API Market:** FAVOR SpA pide ser partner solo para el producto de cuentas (lectura). Si BCI
    aprueba sin costo, se conecta directo con el consentimiento de la empresa; si no, sigue con 1 y 2.
 4. **Finanzas abiertas (2027):** cuando rijan, conexión oficial con todos los bancos.
+5. **Robot con usuario de solo consulta (I7):** descarga la cartola desde la web del banco sin que la
+   persona tenga que hacerlo.
 
-### Por qué no «usuario y clave del banco dentro de NÚCLEO»
+### La clave del banco: solo de un usuario de consulta
 
-Guardar la clave del banco y entrar «como si fuera la persona» (raspado de la web del banco) choca con
-las condiciones de uso de los bancos, se rompe con cada cambio de la web o del segundo factor, y deja en
-el computador una clave que permite mover dinero. Los agregadores autorizados y las APIs de finanzas
-abiertas existen justamente para leer sin esa clave. Decisión D-INT-05.
+NÚCLEO no guarda la clave de un usuario que pueda firmar o transferir: con ella se puede mover dinero.
+Si el robot (I7) entra a la web del banco, lo hace con un usuario de **solo consulta** que el
+administrador de la empresa crea en la banca empresas, y descarga la cartola oficial. Decisiones
+D-INT-05 y D-INT-07.
 
 ### Qué hace NÚCLEO con los movimientos
 
@@ -228,6 +230,70 @@ vuelta (solo «guardada»). La tabla `integrations` se abre a nuevos proveedores
 3. **Bluexpress (I2)** directo o por Woo, apenas estén la documentación/llave o el plugin.
 4. Starken, Chilexpress y Correos de Chile, en ese orden, a medida que lleguen las credenciales.
 5. Solicitud de partner en BCI API Market (FAVOR SpA).
+
+## I7 · Robot de NÚCLEO (hace en la web lo que hoy se hace con mouse y teclado)
+
+Propuesta del dueño (22-11-2026): donde no haya API, que NÚCLEO haga solo el mismo proceso que hoy hace
+una persona en el computador: entrar a Bluexpress, crear la etiqueta con las medidas, pagar; entrar al
+banco con un usuario de solo lectura y ver los movimientos para cuadrar facturas pagadas.
+
+### Cómo funciona
+
+- **Navegador propio del robot:** NÚCLEO abre un Chrome/Edge aparte (perfil «NÚCLEO Robot», separado del
+  Chrome personal) y lo maneja por el protocolo de depuración del navegador, desde el escritorio.
+- **Sesión, no contraseña:** la persona inicia sesión **una vez** en ese navegador (incluido «Entrar con
+  Google»); la sesión queda guardada en el perfil y el robot la reutiliza. Cuando vence, NÚCLEO avisa
+  «vuelve a iniciar sesión en Bluexpress». Así NÚCLEO no guarda la clave de Google ni del portal.
+- **Recetas:** cada sitio tiene una receta versionada (pasos, campos, botones, qué esperar en cada
+  pantalla): «Bluexpress: crear envío», «BCI: descargar cartola», «Banco de Chile: movimientos»…
+  Las recetas son las **extensiones** que después se pueden vender y actualizar.
+- **Puntos de pausa:** el robot se detiene y pide a la persona lo que no debe hacer solo: inicio de
+  sesión, segundo factor, captcha, código de verificación y **confirmación de un pago**.
+- **Registro:** cada ejecución guarda qué hizo, capturas de pantalla y el resultado (n.º de OT,
+  etiqueta PDF, cartola descargada) en Documentos, con auditoría.
+- **Visible primero:** las primeras veces corre a la vista; cuando la receta es confiable, puede correr
+  minimizado y avisar al terminar.
+- **Si existe API, se usa la API** (más estable); el robot es para lo que no tiene API.
+
+### Pagos de envíos con tarjeta prepago
+
+La idea de una **tarjeta prepago con saldo acotado** es buena (si no hay saldo, el pago se rechaza y no
+hay sorpresas). Cómo hacerlo bien:
+
+- La tarjeta se **inscribe en el portal del courier** (su pasarela la guarda tokenizada) y el robot solo
+  elige «tarjeta guardada». NÚCLEO **no guarda número, fecha ni CVV**: la norma de tarjetas PCI DSS
+  prohíbe guardar el CVV después de autorizar un pago, aunque esté cifrado, y tener tarjetas guardadas
+  convertiría a NÚCLEO en un blanco.
+- Si el portal pide el CVV en cada pago, el robot hace una pausa y la persona lo escribe (es un paso de
+  segundos) o confirma el pago con el aviso de su banco.
+- Antes de pagar, NÚCLEO muestra courier, servicio y monto; con un **tope por envío y por mes** que
+  la empresa define, todo lo que lo supere pide confirmación.
+- Mejor aún si el courier da cuenta corriente: no hay paso de pago.
+
+### Bancos con usuario de solo lectura
+
+En la banca empresas, el administrador puede crear usuarios adicionales con perfil de **solo consulta**
+(ver saldos, movimientos y cartolas, sin firmar ni transferir). Para el robot:
+
+1. El administrador de la empresa crea en la banca empresas un usuario «NÚCLEO consulta» con perfil
+   solo consulta (se confirma con el ejecutivo que el banco lo permite y si pide segundo factor al
+   entrar).
+2. La persona inicia sesión con ese usuario en el navegador del robot; si el banco pide clave cada vez,
+   se guarda en la base cifrada (es un usuario que **no puede mover dinero**).
+3. La receta del banco descarga la **cartola oficial** (Excel/CSV) del día o del mes, en vez de leer la
+   pantalla, y NÚCLEO la importa sin duplicar: saldo, ingresos, egresos y glosas.
+4. Si el banco pide segundo factor o captcha, el robot hace una pausa y la persona lo resuelve.
+
+Se revisa con cada banco y courier que sus condiciones permitan el acceso automatizado con el usuario
+de la propia empresa.
+
+### Primeros pasos
+
+1. **Bluexpress:** recorrer juntos el flujo real (entrar, crear envío, medidas, pago) para escribir la
+   receta, deteniéndose antes de pagar; luego una prueba con un envío real confirmado.
+2. **BCI:** crear el usuario de solo consulta y escribir la receta «descargar cartola».
+3. Motor del robot en el escritorio (perfil separado, recetas, pausas, registro) y pantalla
+   Configuración → Integraciones → Robot.
 
 ## I3 · NÚCLEO en línea (cifrado de extremo a extremo)
 
