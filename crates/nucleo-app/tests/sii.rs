@@ -289,4 +289,67 @@ fn emite_envia_y_consulta() {
     let docs = s.sii_status_apply(&t, &e).unwrap();
     assert_eq!(docs.len(), 2);
     assert!(docs.iter().all(|d| d.estado == "aceptado"));
+
+    // Libro de ventas con lo enviado del período (el folio 3 sigue firmado y no entra).
+    let libro = s
+        .sii_libro_create(&sii_ops::SiiLibroInput {
+            operacion: nucleo_dte::libro::Operacion::Venta,
+            periodo: "2026-11".into(),
+            tipo_libro: "ESPECIAL".into(),
+            folio_notificacion: Some(5_198_397),
+            fct_prop: None,
+            documentos: vec![],
+            compras: vec![],
+        })
+        .unwrap();
+    assert_eq!((libro.documentos, libro.estado.as_str()), (2, "firmado"));
+    let xml = String::from_utf8_lossy(&s.sii_libro_xml(libro.id).unwrap()).to_string();
+    assert!(xml.contains("<TipoOperacion>VENTA</TipoOperacion>"));
+    assert!(xml.contains("<TotDoc>2</TotDoc><TotMntExe>0</TotMntExe><TotMntNeto>40000</TotMntNeto><TotMntIVA>7600</TotMntIVA><TotMntTotal>47600</TotMntTotal>"));
+    assert!(xml.contains("<FolioNotificacion>5198397</FolioNotificacion>"));
+    let plan = s.sii_libro_send_plan(libro.id).unwrap();
+    assert!(plan.file_name.starts_with("LibroCV_760000000_VENTA_202611"));
+    let track = sii_ops::send(&fake, &plan).unwrap();
+    assert!(String::from_utf8_lossy(&fake.uploaded.borrow()).contains("<LibroCompraVenta"));
+    let l = s.sii_libro_send_apply(libro.id, &track).unwrap();
+    assert_eq!(l.estado, "enviado");
+    assert!(s.sii_libro_send_plan(libro.id).is_err());
+    *fake.estado.borrow_mut() =
+        "<SII:RESP_HDR><ESTADO>LOK</ESTADO><GLOSA>Libro Cuadrado</GLOSA></SII:RESP_HDR>".into();
+    let (cred, t) = s.sii_libro_status_plan(libro.id).unwrap();
+    let e = sii_ops::check(&fake, &cred, &t).unwrap();
+    assert_eq!(
+        s.sii_libro_status_apply(libro.id, &e).unwrap().estado,
+        "aceptado"
+    );
+
+    // Libro de compras con líneas manuales.
+    let c = s
+        .sii_libro_create(&sii_ops::SiiLibroInput {
+            operacion: nucleo_dte::libro::Operacion::Compra,
+            periodo: "2026-11".into(),
+            tipo_libro: "ESPECIAL".into(),
+            folio_notificacion: Some(5_198_398),
+            fct_prop: Some(0.6),
+            documentos: vec![],
+            compras: vec![nucleo_dte::libro::LineaLibro {
+                tipo: 30,
+                folio: 234,
+                tasa_iva: Some(19.0),
+                fecha: "2026-11-22".into(),
+                rut: "11.111.111-1".into(),
+                razon_social: "Proveedor".into(),
+                neto: 58_129,
+                iva: 11_045,
+                total: 69_174,
+                ..Default::default()
+            }],
+        })
+        .unwrap();
+    assert_eq!(c.operacion, "compra");
+    assert!(
+        String::from_utf8_lossy(&s.sii_libro_xml(c.id).unwrap())
+            .contains("<RUTDoc>11111111-1</RUTDoc>")
+    );
+    assert_eq!(s.sii_libros().unwrap().len(), 2);
 }

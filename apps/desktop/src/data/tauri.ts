@@ -23,7 +23,7 @@ import type {
   PurchaseSummary, ReceiveLine, NewSupplier, Supplier, SupplierDetail, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow, SaleDetail, SaleInput,
   SaleSummary, SearchHit,
   SecuritySettings, SequenceRow, SessionInfo, UserPatch, UserRow,
-  SiiDocument, SiiIssueInput, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
+  SiiDocument, SiiIssueInput, SiiLibro, SiiLibroInput, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
 } from "./types";
 
 interface CommandError { code: string; message: string }
@@ -177,6 +177,16 @@ export class TauriBackend implements Backend {
     const path = await save({ defaultPath: `DTE-${doc.tipo}-${doc.folio}.xml`, title: "Guardar el XML firmado", filters: [{ name: "XML", extensions: ["xml"] }] });
     if (!path) return false;
     await call<void>("sii_export_xml", { id: doc.id, path });
+    return true;
+  }
+  siiLibroCreate(input: SiiLibroInput) { return call<SiiLibro>("sii_libro_create", { input }); }
+  siiLibros() { return call<SiiLibro[]>("sii_libros"); }
+  siiLibroSend(id: number) { return call<SiiLibro>("sii_libro_send", { id }); }
+  siiLibroCheck(id: number) { return call<SiiLibro>("sii_libro_check", { id }); }
+  async siiLibroExportXml(l: SiiLibro): Promise<boolean> {
+    const path = await save({ defaultPath: `Libro-${l.operacion}-${l.periodo}.xml`, title: "Guardar el libro firmado", filters: [{ name: "XML", extensions: ["xml"] }] });
+    if (!path) return false;
+    await call<void>("sii_libro_export_xml", { id: l.id, path });
     return true;
   }
   pendingDispatches() { return call<PendingDispatch[]>("pending_dispatches"); }

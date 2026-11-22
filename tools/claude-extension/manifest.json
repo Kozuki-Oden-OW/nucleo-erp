@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "nucleo-erp",
   "display_name": "NÚCLEO ERP",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Permite que Claude use NÚCLEO ERP en este computador: ve la pantalla, la recorre con su propio cursor y registra ventas, gastos, clientes y cobros.",
   "long_description": "Conecta Claude con NÚCLEO ERP, el sistema de gestión local y gratuito para pymes chilenas. NÚCLEO debe estar abierto con Configuración → Claude activado; ahí eliges si Claude solo mira, crea borradores o tiene acceso completo. La extensión solo se comunica con NÚCLEO dentro del mismo computador (127.0.0.1): los datos del negocio siguen guardados solo en tu equipo.",
   "author": {
@@ -159,6 +159,18 @@
     {
       "name": "consultar_estado_sii",
       "description": "Pregunta al SII el estado del envío de un documento ya enviado (por su track id) y lo actualiza en NÚCLEO: aceptado, con reparos o rechazado, con la glosa del SII."
+    },
+    {
+      "name": "crear_libro_sii",
+      "description": "Arma y firma un libro electrónico de compras o ventas (IECV) del período, sin enviarlo. Ventas: con los documentos ya enviados al SII del período (o los indicados por tipo-folio). Compras: con las lín"
+    },
+    {
+      "name": "enviar_libro_sii",
+      "description": "Sube al SII un libro de compras o ventas ya firmado (estado «firmado»). IRREVERSIBLE: solo después de que la persona confirme en el chat."
+    },
+    {
+      "name": "consultar_libro_sii",
+      "description": "Consulta en el SII el estado de un libro enviado (LOK = libro cuadrado; otros códigos = rechazado o no cuadra) y lo actualiza en NÚCLEO."
     }
   ],
   "keywords": [

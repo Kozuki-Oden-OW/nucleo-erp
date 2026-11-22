@@ -1248,5 +1248,156 @@
       ],
       "additionalProperties": false
     }
+  },
+  {
+    "name": "crear_libro_sii",
+    "nivel": "completo",
+    "description": "Arma y firma un libro electrónico de compras o ventas (IECV) del período, sin enviarlo. Ventas: con los documentos ya enviados al SII del período (o los indicados por tipo-folio). Compras: con las líneas que se entregan (facturas de proveedores, notas de crédito; IVA de uso común con factor de proporcionalidad, IVA no recuperable, retención total). En el set de pruebas: tipo ESPECIAL y el número de atención como folio_notificacion.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "operacion": {
+          "type": "string",
+          "enum": [
+            "venta",
+            "compra"
+          ]
+        },
+        "periodo": {
+          "type": "string",
+          "description": "AAAA-MM"
+        },
+        "tipo_libro": {
+          "type": "string",
+          "enum": [
+            "MENSUAL",
+            "ESPECIAL",
+            "RECTIFICA"
+          ],
+          "default": "MENSUAL"
+        },
+        "folio_notificacion": {
+          "type": "integer",
+          "description": "Número de atención del set (libro ESPECIAL)"
+        },
+        "factor_proporcionalidad": {
+          "type": "number",
+          "description": "IVA de uso común, ej. 0.6",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "documentos": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "description": "tipo-folio, ej. 33-1"
+          },
+          "description": "Solo ventas: documentos a incluir (vacío = todos los enviados del período)"
+        },
+        "compras": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tipo": {
+                "type": "integer",
+                "description": "30 factura papel, 33 electrónica, 34 exenta, 46 factura de compra, 60 NC papel, 61 NC electrónica, 55/56 ND…"
+              },
+              "folio": {
+                "type": "integer"
+              },
+              "fecha": {
+                "type": "string",
+                "description": "AAAA-MM-DD"
+              },
+              "rut": {
+                "type": "string"
+              },
+              "razon_social": {
+                "type": "string"
+              },
+              "exento": {
+                "type": "number"
+              },
+              "neto": {
+                "type": "number"
+              },
+              "iva": {
+                "type": "number",
+                "description": "IVA recuperable; si se omite se calcula 19 % del neto (y queda en 0 si es uso común o no recuperable)"
+              },
+              "iva_uso_comun": {
+                "type": "boolean",
+                "description": "El IVA es de uso común"
+              },
+              "iva_no_recuperable_codigo": {
+                "type": "integer",
+                "description": "1–9; ej. 4 entrega gratuita",
+                "minimum": 1,
+                "maximum": 9
+              },
+              "retencion_total": {
+                "type": "boolean",
+                "description": "Factura de compra con retención total del IVA"
+              },
+              "tipo_ref": {
+                "type": "integer",
+                "description": "Documento que modifica (notas)"
+              },
+              "folio_ref": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "tipo",
+              "folio",
+              "rut",
+              "razon_social"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "operacion",
+        "periodo"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "enviar_libro_sii",
+    "nivel": "completo",
+    "description": "Sube al SII un libro de compras o ventas ya firmado (estado «firmado»). IRREVERSIBLE: solo después de que la persona confirme en el chat.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "libro": {
+          "type": "integer",
+          "description": "Id del libro (listar_documentos_sii)"
+        }
+      },
+      "required": [
+        "libro"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "consultar_libro_sii",
+    "nivel": "ver",
+    "description": "Consulta en el SII el estado de un libro enviado (LOK = libro cuadrado; otros códigos = rechazado o no cuadra) y lo actualiza en NÚCLEO.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "libro": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "libro"
+      ],
+      "additionalProperties": false
+    }
   }
 ]

@@ -183,5 +183,13 @@ describe("Envíos con datos del courier (demostración)", () => {
     });
     expect(txt(g)).toMatch(/33-2 .*\$307\.249/);
     expect(txt(await runTool(b, "ver", "listar_documentos_sii", {}))).toMatch(/quedan 48/);
+    const lv = await runTool(b, "completo", "crear_libro_sii", { operacion: "venta", periodo: new Date().toISOString().slice(0, 7), tipo_libro: "ESPECIAL", folio_notificacion: 5198397, documentos: ["33-1"] });
+    expect(txt(lv)).toMatch(/libro 1: ventas .* 1 docs · firmado/);
+    const lc = await runTool(b, "completo", "crear_libro_sii", { operacion: "compra", periodo: "2026-11", tipo_libro: "ESPECIAL", folio_notificacion: 5198398, factor_proporcionalidad: 0.6,
+      compras: [{ tipo: 30, folio: 781, rut: "33333333-3", razon_social: "Proveedor", neto: 30229, iva_uso_comun: true }, { tipo: 46, folio: 9, rut: "66666666-6", razon_social: "Otro", neto: 10793, retencion_total: true }] });
+    expect(txt(lc)).toMatch(/uso común \$5\.744/);
+    expect(txt(lc)).toMatch(/retenido \$2\.051, total \$10\.793/);
+    expect(txt(await runTool(b, "completo", "enviar_libro_sii", { libro: 1 }))).toMatch(/enviado/);
+    expect(txt(await runTool(b, "ver", "consultar_libro_sii", { libro: 1 }))).toMatch(/aceptado/);
   });
 });

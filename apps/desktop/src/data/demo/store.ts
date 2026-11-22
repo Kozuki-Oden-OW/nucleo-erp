@@ -4,7 +4,7 @@
 import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "../backend";
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
-  SiiDocument, SiiIssueInput, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
+  SiiDocument, SiiIssueInput, SiiLibro, SiiLibroInput, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
   MlBilling, MlOrderRow, MlStatus, MlSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput, StatementLineView, BankSuggestion,
@@ -1996,6 +1996,33 @@ export class DemoBackend implements Backend {
     if (d?.estado === "enviado") { d.estado = "aceptado"; d.glosa = "Demostración: documento aceptado."; }
     return this.siiDocuments();
   }
+  private siiLibrosList: SiiLibro[] = [];
+  async siiLibroCreate(input: SiiLibroInput): Promise<SiiLibro> {
+    this.require("ventas.documentar");
+    if (!/^\d{4}-\d{2}$/.test(input.periodo)) throw new AppError("validacion", "El período va como AAAA-MM.");
+    const n = input.operacion === "compra" ? input.compras.length : this.siiDocs.filter((d) => d.estado !== "firmado" && (input.documentos.length ? input.documentos.includes(d.id) : d.fecha.startsWith(input.periodo))).length;
+    if (!n) throw new AppError("validacion", input.operacion === "compra" ? "El libro de compras no tiene documentos." : "No hay documentos enviados al SII en ese período.");
+    if (input.compras.some((l) => l.iva_uso_comun) && !input.fct_prop) throw new AppError("validacion", "Falta el factor de proporcionalidad del IVA de uso común.");
+    const l: SiiLibro = { id: this.siiLibrosList.length + 1, ambiente: this.sii.setup.ambiente, operacion: input.operacion, periodo: input.periodo, tipo_libro: input.tipo_libro,
+      folio_notificacion: input.folio_notificacion, documentos: n, estado: "firmado", track_id: null, glosa: null, created_at: new Date().toISOString() };
+    this.siiLibrosList.push(l);
+    return wait(l);
+  }
+  async siiLibros(): Promise<SiiLibro[]> { return wait([...this.siiLibrosList].reverse()); }
+  async siiLibroSend(id: number): Promise<SiiLibro> {
+    const l = this.siiLibrosList.find((x) => x.id === id);
+    if (!l) throw new AppError("no_encontrado", "No existe el libro.");
+    if (l.estado !== "firmado") throw new AppError("validacion", "El libro ya fue enviado.");
+    l.estado = "enviado"; l.track_id = String(Date.now()).slice(-10);
+    return wait(l);
+  }
+  async siiLibroCheck(id: number): Promise<SiiLibro> {
+    const l = this.siiLibrosList.find((x) => x.id === id);
+    if (!l) throw new AppError("no_encontrado", "No existe el libro.");
+    if (l.estado === "enviado") { l.estado = "aceptado"; l.glosa = "LOK Libro Cuadrado (demostración)"; }
+    return wait(l);
+  }
+  async siiLibroExportXml(): Promise<boolean> { throw new AppError("validacion", "En la demostración no hay XML firmado."); }
   async siiExportXml(): Promise<boolean> { throw new AppError("validacion", "En la demostración no hay XML firmado."); }
   /** Pedidos de ejemplo: uno con SKU conocido y otro de una publicación sin enlazar que pide factura. */
   async mlSync(): Promise<MlSyncReport> {

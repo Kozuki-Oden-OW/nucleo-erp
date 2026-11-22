@@ -3,7 +3,9 @@
 //! escribe ella en NÚCLEO. La red se usa sin tener tomada la sesión (preparar → SII → aplicar).
 
 use crate::commands::{AppState, CommandError};
-use nucleo_app::sii_ops::{self, SiiDocument, SiiIssueInput, SiiSetup, SiiStatus, UreqSii};
+use nucleo_app::sii_ops::{
+    self, SiiDocument, SiiIssueInput, SiiLibro, SiiLibroInput, SiiSetup, SiiStatus, UreqSii,
+};
 use nucleo_app::{AppError, CompanySession};
 use tauri::State;
 
@@ -120,5 +122,38 @@ pub async fn sii_check(state: State<'_, AppState>, id: i64) -> CmdResult<Vec<Sii
 #[tauri::command]
 pub fn sii_export_xml(state: State<'_, AppState>, id: i64, path: String) -> CmdResult<()> {
     let xml = with(&state, |s| s.sii_document_xml(id))?;
+    std::fs::write(&path, xml).map_err(|e| err(format!("no se pudo guardar: {e}")))
+}
+
+/* ───────────── Libros de compras y ventas (IECV) ───────────── */
+
+#[tauri::command]
+pub fn sii_libro_create(state: State<'_, AppState>, input: SiiLibroInput) -> CmdResult<SiiLibro> {
+    with(&state, |s| s.sii_libro_create(&input))
+}
+
+#[tauri::command]
+pub fn sii_libros(state: State<'_, AppState>) -> CmdResult<Vec<SiiLibro>> {
+    with(&state, |s| s.sii_libros())
+}
+
+/// Sube el libro firmado al SII (irreversible: la interfaz pide confirmar antes).
+#[tauri::command]
+pub async fn sii_libro_send(state: State<'_, AppState>, id: i64) -> CmdResult<SiiLibro> {
+    let plan = with(&state, |s| s.sii_libro_send_plan(id))?;
+    let track = blocking(move || sii_ops::send(&UreqSii::default(), &plan)).await?;
+    with(&state, |s| s.sii_libro_send_apply(id, &track))
+}
+
+#[tauri::command]
+pub async fn sii_libro_check(state: State<'_, AppState>, id: i64) -> CmdResult<SiiLibro> {
+    let (cred, track) = with(&state, |s| s.sii_libro_status_plan(id))?;
+    let estado = blocking(move || sii_ops::check(&UreqSii::default(), &cred, &track)).await?;
+    with(&state, |s| s.sii_libro_status_apply(id, &estado))
+}
+
+#[tauri::command]
+pub fn sii_libro_export_xml(state: State<'_, AppState>, id: i64, path: String) -> CmdResult<()> {
+    let xml = with(&state, |s| s.sii_libro_xml(id))?;
     std::fs::write(&path, xml).map_err(|e| err(format!("no se pudo guardar: {e}")))
 }

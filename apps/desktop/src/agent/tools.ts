@@ -3,7 +3,7 @@
 // valen las mismas reglas, permisos y auditoría.
 import type { Backend } from "../data";
 import { errorMessage } from "../data";
-import type { Customer, HistoricalSale, SiiDocument, LineInput, Product, SaleSummary, SaleTerms, ShipmentInput, ShipmentSize, Supplier } from "../data/types";
+import type { Customer, HistoricalSale, SiiDocument, SiiLibro, SiiLineaLibro, LineInput, Product, SaleSummary, SaleTerms, ShipmentInput, ShipmentSize, Supplier } from "../data/types";
 import { EMPTY_TERMS } from "../data/saleTerms";
 import { formatMoney, todayIso } from "../lib/format";
 import { navigate } from "../lib/router";
@@ -70,6 +70,8 @@ async function findSiiDoc(backend: Backend, ref: string): Promise<SiiDocument> {
   return d;
 }
 const siiLine = (d: SiiDocument) => `- ${d.tipo}-${d.folio} ${d.tipo_nombre} N° ${d.folio} · ${d.fecha} · ${d.receptor} (${d.receptor_rut}) · ${pesos(d.total_minor)} · ${d.estado}${d.track_id ? ` · track ${d.track_id}` : ""}${d.glosa ? ` · ${d.glosa}` : ""}${d.ambiente === "certificacion" ? " · certificación" : ""}`;
+
+const libroLine = (l: SiiLibro) => `- libro ${l.id}: ${l.operacion === "venta" ? "ventas" : "compras"} ${l.periodo} · ${l.tipo_libro}${l.folio_notificacion ? ` (notificación ${l.folio_notificacion})` : ""} · ${l.documentos} docs · ${l.estado}${l.track_id ? ` · track ${l.track_id}` : ""}${l.glosa ? ` · ${l.glosa}` : ""}`;
 
 const METHOD: Record<string, string> = { efectivo: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta de débito", cheque: "Cheque", credito: "" };
 
@@ -512,6 +514,7 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
         st.faltantes.length ? `Falta para emitir: ${st.faltantes.join("; ")}.` : "Listo para emitir.",
         `Folios: ${st.folios.length ? st.folios.map((f) => `${f.tipo} ${f.tipo_nombre} (${f.ambiente}) ${f.desde}–${f.hasta}, siguiente ${f.siguiente}, quedan ${f.restantes}`).join("; ") : "ninguno"}.`,
         docs.length ? `Documentos (${docs.length}):\n${docs.map(siiLine).join("\n")}` : "Aún no hay documentos.",
+        ...(await backend.siiLibros()).map(libroLine),
       ].join("\n"));
     }
     case "cargar_folios_sii": {
@@ -568,6 +571,39 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
       dataChanged();
       const same = out.filter((x) => x.track_id === d.track_id);
       return text(`Estado del envío ${d.track_id}:\n${same.map(siiLine).join("\n")}`);
+    }
+    case "crear_libro_sii": {
+      const op = str(a, "operacion") === "compra" ? "compra" : "venta";
+      const docRefs = Array.isArray(a.documentos) ? (a.documentos as unknown[]).map(String) : [];
+      const ids: number[] = [];
+      for (const r of docRefs) ids.push((await findSiiDoc(backend, r)).id);
+      const compras: SiiLineaLibro[] = (Array.isArray(a.compras) ? (a.compras as Args[]) : []).map((c) => {
+        const neto = Math.round(num(c, "neto") ?? 0), exento = Math.round(num(c, "exento") ?? 0);
+        const ivaCalc = num(c, "iva") ?? Math.round(neto * 0.19);
+        const usoComun = c.iva_uso_comun === true, noRec = num(c, "iva_no_recuperable_codigo"), ret = c.retencion_total === true;
+        return {
+          tipo: Math.round(num(c, "tipo") ?? 0), folio: Math.round(num(c, "folio") ?? 0), tasa_iva: neto ? 19 : null,
+          fecha: str(c, "fecha") || `${str(a, "periodo")}-01`, rut: str(c, "rut"), razon_social: str(c, "razon_social"),
+          tipo_ref: num(c, "tipo_ref"), folio_ref: num(c, "folio_ref"), exento, neto,
+          iva: usoComun || noRec ? 0 : ivaCalc,
+          iva_uso_comun: usoComun ? ivaCalc : null, iva_no_recuperable: noRec ? [noRec, ivaCalc] : null, iva_retenido_total: ret ? ivaCalc : null,
+          total: exento + neto + ivaCalc - (ret ? ivaCalc : 0),
+        };
+      });
+      const l = await backend.siiLibroCreate({ operacion: op, periodo: str(a, "periodo"), tipo_libro: (str(a, "tipo_libro") || "MENSUAL") as "MENSUAL", folio_notificacion: num(a, "folio_notificacion"),
+        fct_prop: num(a, "factor_proporcionalidad"), documentos: ids, compras });
+      dataChanged();
+      return text(`Libro firmado (aún NO enviado):\n${libroLine(l)}${compras.length ? `\n${compras.map((c) => `  · ${c.tipo}-${c.folio} ${c.razon_social}: exento ${pesos(c.exento)}, neto ${pesos(c.neto)}, IVA ${pesos(c.iva)}${c.iva_uso_comun ? `, uso común ${pesos(c.iva_uso_comun)}` : ""}${c.iva_no_recuperable ? `, no recuperable ${pesos(c.iva_no_recuperable[1])} (cód. ${c.iva_no_recuperable[0]})` : ""}${c.iva_retenido_total ? `, retenido ${pesos(c.iva_retenido_total)}` : ""}, total ${pesos(c.total)}`).join("\n")}` : ""}`);
+    }
+    case "enviar_libro_sii": {
+      const l = await backend.siiLibroSend(Math.round(num(a, "libro") ?? 0));
+      dataChanged();
+      return text(`Libro enviado al SII:\n${libroLine(l)}`);
+    }
+    case "consultar_libro_sii": {
+      const l = await backend.siiLibroCheck(Math.round(num(a, "libro") ?? 0));
+      dataChanged();
+      return text(libroLine(l));
     }
     case "registrar_cobro": {
       const s = await findSale(backend, str(a, "venta"), "por_cobrar");

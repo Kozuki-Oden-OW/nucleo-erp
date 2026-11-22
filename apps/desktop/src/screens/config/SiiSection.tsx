@@ -4,11 +4,11 @@
 // en la fase F6 (docs/SII_FACTURACION_PROPIA.md).
 import { useCallback, useEffect, useState } from "react";
 import { open as openFile } from "@tauri-apps/plugin-dialog";
-import { BadgeCheck, FileCode2, FileKey2, FilePlus2, FileText, PlugZap, RefreshCw, Save, Send, Upload } from "lucide-react";
-import { errorMessage, useBackend, type SiiAmbiente, type SiiDocument, type SiiFolios, type SiiSetup, type SiiStatus } from "../../data";
+import { BadgeCheck, BookOpen, FileCode2, FileKey2, FilePlus2, FileText, PlugZap, RefreshCw, Save, Send, Upload } from "lucide-react";
+import { errorMessage, useBackend, type SiiAmbiente, type SiiDocument, type SiiFolios, type SiiLibro, type SiiSetup, type SiiStatus } from "../../data";
 import { formatCLP, formatDate } from "../../lib/format";
 import { useSession } from "../../lib/session";
-import { Badge, Button, Card, Field, IconButton, Notice, Segmented, Spinner } from "../../ui/kit";
+import { Badge, Button, Card, Field, IconButton, Notice, Segmented, Select, Spinner } from "../../ui/kit";
 import { DataTable, type Column } from "../../ui/table";
 import { Dialog, useToast } from "../../ui/overlay";
 import { SiiIssueDialog } from "./SiiIssueDialog";
@@ -46,6 +46,9 @@ export function SiiSection() {
   const [password, setPassword] = useState("");
   const [issuing, setIssuing] = useState(false);
   const [toSend, setToSend] = useState<SiiDocument[] | null>(null);
+  const [libros, setLibros] = useState<SiiLibro[]>([]);
+  const [libroForm, setLibroForm] = useState<{ periodo: string; tipo: "MENSUAL" | "ESPECIAL"; folio: string } | null>(null);
+  const [libroSend, setLibroSend] = useState<SiiLibro | null>(null);
 
   const apply = useCallback((s: SiiStatus) => {
     setSt(s);
@@ -56,6 +59,7 @@ export function SiiSection() {
     try {
       apply(await backend.siiStatus());
       setDocs(await backend.siiDocuments(200));
+      setLibros(await backend.siiLibros());
     } catch (e) { setErr(errorMessage(e)); }
   }, [apply, backend]);
   useEffect(() => { void load(); }, [load]);
@@ -103,6 +107,37 @@ export function SiiSection() {
     if (n) toast(n.estado === "rechazado" ? "danger" : n.estado === "reparos" ? "warning" : "info", `${n.tipo_nombre} N° ${n.folio}: ${ESTADO[n.estado].label}${n.glosa ? ` — ${n.glosa}` : ""}`);
   });
   const exportXml = (d: SiiDocument) => run(`xml${d.id}`, async () => { if (await backend.siiExportXml(d)) toast("success", "XML guardado."); });
+  const crearLibro = () => run("libro", async () => {
+    if (!libroForm) return;
+    const l = await backend.siiLibroCreate({ operacion: "venta", periodo: libroForm.periodo, tipo_libro: libroForm.tipo, folio_notificacion: libroForm.folio ? Number(libroForm.folio.replace(/\D/g, "")) : null, fct_prop: null, documentos: [], compras: [] });
+    setLibros(await backend.siiLibros()); setLibroForm(null);
+    toast("success", `Libro de ventas ${l.periodo} firmado con ${l.documentos} documentos. Revísalo y envíalo.`);
+  });
+  const enviarLibro = () => run("lsend", async () => {
+    if (!libroSend) return;
+    const l = await backend.siiLibroSend(libroSend.id);
+    setLibros(await backend.siiLibros()); setLibroSend(null);
+    toast("success", `Libro enviado al SII (track id ${l.track_id}).`);
+  });
+  const estadoLibro = (l: SiiLibro) => run(`lchk${l.id}`, async () => {
+    const n = await backend.siiLibroCheck(l.id);
+    setLibros(await backend.siiLibros());
+    toast(n.estado === "rechazado" ? "danger" : "info", `Libro de ${n.operacion}s ${n.periodo}: ${ESTADO[n.estado].label}${n.glosa ? ` — ${n.glosa}` : ""}`);
+  });
+  const libroCols: Column<SiiLibro>[] = [
+    { key: "op", header: "Libro", width: "minmax(9rem,1fr)", render: (l) => <span className="truncate">{l.operacion === "venta" ? "Ventas" : "Compras"} {l.periodo}{l.tipo_libro !== "MENSUAL" ? ` · ${l.tipo_libro.toLowerCase()}` : ""}</span> },
+    { key: "n", header: "Docs.", align: "right", width: "4.5rem", render: (l) => l.documentos },
+    { key: "fn", header: "Notificación", width: "7rem", render: (l) => l.folio_notificacion ?? "—" },
+    { key: "e", header: "Estado", width: "8rem", render: (l) => <span title={l.glosa ?? undefined}><Badge tone={ESTADO[l.estado].tone}>{ESTADO[l.estado].label}</Badge></span> },
+    { key: "t", header: "Track id", width: "7rem", render: (l) => <span className="text-xs text-muted tabular-nums">{l.track_id ?? "—"}</span> },
+    { key: "a", header: "", width: "9.5rem", align: "right", render: (l) => (
+      <div className="flex justify-end gap-1">
+        {l.estado === "firmado" && <Button size="sm" variant="secondary" icon={Send} onClick={() => setLibroSend(l)} disabled={!!busy}>Enviar</Button>}
+        {l.track_id && l.estado !== "aceptado" && <Button size="sm" variant="secondary" icon={RefreshCw} onClick={() => estadoLibro(l)} disabled={!!busy}>{busy === `lchk${l.id}` ? "…" : "Estado"}</Button>}
+        <IconButton icon={FileCode2} label="Guardar XML del libro" onClick={() => run(`lxml${l.id}`, async () => { if (await backend.siiLibroExportXml(l)) toast("success", "XML guardado."); })} />
+      </div>
+    ) },
+  ];
   const firmados = docs.filter((d) => d.estado === "firmado" && d.ambiente === st.ambiente);
 
   const ready = st.faltantes.length === 0;
@@ -216,6 +251,31 @@ export function SiiSection() {
           {docs.length ? <DataTable label="Documentos emitidos" rows={docs} columns={docCols} rowKey={(d) => String(d.id)} maxHeight="28rem" /> : <p className="text-sm text-muted">Aún no hay documentos.</p>}
         </Card>
       )}
+
+      {(ready || libros.length > 0) && (
+        <Card title="Libros de compras y ventas" subtitle="Información electrónica de compras y ventas (IECV). El libro de ventas se arma con los documentos ya enviados al SII; el de compras lo prepara Claude con las facturas de tus proveedores."
+          actions={ready && can("ventas.documentar") ? <Button size="sm" variant="secondary" icon={BookOpen} onClick={() => setLibroForm({ periodo: new Date().toISOString().slice(0, 7), tipo: st.ambiente === "certificacion" ? "ESPECIAL" : "MENSUAL", folio: "" })}>Libro de ventas</Button> : undefined}>
+          {libros.length ? <DataTable label="Libros" rows={libros} columns={libroCols} rowKey={(l) => String(l.id)} maxHeight="20rem" /> : <p className="text-sm text-muted">Aún no hay libros.</p>}
+        </Card>
+      )}
+
+      <Dialog open={!!libroForm} onClose={() => setLibroForm(null)} title="Libro de ventas"
+        footer={<><Button variant="ghost" onClick={() => setLibroForm(null)}>Cancelar</Button><Button icon={BookOpen} onClick={crearLibro} disabled={!!busy}>{busy === "libro" ? "Firmando…" : "Armar y firmar"}</Button></>}>
+        {libroForm && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Período" type="month" value={libroForm.periodo} onChange={(e) => setLibroForm({ ...libroForm, periodo: e.target.value })} />
+            <Select label="Tipo" value={libroForm.tipo} onChange={(e) => setLibroForm({ ...libroForm, tipo: e.target.value as "MENSUAL" | "ESPECIAL" })}
+              options={[{ value: "ESPECIAL", label: "Especial (set de pruebas)" }, { value: "MENSUAL", label: "Mensual" }]} />
+            {libroForm.tipo === "ESPECIAL" && <Field className="sm:col-span-2" label="Folio de notificación" inputMode="numeric" value={libroForm.folio} onChange={(e) => setLibroForm({ ...libroForm, folio: e.target.value })} hint="En el set de pruebas: el número de atención del «SET LIBRO DE VENTAS»." />}
+            <p className="text-xs text-muted sm:col-span-2">Incluye los documentos del período ya enviados al SII en {ambLabel}. Se firma sin enviar.</p>
+          </div>
+        )}
+      </Dialog>
+
+      <Dialog open={!!libroSend} onClose={() => setLibroSend(null)} title="¿Enviar el libro al SII?"
+        footer={<><Button variant="ghost" onClick={() => setLibroSend(null)}>Cancelar</Button><Button icon={Send} onClick={enviarLibro} disabled={!!busy}>{busy === "lsend" ? "Enviando…" : "Enviar al SII"}</Button></>}>
+        {libroSend && <p className="text-sm">Libro de {libroSend.operacion}s {libroSend.periodo} ({libroSend.documentos} documentos{libroSend.folio_notificacion ? `, notificación ${libroSend.folio_notificacion}` : ""}) a <strong>{ambLabel}</strong>. Un libro enviado no se borra: se corrige con uno rectificatorio.</p>}
+      </Dialog>
 
       <SiiIssueDialog open={issuing} onClose={() => setIssuing(false)} folios={st.folios} ambiente={st.ambiente}
         onIssued={(d) => { setIssuing(false); toast("success", `${d.tipo_nombre} N° ${d.folio} firmada por ${formatCLP(d.total_minor)}. Revísala y envíala al SII.`); void load(); }} />

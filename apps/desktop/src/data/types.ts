@@ -1718,6 +1718,51 @@ export interface SiiIssueInput {
   sale_uid: string | null;
 }
 
+export interface SiiLineaLibro {
+  tipo: number;
+  folio: number;
+  anulado?: boolean;
+  tasa_iva: number | null;
+  fecha: string;
+  rut: string;
+  razon_social: string;
+  tipo_ref?: number | null;
+  folio_ref?: number | null;
+  exento: number;
+  neto: number;
+  iva: number;
+  /** [código SII 1–9, monto] */
+  iva_no_recuperable?: [number, number] | null;
+  iva_uso_comun?: number | null;
+  iva_retenido_total?: number | null;
+  total: number;
+}
+
+export interface SiiLibroInput {
+  operacion: "venta" | "compra";
+  /** AAAA-MM */
+  periodo: string;
+  tipo_libro: "MENSUAL" | "ESPECIAL" | "RECTIFICA";
+  folio_notificacion: number | null;
+  fct_prop: number | null;
+  documentos: number[];
+  compras: SiiLineaLibro[];
+}
+
+export interface SiiLibro {
+  id: number;
+  ambiente: SiiAmbiente;
+  operacion: "venta" | "compra";
+  periodo: string;
+  tipo_libro: string;
+  folio_notificacion: number | null;
+  documentos: number;
+  estado: SiiDocument["estado"];
+  track_id: string | null;
+  glosa: string | null;
+  created_at: string;
+}
+
 export interface SiiDocument {
   id: number;
   ambiente: SiiAmbiente;

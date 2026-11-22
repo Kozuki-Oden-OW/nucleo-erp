@@ -16,6 +16,7 @@ use crate::sales_ops::log;
 use crate::{AppError, AppResult};
 use nucleo_db::now_utc;
 use nucleo_dte::envio::{Caratula, envio_dte};
+use nucleo_dte::libro::{CaratulaLibro, LineaLibro, Operacion, libro_cv};
 use nucleo_dte::sii::{self, Ambiente, EstadoEnvio};
 use nucleo_dte::{
     Caf, Certificate, DescuentoGlobal, Detalle, Dte, DteError, Emisor, Receptor, Referencia,
@@ -1076,5 +1077,340 @@ mod tests {
         );
         assert_eq!(rut_in_text("sin rut"), None);
         assert_eq!(fmt_rut("76.123.456-k"), "76123456-K");
+    }
+}
+
+/* ─────────────────────── Libros de compras y ventas (IECV) ─────────────────────── */
+
+/// Libro de compras o ventas firmado por NÚCLEO y su estado en el SII.
+#[derive(Debug, Clone, Serialize)]
+pub struct SiiLibro {
+    pub id: i64,
+    pub ambiente: Ambiente,
+    pub operacion: String,
+    pub periodo: String,
+    pub tipo_libro: String,
+    pub folio_notificacion: Option<i64>,
+    pub documentos: i64,
+    pub estado: String,
+    pub track_id: Option<String>,
+    pub glosa: Option<String>,
+    pub created_at: String,
+}
+
+fn default_mensual() -> String {
+    "MENSUAL".into()
+}
+
+/// Libro a armar. Ventas: los documentos emitidos por NÚCLEO (los indicados o, si no se indican,
+/// todos los enviados del período en el ambiente actual). Compras: las líneas que se entregan.
+#[derive(Debug, Clone, Deserialize)]
+pub struct SiiLibroInput {
+    pub operacion: Operacion,
+    /// AAAA-MM
+    pub periodo: String,
+    #[serde(default = "default_mensual")]
+    pub tipo_libro: String,
+    pub folio_notificacion: Option<u64>,
+    /// Factor de proporcionalidad del IVA de uso común (compras), ej. 0.6.
+    pub fct_prop: Option<f64>,
+    #[serde(default)]
+    pub documentos: Vec<i64>,
+    #[serde(default)]
+    pub compras: Vec<LineaLibro>,
+}
+
+/// Línea del libro de ventas desde el XML de un documento emitido.
+fn linea_venta(xml: &[u8]) -> AppResult<LineaLibro> {
+    let text = nucleo_dte::xml::from_latin1(xml);
+    let body = match text.find("?>") {
+        Some(i) => &text[i + 2..],
+        None => &text[..],
+    };
+    let doc = roxmltree_parse(body)?;
+    let el = nucleo_dte::xml::from_rox(doc.root_element());
+    let bad = || AppError::Validation("documento guardado dañado".into());
+    let d = el.find("Documento").ok_or_else(bad)?;
+    let enc = d.find("Encabezado").ok_or_else(bad)?;
+    let get = |e: Option<&nucleo_dte::xml::El>, n: &str| -> String {
+        e.and_then(|x| x.find(n))
+            .map(|x| x.text_content())
+            .unwrap_or_default()
+    };
+    let num = |e: Option<&nucleo_dte::xml::El>, n: &str| -> i64 { get(e, n).parse().unwrap_or(0) };
+    let id_doc = enc.find("IdDoc");
+    let rec = enc.find("Receptor");
+    let tot = enc.find("Totales");
+    let tasa = get(tot, "TasaIVA").parse::<f64>().ok();
+    // La referencia al documento que modifica (notas): la primera con tipo numérico.
+    let referencia = d
+        .kids
+        .iter()
+        .filter_map(|c| match c {
+            nucleo_dte::xml::Node::El(e) if e.name == "Referencia" => Some(e),
+            _ => None,
+        })
+        .find_map(|r| {
+            let t = get(Some(r), "TpoDocRef").parse::<u16>().ok()?;
+            let f = get(Some(r), "FolioRef").parse::<u64>().ok()?;
+            Some((t, f))
+        });
+    Ok(LineaLibro {
+        tipo: get(id_doc, "TipoDTE").parse().map_err(|_| bad())?,
+        folio: get(id_doc, "Folio").parse().map_err(|_| bad())?,
+        anulado: false,
+        tasa_iva: tasa,
+        fecha: get(id_doc, "FchEmis"),
+        rut: get(rec, "RUTRecep"),
+        razon_social: get(rec, "RznSocRecep"),
+        tipo_ref: referencia.map(|r| r.0),
+        folio_ref: referencia.map(|r| r.1),
+        exento: num(tot, "MntExe"),
+        neto: num(tot, "MntNeto"),
+        iva: num(tot, "IVA"),
+        total: num(tot, "MntTotal"),
+        ..Default::default()
+    })
+}
+
+impl CompanySession {
+    /// Arma y firma un libro de compras o ventas (no lo envía).
+    pub fn sii_libro_create(&mut self, input: &SiiLibroInput) -> AppResult<SiiLibro> {
+        let user = self.require("ventas.documentar")?.username.clone();
+        let c = self.sii_row()?;
+        let cred = self.sii_credentials(&c)?;
+        let fecha_resol = c
+            .resolucion_fecha
+            .clone()
+            .ok_or_else(|| AppError::Validation("anota la fecha de resolución del SII".into()))?;
+        let amb = c.ambiente;
+        let lineas: Vec<LineaLibro> = match input.operacion {
+            Operacion::Compra => {
+                if input.compras.is_empty() {
+                    return Err(AppError::Validation(
+                        "el libro de compras no tiene documentos".into(),
+                    ));
+                }
+                input
+                    .compras
+                    .iter()
+                    .map(|l| LineaLibro {
+                        rut: fmt_rut(&l.rut),
+                        ..l.clone()
+                    })
+                    .collect()
+            }
+            Operacion::Venta => {
+                let rows: Vec<(i64, String, String, Vec<u8>)> = {
+                    let mut st = self.db.conn().prepare(
+                        "SELECT id, fecha, estado, xml FROM sii_documents WHERE ambiente = ?1 ORDER BY tipo, folio",
+                    )?;
+                    st.query_map([amb.as_str()], |r| {
+                        Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
+                    })?
+                    .collect::<Result<_, _>>()?
+                };
+                let mut out = Vec::new();
+                for (id, fecha, estado, xml) in rows {
+                    let elegido = if input.documentos.is_empty() {
+                        fecha.starts_with(&input.periodo) && estado != "firmado"
+                    } else {
+                        input.documentos.contains(&id)
+                    };
+                    if elegido {
+                        out.push(linea_venta(&xml)?);
+                    }
+                }
+                if out.is_empty() {
+                    return Err(AppError::Validation(
+                        "no hay documentos enviados al SII en ese período".into(),
+                    ));
+                }
+                out
+            }
+        };
+        let car = CaratulaLibro {
+            rut_emisor: cred.rut_emisor.clone(),
+            rut_envia: cred.rut_envia.clone(),
+            periodo: input.periodo.clone(),
+            fecha_resolucion: fecha_resol,
+            numero_resolucion: c.resolucion_numero.unwrap_or(0),
+            operacion: input.operacion,
+            tipo_libro: input.tipo_libro.to_uppercase(),
+            folio_notificacion: input.folio_notificacion,
+        };
+        let cert = cred.certificate()?;
+        let now = self.sii_now()?;
+        let xml = libro_cv(&car, &lineas, input.fct_prop, &cert, &now)?;
+        let op = if input.operacion == Operacion::Compra {
+            "compra"
+        } else {
+            "venta"
+        };
+        let ts = now_utc();
+        self.db.conn().execute(
+            "INSERT INTO sii_libros (ambiente, operacion, periodo, tipo_libro, folio_notificacion, documentos, xml, estado, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'firmado', ?8, ?8)",
+            params![amb.as_str(), op, car.periodo, car.tipo_libro, input.folio_notificacion.map(|f| f as i64), lineas.len() as i64, xml, ts],
+        )?;
+        let id = self.db.conn().last_insert_rowid();
+        log(
+            self.db.conn(),
+            &user,
+            "create",
+            "sii",
+            &format!("libro-{op}-{}", car.periodo),
+            &format!(
+                "Firmó el libro de {op}s {} ({} documentos, {})",
+                car.periodo,
+                lineas.len(),
+                amb.as_str()
+            ),
+            None,
+        )?;
+        self.sii_libro(id)
+    }
+
+    pub fn sii_libros(&self) -> AppResult<Vec<SiiLibro>> {
+        self.require("ventas.ver")?;
+        self.sii_libros_where("", [])
+    }
+
+    fn sii_libro(&self, id: i64) -> AppResult<SiiLibro> {
+        self.sii_libros_where("WHERE id = ?1", params![id])?
+            .pop()
+            .ok_or_else(|| AppError::NotFound("el libro".into()))
+    }
+
+    fn sii_libros_where(&self, filter: &str, p: impl rusqlite::Params) -> AppResult<Vec<SiiLibro>> {
+        let sql = format!(
+            "SELECT id, ambiente, operacion, periodo, tipo_libro, folio_notificacion, documentos, estado, track_id, glosa, created_at
+             FROM sii_libros {filter} ORDER BY id DESC LIMIT 200"
+        );
+        let mut st = self.db.conn().prepare(&sql)?;
+        let rows = st.query_map(p, |r| {
+            Ok(SiiLibro {
+                id: r.get(0)?,
+                ambiente: Ambiente::parse(&r.get::<_, String>(1)?)
+                    .unwrap_or(Ambiente::Certificacion),
+                operacion: r.get(2)?,
+                periodo: r.get(3)?,
+                tipo_libro: r.get(4)?,
+                folio_notificacion: r.get(5)?,
+                documentos: r.get(6)?,
+                estado: r.get(7)?,
+                track_id: r.get(8)?,
+                glosa: r.get(9)?,
+                created_at: r.get(10)?,
+            })
+        })?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    pub fn sii_libro_xml(&self, id: i64) -> AppResult<Vec<u8>> {
+        self.require("ventas.ver")?;
+        self.db
+            .conn()
+            .query_row("SELECT xml FROM sii_libros WHERE id = ?1", [id], |r| {
+                r.get(0)
+            })
+            .optional()?
+            .ok_or_else(|| AppError::NotFound("el libro".into()))
+    }
+
+    /// Prepara la subida del libro firmado.
+    pub fn sii_libro_send_plan(&self, id: i64) -> AppResult<SendPlan> {
+        self.require("ventas.documentar")?;
+        let c = self.sii_row()?;
+        let cred = self.sii_credentials(&c)?;
+        let (amb, estado, op, periodo, xml): (String, String, String, String, Vec<u8>) = self
+            .db
+            .conn()
+            .query_row(
+                "SELECT ambiente, estado, operacion, periodo, xml FROM sii_libros WHERE id = ?1",
+                [id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+            )
+            .optional()?
+            .ok_or_else(|| AppError::NotFound("el libro".into()))?;
+        if amb != c.ambiente.as_str() {
+            return Err(AppError::Validation("el libro es de otro ambiente".into()));
+        }
+        if estado != "firmado" && estado != "rechazado" {
+            return Err(AppError::Validation("el libro ya fue enviado".into()));
+        }
+        Ok(SendPlan {
+            file_name: format!(
+                "LibroCV_{}_{}_{}.xml",
+                norm_rut(&cred.rut_emisor),
+                op.to_uppercase(),
+                periodo.replace('-', "")
+            ),
+            cred,
+            ids: vec![id],
+            envio: xml,
+        })
+    }
+
+    pub fn sii_libro_send_apply(&mut self, id: i64, track_id: &str) -> AppResult<SiiLibro> {
+        let user = self.require("ventas.documentar")?.username.clone();
+        self.db.conn().execute(
+            "UPDATE sii_libros SET estado = 'enviado', track_id = ?1, glosa = NULL, updated_at = ?2 WHERE id = ?3",
+            params![track_id, now_utc(), id],
+        )?;
+        log(
+            self.db.conn(),
+            &user,
+            "update",
+            "sii",
+            track_id,
+            &format!("Envió un libro al SII (seguimiento {track_id})"),
+            None,
+        )?;
+        self.sii_libro(id)
+    }
+
+    pub fn sii_libro_status_plan(&self, id: i64) -> AppResult<(SiiCredentials, String)> {
+        self.require("ventas.ver")?;
+        let c = self.sii_row()?;
+        let track: Option<String> = self
+            .db
+            .conn()
+            .query_row("SELECT track_id FROM sii_libros WHERE id = ?1", [id], |r| {
+                r.get(0)
+            })
+            .optional()?
+            .flatten();
+        let track = track.ok_or_else(|| AppError::Validation("el libro aún no se envía".into()))?;
+        Ok((self.sii_credentials(&c)?, track))
+    }
+
+    /// Estado del libro: LOK = libro cuadrado; LRH/LRF/LRS/LNC… = rechazado o no cuadra.
+    pub fn sii_libro_status_apply(&mut self, id: i64, e: &EstadoEnvio) -> AppResult<SiiLibro> {
+        let user = self.require("ventas.ver")?.username.clone();
+        let estado = if e.pendiente {
+            "enviado"
+        } else if matches!(e.estado.as_str(), "LOK" | "EPR") {
+            "aceptado"
+        } else {
+            "rechazado"
+        };
+        let glosa = format!("{} {}", e.estado, e.glosa).trim().to_string();
+        self.db.conn().execute(
+            "UPDATE sii_libros SET estado = ?1, glosa = ?2, updated_at = ?3 WHERE id = ?4",
+            params![estado, glosa, now_utc(), id],
+        )?;
+        if !e.pendiente {
+            log(
+                self.db.conn(),
+                &user,
+                "update",
+                "sii",
+                &format!("libro-{id}"),
+                &format!("El SII respondió el libro: {glosa}"),
+                None,
+            )?;
+        }
+        self.sii_libro(id)
     }
 }

@@ -9,6 +9,7 @@ pub mod caf;
 pub mod crypto;
 pub mod dte;
 pub mod envio;
+pub mod libro;
 pub mod sii;
 pub mod xml;
 

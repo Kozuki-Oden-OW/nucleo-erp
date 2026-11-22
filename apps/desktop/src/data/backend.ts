@@ -22,7 +22,7 @@ import type {
   PermissionRow, PriceHistoryRow, Product, ProductCategory, ProductPatch, PurchaseDetail, PurchaseInput, PurchaseOrderDetail, PurchaseOrderInput,
   PurchaseOrderSummary, PurchaseSummary, ReceiveLine, NewSupplier, Supplier, SupplierDetail, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow,
   SaleDetail, SaleInput, SaleSummary, SearchHit, SecuritySettings, SequenceRow, SessionInfo, UserPatch, UserRow,
-  SiiDocument, SiiIssueInput, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
+  SiiDocument, SiiIssueInput, SiiLibro, SiiLibroInput, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
 } from "./types";
 
 /** Archivo elegido para adjuntar: ruta en el escritorio o archivo del navegador en la demostración. */
@@ -181,6 +181,13 @@ export interface Backend {
   siiCheck(id: number): Promise<SiiDocument[]>;
   /** Guarda el XML firmado donde la persona elija; false si cancela. */
   siiExportXml(doc: SiiDocument): Promise<boolean>;
+  /** Arma y firma un libro de compras o ventas (IECV), sin enviarlo. */
+  siiLibroCreate(input: SiiLibroInput): Promise<SiiLibro>;
+  siiLibros(): Promise<SiiLibro[]>;
+  /** Sube el libro al SII (irreversible). */
+  siiLibroSend(id: number): Promise<SiiLibro>;
+  siiLibroCheck(id: number): Promise<SiiLibro>;
+  siiLibroExportXml(libro: SiiLibro): Promise<boolean>;
   pendingDispatches(): Promise<PendingDispatch[]>;
   dispatchItems(id: number, qtyMilli: number, date?: string | null): Promise<PendingDispatch[]>;
   warehouseStock(warehouseUid: string): Promise<WarehouseStockRow[]>;

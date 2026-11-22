@@ -408,6 +408,17 @@ fn descuento_global_set_basico() {
     assert!(xml.rfind("</Detalle>").unwrap() < d && d < r);
     assert!(xml.contains("<TpoMov>D</TpoMov><GlosaDR>Descuento global ítemes afectos</GlosaDR><TpoValor>%</TpoValor><ValorDR>7</ValorDR>"));
     assert!(!xml.contains("IndExeDR"));
+    let car = Caratula::al_sii(RUT, "11111111-1", "2026-11-22", 0);
+    let bytes = envio_dte(&car, &[s], &cert, "2026-11-22T12:01:00").unwrap();
+    std::fs::create_dir_all(concat!(env!("CARGO_TARGET_TMPDIR"), "/dte")).unwrap();
+    std::fs::write(
+        concat!(
+            env!("CARGO_TARGET_TMPDIR"),
+            "/dte/envio_descuento_global.xml"
+        ),
+        &bytes,
+    )
+    .unwrap();
 }
 
 /// Un .pfx en el formato antiguo (certificado con RC2-40 y llave con 3DES), como los que entregan
@@ -451,4 +462,73 @@ fn pfx_formato_antiguo() {
         .unwrap()
         .to_string();
     assert!(e.contains("clave del certificado no es correcta"), "{e}");
+}
+
+/// Libro de compras del set de pruebas (atención 5198398 de FAVOR): factura en papel, electrónica
+/// con exento, IVA de uso común con factor 0,60, nota de crédito, entrega gratuita (IVA no
+/// recuperable código 4), factura de compra con retención total y nota de crédito a electrónica.
+#[test]
+fn libro_de_compras_set() {
+    use nucleo_dte::libro::{CaratulaLibro, LineaLibro, Operacion, libro_cv};
+    let (cert, _) = certificado();
+    let iva = |n: i64| (n as f64 * 0.19).round() as i64;
+    let l = |tipo: u16, folio: u64, rut: &str, exe: i64, neto: i64| LineaLibro {
+        tipo,
+        folio,
+        tasa_iva: Some(19.0),
+        fecha: "2026-11-22".into(),
+        rut: rut.into(),
+        razon_social: format!("Proveedor {rut}"),
+        exento: exe,
+        neto,
+        iva: iva(neto),
+        total: exe + neto + iva(neto),
+        ..Default::default()
+    };
+    let mut uso_comun = l(30, 781, "33333333-3", 0, 30_229);
+    uso_comun.iva_uso_comun = Some(uso_comun.iva);
+    uso_comun.iva = 0;
+    let mut gratis = l(33, 67, "55555555-5", 0, 12_457);
+    gratis.iva_no_recuperable = Some((4, gratis.iva));
+    gratis.iva = 0;
+    let mut compra = l(46, 9, "66666666-6", 0, 10_793);
+    compra.iva_retenido_total = Some(compra.iva);
+    compra.total = compra.neto;
+    let mut nc1 = l(60, 451, "11111111-1", 0, 2_960);
+    (nc1.tipo_ref, nc1.folio_ref) = (Some(30), Some(234));
+    let mut nc2 = l(60, 211, "22222222-2", 0, 9_753);
+    (nc2.tipo_ref, nc2.folio_ref) = (Some(33), Some(32));
+    let lineas = vec![
+        l(30, 234, "11111111-1", 0, 58_129),
+        l(33, 32, "22222222-2", 10_906, 12_228),
+        uso_comun,
+        nc1,
+        gratis,
+        compra,
+        nc2,
+    ];
+    let car = CaratulaLibro {
+        rut_emisor: RUT.into(),
+        rut_envia: "11111111-1".into(),
+        periodo: "2026-11".into(),
+        fecha_resolucion: "2026-11-22".into(),
+        numero_resolucion: 0,
+        operacion: Operacion::Compra,
+        tipo_libro: "ESPECIAL".into(),
+        folio_notificacion: Some(5_198_398),
+    };
+    let bytes = libro_cv(&car, &lineas, Some(0.6), &cert, "2026-11-22T13:00:00").unwrap();
+    let xml = from_latin1(&bytes);
+    assert!(xml.contains("<TotIVAUsoComun>5744</TotIVAUsoComun><FctProp>0.6</FctProp><TotCredIVAUsoComun>3446</TotCredIVAUsoComun>"));
+    assert!(xml.contains(
+        "<IVANoRec><CodIVANoRec>4</CodIVANoRec><MntIVANoRec>2367</MntIVANoRec></IVANoRec>"
+    ));
+    std::fs::create_dir_all(concat!(env!("CARGO_TARGET_TMPDIR"), "/dte")).unwrap();
+    std::fs::write(
+        concat!(env!("CARGO_TARGET_TMPDIR"), "/dte/libro_compras.xml"),
+        &bytes,
+    )
+    .unwrap();
+    // Sin factor de proporcionalidad no se puede declarar IVA de uso común.
+    assert!(libro_cv(&car, &lineas, None, &cert, "2026-11-22T13:00:00").is_err());
 }
