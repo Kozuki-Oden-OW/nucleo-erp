@@ -577,12 +577,15 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
       const docRefs = Array.isArray(a.documentos) ? (a.documentos as unknown[]).map(String) : [];
       const ids: number[] = [];
       for (const r of docRefs) ids.push((await findSiiDoc(backend, r)).id);
+      const biz = await backend.business();
+      const ppm = biz.tax_enabled ? biz.tax_rate_ppm ?? 0 : 0;
+      const pct = ppm / 10_000;
       const compras: SiiLineaLibro[] = (Array.isArray(a.compras) ? (a.compras as Args[]) : []).map((c) => {
         const neto = Math.round(num(c, "neto") ?? 0), exento = Math.round(num(c, "exento") ?? 0);
-        const ivaCalc = num(c, "iva") ?? Math.round(neto * 0.19);
+        const ivaCalc = num(c, "iva") ?? Math.round((neto * ppm) / 1_000_000);
         const usoComun = c.iva_uso_comun === true, noRec = num(c, "iva_no_recuperable_codigo"), ret = c.retencion_total === true;
         return {
-          tipo: Math.round(num(c, "tipo") ?? 0), folio: Math.round(num(c, "folio") ?? 0), tasa_iva: neto ? 19 : null,
+          tipo: Math.round(num(c, "tipo") ?? 0), folio: Math.round(num(c, "folio") ?? 0), tasa_iva: neto && pct ? pct : null,
           fecha: str(c, "fecha") || `${str(a, "periodo")}-01`, rut: str(c, "rut"), razon_social: str(c, "razon_social"),
           tipo_ref: num(c, "tipo_ref"), folio_ref: num(c, "folio_ref"), exento, neto,
           iva: usoComun || noRec ? 0 : ivaCalc,

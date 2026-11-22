@@ -1979,7 +1979,7 @@ export class DemoBackend implements Backend {
     const exento = input.detalle.filter((d) => d.exento).reduce((a, d) => a + d.monto, 0);
     const netoL = input.detalle.filter((d) => !d.exento).reduce((a, d) => a + d.monto, 0);
     const neto = netoL - input.descuentos_globales.filter((g) => !g.exento).reduce((a, g) => a + (g.porcentaje ? Math.round((netoL * g.porcentaje) / 100) : g.monto ?? 0) * (g.recargo ? -1 : 1), 0);
-    const total = exento + neto + (input.tipo === 34 ? 0 : Math.round(neto * 0.19));
+    const total = exento + neto + (input.tipo === 34 ? 0 : Math.round((neto * (this.taxPpm() ?? 0)) / 1_000_000));
     const doc: SiiDocument = { id: this.siiDocs.length + 1, ambiente: this.sii.setup.ambiente, tipo: input.tipo, tipo_nombre: f.tipo_nombre, folio: f.siguiente,
       fecha: input.fecha || this.today, receptor_rut: input.receptor.rut, receptor: input.receptor.razon_social, total_minor: total, estado: "firmado", track_id: null, glosa: null, created_at: new Date().toISOString() };
     f.siguiente += 1; f.restantes -= 1;

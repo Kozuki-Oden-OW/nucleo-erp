@@ -1324,7 +1324,7 @@
               },
               "iva": {
                 "type": "number",
-                "description": "IVA recuperable; si se omite se calcula 19 % del neto (y queda en 0 si es uso común o no recuperable)"
+                "description": "IVA recuperable; si se omite se calcula con la tasa de IVA de la empresa (y queda en 0 si es uso común o no recuperable)"
               },
               "iva_uso_comun": {
                 "type": "boolean",

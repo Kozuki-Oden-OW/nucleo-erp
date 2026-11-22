@@ -1,7 +1,7 @@
 // Facturación SII → «Nuevo documento»: arma una factura, exenta, nota de crédito/débito o guía, la
 // timbra con el siguiente folio del CAF y la firma con el certificado. NO la envía: el envío al SII es
 // un paso aparte (y se confirma), así se puede revisar el documento antes.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Stamp, Trash2 } from "lucide-react";
 import { errorMessage, useBackend, type SiiDetalle, type SiiDocument, type SiiFolios, type SiiIssueInput, type SiiReferencia } from "../../data";
 import { formatCLP } from "../../lib/format";
@@ -64,6 +64,9 @@ export function SiiIssueDialog({ open, onClose, folios, ambiente, onIssued }: {
   const [lines, setLines] = useState<LineForm[]>([emptyLine()]);
   const [refs, setRefs] = useState<SiiReferencia[]>([]);
   const [dg, setDg] = useState("");
+  // Tasa de IVA de la empresa (Configuración → Mi negocio); NÚCLEO no la escribe en el código.
+  const [taxPpm, setTaxPpm] = useState<number>(0);
+  useEffect(() => { void backend.business().then((b) => setTaxPpm(b.tax_enabled ? b.tax_rate_ppm ?? 0 : 0)).catch(() => setTaxPpm(0)); }, [backend]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,7 +77,7 @@ export function SiiIssueDialog({ open, onClose, folios, ambiente, onIssued }: {
   const dgMonto = dgPct > 0 ? Math.round((netoLineas * dgPct) / 100) : 0;
   const neto = netoLineas - dgMonto;
   const exento = lines.reduce((a, l, i) => a + (l.exento || tipo === 34 ? amounts[i]?.monto ?? 0 : 0), 0);
-  const iva = Math.round(neto * 0.19);
+  const iva = Math.round((neto * taxPpm) / 1_000_000);
   const setLine = (i: number, p: Partial<LineForm>) => setLines(lines.map((l, j) => (j === i ? { ...l, ...p } : l)));
   const setRef = (i: number, p: Partial<SiiReferencia>) => setRefs(refs.map((r, j) => (j === i ? { ...r, ...p } : r)));
   const r = (k: keyof typeof rec) => ({ value: rec[k], onChange: (e: React.ChangeEvent<HTMLInputElement>) => setRec({ ...rec, [k]: e.target.value }) });
@@ -194,7 +197,7 @@ export function SiiIssueDialog({ open, onClose, folios, ambiente, onIssued }: {
 
         <dl className="ml-auto grid w-64 grid-cols-2 gap-x-4 gap-y-1 text-sm">
           {dgMonto > 0 && <><dt className="text-muted">Descuento {dgPct}%</dt><dd className="text-right tabular-nums">−{formatCLP(dgMonto)}</dd></>}
-          {neto > 0 && <><dt className="text-muted">Neto</dt><dd className="text-right tabular-nums">{formatCLP(neto)}</dd><dt className="text-muted">IVA 19%</dt><dd className="text-right tabular-nums">{formatCLP(iva)}</dd></>}
+          {neto > 0 && <><dt className="text-muted">Neto</dt><dd className="text-right tabular-nums">{formatCLP(neto)}</dd><dt className="text-muted">IVA {taxPpm / 10_000}%</dt><dd className="text-right tabular-nums">{formatCLP(iva)}</dd></>}
           {exento > 0 && <><dt className="text-muted">Exento</dt><dd className="text-right tabular-nums">{formatCLP(exento)}</dd></>}
           <dt className="font-semibold">Total</dt><dd className="text-right font-semibold tabular-nums">{formatCLP(neto + iva + exento)}</dd>
         </dl>
