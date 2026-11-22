@@ -1658,6 +1658,66 @@ export interface SiiStatus {
   faltantes: string[];
 }
 
+export interface SiiReceptor {
+  rut: string;
+  razon_social: string;
+  giro: string | null;
+  direccion: string | null;
+  comuna: string | null;
+  ciudad: string | null;
+  contacto: string | null;
+  correo: string | null;
+}
+
+export interface SiiDetalle {
+  codigo: string | null;
+  nombre: string;
+  descripcion: string | null;
+  /** Cantidad en milésimas (1 un = 1000). */
+  cantidad_milli: number | null;
+  unidad: string | null;
+  /** Precio unitario neto en pesos. */
+  precio: number | null;
+  descuento_pct: number | null;
+  descuento_monto: number | null;
+  /** Neto de la línea (cantidad × precio − descuento). */
+  monto: number;
+  exento: boolean;
+}
+
+export interface SiiReferencia {
+  /** 33, 52, 801 (orden de compra), «SET» (set de pruebas)… */
+  tipo: string;
+  folio: string;
+  fecha: string;
+  /** 1 anula, 2 corrige texto, 3 corrige montos (notas). */
+  codigo: number | null;
+  razon: string | null;
+}
+
+export interface SiiDescuentoGlobal {
+  recargo: boolean;
+  glosa: string | null;
+  porcentaje: number | null;
+  monto: number | null;
+  /** Aplica a las líneas exentas en vez de las afectas. */
+  exento: boolean;
+}
+
+export interface SiiIssueInput {
+  tipo: number;
+  fecha: string | null;
+  receptor: SiiReceptor;
+  detalle: SiiDetalle[];
+  referencias: SiiReferencia[];
+  descuentos_globales: SiiDescuentoGlobal[];
+  forma_pago: number | null;
+  vencimiento: string | null;
+  ind_traslado: number | null;
+  tipo_despacho: number | null;
+  sale_uid: string | null;
+}
+
 export interface SiiDocument {
   id: number;
   ambiente: SiiAmbiente;

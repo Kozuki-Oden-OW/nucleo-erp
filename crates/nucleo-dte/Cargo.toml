@@ -8,6 +8,9 @@ license.workspace = true
 
 [dependencies]
 openssl = { workspace = true }
+# Proveedor «legacy» de OpenSSL 3: muchos .pfx de proveedores chilenos (y los exportados desde Windows)
+# cifran el certificado con RC2-40, que OpenSSL 3 solo lee con ese proveedor.
+openssl-src = { version = "300", features = ["legacy"] }
 roxmltree = { workspace = true }
 data-encoding.workspace = true
 serde.workspace = true

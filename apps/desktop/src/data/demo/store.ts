@@ -4,7 +4,7 @@
 import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "../backend";
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
-  SiiDocument, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
+  SiiDocument, SiiIssueInput, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
   MlBilling, MlOrderRow, MlStatus, MlSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput, StatementLineView, BankSuggestion,
@@ -1966,7 +1966,37 @@ export class DemoBackend implements Backend {
     if (!this.sii.cert) throw new AppError("validacion", "Carga primero el certificado digital.");
     return wait("Demostración: en el escritorio NÚCLEO pide semilla y token al SII con tu certificado.");
   }
-  async siiDocuments(): Promise<SiiDocument[]> { return wait([]); }
+  private siiDocs: SiiDocument[] = [];
+  async siiDocuments(): Promise<SiiDocument[]> { return wait([...this.siiDocs].reverse()); }
+  async siiIssue(input: SiiIssueInput): Promise<SiiDocument> {
+    this.require("ventas.documentar");
+    const st = await this.siiStatus();
+    if (st.faltantes.length) throw new AppError("validacion", `Falta ${st.faltantes[0]}.`);
+    const f = this.sii.folios.find((x) => x.ambiente === this.sii.setup.ambiente && x.tipo === input.tipo && x.restantes > 0);
+    if (!f) throw new AppError("validacion", "No quedan folios de ese documento: carga un CAF nuevo.");
+    if (!input.receptor.rut.trim() || !input.receptor.razon_social.trim()) throw new AppError("validacion", "Falta el RUT o la razón social del receptor.");
+    if (!input.detalle.length) throw new AppError("validacion", "El documento debe tener al menos una línea.");
+    const exento = input.detalle.filter((d) => d.exento).reduce((a, d) => a + d.monto, 0);
+    const netoL = input.detalle.filter((d) => !d.exento).reduce((a, d) => a + d.monto, 0);
+    const neto = netoL - input.descuentos_globales.filter((g) => !g.exento).reduce((a, g) => a + (g.porcentaje ? Math.round((netoL * g.porcentaje) / 100) : g.monto ?? 0) * (g.recargo ? -1 : 1), 0);
+    const total = exento + neto + (input.tipo === 34 ? 0 : Math.round(neto * 0.19));
+    const doc: SiiDocument = { id: this.siiDocs.length + 1, ambiente: this.sii.setup.ambiente, tipo: input.tipo, tipo_nombre: f.tipo_nombre, folio: f.siguiente,
+      fecha: input.fecha || this.today, receptor_rut: input.receptor.rut, receptor: input.receptor.razon_social, total_minor: total, estado: "firmado", track_id: null, glosa: null, created_at: new Date().toISOString() };
+    f.siguiente += 1; f.restantes -= 1;
+    this.siiDocs.push(doc);
+    return wait(doc);
+  }
+  async siiSend(ids: number[]): Promise<SiiDocument[]> {
+    const track = String(Date.now()).slice(-10);
+    for (const d of this.siiDocs) if (ids.includes(d.id) && d.estado === "firmado") { d.estado = "enviado"; d.track_id = track; d.glosa = "Demostración: en el escritorio el sobre va al SII."; }
+    return this.siiDocuments();
+  }
+  async siiCheck(id: number): Promise<SiiDocument[]> {
+    const d = this.siiDocs.find((x) => x.id === id);
+    if (d?.estado === "enviado") { d.estado = "aceptado"; d.glosa = "Demostración: documento aceptado."; }
+    return this.siiDocuments();
+  }
+  async siiExportXml(): Promise<boolean> { throw new AppError("validacion", "En la demostración no hay XML firmado."); }
   /** Pedidos de ejemplo: uno con SKU conocido y otro de una publicación sin enlazar que pide factura. */
   async mlSync(): Promise<MlSyncReport> {
     if (!this.ml.connected) throw new AppError("validacion", "Mercado Libre no está conectado: Configuración → Integraciones.");

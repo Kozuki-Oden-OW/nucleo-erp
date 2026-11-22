@@ -3,7 +3,7 @@
 // valen las mismas reglas, permisos y auditoría.
 import type { Backend } from "../data";
 import { errorMessage } from "../data";
-import type { Customer, HistoricalSale, LineInput, Product, SaleSummary, SaleTerms, ShipmentInput, ShipmentSize, Supplier } from "../data/types";
+import type { Customer, HistoricalSale, SiiDocument, LineInput, Product, SaleSummary, SaleTerms, ShipmentInput, ShipmentSize, Supplier } from "../data/types";
 import { EMPTY_TERMS } from "../data/saleTerms";
 import { formatMoney, todayIso } from "../lib/format";
 import { navigate } from "../lib/router";
@@ -60,6 +60,16 @@ async function searchBoth<T extends { uid: string }>(search: (q: string) => Prom
   }
   return out;
 }
+
+/** Documento del SII por «tipo-folio» (33-1) o id interno. */
+async function findSiiDoc(backend: Backend, ref: string): Promise<SiiDocument> {
+  const docs = await backend.siiDocuments(1000);
+  const m = ref.trim().match(/^(\d{2,3})\s*[-–]\s*(\d+)$/);
+  const d = m ? docs.find((x) => x.tipo === Number(m[1]) && x.folio === Number(m[2])) : docs.find((x) => String(x.id) === ref.trim());
+  if (!d) throw new Error(`No encontré el documento «${ref}». Usa tipo-folio (ej. 33-1).`);
+  return d;
+}
+const siiLine = (d: SiiDocument) => `- ${d.tipo}-${d.folio} ${d.tipo_nombre} N° ${d.folio} · ${d.fecha} · ${d.receptor} (${d.receptor_rut}) · ${pesos(d.total_minor)} · ${d.estado}${d.track_id ? ` · track ${d.track_id}` : ""}${d.glosa ? ` · ${d.glosa}` : ""}${d.ambiente === "certificacion" ? " · certificación" : ""}`;
 
 const METHOD: Record<string, string> = { efectivo: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta de débito", cheque: "Cheque", credito: "" };
 
@@ -493,6 +503,71 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
         ...r.results.filter((x) => x.status === "actualizada").map((x) => `- Folio ${x.number}: ${x.message ?? "actualizada"}`),
         ...errs.map((x) => `- Folio ${x.number}: ${x.message}`),
       ].join("\n"), r.imported === 0 && r.errors > 0);
+    }
+    case "listar_documentos_sii": {
+      const st = await backend.siiStatus();
+      const docs = await backend.siiDocuments(Math.round(num(a, "limite") ?? 30));
+      return text([
+        `Ambiente: ${st.ambiente === "certificacion" ? "certificación (maullin)" : "producción (palena)"} · emisor ${st.razon_social ?? "?"} ${st.rut ?? ""}`,
+        st.faltantes.length ? `Falta para emitir: ${st.faltantes.join("; ")}.` : "Listo para emitir.",
+        `Folios: ${st.folios.length ? st.folios.map((f) => `${f.tipo} ${f.tipo_nombre} (${f.ambiente}) ${f.desde}–${f.hasta}, siguiente ${f.siguiente}, quedan ${f.restantes}`).join("; ") : "ninguno"}.`,
+        docs.length ? `Documentos (${docs.length}):\n${docs.map(siiLine).join("\n")}` : "Aún no hay documentos.",
+      ].join("\n"));
+    }
+    case "cargar_folios_sii": {
+      const ruta = str(a, "ruta");
+      if (!/\.xml$/i.test(ruta)) throw new Error("Indica la ruta completa del archivo .xml de folios.");
+      const st = await backend.siiLoadCaf(ruta);
+      dataChanged();
+      return text(`Folios cargados. Disponibles: ${st.folios.map((f) => `${f.tipo} ${f.tipo_nombre} (${f.ambiente}) ${f.desde}–${f.hasta}, quedan ${f.restantes}`).join("; ")}.`);
+    }
+    case "emitir_documento_sii": {
+      const tipo = Math.round(num(a, "tipo") ?? 0);
+      const rec = (a.receptor ?? {}) as Args;
+      const lineas = Array.isArray(a.lineas) ? (a.lineas as Args[]) : [];
+      const refs = Array.isArray(a.referencias) ? (a.referencias as Args[]) : [];
+      const o = (x: Args, k: string) => str(x, k) || null;
+      const fp = str(a, "forma_pago") || "contado";
+      const fecha = str(a, "fecha") || null;
+      const d = await backend.siiIssue({
+        tipo, fecha,
+        receptor: { rut: str(rec, "rut"), razon_social: str(rec, "razon_social"), giro: o(rec, "giro"), direccion: o(rec, "direccion"), comuna: o(rec, "comuna"), ciudad: o(rec, "ciudad"), contacto: null, correo: o(rec, "correo") },
+        detalle: lineas.map((l) => {
+          const q = num(l, "cantidad") ?? 1, p = num(l, "precio"), pct = num(l, "descuento_pct") ?? 0;
+          const bruto = p == null ? 0 : Math.round(q * p);
+          const desc = pct > 0 ? Math.round((bruto * pct) / 100) : 0;
+          return { codigo: null, nombre: str(l, "nombre").slice(0, 80), descripcion: null, cantidad_milli: p == null ? null : Math.round(q * 1000), unidad: o(l, "unidad"),
+            precio: p == null ? null : Math.round(p), descuento_pct: pct > 0 ? pct : null, descuento_monto: desc > 0 ? desc : null, monto: bruto - desc, exento: l.exento === true || tipo === 34 };
+        }),
+        descuentos_globales: (num(a, "descuento_global_pct") ?? 0) > 0 ? [{ recargo: false, glosa: "Descuento global", porcentaje: num(a, "descuento_global_pct"), monto: null, exento: false }] : [],
+        referencias: refs.map((r) => ({ tipo: str(r, "tipo"), folio: str(r, "folio") || "0", fecha: str(r, "fecha") || fecha || todayIso(), codigo: num(r, "codigo"), razon: o(r, "razon") })),
+        forma_pago: tipo === 52 ? null : fp === "credito" ? 2 : fp === "sin_costo" ? 3 : 1,
+        vencimiento: fp === "credito" ? o(a, "vencimiento") : null,
+        ind_traslado: tipo === 52 ? Math.round(num(a, "tipo_traslado") ?? 1) : null,
+        tipo_despacho: tipo === 52 ? num(a, "tipo_despacho") : null,
+        sale_uid: null,
+      });
+      dataChanged();
+      return text(`Timbrado y firmado (aún NO enviado al SII):\n${siiLine(d)}\nPara enviarlo usa enviar_documentos_sii con «${d.tipo}-${d.folio}», después de que la persona lo confirme.`);
+    }
+    case "enviar_documentos_sii": {
+      const refs = Array.isArray(a.documentos) ? (a.documentos as unknown[]).map(String) : [];
+      const docs: SiiDocument[] = [];
+      for (const r of refs) docs.push(await findSiiDoc(backend, r));
+      const ya = docs.filter((d) => d.estado !== "firmado");
+      if (ya.length) throw new Error(`Ya fueron enviados: ${ya.map((d) => `${d.tipo}-${d.folio}`).join(", ")}.`);
+      const out = await backend.siiSend(docs.map((d) => d.id));
+      dataChanged();
+      const sent = out.filter((d) => docs.some((x) => x.id === d.id));
+      return text(`Enviado al SII (track id ${sent[0]?.track_id ?? "?"}):\n${sent.map(siiLine).join("\n")}\nConsulta el estado en unos minutos con consultar_estado_sii.`);
+    }
+    case "consultar_estado_sii": {
+      const d = await findSiiDoc(backend, str(a, "documento"));
+      if (!d.track_id) throw new Error(`${d.tipo}-${d.folio} aún no se envía al SII.`);
+      const out = await backend.siiCheck(d.id);
+      dataChanged();
+      const same = out.filter((x) => x.track_id === d.track_id);
+      return text(`Estado del envío ${d.track_id}:\n${same.map(siiLine).join("\n")}`);
     }
     case "registrar_cobro": {
       const s = await findSale(backend, str(a, "venta"), "por_cobrar");

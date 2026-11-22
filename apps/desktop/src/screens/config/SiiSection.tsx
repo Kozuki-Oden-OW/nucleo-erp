@@ -1,15 +1,17 @@
 // Configuración → Facturación SII: datos del emisor ante el SII, certificado digital (.pfx), folios
-// (CAF) y prueba de conexión. La emisión desde las ventas llega en la fase F6
-// (docs/SII_FACTURACION_PROPIA.md); por ahora se prepara todo lo necesario para la certificación.
+// (CAF), prueba de conexión y documentos: timbrar y firmar (Nuevo documento), enviar al SII (con
+// confirmación, es irreversible), consultar estado y guardar el XML. La emisión desde cada venta llega
+// en la fase F6 (docs/SII_FACTURACION_PROPIA.md).
 import { useCallback, useEffect, useState } from "react";
 import { open as openFile } from "@tauri-apps/plugin-dialog";
-import { BadgeCheck, FileKey2, FileText, PlugZap, Save, Upload } from "lucide-react";
+import { BadgeCheck, FileCode2, FileKey2, FilePlus2, FileText, PlugZap, RefreshCw, Save, Send, Upload } from "lucide-react";
 import { errorMessage, useBackend, type SiiAmbiente, type SiiDocument, type SiiFolios, type SiiSetup, type SiiStatus } from "../../data";
 import { formatCLP, formatDate } from "../../lib/format";
 import { useSession } from "../../lib/session";
-import { Badge, Button, Card, Field, Notice, Segmented, Spinner } from "../../ui/kit";
+import { Badge, Button, Card, Field, IconButton, Notice, Segmented, Spinner } from "../../ui/kit";
 import { DataTable, type Column } from "../../ui/table";
-import { useToast } from "../../ui/overlay";
+import { Dialog, useToast } from "../../ui/overlay";
+import { SiiIssueDialog } from "./SiiIssueDialog";
 
 const ESTADO: Record<SiiDocument["estado"], { label: string; tone: "neutral" | "info" | "success" | "warning" | "danger" }> = {
   firmado: { label: "Firmado", tone: "neutral" },
@@ -42,6 +44,8 @@ export function SiiSection() {
   const [actecos, setActecos] = useState("");
   const [certPath, setCertPath] = useState<string | null>(null);
   const [password, setPassword] = useState("");
+  const [issuing, setIssuing] = useState(false);
+  const [toSend, setToSend] = useState<SiiDocument[] | null>(null);
 
   const apply = useCallback((s: SiiStatus) => {
     setSt(s);
@@ -84,6 +88,22 @@ export function SiiSection() {
     toast("success", "Folios cargados.");
   });
   const test = () => run("test", async () => { toast("success", await backend.siiTestConnection()); });
+  const send = () => run("send", async () => {
+    if (!toSend?.length) return;
+    const ids = toSend.map((d) => d.id);
+    const out = await backend.siiSend(ids);
+    setDocs(out); setToSend(null);
+    const track = out.find((d) => d.id === ids[0])?.track_id;
+    toast("success", `Enviado al SII${track ? ` (track id ${track})` : ""}. Consulta el estado en unos minutos.`);
+  });
+  const check = (d: SiiDocument) => run(`chk${d.id}`, async () => {
+    const out = await backend.siiCheck(d.id);
+    setDocs(out);
+    const n = out.find((x) => x.id === d.id);
+    if (n) toast(n.estado === "rechazado" ? "danger" : n.estado === "reparos" ? "warning" : "info", `${n.tipo_nombre} N° ${n.folio}: ${ESTADO[n.estado].label}${n.glosa ? ` — ${n.glosa}` : ""}`);
+  });
+  const exportXml = (d: SiiDocument) => run(`xml${d.id}`, async () => { if (await backend.siiExportXml(d)) toast("success", "XML guardado."); });
+  const firmados = docs.filter((d) => d.estado === "firmado" && d.ambiente === st.ambiente);
 
   const ready = st.faltantes.length === 0;
   const ambLabel = st.ambiente === "certificacion" ? "certificación (maullin)" : "producción (palena)";
@@ -100,6 +120,14 @@ export function SiiSection() {
     { key: "rec", header: "Receptor", width: "minmax(8rem,1fr)", render: (d) => <span className="truncate" title={d.receptor_rut}>{d.receptor}</span> },
     { key: "total", header: "Total", align: "right", width: "6.5rem", render: (d) => formatCLP(d.total_minor) },
     { key: "estado", header: "Estado", width: "8rem", render: (d) => <span title={d.glosa ?? undefined}><Badge tone={ESTADO[d.estado].tone}>{ESTADO[d.estado].label}</Badge></span> },
+    { key: "track", header: "Track id", width: "7rem", render: (d) => <span className="text-xs text-muted tabular-nums">{d.track_id ?? "—"}</span> },
+    { key: "acc", header: "", width: "9.5rem", align: "right", render: (d) => (
+      <div className="flex justify-end gap-1">
+        {d.estado === "firmado" && <Button size="sm" variant="secondary" icon={Send} onClick={() => setToSend([d])} disabled={!!busy}>Enviar</Button>}
+        {d.track_id && d.estado !== "aceptado" && <Button size="sm" variant="secondary" icon={RefreshCw} onClick={() => check(d)} disabled={!!busy}>{busy === `chk${d.id}` ? "…" : "Estado"}</Button>}
+        <IconButton icon={FileCode2} label="Guardar XML firmado" onClick={() => exportXml(d)} />
+      </div>
+    ) },
   ];
 
   return (
@@ -178,11 +206,30 @@ export function SiiSection() {
         </div>
       </Card>
 
-      {docs.length > 0 && (
-        <Card title="Documentos emitidos" subtitle="Timbrados y firmados por NÚCLEO, con su estado en el SII." actions={<Badge icon={FileText}>{docs.length}</Badge>}>
-          <DataTable label="Documentos emitidos" rows={docs} columns={docCols} rowKey={(d) => String(d.id)} />
+      {(ready || docs.length > 0) && (
+        <Card title="Documentos" subtitle="Timbrados y firmados por NÚCLEO, con su estado en el SII. Firmar no envía: el envío al SII es aparte y no se puede deshacer."
+          actions={<div className="flex items-center gap-2">
+            <Badge icon={FileText}>{docs.length}</Badge>
+            {firmados.length > 1 && <Button size="sm" variant="secondary" icon={Send} onClick={() => setToSend(firmados)} disabled={!!busy}>Enviar firmados ({firmados.length})</Button>}
+            {ready && can("ventas.documentar") && <Button size="sm" icon={FilePlus2} onClick={() => setIssuing(true)}>Nuevo documento</Button>}
+          </div>}>
+          {docs.length ? <DataTable label="Documentos emitidos" rows={docs} columns={docCols} rowKey={(d) => String(d.id)} maxHeight="28rem" /> : <p className="text-sm text-muted">Aún no hay documentos.</p>}
         </Card>
       )}
+
+      <SiiIssueDialog open={issuing} onClose={() => setIssuing(false)} folios={st.folios} ambiente={st.ambiente}
+        onIssued={(d) => { setIssuing(false); toast("success", `${d.tipo_nombre} N° ${d.folio} firmada por ${formatCLP(d.total_minor)}. Revísala y envíala al SII.`); void load(); }} />
+
+      <Dialog open={!!toSend} onClose={() => setToSend(null)} title="¿Enviar al SII?"
+        footer={<><Button variant="ghost" onClick={() => setToSend(null)}>Cancelar</Button><Button icon={Send} onClick={send} disabled={!!busy}>{busy === "send" ? "Enviando…" : "Enviar al SII"}</Button></>}>
+        <div className="flex flex-col gap-3 text-sm">
+          <p>Se enviará{toSend && toSend.length > 1 ? "n" : ""} a <strong>{ambLabel}</strong> en un solo sobre firmado con tu certificado:</p>
+          <ul className="flex flex-col gap-1">
+            {toSend?.map((d) => <li key={d.id} className="flex justify-between gap-3"><span>{d.tipo_nombre} N° {d.folio} · {d.receptor} ({d.receptor_rut})</span><span className="tabular-nums">{formatCLP(d.total_minor)}</span></li>)}
+          </ul>
+          <Notice tone="warning">Un documento enviado al SII no se puede borrar: si tiene un error se corrige con una nota de crédito.{st.ambiente === "certificacion" ? " En certificación no tiene efecto tributario." : ""}</Notice>
+        </div>
+      </Dialog>
     </div>
   );
 }

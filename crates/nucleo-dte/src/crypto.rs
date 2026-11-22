@@ -17,6 +17,14 @@ pub const RSA_SHA1: &str = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
 pub const SHA1: &str = "http://www.w3.org/2000/09/xmldsig#sha1";
 pub const ENVELOPED: &str = "http://www.w3.org/2000/09/xmldsig#enveloped-signature";
 
+/// Carga (una vez) el proveedor «legacy» de OpenSSL junto al predeterminado, para leer .pfx cifrados
+/// con RC2-40 o 3DES (formato antiguo, muy usado por los proveedores y por Windows).
+pub fn load_legacy() {
+    static LEGACY: std::sync::OnceLock<Option<openssl::provider::Provider>> =
+        std::sync::OnceLock::new();
+    LEGACY.get_or_init(|| openssl::provider::Provider::try_load(None, "legacy", true).ok());
+}
+
 /// Certificado del firmante con su llave privada.
 pub struct Certificate {
     key: PKey<Private>,

@@ -22,7 +22,7 @@ import type {
   PermissionRow, PriceHistoryRow, Product, ProductCategory, ProductPatch, PurchaseDetail, PurchaseInput, PurchaseOrderDetail, PurchaseOrderInput,
   PurchaseOrderSummary, PurchaseSummary, ReceiveLine, NewSupplier, Supplier, SupplierDetail, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow,
   SaleDetail, SaleInput, SaleSummary, SearchHit, SecuritySettings, SequenceRow, SessionInfo, UserPatch, UserRow,
-  SiiDocument, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
+  SiiDocument, SiiIssueInput, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
 } from "./types";
 
 /** Archivo elegido para adjuntar: ruta en el escritorio o archivo del navegador en la demostración. */
@@ -173,6 +173,14 @@ export interface Backend {
   /** Pide semilla y token al SII con el certificado (no emite nada). */
   siiTestConnection(): Promise<string>;
   siiDocuments(limit?: number): Promise<SiiDocument[]>;
+  /** Timbra y firma un documento con el siguiente folio (no lo envía al SII). */
+  siiIssue(input: SiiIssueInput): Promise<SiiDocument>;
+  /** Envía al SII los documentos firmados (irreversible). */
+  siiSend(ids: number[]): Promise<SiiDocument[]>;
+  /** Consulta en el SII el estado del envío de ese documento. */
+  siiCheck(id: number): Promise<SiiDocument[]>;
+  /** Guarda el XML firmado donde la persona elija; false si cancela. */
+  siiExportXml(doc: SiiDocument): Promise<boolean>;
   pendingDispatches(): Promise<PendingDispatch[]>;
   dispatchItems(id: number, qtyMilli: number, date?: string | null): Promise<PendingDispatch[]>;
   warehouseStock(warehouseUid: string): Promise<WarehouseStockRow[]>;

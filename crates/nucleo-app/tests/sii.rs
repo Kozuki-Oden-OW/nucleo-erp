@@ -120,6 +120,7 @@ fn factura() -> SiiIssueInput {
             codigo: None,
             razon: Some("CASO 1".into()),
         }],
+        descuentos_globales: vec![],
         forma_pago: Some(1),
         vencimiento: None,
         ind_traslado: None,

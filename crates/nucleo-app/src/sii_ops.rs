@@ -17,7 +17,10 @@ use crate::{AppError, AppResult};
 use nucleo_db::now_utc;
 use nucleo_dte::envio::{Caratula, envio_dte};
 use nucleo_dte::sii::{self, Ambiente, EstadoEnvio};
-use nucleo_dte::{Caf, Certificate, Detalle, Dte, DteError, Emisor, Receptor, Referencia, TipoDte};
+use nucleo_dte::{
+    Caf, Certificate, DescuentoGlobal, Detalle, Dte, DteError, Emisor, Receptor, Referencia,
+    TipoDte,
+};
 use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 
@@ -117,6 +120,8 @@ pub struct SiiIssueInput {
     pub detalle: Vec<Detalle>,
     #[serde(default)]
     pub referencias: Vec<Referencia>,
+    #[serde(default)]
+    pub descuentos_globales: Vec<DescuentoGlobal>,
     pub forma_pago: Option<u8>,
     pub vencimiento: Option<String>,
     pub ind_traslado: Option<u8>,
@@ -744,6 +749,7 @@ impl CompanySession {
             receptor: receptor.clone(),
             detalle: input.detalle.clone(),
             referencias: input.referencias.clone(),
+            descuentos_globales: input.descuentos_globales.clone(),
             tasa_iva_ppm: tasa,
         };
         let signed = dte.sign(&caf, &cert, &now)?;

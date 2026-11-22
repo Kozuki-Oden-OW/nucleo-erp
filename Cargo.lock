@@ -2335,6 +2335,7 @@ version = "0.7.1"
 dependencies = [
  "data-encoding",
  "openssl",
+ "openssl-src",
  "roxmltree",
  "serde",
  "serde_json",

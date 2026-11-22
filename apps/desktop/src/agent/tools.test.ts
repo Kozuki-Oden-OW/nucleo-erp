@@ -159,4 +159,29 @@ describe("Envíos con datos del courier (demostración)", () => {
     expect(txt(list)).toMatch(/1 envíos:.*Bluexpress 2480522914 · en_camino/s);
     expect((await runTool(b, "ver", "registrar_envio", { agencia: "X" })).isError).toBe(true);
   });
+
+  it("factura del SII: firma sin enviar, envía y consulta", async () => {
+    const b = new DemoBackend();
+    await b.siiSaveSetup({ ambiente: "certificacion", emisor: { giro: "Software", actecos: [620100], direccion: "Guardia Vieja 202", comuna: "Providencia", ciudad: "Santiago", sucursal: null, rut_envia: "" }, resolucion_fecha: "2026-11-22", resolucion_numero: 0 });
+    await b.siiLoadCertificate("demo.pfx", "1234");
+    await b.siiLoadCaf("demo.xml");
+    const e = await runTool(b, "completo", "emitir_documento_sii", {
+      tipo: 33, receptor: { rut: "76.123.456-0", razon_social: "Cliente de Prueba", giro: "Comercio", direccion: "Calle 1", comuna: "Santiago" },
+      lineas: [{ nombre: "Servicio", cantidad: 2, precio: 10000, descuento_pct: 10 }], referencias: [{ tipo: "SET", razon: "CASO 1-1" }],
+    });
+    expect(e.isError).toBeUndefined();
+    expect(txt(e)).toMatch(/33-1 .*\$21\.420 · firmado/);
+    expect((await runTool(b, "ver", "enviar_documentos_sii", { documentos: ["33-1"] })).isError).toBe(true);
+    const s = await runTool(b, "completo", "enviar_documentos_sii", { documentos: ["33-1"] });
+    expect(txt(s)).toMatch(/enviado/);
+    expect(txt(await runTool(b, "completo", "enviar_documentos_sii", { documentos: ["33-1"] }))).toMatch(/Ya fueron enviados/);
+    expect(txt(await runTool(b, "ver", "consultar_estado_sii", { documento: "33-1" }))).toMatch(/aceptado/);
+    const g = await runTool(b, "completo", "emitir_documento_sii", {
+      tipo: 33, receptor: { rut: "76.123.456-0", razon_social: "Cliente de Prueba", giro: "Comercio", direccion: "Calle 1", comuna: "Santiago" },
+      lineas: [{ nombre: "ITEM 1 AFECTO", cantidad: 100, precio: 1910 }, { nombre: "ITEM 2 AFECTO", cantidad: 43, precio: 1730 }, { nombre: "ITEM 3 SERVICIO EXENTO", cantidad: 2, precio: 6771, exento: true }],
+      descuento_global_pct: 7,
+    });
+    expect(txt(g)).toMatch(/33-2 .*\$307\.249/);
+    expect(txt(await runTool(b, "ver", "listar_documentos_sii", {}))).toMatch(/quedan 48/);
+  });
 });

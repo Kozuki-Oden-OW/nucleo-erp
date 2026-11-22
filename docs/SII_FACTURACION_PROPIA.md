@@ -29,11 +29,19 @@
 
 ## Lo que ya sabemos del SII
 
-- **Data Logger ya es emisor autorizado** (sistema gratuito). La postulación se hace una sola vez por
-  contribuyente: **no hay que postular de nuevo**. Se entra directo al ambiente de certificación:
-  sii.cl → Servicios online → Factura electrónica → Sistema de facturación de mercado → menú
-  Postulantes → Ambiente de certificación y prueba → Opciones para el postulante → Generación de set
-  de pruebas. ([FAQ SII](https://www.sii.cl/preguntas_frecuentes/factura_electronica/001_003_6529.htm))
+- **Corrección (22-11-2026, revisado en maullin):** Data Logger usa el **sistema gratuito del SII** y
+  **no está inscrito en Postulación** («el contribuyente no está inscrito en Postulación»; pedir folios
+  de certificación responde «no está autorizado»). La regla de «no postular de nuevo» del SII vale para
+  quien ya postuló alguna vez (software propio o de mercado). Hay que **postular**: sii.cl → Factura
+  electrónica → Sistema de facturación de mercado → Inscríbase aquí → Postule aquí
+  (`maullin.sii.cl/cvc_cgi/dte/pe_ingrut`), como representante legal con certificado.
+- **Aviso del SII al postular desde el sistema gratuito:** «al momento de autorizarse, perderá su calidad
+  de usuario activo del Sistema de Facturación SII»; recomienda respaldar los documentos antes de terminar
+  la certificación. Según ese texto, el sistema gratuito sigue activo durante las pruebas y el cambio ocurre
+  con la autorización final (después de la declaración de cumplimiento). **Pendiente:** confirmarlo con la
+  mesa de ayuda del SII antes de postular (el dueño no puede quedar sin facturar). No se envió la postulación.
+- Antes de la autorización final: respaldo completo del sistema gratuito (PDF y XML; faltan FE 43–81, FE 519,
+  NC 1–3, GD 7–9).
 - Quien entra: el **representante legal con certificado digital**; el usuario administrador de DTE
   debe ser empleado de la empresa (el representante puede nombrarse a sí mismo).
 - Documentos mínimos a certificar: **factura (33), nota de crédito (61) y nota de débito (56)**.
@@ -53,8 +61,8 @@
 |---|---|---|---|
 | F0 | Certificado digital vigente del representante (archivo .pfx/.p12 y su clave). Folios (CAF) de prueba descargados del ambiente de certificación | Kozuki | Certificado y CAF de prueba en el computador |
 | F1 ✅ | Núcleo técnico en Rust: XML del DTE (encabezado, detalle, referencias, descuentos), timbre electrónico (TED) firmado con la llave del CAF, firma XML del documento y del sobre (EnvioDTE) con el certificado. *Hecho el 22-11-2026 en `crates/nucleo-dte`; el código PDF417 pasa a F5* | Claude | Factura, exenta, guía, NC y sobre validan contra los XSD del SII; firmas verificadas con xmlsec |
-| F2 🟡 | Conexión con el SII: semilla → token con el certificado, envío del sobre al ambiente de certificación, consulta del estado (track id), control de folios. *Código listo el 22-11-2026 (`nucleo-app::sii_ops`, Configuración → Facturación SII), probado con un SII simulado; falta la prueba real en maullin con el certificado de Kozuki* | Claude (+ Kozuki carga certificado y CAF) | Un documento de prueba aceptado en certificación |
-| F3 | Pedir el **set de pruebas** y emitirlo desde NÚCLEO; luego el set de simulación (documentos parecidos a los reales) | Kozuki pide el set, Claude lo emite | Sets aprobados por el SII |
+| F2 🟡 | Conexión con el SII: semilla → token con el certificado, envío del sobre al ambiente de certificación, consulta del estado (track id), control de folios. *Código listo el 22-11-2026 (`nucleo-app::sii_ops`, Configuración → Facturación SII), probado con un SII simulado. **22-11-2026: semilla → token aceptado por maullin con el certificado de Kozuki (firma XML validada por el SII).** Falta postular (ver arriba) para obtener CAF de certificación y hacer un envío de prueba* | Claude (+ Kozuki carga certificado y CAF) | Un documento de prueba aceptado en certificación |
+| F3 🟡 | *22-11-2026: FAVOR SpA (78.477.921-1) postulada y aceptada; CAF de certificación 33 (1–50), 61 (1–10) y 56 (1–10); set básico obtenido (atención 5198396: 4 facturas, 3 NC, 1 ND; libro de ventas 5198397 y de compras 5198398). Pantalla y herramientas de Claude para emitir/enviar/consultar listas; descuento global agregado. Falta: libros de compra y venta (IECV)* Pedir el **set de pruebas** y emitirlo desde NÚCLEO; luego el set de simulación (documentos parecidos a los reales) | Kozuki pide el set, Claude lo emite | Sets aprobados por el SII |
 | F4 | Intercambio: recibir y responder documentos de otro contribuyente (acuse de recibo, aceptación o reclamo) | Claude | Intercambio aprobado |
 | F5 | PDF de la factura con el timbre (muestras impresas) y declaración de cumplimiento | Claude arma, Kozuki declara | Autorización para emitir con NÚCLEO |
 | F6 | En NÚCLEO: botón «Emitir en el SII» en cada venta (factura, nota de crédito al anular, guía), folios de producción, PDF guardado en el computador, envío del XML al cliente, venta documentada sola | Claude | Emisión real desde NÚCLEO |

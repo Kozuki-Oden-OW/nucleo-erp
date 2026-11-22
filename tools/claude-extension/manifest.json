@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "nucleo-erp",
   "display_name": "NÚCLEO ERP",
-  "version": "0.7.9",
+  "version": "0.8.0",
   "description": "Permite que Claude use NÚCLEO ERP en este computador: ve la pantalla, la recorre con su propio cursor y registra ventas, gastos, clientes y cobros.",
   "long_description": "Conecta Claude con NÚCLEO ERP, el sistema de gestión local y gratuito para pymes chilenas. NÚCLEO debe estar abierto con Configuración → Claude activado; ahí eliges si Claude solo mira, crea borradores o tiene acceso completo. La extensión solo se comunica con NÚCLEO dentro del mismo computador (127.0.0.1): los datos del negocio siguen guardados solo en tu equipo.",
   "author": {
@@ -139,6 +139,26 @@
     {
       "name": "registrar_envio",
       "description": "Crea o actualiza un envío con los datos que pide el courier (Bluexpress u otro): destinatario, dirección por partes, paquete (contenido, valor declarado, talla XS/S/M/L, peso y medidas, declaración de"
+    },
+    {
+      "name": "listar_documentos_sii",
+      "description": "Facturación electrónica propia (SII): ambiente (certificación/producción), qué falta para emitir, folios disponibles por tipo y los documentos timbrados con su estado en el SII (firmado, enviado, acep"
+    },
+    {
+      "name": "cargar_folios_sii",
+      "description": "Carga en NÚCLEO un archivo de folios (CAF) descargado del SII, indicando su ruta en el computador (ej. F:\\NUCLEO ERP\\Folios\\FoliosSII…xml). Valida que sea de esta empresa."
+    },
+    {
+      "name": "emitir_documento_sii",
+      "description": "Timbra y firma en NÚCLEO un documento tributario (33 factura, 34 exenta, 61 nota de crédito, 56 nota de débito, 52 guía) con el siguiente folio del CAF. Consume un folio pero NO lo envía al SII (eso e"
+    },
+    {
+      "name": "enviar_documentos_sii",
+      "description": "Envía al SII, en un sobre firmado, documentos ya timbrados (estado «firmado»). IRREVERSIBLE: solo úsala después de que la persona confirme en el chat la lista exacta de documentos a enviar. Devuelve e"
+    },
+    {
+      "name": "consultar_estado_sii",
+      "description": "Pregunta al SII el estado del envío de un documento ya enviado (por su track id) y lo actualiza en NÚCLEO: aceptado, con reparos o rechazado, con la glosa del SII."
     }
   ],
   "keywords": [

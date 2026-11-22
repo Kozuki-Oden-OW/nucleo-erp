@@ -1001,5 +1001,252 @@
       },
       "additionalProperties": false
     }
+  },
+  {
+    "name": "listar_documentos_sii",
+    "nivel": "ver",
+    "description": "Facturación electrónica propia (SII): ambiente (certificación/producción), qué falta para emitir, folios disponibles por tipo y los documentos timbrados con su estado en el SII (firmado, enviado, aceptado, con reparos, rechazado), track id y glosa.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "limite": {
+          "type": "integer",
+          "description": "Cuántos documentos mostrar (por defecto 30)",
+          "minimum": 1,
+          "maximum": 200
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "cargar_folios_sii",
+    "nivel": "completo",
+    "description": "Carga en NÚCLEO un archivo de folios (CAF) descargado del SII, indicando su ruta en el computador (ej. F:\\NUCLEO ERP\\Folios\\FoliosSII…xml). Valida que sea de esta empresa.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "ruta": {
+          "type": "string",
+          "description": "Ruta completa del .xml del CAF"
+        }
+      },
+      "required": [
+        "ruta"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "emitir_documento_sii",
+    "nivel": "completo",
+    "description": "Timbra y firma en NÚCLEO un documento tributario (33 factura, 34 exenta, 61 nota de crédito, 56 nota de débito, 52 guía) con el siguiente folio del CAF. Consume un folio pero NO lo envía al SII (eso es enviar_documentos_sii). Antes de usarla muestra a la persona el resumen (receptor, líneas, totales) y espera su confirmación.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "tipo": {
+          "type": "integer",
+          "enum": [
+            33,
+            34,
+            61,
+            56,
+            52
+          ]
+        },
+        "fecha": {
+          "type": "string",
+          "description": "AAAA-MM-DD; vacío = hoy"
+        },
+        "receptor": {
+          "type": "object",
+          "properties": {
+            "rut": {
+              "type": "string"
+            },
+            "razon_social": {
+              "type": "string"
+            },
+            "giro": {
+              "type": "string"
+            },
+            "direccion": {
+              "type": "string"
+            },
+            "comuna": {
+              "type": "string"
+            },
+            "ciudad": {
+              "type": "string"
+            },
+            "correo": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "rut",
+            "razon_social"
+          ],
+          "additionalProperties": false
+        },
+        "lineas": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 60,
+          "items": {
+            "type": "object",
+            "properties": {
+              "nombre": {
+                "type": "string",
+                "description": "Nombre del producto o servicio (máx. 80)"
+              },
+              "cantidad": {
+                "type": "number",
+                "description": "Por defecto 1",
+                "exclusiveMinimum": 0
+              },
+              "precio": {
+                "type": "number",
+                "description": "Precio unitario neto en pesos (sin IVA); omitir solo en notas que corrigen texto",
+                "minimum": 0
+              },
+              "descuento_pct": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "unidad": {
+                "type": "string"
+              },
+              "exento": {
+                "type": "boolean",
+                "description": "Línea exenta de IVA"
+              }
+            },
+            "required": [
+              "nombre"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "referencias": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tipo": {
+                "type": "string",
+                "description": "SET (caso del set de pruebas), 33, 34, 52, 56, 61, 801 (orden de compra), HES…"
+              },
+              "folio": {
+                "type": "string"
+              },
+              "fecha": {
+                "type": "string",
+                "description": "AAAA-MM-DD"
+              },
+              "codigo": {
+                "type": "integer",
+                "description": "Solo notas: 1 anula, 2 corrige texto, 3 corrige montos",
+                "enum": [
+                  1,
+                  2,
+                  3
+                ]
+              },
+              "razon": {
+                "type": "string",
+                "description": "Ej. «CASO 1234567-1» en el set de pruebas"
+              }
+            },
+            "required": [
+              "tipo"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "forma_pago": {
+          "type": "string",
+          "enum": [
+            "contado",
+            "credito",
+            "sin_costo"
+          ],
+          "default": "contado"
+        },
+        "vencimiento": {
+          "type": "string",
+          "description": "AAAA-MM-DD, si es a crédito"
+        },
+        "tipo_traslado": {
+          "type": "integer",
+          "description": "Guía: 1 venta, 2 venta por efectuar, 3 consignación, 4 entrega gratuita, 5 traslado interno, 6 otros, 7 devolución",
+          "minimum": 1,
+          "maximum": 7
+        },
+        "tipo_despacho": {
+          "type": "integer",
+          "description": "Guía: 1 receptor, 2 emisor a cliente, 3 emisor a otras instalaciones",
+          "enum": [
+            1,
+            2,
+            3
+          ]
+        },
+        "descuento_global_pct": {
+          "type": "number",
+          "description": "Descuento global en % sobre las líneas afectas",
+          "exclusiveMinimum": 0,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "tipo",
+        "receptor",
+        "lineas"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "enviar_documentos_sii",
+    "nivel": "completo",
+    "description": "Envía al SII, en un sobre firmado, documentos ya timbrados (estado «firmado»). IRREVERSIBLE: solo úsala después de que la persona confirme en el chat la lista exacta de documentos a enviar. Devuelve el track id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentos": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "description": "«tipo-folio», ej. 33-1, o el id interno"
+          },
+          "description": "Documentos a enviar"
+        }
+      },
+      "required": [
+        "documentos"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "consultar_estado_sii",
+    "nivel": "ver",
+    "description": "Pregunta al SII el estado del envío de un documento ya enviado (por su track id) y lo actualiza en NÚCLEO: aceptado, con reparos o rechazado, con la glosa del SII.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documento": {
+          "type": "string",
+          "description": "«tipo-folio», ej. 33-1, o el id interno"
+        }
+      },
+      "required": [
+        "documento"
+      ],
+      "additionalProperties": false
+    }
   }
 ]

@@ -14,7 +14,7 @@ pub mod xml;
 
 pub use caf::Caf;
 pub use crypto::Certificate;
-pub use dte::{Detalle, Dte, Emisor, Receptor, Referencia, SignedDte, TipoDte};
+pub use dte::{DescuentoGlobal, Detalle, Dte, Emisor, Receptor, Referencia, SignedDte, TipoDte};
 
 #[derive(Debug, thiserror::Error)]
 pub enum DteError {

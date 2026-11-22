@@ -6,7 +6,9 @@ use nucleo_dte::crypto::verify_sha1_pem;
 use nucleo_dte::dte::dte_scope;
 use nucleo_dte::envio::{Caratula, envio_dte};
 use nucleo_dte::xml::{El, from_latin1, from_rox, latin1};
-use nucleo_dte::{Caf, Certificate, Detalle, Dte, Emisor, Receptor, Referencia, TipoDte};
+use nucleo_dte::{
+    Caf, Certificate, DescuentoGlobal, Detalle, Dte, Emisor, Receptor, Referencia, TipoDte,
+};
 use openssl::asn1::Asn1Time;
 use openssl::bn::BigNum;
 use openssl::hash::{MessageDigest, hash};
@@ -121,6 +123,7 @@ fn factura(folio: u64) -> Dte {
             },
         ],
         referencias: vec![],
+        descuentos_globales: vec![],
         tasa_iva_ppm: 190_000,
     }
 }
@@ -357,4 +360,95 @@ fn guia_y_exenta() {
         &bytes,
     )
     .unwrap();
+}
+
+/// Caso 4 del set básico del SII: dos líneas afectas, una exenta y 7 % de descuento global sobre
+/// las afectas (DscRcgGlobal va entre el detalle y las referencias).
+#[test]
+fn descuento_global_set_basico() {
+    let (cert, _) = certificado();
+    let (caf33, _) = caf(33, 1, 10);
+    let mut f = factura(4);
+    let l = |n: &str, q: i64, p: i64, exento: bool| Detalle {
+        nombre: n.into(),
+        cantidad_milli: Some(q * 1000),
+        precio: Some(p),
+        monto: q * p,
+        exento,
+        ..Default::default()
+    };
+    f.detalle = vec![
+        l("ITEM 1 AFECTO", 100, 1910, false),
+        l("ITEM 2 AFECTO", 43, 1730, false),
+        l("ITEM 3 SERVICIO EXENTO", 2, 6771, true),
+    ];
+    f.descuentos_globales = vec![DescuentoGlobal {
+        glosa: Some("Descuento global ítemes afectos".into()),
+        porcentaje: Some(7.0),
+        ..Default::default()
+    }];
+    f.referencias = vec![Referencia {
+        tipo: "SET".into(),
+        folio: "4".into(),
+        fecha: "2026-11-22".into(),
+        codigo: None,
+        razon: Some("CASO 5198396-4".into()),
+    }];
+    let s = f.sign(&caf33, &cert, "2026-11-22T12:00:00").unwrap();
+    let t = &s.totales;
+    assert_eq!(
+        (t.neto, t.exento, t.iva, t.total),
+        (246_813, 13_542, 46_894, 307_249)
+    );
+    let xml = from_latin1(&s.to_document());
+    let (d, r) = (
+        xml.find("<DscRcgGlobal>").unwrap(),
+        xml.find("<Referencia>").unwrap(),
+    );
+    assert!(xml.rfind("</Detalle>").unwrap() < d && d < r);
+    assert!(xml.contains("<TpoMov>D</TpoMov><GlosaDR>Descuento global ítemes afectos</GlosaDR><TpoValor>%</TpoValor><ValorDR>7</ValorDR>"));
+    assert!(!xml.contains("IndExeDR"));
+}
+
+/// Un .pfx en el formato antiguo (certificado con RC2-40 y llave con 3DES), como los que entregan
+/// varios proveedores chilenos o exporta Windows: se lee con la clave correcta y una clave equivocada
+/// se informa como tal.
+#[test]
+fn pfx_formato_antiguo() {
+    use openssl::nid::Nid;
+    nucleo_dte::crypto::load_legacy();
+    let key = PKey::from_rsa(Rsa::generate(2048).unwrap()).unwrap();
+    let mut name = X509NameBuilder::new().unwrap();
+    name.append_entry_by_text("CN", "PERSONA ANTIGUA").unwrap();
+    let name = name.build();
+    let mut b = X509::builder().unwrap();
+    b.set_version(2).unwrap();
+    b.set_serial_number(&BigNum::from_u32(9).unwrap().to_asn1_integer().unwrap())
+        .unwrap();
+    b.set_subject_name(&name).unwrap();
+    b.set_issuer_name(&name).unwrap();
+    b.set_pubkey(&key).unwrap();
+    b.set_not_before(&Asn1Time::days_from_now(0).unwrap())
+        .unwrap();
+    b.set_not_after(&Asn1Time::days_from_now(30).unwrap())
+        .unwrap();
+    b.sign(&key, MessageDigest::sha256()).unwrap();
+    let der = Pkcs12::builder()
+        .name("antiguo")
+        .pkey(&key)
+        .cert(&b.build())
+        .key_algorithm(Nid::PBE_WITHSHA1AND3_KEY_TRIPLEDES_CBC)
+        .cert_algorithm(Nid::PBE_WITHSHA1AND40BITRC2_CBC)
+        .mac_md(MessageDigest::sha1())
+        .build2("1234")
+        .unwrap()
+        .to_der()
+        .unwrap();
+    let c = Certificate::from_pkcs12(&der, "1234").unwrap();
+    assert_eq!(c.subject().0.as_deref(), Some("PERSONA ANTIGUA"));
+    let e = Certificate::from_pkcs12(&der, "9999")
+        .err()
+        .unwrap()
+        .to_string();
+    assert!(e.contains("clave del certificado no es correcta"), "{e}");
 }

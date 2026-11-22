@@ -23,7 +23,7 @@ import type {
   PurchaseSummary, ReceiveLine, NewSupplier, Supplier, SupplierDetail, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow, SaleDetail, SaleInput,
   SaleSummary, SearchHit,
   SecuritySettings, SequenceRow, SessionInfo, UserPatch, UserRow,
-  SiiDocument, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
+  SiiDocument, SiiIssueInput, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
 } from "./types";
 
 interface CommandError { code: string; message: string }
@@ -170,6 +170,15 @@ export class TauriBackend implements Backend {
   siiLoadCaf(path: string) { return call<SiiStatus>("sii_load_caf", { path }); }
   siiTestConnection() { return call<string>("sii_test_connection"); }
   siiDocuments(limit?: number) { return call<SiiDocument[]>("sii_documents", { limit: limit ?? null }); }
+  siiIssue(input: SiiIssueInput) { return call<SiiDocument>("sii_issue", { input }); }
+  siiSend(ids: number[]) { return call<SiiDocument[]>("sii_send", { ids }); }
+  siiCheck(id: number) { return call<SiiDocument[]>("sii_check", { id }); }
+  async siiExportXml(doc: SiiDocument): Promise<boolean> {
+    const path = await save({ defaultPath: `DTE-${doc.tipo}-${doc.folio}.xml`, title: "Guardar el XML firmado", filters: [{ name: "XML", extensions: ["xml"] }] });
+    if (!path) return false;
+    await call<void>("sii_export_xml", { id: doc.id, path });
+    return true;
+  }
   pendingDispatches() { return call<PendingDispatch[]>("pending_dispatches"); }
   dispatchItems(id: number, qtyMilli: number, date?: string | null) { return call<PendingDispatch[]>("dispatch_items", { id, qtyMilli, date: date ?? null }); }
   warehouseStock(warehouseUid: string) { return call<WarehouseStockRow[]>("warehouse_stock", { warehouseUid }); }

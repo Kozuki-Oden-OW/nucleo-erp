@@ -102,6 +102,29 @@ pub struct Referencia {
     pub razon: Option<String>,
 }
 
+/// Descuento o recargo global (DscRcgGlobal): se aplica sobre la suma de las líneas afectas (o exentas).
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct DescuentoGlobal {
+    /// true = recargo; false = descuento.
+    pub recargo: bool,
+    pub glosa: Option<String>,
+    /// Porcentaje (con hasta 2 decimales); si no viene, se usa `monto`.
+    pub porcentaje: Option<f64>,
+    pub monto: Option<i64>,
+    /// Aplica a las líneas exentas en vez de las afectas.
+    pub exento: bool,
+}
+
+impl DescuentoGlobal {
+    fn valor(&self, base: i64) -> i64 {
+        match self.porcentaje.filter(|p| *p > 0.0) {
+            Some(p) => (base as f64 * p / 100.0).round() as i64,
+            None => self.monto.unwrap_or(0),
+        }
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Dte {
     pub tipo: TipoDte,
@@ -119,6 +142,8 @@ pub struct Dte {
     pub receptor: Receptor,
     pub detalle: Vec<Detalle>,
     pub referencias: Vec<Referencia>,
+    #[serde(default)]
+    pub descuentos_globales: Vec<DescuentoGlobal>,
     /// Tasa de IVA en partes por millón (de la configuración de la empresa; no está en el código).
     pub tasa_iva_ppm: i64,
 }
@@ -155,6 +180,21 @@ impl Dte {
             .filter(|d| d.exento || exento_doc)
             .map(|d| d.monto)
             .sum();
+        let ajuste = |base: i64, exe: bool| -> i64 {
+            self.descuentos_globales
+                .iter()
+                .filter(|g| g.exento == exe)
+                .map(|g| {
+                    if g.recargo {
+                        g.valor(base)
+                    } else {
+                        -g.valor(base)
+                    }
+                })
+                .sum::<i64>()
+        };
+        let neto = neto + ajuste(neto, false);
+        let exento = exento + ajuste(exento, true);
         let iva = if neto > 0 {
             let n = neto as i128 * self.tasa_iva_ppm as i128;
             ((n + 500_000) / 1_000_000) as i64
@@ -220,6 +260,17 @@ impl Dte {
             && self.detalle.iter().any(|d| !d.exento)
         {
             return v("falta la tasa de IVA de la empresa");
+        }
+        if self.descuentos_globales.len() > 20 {
+            return v("hasta 20 descuentos o recargos globales");
+        }
+        if self.descuentos_globales.iter().any(|g| {
+            g.porcentaje.is_some_and(|p| !(0.0..=100.0).contains(&p))
+                || g.monto.is_some_and(|m| m < 0)
+        }) {
+            return v(
+                "el descuento global debe ser un porcentaje entre 0 y 100 o un monto positivo",
+            );
         }
         if self.forma_pago == Some(2) && self.vencimiento.is_none() {
             return v("una venta a crédito necesita la fecha de vencimiento");
@@ -320,6 +371,26 @@ impl Dte {
             .collect()
     }
 
+    fn globales_el(&self) -> Vec<El> {
+        self.descuentos_globales
+            .iter()
+            .enumerate()
+            .map(|(i, g)| {
+                let (tv, v) = match g.porcentaje.filter(|p| *p > 0.0) {
+                    Some(p) => ("%", format!("{}", (p * 100.0).round() / 100.0)),
+                    None => ("$", g.monto.unwrap_or(0).to_string()),
+                };
+                El::new("DscRcgGlobal")
+                    .child(El::text("NroLinDR", (i + 1).to_string()))
+                    .child(El::text("TpoMov", if g.recargo { "R" } else { "D" }))
+                    .opt("GlosaDR", g.glosa.clone().map(|x| clip(&x, 45)))
+                    .child(El::text("TpoValor", tv))
+                    .child(El::text("ValorDR", v))
+                    .opt("IndExeDR", g.exento.then(|| "1".to_string()))
+            })
+            .collect()
+    }
+
     fn referencias_el(&self) -> Vec<El> {
         self.referencias
             .iter()
@@ -381,6 +452,9 @@ impl Dte {
             .child(self.encabezado(&t));
         for d in self.detalle_el() {
             doc.push(d);
+        }
+        for g in self.globales_el() {
+            doc.push(g);
         }
         for r in self.referencias_el() {
             doc.push(r);
