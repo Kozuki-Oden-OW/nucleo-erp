@@ -1457,3 +1457,59 @@ export interface HistoricalSale {
 }
 export interface HistoricalResult { number: string; status: "importada" | "actualizada" | "ya_existia" | "error"; sale_uid: string | null; sale_number: string | null; message: string | null }
 export interface HistoricalReport { imported: number; updated?: number; skipped: number; errors: number; customers_created: number; results: HistoricalResult[] }
+
+/* ───────────── Integraciones: Mercado Libre ───────────── */
+
+export interface MlStatus {
+  configured: boolean;
+  connected: boolean;
+  client_id: string | null;
+  redirect_uri: string;
+  has_secret: boolean;
+  user_id: string | null;
+  nickname: string | null;
+  connected_at: string | null;
+  last_sync_at: string | null;
+}
+
+export interface MlBilling {
+  doc_type: string | null;
+  doc_number: string | null;
+  name: string | null;
+  business_name: string | null;
+  activity: string | null;
+  address: string | null;
+  commune: string | null;
+  city: string | null;
+  region: string | null;
+}
+
+export interface MlOrderRow {
+  order_id: string;
+  pack_id: string | null;
+  sale_uid: string | null;
+  sale_number: string | null;
+  sale_state: string | null;
+  date_created: string;
+  buyer: string | null;
+  ml_status: string;
+  /** «importada», «por_revisar» o «cancelada». */
+  status: "importada" | "por_revisar" | "cancelada";
+  total_minor: number;
+  sale_fee_minor: number;
+  shipping_cost_minor: number;
+  net_minor: number;
+  needs_invoice: boolean;
+  billing: MlBilling | null;
+  issue: string | null;
+}
+
+export interface MlSyncReport {
+  imported: number;
+  to_review: number;
+  completed: number;
+  cancelled: number;
+  unchanged: number;
+  to_invoice: number;
+  messages: string[];
+}

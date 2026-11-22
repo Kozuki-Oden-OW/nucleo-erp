@@ -4,7 +4,7 @@
 import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "../backend";
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
-  AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
+  MlBilling, MlOrderRow, MlStatus, MlSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput, StatementLineView, BankSuggestion,
   F22Inputs, F22View,
@@ -1767,6 +1767,113 @@ export class DemoBackend implements Backend {
     p.archived = true; p.active = false;
     this.log("promocion.eliminar", "promocion", p.name);
     return this.promotions();
+  }
+
+  /* ───────────── Mercado Libre (simulado) ───────────── */
+
+  private ml = {
+    clientId: "", secret: false, redirect: "https://www.nucleoerp.cl/ml/", connected: false, nickname: null as string | null,
+    connectedAt: null as string | null, lastSync: null as string | null, pending: false,
+    orders: [] as MlOrderRow[], links: new Map<string, string>(),
+  };
+
+  async mlStatus(): Promise<MlStatus> {
+    const m = this.ml;
+    return wait({ configured: !!m.clientId && m.secret, connected: m.connected, client_id: m.clientId || null, redirect_uri: m.redirect, has_secret: m.secret,
+      user_id: m.connected ? "123456789" : null, nickname: m.nickname, connected_at: m.connectedAt, last_sync_at: m.lastSync });
+  }
+  async mlSaveApp(clientId: string, clientSecret: string, redirectUri?: string | null): Promise<MlStatus> {
+    this.require("config.editar");
+    const id = clientId.trim();
+    if (!/^\d{1,40}$/.test(id)) throw new AppError("validacion", "El App ID de Mercado Libre es un número (lo ves en developers.mercadolibre.cl → Mis aplicaciones).");
+    if (id !== this.ml.clientId) Object.assign(this.ml, { connected: false, nickname: null, connectedAt: null, secret: false });
+    this.ml.clientId = id;
+    if (clientSecret.trim()) this.ml.secret = true;
+    if (!this.ml.secret) throw new AppError("validacion", "Falta la clave secreta de la aplicación.");
+    const r = (redirectUri ?? "").trim();
+    if (r) {
+      if (!r.startsWith("https://")) throw new AppError("validacion", "La dirección de retorno debe empezar con https://.");
+      this.ml.redirect = r;
+    }
+    this.log("integracion.editar", "integracion", "mercadolibre");
+    return this.mlStatus();
+  }
+  async mlConnect(): Promise<string> {
+    if (!this.ml.clientId || !this.ml.secret) throw new AppError("validacion", "Primero guarda el App ID y la clave secreta de tu aplicación.");
+    this.ml.pending = true;
+    return wait(`https://auth.mercadolibre.cl/authorization?response_type=code&client_id=${this.ml.clientId}&redirect_uri=${encodeURIComponent(this.ml.redirect)}&state=demo`);
+  }
+  private mlDone(): Promise<MlStatus> {
+    Object.assign(this.ml, { connected: true, nickname: "VENDEDOR_DEMO", connectedAt: new Date().toISOString(), pending: false });
+    this.log("integracion.conectar", "integracion", "mercadolibre");
+    return this.mlStatus();
+  }
+  async mlWait(): Promise<MlStatus> {
+    if (!this.ml.pending) throw new AppError("validacion", "Primero presiona «Conectar».");
+    return this.mlDone();
+  }
+  async mlFinish(input: string): Promise<MlStatus> {
+    if (!input.trim()) throw new AppError("validacion", "Pega el código que te mostró la página.");
+    return this.mlDone();
+  }
+  async mlDisconnect(): Promise<MlStatus> {
+    Object.assign(this.ml, { connected: false, nickname: null, connectedAt: null });
+    return this.mlStatus();
+  }
+  async mlOrders(limit = 200): Promise<MlOrderRow[]> {
+    return wait(this.ml.orders.map((o) => {
+      const s = o.sale_uid ? this.sales.find((x) => x.uid === o.sale_uid) : undefined;
+      return { ...o, sale_number: s?.number ?? null, sale_state: s?.commercial_state ?? null };
+    }).sort((a, b) => b.date_created.localeCompare(a.date_created) || b.order_id.localeCompare(a.order_id)).slice(0, limit));
+  }
+  async mlLinkItem(itemId: string, variationId: string | null, productUid: string): Promise<void> {
+    if (!this.products.some((p) => p.uid === productUid)) throw new AppError("no_encontrado", "No encontramos el producto.");
+    this.ml.links.set(`${itemId.trim().toUpperCase()}|${variationId ?? ""}`, productUid);
+    return wait(undefined);
+  }
+  /** Pedidos de ejemplo: uno con SKU conocido y otro de una publicación sin enlazar que pide factura. */
+  async mlSync(): Promise<MlSyncReport> {
+    if (!this.ml.connected) throw new AppError("validacion", "Mercado Libre no está conectado: Configuración → Integraciones.");
+    this.require("ventas.crear");
+    const goods = this.products.filter((p) => p.kind === "producto");
+    const tax = this.taxPpm() ?? 0;
+    const net = (g: number) => Math.round((g * 1_000_000) / (1_000_000 + tax));
+    const incoming = [
+      { id: "2000009123", item: "MLC-DEMO-1", title: goods[0]?.name ?? "Producto", sku: goods[0]?.sku ?? null, qty: 1, price: 27_900, fee: 3_906, ship: 3_000, buyer: "Ana Pérez", billing: null as MlBilling | null },
+      { id: "2000009124", item: "MLC-DEMO-2", title: "Publicación sin enlazar", sku: null, qty: 2, price: 9_990, fee: 1_399, ship: 0, buyer: "Comercial Sur SpA",
+        billing: { doc_type: "RUT", doc_number: "76123456-0", name: null, business_name: "Comercial Sur SpA", activity: "Venta al por menor", address: "Merced 838", commune: "Santiago", city: "Santiago", region: null } },
+    ];
+    const r: MlSyncReport = { imported: 0, to_review: 0, completed: 0, cancelled: 0, unchanged: 0, to_invoice: 0, messages: [] };
+    for (const o of incoming) {
+      const known = this.ml.orders.find((x) => x.order_id === o.id);
+      if (known?.status === "importada") { r.unchanged++; continue; }
+      const product = this.ml.links.get(`${o.item}|`) ?? this.products.find((p) => o.sku && p.sku === o.sku)?.uid ?? null;
+      const invoice = !!o.billing?.business_name;
+      const customers = await this.searchCustomers(o.buyer);
+      const customer = customers.find((c) => c.name.toLowerCase() === o.buyer.toLowerCase()) ?? await this.addCustomer({ name: o.buyer, rut: o.billing?.doc_number ?? undefined, kind: o.billing ? "empresa" : "persona" } as NewCustomer);
+      const input: SaleInput = {
+        doc_type: invoice ? "FV" : "VEN", customer_uid: customer.uid, issue_date: this.today,
+        lines: [{ product_uid: product, description: o.title, qty_milli: o.qty * 1000, unit_price_minor: net(o.price), discount_ppm: 0, taxable: true }],
+        notes: `Mercado Libre · pedido ${o.id} · total ML $${o.price * o.qty} · comisión $${o.fee * o.qty} · envío vendedor $${o.ship}`,
+        terms: { ...EMPTY_TERMS, payment: "transferencia", references: [{ kind: "ML", folio: o.id, date: this.today, note: null }] },
+      };
+      const sale = known?.sale_uid ? await this.saveSale(input, known.sale_uid) : await this.saveSale(input);
+      let status: MlOrderRow["status"] = "por_revisar";
+      let issue: string | null = `Enlaza la publicación «${o.title}» (${o.item}) con un producto de NÚCLEO`;
+      if (product) {
+        try { await this.effectSale(sale.uid, { mode: "contado", method: "Transferencia", due_date: null }); status = "importada"; issue = null; }
+        catch (e) { issue = `No se pudo confirmar: ${(e as Error).message}`; }
+      }
+      const row: MlOrderRow = { order_id: o.id, pack_id: null, sale_uid: sale.uid, sale_number: null, sale_state: null, date_created: this.today, buyer: o.buyer, ml_status: "paid",
+        status, total_minor: o.price * o.qty, sale_fee_minor: o.fee * o.qty, shipping_cost_minor: o.ship, net_minor: o.price * o.qty - o.fee * o.qty - o.ship,
+        needs_invoice: invoice, billing: o.billing, issue };
+      this.ml.orders = [...this.ml.orders.filter((x) => x.order_id !== o.id), row];
+      if (invoice) r.to_invoice++;
+      if (status === "importada") { if (known) r.completed++; else r.imported++; }
+      else { r.to_review++; r.messages.push(`Pedido ${o.id}: ${issue}`); }
+    }
+    this.ml.lastSync = new Date().toISOString();
+    return r;
   }
 
   /* ───────────── Envíos ───────────── */

@@ -27,6 +27,8 @@ tempfile.workspace = true
 data-encoding.workspace = true
 argon2.workspace = true
 rust_decimal.workspace = true
+sha2.workspace = true
+ureq.workspace = true
 keyring = { workspace = true, optional = true, features = ["windows-native", "apple-native", "linux-native"] }
 
 [dev-dependencies]

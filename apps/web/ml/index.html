@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+  <meta charset="utf-8">
+  <title>Conectar Mercado Libre — NÚCLEO ERP</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <link rel="stylesheet" href="/assets/site.css?v={{ASSET_VERSION}}">
+</head>
+<body>
+  <main id="contenido" class="wrap">
+    <div class="prose">
+      <p class="eyebrow">Mercado Libre</p>
+      <h1 id="titulo">Conectando con NÚCLEO…</h1>
+      <p id="texto">Esta página devuelve a NÚCLEO ERP el código de autorización de Mercado Libre. No guarda ni envía nada a otro lugar.</p>
+      <p id="caja" hidden>Copia este código y pégalo en NÚCLEO (Configuración → Integraciones → Mercado Libre):<br>
+        <code id="codigo" style="font-size:1.1rem;user-select:all;word-break:break-all"></code></p>
+    </div>
+  </main>
+  <script>
+    // El código solo viaja a este mismo computador (127.0.0.1), donde NÚCLEO lo está esperando.
+    (function () {
+      var q = new URLSearchParams(location.search);
+      var code = q.get("code"), state = q.get("state") || "", err = q.get("error");
+      var t = document.getElementById("titulo"), x = document.getElementById("texto");
+      if (err || !code) { t.textContent = "No llegó el código"; x.textContent = "Mercado Libre no entregó la autorización. Vuelve a NÚCLEO y presiona «Conectar» de nuevo."; return; }
+      document.getElementById("codigo").textContent = code;
+      var port = /^(\d{4,5})\./.exec(state);
+      if (port && +port[1] > 1023 && +port[1] < 65536) {
+        // Si NÚCLEO no responde, al volver atrás queda visible el código para copiarlo.
+        t.textContent = "Volviendo a NÚCLEO…";
+        document.getElementById("caja").hidden = false;
+        location.assign("http://127.0.0.1:" + port[1] + "/ml?code=" + encodeURIComponent(code) + "&state=" + encodeURIComponent(state));
+      } else {
+        t.textContent = "Copia el código en NÚCLEO";
+        document.getElementById("caja").hidden = false;
+      }
+    })();
+  </script>
+</body>
+</html>

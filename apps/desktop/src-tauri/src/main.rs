@@ -5,6 +5,7 @@ mod agent;
 mod commands;
 #[cfg(test)]
 mod ipc_tests;
+mod ml;
 
 use nucleo_app::AppService;
 use nucleo_app::keys::OsKeyStore;
@@ -97,6 +98,15 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         commands::delete_promotion,
         commands::shipments,
         commands::save_shipment,
+        ml::ml_status,
+        ml::ml_save_app,
+        ml::ml_connect,
+        ml::ml_wait,
+        ml::ml_finish,
+        ml::ml_disconnect,
+        ml::ml_sync,
+        ml::ml_orders,
+        ml::ml_link_item,
         commands::pending_dispatches,
         commands::dispatch_items,
         commands::warehouse_stock,

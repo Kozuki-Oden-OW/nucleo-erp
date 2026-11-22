@@ -295,7 +295,7 @@ def main() -> int:
     pages = sorted(
         "/" + str(p.parent.relative_to(out)).replace("\\", "/").strip(".") + "/"
         for p in out.rglob("index.html")
-        if "demo" not in p.relative_to(out).parts[:1]
+        if p.relative_to(out).parts[:1] not in (("demo",), ("ml",))
     )
     pages = [p.replace("//", "/") for p in pages] + (["/demo/"] if args.demo else [])
     prio = lambda u: "1.0" if u == "/" else "0.9" if u in ("/descargar/", "/funciones/") else "0.8" if u.startswith("/funciones/") else "0.5"

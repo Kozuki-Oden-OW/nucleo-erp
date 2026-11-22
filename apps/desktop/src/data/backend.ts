@@ -7,7 +7,7 @@ import type {
   AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput,
-  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, Shipment, ShipmentInput, WarehouseStockRow,
+  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlOrderRow, MlStatus, MlSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
@@ -137,6 +137,19 @@ export interface Backend {
   deletePromotion(uid: string): Promise<Promotion[]>;
   shipments(saleUid?: string | null): Promise<Shipment[]>;
   saveShipment(uid: string | null, input: ShipmentInput): Promise<Shipment>;
+  // Mercado Libre (Configuración → Integraciones)
+  mlStatus(): Promise<MlStatus>;
+  mlSaveApp(clientId: string, clientSecret: string, redirectUri?: string | null): Promise<MlStatus>;
+  /** Abre Mercado Libre en el navegador y devuelve la dirección (para copiarla si no se abrió). */
+  mlConnect(): Promise<string>;
+  /** Espera a que el navegador vuelva con el código (hasta 5 minutos). */
+  mlWait(): Promise<MlStatus>;
+  /** Termina la conexión con el código o la dirección que pegó la persona. */
+  mlFinish(input: string): Promise<MlStatus>;
+  mlDisconnect(): Promise<MlStatus>;
+  mlSync(from?: string | null): Promise<MlSyncReport>;
+  mlOrders(limit?: number): Promise<MlOrderRow[]>;
+  mlLinkItem(itemId: string, variationId: string | null, productUid: string, title?: string | null): Promise<void>;
   pendingDispatches(): Promise<PendingDispatch[]>;
   dispatchItems(id: number, qtyMilli: number, date?: string | null): Promise<PendingDispatch[]>;
   warehouseStock(warehouseUid: string): Promise<WarehouseStockRow[]>;

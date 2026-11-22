@@ -7,7 +7,7 @@ import type {
   AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput,
-  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, Shipment, ShipmentInput, WarehouseStockRow,
+  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlOrderRow, MlStatus, MlSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
@@ -144,6 +144,15 @@ export class TauriBackend implements Backend {
   deletePromotion(uid: string) { return call<Promotion[]>("delete_promotion", { uid }); }
   shipments(saleUid?: string | null) { return call<Shipment[]>("shipments", { saleUid: saleUid ?? null }); }
   saveShipment(uid: string | null, input: ShipmentInput) { return call<Shipment>("save_shipment", { uid, input }); }
+  mlStatus() { return call<MlStatus>("ml_status"); }
+  mlSaveApp(clientId: string, clientSecret: string, redirectUri?: string | null) { return call<MlStatus>("ml_save_app", { clientId, clientSecret, redirectUri: redirectUri ?? null }); }
+  mlConnect() { return call<string>("ml_connect"); }
+  mlWait() { return call<MlStatus>("ml_wait"); }
+  mlFinish(input: string) { return call<MlStatus>("ml_finish", { input }); }
+  mlDisconnect() { return call<MlStatus>("ml_disconnect"); }
+  mlSync(from?: string | null) { return call<MlSyncReport>("ml_sync", { from: from ?? null }); }
+  mlOrders(limit?: number) { return call<MlOrderRow[]>("ml_orders", { limit: limit ?? null }); }
+  async mlLinkItem(itemId: string, variationId: string | null, productUid: string, title?: string | null) { await call<null>("ml_link_item", { itemId, variationId, productUid, title: title ?? null }); }
   pendingDispatches() { return call<PendingDispatch[]>("pending_dispatches"); }
   dispatchItems(id: number, qtyMilli: number, date?: string | null) { return call<PendingDispatch[]>("dispatch_items", { id, qtyMilli, date: date ?? null }); }
   warehouseStock(warehouseUid: string) { return call<WarehouseStockRow[]>("warehouse_stock", { warehouseUid }); }

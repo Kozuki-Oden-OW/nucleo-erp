@@ -12,6 +12,7 @@ pub mod customers;
 pub mod dispatch;
 pub mod f22;
 pub mod finance;
+pub mod integrations;
 pub mod inventory;
 pub mod maintenance;
 pub mod migrations;

@@ -550,7 +550,7 @@ impl CompanySession {
     }
 
     /// Cliente por RUT (o por nombre exacto si no trae RUT); si no existe, se crea con su ficha.
-    fn historical_customer(
+    pub(crate) fn historical_customer(
         &mut self,
         c: &HistoricalCustomer,
         created: &mut usize,

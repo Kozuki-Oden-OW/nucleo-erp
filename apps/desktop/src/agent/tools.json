@@ -826,5 +826,33 @@
       ],
       "additionalProperties": false
     }
+  },
+  {
+    "name": "sincronizar_mercadolibre",
+    "nivel": "completo",
+    "description": "Trae de Mercado Libre los pedidos pagados desde una fecha (por defecto los últimos 15 días) y los pasa a ventas de NÚCLEO: cada pedido o carrito queda como venta al contado que descuenta stock (producto por SKU del vendedor o publicación enlazada), con referencia ML. Los que piden factura quedan como factura con los datos del comprador; los que tienen una publicación sin producto o sin stock quedan en borrador por revisar. No duplica. Requiere Mercado Libre conectado en Configuración → Integraciones.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "desde": {
+          "type": "string",
+          "description": "AAAA-MM-DD (opcional)"
+        }
+      }
+    }
+  },
+  {
+    "name": "pedidos_mercadolibre",
+    "nivel": "ver",
+    "description": "Lista los pedidos de Mercado Libre ya vistos por NÚCLEO: fecha, comprador, total, comisión, envío, neto a recibir de Mercado Pago, estado (importada, por revisar, cancelada), si pide factura y la venta enlazada. Sirve para cuadrar los depósitos de Mercado Pago con el banco.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "limite": {
+          "type": "number",
+          "description": "Máximo de pedidos (por defecto 50)"
+        }
+      }
+    }
   }
 ]

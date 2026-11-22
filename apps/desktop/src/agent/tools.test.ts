@@ -118,3 +118,26 @@ describe("historial a crédito", () => {
     expect(txt(await runTool(b, "completo", "registrar_cobro", { venta: "FE-521", monto: 1140020, fecha: "2026-12-18" }))).toMatch(/Queda por cobrar \$0/);
   });
 });
+
+describe("Mercado Libre (demostración)", () => {
+  it("conecta, trae pedidos sin duplicar y deja por revisar lo que no tiene producto", async () => {
+    const b = new DemoBackend();
+    await expect(b.mlConnect()).rejects.toThrow(/App ID/);
+    await b.mlSaveApp("1234567890", "secreto");
+    await b.mlConnect();
+    expect((await b.mlWait()).connected).toBe(true);
+    const r = await runTool(b, "completo", "sincronizar_mercadolibre", {});
+    expect(txt(r)).toMatch(/ventas nuevas 1 · completadas 0 · por revisar 1 · por facturar 1/);
+    const again = await runTool(b, "completo", "sincronizar_mercadolibre", {});
+    expect(txt(again)).toMatch(/ventas nuevas 0 .* sin cambios 1/);
+    const orders = await b.mlOrders();
+    const review = orders.find((o) => o.status === "por_revisar")!;
+    expect(review.needs_invoice).toBe(true);
+    const [p] = await b.searchProducts("");
+    await b.mlLinkItem("MLC-DEMO-2", null, p!.uid);
+    const done = await b.mlSync();
+    expect(done.completed).toBe(1);
+    expect(txt(await runTool(b, "ver", "pedidos_mercadolibre", {}))).toMatch(/2 pedidos de Mercado Libre/);
+    expect((await runTool(b, "borradores", "sincronizar_mercadolibre", {})).isError).toBe(true);
+  });
+});

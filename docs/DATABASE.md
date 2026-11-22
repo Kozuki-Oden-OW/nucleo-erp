@@ -59,6 +59,10 @@ Todo es entero: las sumas y los reportes se hacen en SQL sin perder exactitud y 
 | 30 | `0030_ingresos_stock.sql` | Tipo de documento `ING` y tabla `stock_entries` («Agregar stock»): encabezado del ingreso con bodega, fecha, proveedor y documento de respaldo opcionales; los movimientos van a `stock_movements` como `entrada` con origen `ING` |
 | 31 | `0031_plan_de_cuentas.sql` | Plan de cuentas base (activo, pasivo, patrimonio, ingresos, costos y gastos; nombre contable y nombre Simple) para la contabilidad automática; índice de asientos por estado y fecha |
 | 32 | `0032_conciliacion_bancaria.sql` | Tablas `bank_statements` (cartolas subidas) y `bank_statement_lines` (movimientos con huella única por cuenta, estado pendiente/conciliado/ignorado y vínculo a un cobro/pago o traspaso) |
+| 33 | `0033_sincronizacion.sql` | Registro de cambios y estado de sincronización entre dispositivos (ver `docs/SINCRONIZACION.md`) |
+| 34 | `0034_ventas_historicas.sql` | `sales.historical`: ventas importadas como historial (documentos ya emitidos) |
+| 35 | `0035_historial_por_cobrar.sql` | Una venta histórica cerrada puede volver a efectuada para quedar por cobrar |
+| 36 | `0036_integraciones.sql` | `integrations` (configuración y tokens por proveedor), `ml_orders` (pedido de Mercado Libre → venta, estado, total, comisión, envío, facturación, aviso) y `ml_item_links` (publicación y variación → producto) |
 
 Las migraciones son transaccionales y versionadas con `PRAGMA user_version`. **Pre-1.0:** se pueden
 reescribir (en la Fase 2 se reemplazó la tabla mínima de clientes de la Fase 1); desde la primera beta

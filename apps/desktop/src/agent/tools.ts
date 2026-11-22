@@ -210,6 +210,19 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
       const r = await backend.listSales({ view, query: str(a, "texto") || undefined });
       return text(r.length ? `${r.length} ventas (${view}):\n${r.slice(0, 50).map(saleLine).join("\n")}${r.length > 50 ? "\n…" : ""}` : "No hay ventas en esa vista.");
     }
+    case "sincronizar_mercadolibre": {
+      const r = await backend.mlSync(str(a, "desde") || null);
+      return text([
+        `Mercado Libre: ventas nuevas ${r.imported} · completadas ${r.completed} · por revisar ${r.to_review} · por facturar ${r.to_invoice} · canceladas ${r.cancelled} · sin cambios ${r.unchanged}.`,
+        ...r.messages.map((m) => `- ${m}`),
+      ].join("\n"));
+    }
+    case "pedidos_mercadolibre": {
+      const r = (await backend.mlOrders(Math.min(Math.max(num(a, "limite") || 50, 1), 300)));
+      return text(r.length
+        ? `${r.length} pedidos de Mercado Libre:\n${r.map((o) => `- ${o.date_created} · ${o.pack_id ?? o.order_id} · ${o.buyer ?? "—"} · total ${pesos(o.total_minor)} · comisión ${pesos(o.sale_fee_minor)} · envío ${pesos(o.shipping_cost_minor)} · a recibir ${pesos(o.net_minor)} · ${o.status}${o.needs_invoice ? " · por facturar" : ""}${o.sale_number ? ` · ${o.sale_number}` : ""}${o.issue ? ` · ${o.issue}` : ""}`).join("\n")}`
+        : "Aún no hay pedidos de Mercado Libre en NÚCLEO.");
+    }
     case "listar_gastos": {
       const r = await backend.listExpenses({ from: str(a, "desde") || undefined, to: str(a, "hasta") || undefined, query: str(a, "texto") || undefined });
       return text(r.length
