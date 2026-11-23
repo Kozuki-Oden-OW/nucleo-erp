@@ -6,6 +6,7 @@
 > **Ampliado el 2026-11-22** (pedido del dueño: «que NÚCLEO pueda hacer todo desde el mismo lugar»):
 > envíos con varios couriers (I2), bancos solo lectura (I4), correo propio (I5) y una sola pantalla de
 > conexiones (I6).
+> **WooCommerce (I8) construido el 2026-11-23**, con su plugin de WordPress; falta probarlo en la tienda real.
 
 ## Principios que no cambian
 
@@ -144,7 +145,7 @@ adelante se vende NÚCLEO como servicio (con la facturación SII), las extension
 | Mercado Libre | Lista (falta el permiso de Mercado Libre para crear la app) |
 | Avisos de pago por correo (bancos) | Propuesta (ver I4) |
 | Bluexpress / Starken / Chilexpress / Correos | Esperando credenciales |
-| WooCommerce | Esperando llave REST |
+| WooCommerce | Lista (falta probar con la tienda real; plugin 0.1.0) |
 
 ## I4 · Bancos (solo lectura: saldos y movimientos)
 
@@ -329,6 +330,73 @@ se ofrece Telegram como alternativa gratuita a WhatsApp.
 2. **BCI:** crear el usuario de solo consulta y escribir la receta «descargar cartola».
 3. Motor del robot en el escritorio (perfil separado, recetas, pausas, registro) y pantalla
    Configuración → Integraciones → Robot.
+
+## I8 · WooCommerce (tienda propia)
+
+Pedido del dueño (23-11-2026): «revisar los datos de la venta y del cliente y anotarlos en NÚCLEO,
+revisar el stock y descontar, revisar el envío y anotarlo en Envíos para luego hacer la orden de
+transporte», más stock y precios desde NÚCLEO hacia la tienda, y un plugin que se encuentre al buscar
+«NÚCLEO ERP».
+
+### Conexión
+
+| Camino | Pasos |
+|---|---|
+| Con el plugin | WordPress → WooCommerce → **NÚCLEO ERP** → «Crear conexión». Muestra una sola vez un código (`nucleo-woo:…`) con la dirección y las llaves. Se pega en NÚCLEO → Configuración → Integraciones → WooCommerce |
+| Sin el plugin | WooCommerce → Ajustes → Avanzado → API REST → «Añadir clave» (lectura y escritura). En NÚCLEO se escriben la dirección, la clave del cliente (`ck_…`) y la clave secreta (`cs_…`) |
+
+Al conectar, NÚCLEO prueba las llaves contra la tienda y recién entonces las guarda (cifradas, en
+`integrations`). La interfaz solo muestra los últimos caracteres de la llave. Requisitos de la tienda:
+https y enlaces permanentes distintos de «Simple». El código y la clave secreta se escriben en campos de
+contraseña: Claude no puede escribirlos.
+
+### De la tienda a NÚCLEO («Sincronizar pedidos»)
+
+| Dato del pedido | En NÚCLEO |
+|---|---|
+| Estado «Procesando» o «Completado» | Venta al contado efectuada (medio según el pago: transferencia, tarjeta u otro), referencia «Pedido de internet» con el n.º del pedido. Un pedido = una venta |
+| Estado «En espera» o «Pendiente de pago» | No se registra (se cuenta como «esperando pago»); entra cuando se pague |
+| Cancelado, reembolsado o fallido después de importado | Aviso «anula la venta»: NÚCLEO no anula solo |
+| Líneas | Producto de NÚCLEO con el **mismo SKU**; cantidad; precio neto; descuento del cupón como % de la línea. Descuenta stock |
+| Montos | Si la tienda calcula impuestos, sus líneas ya vienen netas. Si no (`total_tax` = 0), se tratan como IVA incluido y se llevan a neto con la tasa de la empresa |
+| Envío cobrado y cargos | Línea «Envío <método>» y una línea por cargo |
+| Facturación (nombre, empresa, dirección, comuna, correo) | Cliente: por RUT si viene; si no, por nombre. Se crea con su correo y dirección |
+| Boleta o factura, RUT, razón social, giro (del plugin o de otros plugins de RUT) | Con factura y RUT válido: venta tipo factura «por facturar» con el receptor completo |
+| Dirección de despacho y método de envío | **Envío «no despachado»** unido a la venta: destinatario, teléfono, correo, calle, depto, comuna, región, courier (si el método lo nombra), servicio, contenido y valor declarado. «Retiro en tienda» no crea envío |
+| Nota del cliente, transacción | En las notas de la venta y del envío |
+
+Lo que no calza (producto sin el mismo SKU, otra moneda, stock insuficiente con bloqueo) deja la venta
+en **borrador por revisar** con el motivo; al corregirlo y sincronizar otra vez, la misma venta se
+confirma. Con «Anotar en el pedido de la tienda…» activado, NÚCLEO escribe en el pedido el dato
+`_nucleo_venta` con el número de la venta (el plugin lo muestra).
+
+### De NÚCLEO a la tienda («Revisar stock», «Revisar precios»)
+
+- Calza por SKU los productos simples y las variaciones. Muestra primero **qué cambiaría**; nada se
+  envía hasta confirmar. El botón de envío es solo para la persona (`data-agent-human`).
+- **Stock:** unidades disponibles = en bodega − reservado por despachar. Activa «gestionar inventario»
+  en el producto de la tienda.
+- **Precios:** el precio de lista de NÚCLEO es neto. Si la tienda no calcula impuestos o escribe sus
+  precios con IVA incluido, se envía neto + IVA; si los escribe sin IVA, el neto. Si no se puede saber,
+  los precios no se tocan.
+
+### Plugin «NÚCLEO ERP para WooCommerce»
+
+`integraciones/woocommerce/nucleo-erp` (GPL-2.0-or-later, requisito de WordPress.org). No envía datos a
+ningún servidor. Trae: la conexión en un paso (crear, renovar, revocar), la ruta
+`nucleo-erp/v1/status` (moneda, impuestos, versión; misma autenticación que WooCommerce), boleta o
+factura en el checkout con RUT validado, razón social y giro (clásico y por bloques, apagado por
+defecto) y la venta de NÚCLEO en una columna y un recuadro del pedido. Compatible con el almacenamiento
+de pedidos de alto rendimiento.
+
+| Paso | Estado |
+|---|---|
+| Código de NÚCLEO y pruebas con una tienda simulada | ✅ |
+| Plugin 0.1.0 y pruebas con funciones de WordPress simuladas | ✅ |
+| Prueba en un WordPress real (tienda de pruebas o copia de datalogger.cl) | ⏳ |
+| Envío a revisión del directorio de WordPress.org (lo hace el dueño con su cuenta) | ⏳ |
+| Enviar a la tienda el n.º de seguimiento cuando el envío se despacha | ⏳ |
+| Productos de la tienda sin SKU: enlazarlos a mano, como en Mercado Libre | ⏳ |
 
 ## I3 · NÚCLEO en línea (cifrado de extremo a extremo)
 

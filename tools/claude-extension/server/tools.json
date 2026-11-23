@@ -856,6 +856,53 @@
     }
   },
   {
+    "name": "sincronizar_woocommerce",
+    "nivel": "completo",
+    "description": "Trae de la tienda WooCommerce los pedidos pagados desde una fecha (por defecto los últimos 30 días) y los pasa a NÚCLEO: cliente con sus datos (por RUT si lo dejó; si no, por nombre), venta al contado que descuenta stock (producto con el mismo SKU; referencia «Pedido de internet» con el n.º del pedido) y, si lleva despacho, un envío «no despachado» con destinatario, dirección, contenido y valor declarado, listo para crear la orden de transporte. Los que piden factura quedan como factura con RUT, razón social y giro. Un producto sin el mismo SKU deja la venta en borrador por revisar. No duplica; los pedidos sin pagar no se registran y una cancelación posterior solo se avisa. Si está activado, anota en el pedido de la tienda el número de la venta. Requiere la tienda conectada en Configuración → Integraciones.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "desde": {
+          "type": "string",
+          "description": "AAAA-MM-DD (opcional)"
+        }
+      }
+    }
+  },
+  {
+    "name": "pedidos_woocommerce",
+    "nivel": "ver",
+    "description": "Lista los pedidos de la tienda WooCommerce ya vistos por NÚCLEO: fecha, n.º de pedido, comprador y correo, total, envío elegido, medio de pago, estado (importada, por revisar, cancelada), si pide factura, la venta enlazada y el envío anotado.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "limite": {
+          "type": "number",
+          "description": "Máximo de pedidos (por defecto 50)"
+        }
+      }
+    }
+  },
+  {
+    "name": "comparar_woocommerce",
+    "nivel": "ver",
+    "description": "Compara, sin cambiar nada, el stock disponible y/o los precios de lista de NÚCLEO con los de la tienda WooCommerce, calzando por SKU: muestra qué productos cambiarían (stock o precio de la tienda → de NÚCLEO), cuántos calzan y cuántos faltan en cada lado. Enviar los cambios a la tienda lo hace la persona en Configuración → Integraciones → WooCommerce (cambia lo que ve el público).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "que": {
+          "type": "string",
+          "enum": [
+            "stock",
+            "precios",
+            "ambos"
+          ],
+          "description": "Qué comparar (por defecto stock)"
+        }
+      }
+    }
+  },
+  {
     "name": "listar_envios",
     "nivel": "ver",
     "description": "Lista los envíos registrados en NÚCLEO (de una venta si se indica): número ENV, venta, cliente, agencia, n.º de seguimiento, estado, destino, talla, costo pagado al courier.",

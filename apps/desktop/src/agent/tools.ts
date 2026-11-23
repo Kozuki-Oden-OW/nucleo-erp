@@ -241,6 +241,31 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
         ? `${r.length} pedidos de Mercado Libre:\n${r.map((o) => `- ${o.date_created} · ${o.pack_id ?? o.order_id} · ${o.buyer ?? "—"} · total ${pesos(o.total_minor)} · comisión ${pesos(o.sale_fee_minor)} · envío ${pesos(o.shipping_cost_minor)} · a recibir ${pesos(o.net_minor)} · ${o.status}${o.needs_invoice ? " · por facturar" : ""}${o.sale_number ? ` · ${o.sale_number}` : ""}${o.issue ? ` · ${o.issue}` : ""}`).join("\n")}`
         : "Aún no hay pedidos de Mercado Libre en NÚCLEO.");
     }
+    case "sincronizar_woocommerce": {
+      const r = await backend.wooSync(str(a, "desde") || null);
+      return text([
+        `WooCommerce: ventas nuevas ${r.imported} · completadas ${r.completed} · por revisar ${r.to_review} · envíos anotados ${r.shipments} · por facturar ${r.to_invoice} · esperando pago ${r.waiting_payment} · canceladas ${r.cancelled} · sin cambios ${r.unchanged}.`,
+        ...r.messages.map((m) => `- ${m}`),
+      ].join("\n"));
+    }
+    case "pedidos_woocommerce": {
+      const r = (await backend.wooOrders(Math.min(Math.max(num(a, "limite") || 50, 1), 300)));
+      return text(r.length
+        ? `${r.length} pedidos de la tienda:\n${r.map((o) => `- ${o.date_created} · #${o.number} · ${o.buyer ?? "—"}${o.email ? ` <${o.email}>` : ""} · total ${pesos(o.total_minor)}${o.shipping_method ? ` · envío: ${o.shipping_method}` : ""}${o.payment_method ? ` · pago: ${o.payment_method}` : ""} · ${o.status}${o.needs_invoice ? " · por facturar" : ""}${o.sale_number ? ` · ${o.sale_number}` : ""}${o.shipment_number ? ` · ${o.shipment_number}` : ""}${o.issue ? ` · ${o.issue}` : ""}`).join("\n")}`
+        : "Aún no hay pedidos de la tienda en NÚCLEO.");
+    }
+    case "comparar_woocommerce": {
+      const que = str(a, "que") || "stock";
+      const r = await backend.wooPush(que !== "precios", que !== "stock", false);
+      const line = (c: (typeof r.changes)[number]) => `- ${c.sku} · ${c.name}${c.stock_to !== null ? ` · stock ${c.stock_from ?? "sin control"} → ${c.stock_to}` : ""}${c.price_to !== null ? ` · precio ${c.price_from === null ? "sin precio" : pesos(c.price_from)} → ${pesos(c.price_to)}` : ""}`;
+      return text([
+        `Tienda WooCommerce: ${r.matched} productos calzan por SKU · ${r.not_in_store} de NÚCLEO no están en la tienda · ${r.not_in_nucleo} de la tienda sin un SKU que NÚCLEO conozca.${r.prices_with_tax === null ? "" : r.prices_with_tax ? " Precios de la tienda con IVA incluido." : " Precios de la tienda sin IVA."}`,
+        r.changes.length ? `Cambiarían ${r.changes.length} (nada se envió):` : "No hay diferencias: la tienda ya está igual que NÚCLEO.",
+        ...r.changes.slice(0, 80).map(line),
+        ...(r.changes.length > 80 ? ["…"] : []),
+        ...(r.changes.length ? ["Para enviarlos: Configuración → Integraciones → WooCommerce → «Revisar stock» o «Revisar precios» (lo confirma la persona)."] : []),
+      ].join("\n"));
+    }
     case "listar_envios": {
       let saleUid: string | null = null;
       const ref = str(a, "venta");

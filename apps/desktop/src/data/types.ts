@@ -1557,6 +1557,89 @@ export interface MlSyncReport {
   messages: string[];
 }
 
+/* ───────── WooCommerce (tienda propia) ───────── */
+
+export interface WooStatus {
+  configured: boolean;
+  connected: boolean;
+  url: string | null;
+  /** Últimos caracteres de la llave guardada, para reconocerla. */
+  key_hint: string | null;
+  store_name: string | null;
+  currency: string | null;
+  /** Versión del plugin «NÚCLEO ERP» si está instalado en la tienda. */
+  plugin_version: string | null;
+  /** Anota en el pedido de la tienda el número de la venta de NÚCLEO. */
+  write_back: boolean;
+  connected_at: string | null;
+  last_sync_at: string | null;
+}
+
+/** Lo que escribe la persona: el código del plugin, o la dirección y las dos llaves. Las llaves vacías conservan las guardadas. */
+export interface WooConnectInput {
+  url: string;
+  consumer_key: string;
+  consumer_secret: string;
+  code: string;
+  write_back?: boolean | null;
+}
+
+export interface WooOrderRow {
+  order_id: string;
+  number: string;
+  sale_uid: string | null;
+  sale_number: string | null;
+  sale_state: string | null;
+  shipment_uid: string | null;
+  shipment_number: string | null;
+  date_created: string;
+  buyer: string | null;
+  email: string | null;
+  woo_status: string;
+  status: "importada" | "por_revisar" | "cancelada";
+  total_minor: number;
+  shipping_minor: number;
+  payment_method: string | null;
+  shipping_method: string | null;
+  needs_invoice: boolean;
+  issue: string | null;
+}
+
+export interface WooSyncReport {
+  imported: number;
+  to_review: number;
+  completed: number;
+  cancelled: number;
+  unchanged: number;
+  /** Pedidos aún sin pagar (no se registran). */
+  waiting_payment: number;
+  to_invoice: number;
+  /** Envíos anotados para la orden de transporte. */
+  shipments: number;
+  messages: string[];
+}
+
+export interface WooPushChange {
+  sku: string;
+  name: string;
+  stock_from: number | null;
+  stock_to: number | null;
+  price_from: number | null;
+  price_to: number | null;
+}
+
+export interface WooPushReport {
+  changes: WooPushChange[];
+  /** `true` si los cambios ya se enviaron a la tienda. */
+  applied: boolean;
+  matched: number;
+  not_in_store: number;
+  not_in_nucleo: number;
+  /** Los precios de la tienda llevan el IVA incluido. */
+  prices_with_tax: boolean | null;
+  messages: string[];
+}
+
 /* ───────── Correo de la empresa (SMTP) ───────── */
 
 export interface MailStatus {

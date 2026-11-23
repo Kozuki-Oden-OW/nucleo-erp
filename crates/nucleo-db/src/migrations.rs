@@ -215,6 +215,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "sii_folios_reutilizados",
         sql: include_str!("../migrations/0041_sii_folios_reutilizados.sql"),
     },
+    Migration {
+        version: 42,
+        name: "woocommerce",
+        sql: include_str!("../migrations/0042_woocommerce.sql"),
+    },
 ];
 
 pub fn latest_version() -> i64 {

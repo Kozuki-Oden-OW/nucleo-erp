@@ -199,3 +199,166 @@ pub fn link_item(
     )?;
     Ok(())
 }
+
+/* ─────────────────────────────── WooCommerce ─────────────────────────────── */
+
+#[derive(Debug, Clone, Serialize)]
+pub struct WooOrderRow {
+    pub order_id: String,
+    pub number: String,
+    pub sale_uid: Option<String>,
+    pub sale_number: Option<String>,
+    pub sale_state: Option<String>,
+    pub shipment_uid: Option<String>,
+    pub shipment_number: Option<String>,
+    pub date_created: String,
+    pub buyer: Option<String>,
+    pub email: Option<String>,
+    pub woo_status: String,
+    /// «importada», «por_revisar» o «cancelada».
+    pub status: String,
+    pub total_minor: i64,
+    pub shipping_minor: i64,
+    pub payment_method: Option<String>,
+    pub shipping_method: Option<String>,
+    pub needs_invoice: bool,
+    pub issue: Option<String>,
+}
+
+pub struct WooOrderWrite<'a> {
+    pub order_id: &'a str,
+    pub number: &'a str,
+    pub sale_id: Option<i64>,
+    pub date_created: &'a str,
+    pub buyer: Option<&'a str>,
+    pub email: Option<&'a str>,
+    pub woo_status: &'a str,
+    pub status: &'a str,
+    pub total_minor: i64,
+    pub shipping_minor: i64,
+    pub payment_method: Option<&'a str>,
+    pub shipping_method: Option<&'a str>,
+    pub needs_invoice: bool,
+    pub issue: Option<&'a str>,
+    pub now: &'a str,
+}
+
+/// Guarda el pedido de la tienda (el envío enlazado se conserva).
+pub fn woo_upsert_order(conn: &Connection, w: &WooOrderWrite<'_>) -> DbResult<()> {
+    conn.execute(
+        "INSERT INTO woo_orders (order_id, number, sale_id, date_created, buyer, email, woo_status, status,
+            total_minor, shipping_minor, payment_method, shipping_method, needs_invoice, issue, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+         ON CONFLICT (order_id) DO UPDATE SET number = excluded.number, sale_id = excluded.sale_id,
+            date_created = excluded.date_created, buyer = excluded.buyer, email = excluded.email,
+            woo_status = excluded.woo_status, status = excluded.status, total_minor = excluded.total_minor,
+            shipping_minor = excluded.shipping_minor, payment_method = excluded.payment_method,
+            shipping_method = excluded.shipping_method, needs_invoice = excluded.needs_invoice,
+            issue = excluded.issue, updated_at = excluded.updated_at",
+        params![
+            w.order_id,
+            w.number,
+            w.sale_id,
+            w.date_created,
+            w.buyer,
+            w.email,
+            w.woo_status,
+            w.status,
+            w.total_minor,
+            w.shipping_minor,
+            w.payment_method,
+            w.shipping_method,
+            w.needs_invoice as i64,
+            w.issue,
+            w.now
+        ],
+    )?;
+    Ok(())
+}
+
+/// Venta, envío y estado con que quedó un pedido ya visto.
+pub type WooOrderState = (Option<i64>, Option<i64>, String);
+
+pub fn woo_order_state(conn: &Connection, order_id: &str) -> DbResult<Option<WooOrderState>> {
+    Ok(conn
+        .query_row(
+            "SELECT sale_id, shipment_id, status FROM woo_orders WHERE order_id = ?1",
+            [order_id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )
+        .optional()?)
+}
+
+pub fn woo_set_shipment(conn: &Connection, order_id: &str, shipment_id: i64) -> DbResult<()> {
+    conn.execute(
+        "UPDATE woo_orders SET shipment_id = ?2 WHERE order_id = ?1",
+        params![order_id, shipment_id],
+    )?;
+    Ok(())
+}
+
+pub fn woo_list_orders(conn: &Connection, limit: i64) -> DbResult<Vec<WooOrderRow>> {
+    let mut st = conn.prepare(
+        "SELECT o.order_id, o.number, s.uid, s.number, s.commercial_state, h.uid, h.number, o.date_created,
+                o.buyer, o.email, o.woo_status, o.status, o.total_minor, o.shipping_minor, o.payment_method,
+                o.shipping_method, o.needs_invoice, o.issue
+         FROM woo_orders o LEFT JOIN sales s ON s.id = o.sale_id LEFT JOIN shipments h ON h.id = o.shipment_id
+         ORDER BY o.date_created DESC, CAST(o.order_id AS INTEGER) DESC LIMIT ?1",
+    )?;
+    let rows = st.query_map([limit], |r| {
+        Ok(WooOrderRow {
+            order_id: r.get(0)?,
+            number: r.get(1)?,
+            sale_uid: r.get(2)?,
+            sale_number: r.get(3)?,
+            sale_state: r.get(4)?,
+            shipment_uid: r.get(5)?,
+            shipment_number: r.get(6)?,
+            date_created: r.get(7)?,
+            buyer: r.get(8)?,
+            email: r.get(9)?,
+            woo_status: r.get(10)?,
+            status: r.get(11)?,
+            total_minor: r.get(12)?,
+            shipping_minor: r.get(13)?,
+            payment_method: r.get(14)?,
+            shipping_method: r.get(15)?,
+            needs_invoice: r.get::<_, i64>(16)? == 1,
+            issue: r.get(17)?,
+        })
+    })?;
+    Ok(rows.collect::<Result<_, _>>()?)
+}
+
+/// Producto de NÚCLEO con código (SKU) para enviar a la tienda: stock disponible y precio de lista.
+#[derive(Debug, Clone)]
+pub struct WooPushProduct {
+    pub sku: String,
+    pub name: String,
+    pub price_minor: i64,
+    pub taxable: bool,
+    pub track_stock: bool,
+    pub on_hand_milli: i64,
+    pub reserved_milli: i64,
+}
+
+pub fn woo_push_products(conn: &Connection) -> DbResult<Vec<WooPushProduct>> {
+    let mut st = conn.prepare(
+        "SELECT p.sku, p.name, p.price_minor, p.taxable, p.track_stock,
+                coalesce(v.on_hand_milli, 0), coalesce(v.reserved_milli, 0)
+         FROM products p LEFT JOIN v_stock_position v ON v.product_id = p.id
+         WHERE p.archived_at IS NULL AND coalesce(p.sku, '') <> '' AND p.kind <> 'servicio'",
+    )?;
+    let rows = st.query_map([], |r| {
+        Ok(WooPushProduct {
+            sku: r.get(0)?,
+            name: r.get(1)?,
+            price_minor: r.get(2)?,
+            taxable: r.get::<_, i64>(3)? == 1,
+            track_stock: r.get::<_, i64>(4)? == 1,
+            on_hand_milli: r.get(5)?,
+            reserved_milli: r.get(6)?,
+        })
+    })?;
+    Ok(rows.collect::<Result<_, _>>()?)
+}

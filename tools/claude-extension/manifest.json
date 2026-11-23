@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "nucleo-erp",
   "display_name": "NÚCLEO ERP",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "description": "Permite que Claude use NÚCLEO ERP en este computador: ve la pantalla, la recorre con su propio cursor y registra ventas, gastos, clientes y cobros.",
   "long_description": "Conecta Claude con NÚCLEO ERP, el sistema de gestión local y gratuito para pymes chilenas. NÚCLEO debe estar abierto con Configuración → Claude activado; ahí eliges si Claude solo mira, crea borradores o tiene acceso completo. La extensión solo se comunica con NÚCLEO dentro del mismo computador (127.0.0.1): los datos del negocio siguen guardados solo en tu equipo.",
   "author": {
@@ -131,6 +131,18 @@
     {
       "name": "pedidos_mercadolibre",
       "description": "Lista los pedidos de Mercado Libre ya vistos por NÚCLEO: fecha, comprador, total, comisión, envío, neto a recibir de Mercado Pago, estado (importada, por revisar, cancelada), si pide factura y la vent"
+    },
+    {
+      "name": "sincronizar_woocommerce",
+      "description": "Trae de la tienda WooCommerce los pedidos pagados desde una fecha (por defecto los últimos 30 días) y los pasa a NÚCLEO: cliente con sus datos (por RUT si lo dejó; si no, por nombre), venta al contado"
+    },
+    {
+      "name": "pedidos_woocommerce",
+      "description": "Lista los pedidos de la tienda WooCommerce ya vistos por NÚCLEO: fecha, n.º de pedido, comprador y correo, total, envío elegido, medio de pago, estado (importada, por revisar, cancelada), si pide fact"
+    },
+    {
+      "name": "comparar_woocommerce",
+      "description": "Compara, sin cambiar nada, el stock disponible y/o los precios de lista de NÚCLEO con los de la tienda WooCommerce, calzando por SKU: muestra qué productos cambiarían (stock o precio de la tienda → de"
     },
     {
       "name": "listar_envios",

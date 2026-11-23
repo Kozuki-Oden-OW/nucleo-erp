@@ -7,7 +7,7 @@ import type {
   AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput,
-  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlOrderRow, MlStatus, MlSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
+  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlOrderRow, MlStatus, MlSyncReport, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
@@ -154,6 +154,12 @@ export class TauriBackend implements Backend {
   mlSync(from?: string | null) { return call<MlSyncReport>("ml_sync", { from: from ?? null }); }
   mlOrders(limit?: number) { return call<MlOrderRow[]>("ml_orders", { limit: limit ?? null }); }
   async mlLinkItem(itemId: string, variationId: string | null, productUid: string, title?: string | null) { await call<null>("ml_link_item", { itemId, variationId, productUid, title: title ?? null }); }
+  wooStatus() { return call<WooStatus>("woo_status"); }
+  wooConnect(input: WooConnectInput) { return call<WooStatus>("woo_connect", { input }); }
+  wooDisconnect() { return call<WooStatus>("woo_disconnect"); }
+  wooSync(from?: string | null) { return call<WooSyncReport>("woo_sync", { from: from ?? null }); }
+  wooOrders(limit?: number) { return call<WooOrderRow[]>("woo_orders", { limit: limit ?? null }); }
+  wooPush(stock: boolean, prices: boolean, apply: boolean) { return call<WooPushReport>("woo_push", { stock, prices, apply }); }
   mailStatus() { return call<MailStatus>("mail_status"); }
   mailPresets() { return call<MailPreset[]>("mail_presets"); }
   mailSave(setup: MailSetup) { return call<MailStatus>("mail_save", { setup }); }

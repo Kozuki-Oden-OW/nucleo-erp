@@ -5,7 +5,7 @@ import { AppError, type Backend, type Feature, type FileSource, type ImportView,
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
   SiiDocument, SiiIssueInput, SiiIntercambioGuardado, SiiIntercambioInput, SiiIntercambioResumen, SiiLibro, SiiLibroInput, SiiPrintDoc, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
-  MlBilling, MlOrderRow, MlStatus, MlSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
+  MlBilling, MlOrderRow, MlStatus, MlSyncReport, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput, StatementLineView, BankSuggestion,
   F22Inputs, F22View,
@@ -2086,6 +2086,125 @@ export class DemoBackend implements Backend {
     if (!l) throw new AppError("no_encontrado", "No existe el libro.");
     if (l.estado === "enviado") { l.estado = "aceptado"; l.glosa = "LOK Libro Cuadrado (demostración)"; }
     return wait(l);
+  }
+  /* ───────────── WooCommerce (simulado) ───────────── */
+
+  private woo = {
+    url: "", key: "", connected: false, connectedAt: null as string | null, lastSync: null as string | null, writeBack: true,
+    orders: [] as WooOrderRow[], store: new Map<string, { stock: number | null; price: number }>(),
+  };
+
+  async wooStatus(): Promise<WooStatus> {
+    const w = this.woo;
+    return wait({ configured: !!w.url && !!w.key, connected: w.connected, url: w.url || null, key_hint: w.key ? `…${w.key.slice(-4)}` : null,
+      store_name: w.connected ? "Tienda de demostración" : null, currency: w.connected ? "CLP" : null, plugin_version: w.connected ? "0.1.0" : null,
+      write_back: w.writeBack, connected_at: w.connectedAt, last_sync_at: w.lastSync });
+  }
+  async wooConnect(input: WooConnectInput): Promise<WooStatus> {
+    this.require("config.editar");
+    let url = input.url.trim().replace(/\/+$/, "");
+    let key = input.consumer_key.trim();
+    let secret = input.consumer_secret.trim();
+    if (input.code.trim()) {
+      if (!input.code.trim().startsWith("nucleo-woo:")) throw new AppError("validacion", "El código de conexión no es válido: cópialo completo desde WooCommerce → NÚCLEO ERP.");
+      url = url || "https://tienda-demo.cl"; key = "ck_demo0000"; secret = "cs_demo";
+    }
+    if (!url.startsWith("https://")) throw new AppError("validacion", "La dirección de la tienda debe empezar con https:// (ej. https://mitienda.cl).");
+    if (!key.startsWith("ck_")) throw new AppError("validacion", "La clave del cliente de WooCommerce empieza con ck_.");
+    if (!secret.startsWith("cs_")) throw new AppError("validacion", "La clave secreta de WooCommerce empieza con cs_.");
+    Object.assign(this.woo, { url, key, connected: true, connectedAt: new Date().toISOString(), writeBack: input.write_back ?? this.woo.writeBack });
+    this.log("integracion.conectar", "integracion", "woocommerce");
+    return this.wooStatus();
+  }
+  async wooDisconnect(): Promise<WooStatus> {
+    this.require("config.editar");
+    Object.assign(this.woo, { url: "", key: "", connected: false, connectedAt: null });
+    return this.wooStatus();
+  }
+  async wooOrders(limit = 200): Promise<WooOrderRow[]> {
+    return wait(this.woo.orders.map((o) => {
+      const s = o.sale_uid ? this.sales.find((x) => x.uid === o.sale_uid) : undefined;
+      return { ...o, sale_number: s?.number ?? null, sale_state: s?.commercial_state ?? null };
+    }).sort((a, b) => b.date_created.localeCompare(a.date_created) || b.order_id.localeCompare(a.order_id)).slice(0, limit));
+  }
+  /** Pedidos de ejemplo: uno con SKU conocido (con despacho) y otro con un producto que NÚCLEO no tiene. */
+  async wooSync(): Promise<WooSyncReport> {
+    if (!this.woo.connected) throw new AppError("validacion", "La tienda WooCommerce no está conectada: Configuración → Integraciones.");
+    this.require("ventas.crear");
+    const goods = this.products.filter((p) => p.kind === "producto");
+    const tax = this.taxPpm() ?? 0;
+    const net = (g: number) => Math.round((g * 1_000_000) / (1_000_000 + tax));
+    const incoming = [
+      { id: "1301", title: goods[0]?.name ?? "Producto", sku: goods[0]?.sku ?? null, qty: 2, price: 23_990, ship: 3_920, method: "Blue Express a domicilio", buyer: ["Camila", "Rojas"], email: "camila@correo.cl" },
+      { id: "1302", title: "Producto solo de la tienda", sku: "WEB-SIN-NUCLEO", qty: 1, price: 12_990, ship: 0, method: "Retiro en tienda", buyer: ["Diego", "Muñoz"], email: "diego@correo.cl" },
+    ];
+    const r: WooSyncReport = { imported: 0, to_review: 0, completed: 0, cancelled: 0, unchanged: 0, waiting_payment: 0, to_invoice: 0, shipments: 0, messages: [] };
+    for (const o of incoming) {
+      const known = this.woo.orders.find((x) => x.order_id === o.id);
+      if (known?.status === "importada") { r.unchanged++; continue; }
+      const product = this.products.find((p) => o.sku && p.sku.toLowerCase() === o.sku.toLowerCase())?.uid ?? null;
+      const name = o.buyer.join(" ");
+      const customers = await this.searchCustomers(name);
+      const customer = customers.find((c) => c.name.toLowerCase() === name.toLowerCase()) ?? await this.addCustomer({ name, email: o.email, kind: "persona" } as NewCustomer);
+      const lines = [{ product_uid: product, description: o.title, qty_milli: o.qty * 1000, unit_price_minor: net(o.price), discount_ppm: 0, taxable: true }];
+      if (o.ship) lines.push({ product_uid: null, description: `Envío ${o.method}`, qty_milli: 1000, unit_price_minor: net(o.ship), discount_ppm: 0, taxable: true });
+      const total = o.price * o.qty + o.ship;
+      const input: SaleInput = {
+        doc_type: "VEN", customer_uid: customer.uid, issue_date: this.today, lines,
+        notes: `WooCommerce · pedido #${o.id} · total en la tienda $${total} · pago: Webpay Plus`,
+        terms: { ...EMPTY_TERMS, payment: "tarjeta", references: [{ kind: "WEB", folio: o.id, date: this.today, note: null }] },
+      };
+      const sale = known?.sale_uid ? await this.saveSale(input, known.sale_uid) : await this.saveSale(input);
+      let status: WooOrderRow["status"] = "por_revisar";
+      let issue: string | null = `No hay un producto de NÚCLEO con el mismo código: «${o.title}» (SKU ${o.sku}). Pon el mismo SKU en la tienda y en NÚCLEO y vuelve a sincronizar`;
+      let shipment: { uid: string; number: string } | null = null;
+      if (product) {
+        try {
+          await this.effectSale(sale.uid, { mode: "contado", method: "Tarjeta de débito", due_date: null });
+          status = "importada"; issue = null;
+          if (o.ship) {
+            const e = await this.saveShipment(null, { sale_uid: sale.uid, carrier: "Bluexpress", first_name: o.buyer[0], last_name: o.buyer[1], email: o.email, phone: "+56 9 5555 0101",
+              street: "Av. Providencia 1234", unit: "Depto 56", commune: "Providencia", region: "Metropolitana", delivery_mode: "domicilio", service: o.method,
+              content: `${o.qty} × ${o.title}`.slice(0, 200), declared_value_minor: total, status: "no_despachado", notes: `Pedido WooCommerce #${o.id} · envío elegido: ${o.method}` } as ShipmentInput);
+            shipment = { uid: e.uid, number: e.number };
+            r.shipments++;
+          }
+        } catch (e) { issue = `No se pudo confirmar: ${(e as Error).message}`; }
+      }
+      const row: WooOrderRow = { order_id: o.id, number: o.id, sale_uid: sale.uid, sale_number: null, sale_state: null, shipment_uid: shipment?.uid ?? null, shipment_number: shipment?.number ?? null,
+        date_created: this.today, buyer: name, email: o.email, woo_status: "processing", status, total_minor: total, shipping_minor: o.ship, payment_method: "Webpay Plus",
+        shipping_method: o.method, needs_invoice: false, issue };
+      this.woo.orders = [...this.woo.orders.filter((x) => x.order_id !== o.id), row];
+      if (status === "importada") { if (known) r.completed++; else r.imported++; }
+      else { r.to_review++; r.messages.push(`Pedido #${o.id}: ${issue}`); }
+    }
+    this.woo.lastSync = new Date().toISOString();
+    return r;
+  }
+  /** La tienda de ejemplo parte con el stock y el precio desfasados en los tres primeros productos. */
+  async wooPush(stock: boolean, prices: boolean, apply: boolean): Promise<WooPushReport> {
+    this.require("config.editar");
+    if (!this.woo.connected) throw new AppError("validacion", "La tienda WooCommerce no está conectada: Configuración → Integraciones.");
+    if (!stock && !prices) throw new AppError("validacion", "Elige qué enviar a la tienda: stock, precios o ambos.");
+    const tax = this.taxPpm() ?? 0;
+    const goods = this.products.filter((p) => p.kind === "producto" && p.sku);
+    const inStore = goods.slice(0, Math.max(1, goods.length - 2));
+    const changes: WooPushReport["changes"] = [];
+    inStore.forEach((p, i) => {
+      const units = Math.max(0, Math.floor(p.on_hand_milli / 1000));
+      const gross = p.price_minor + Math.round((p.price_minor * tax) / 1_000_000);
+      if (!this.woo.store.has(p.uid)) this.woo.store.set(p.uid, i < 3 ? { stock: units + 2, price: Math.round(gross * 0.95) } : { stock: units, price: gross });
+      const cur = this.woo.store.get(p.uid)!;
+      const stock_to = stock && cur.stock !== units ? units : null;
+      const price_to = prices && p.price_minor > 0 && cur.price !== gross ? gross : null;
+      if (stock_to !== null || price_to !== null) {
+        changes.push({ sku: p.sku, name: p.name, stock_from: cur.stock, stock_to, price_from: cur.price, price_to });
+        if (apply) this.woo.store.set(p.uid, { stock: stock_to ?? cur.stock, price: price_to ?? cur.price });
+      }
+    });
+    const applied = apply && changes.length > 0;
+    if (applied) this.log("integracion.editar", "integracion", "woocommerce");
+    return wait({ changes, applied, matched: inStore.length, not_in_store: goods.length - inStore.length, not_in_nucleo: 1, prices_with_tax: prices ? true : null, messages: [] });
   }
   async siiLibroExportXml(): Promise<boolean> { throw new AppError("validacion", "En la demostración no hay XML firmado."); }
   async siiExportXml(): Promise<boolean> { throw new AppError("validacion", "En la demostración no hay XML firmado."); }

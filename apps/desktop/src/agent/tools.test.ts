@@ -119,6 +119,35 @@ describe("historial a crédito", () => {
   });
 });
 
+describe("WooCommerce (demostración)", () => {
+  it("conecta, trae pedidos con su envío sin duplicar y compara stock y precios sin enviar", async () => {
+    const b = new DemoBackend();
+    expect((await runTool(b, "completo", "sincronizar_woocommerce", {})).isError).toBe(true);
+    await expect(b.wooConnect({ url: "http://tienda.cl", consumer_key: "ck_a", consumer_secret: "cs_b", code: "" })).rejects.toThrow(/https/);
+    const st = await b.wooConnect({ url: "https://tienda.cl/", consumer_key: "ck_llave1234", consumer_secret: "cs_secreta", code: "" });
+    expect(st.connected).toBe(true);
+    expect(JSON.stringify(st)).not.toMatch(/cs_secreta|ck_llave1234/);
+    const r = await runTool(b, "completo", "sincronizar_woocommerce", {});
+    expect(txt(r)).toMatch(/ventas nuevas 1 · completadas 0 · por revisar 1 · envíos anotados 1/);
+    expect(txt(r)).toMatch(/SKU WEB-SIN-NUCLEO/);
+    const again = await runTool(b, "completo", "sincronizar_woocommerce", {});
+    expect(txt(again)).toMatch(/ventas nuevas 0 .* sin cambios 1/);
+    const orders = await b.wooOrders();
+    const ok = orders.find((o) => o.status === "importada")!;
+    expect(ok.shipment_number).toMatch(/^ENV/);
+    expect((await b.shipments(ok.sale_uid)).length).toBe(1);
+    expect(txt(await runTool(b, "ver", "pedidos_woocommerce", {}))).toMatch(/2 pedidos de la tienda/);
+    expect((await runTool(b, "borradores", "sincronizar_woocommerce", {})).isError).toBe(true);
+    // Comparar no envía nada: la segunda comparación muestra los mismos cambios.
+    const c1 = txt(await runTool(b, "ver", "comparar_woocommerce", { que: "ambos" }));
+    expect(c1).toMatch(/Cambiarían \d+ \(nada se envió\)/);
+    expect(txt(await runTool(b, "ver", "comparar_woocommerce", { que: "ambos" }))).toBe(c1);
+    // Enviar (lo hace la persona en la pantalla) deja la tienda igual que NÚCLEO.
+    expect((await b.wooPush(true, true, true)).applied).toBe(true);
+    expect(txt(await runTool(b, "ver", "comparar_woocommerce", { que: "ambos" }))).toMatch(/No hay diferencias/);
+  });
+});
+
 describe("Mercado Libre (demostración)", () => {
   it("conecta, trae pedidos sin duplicar y deja por revisar lo que no tiene producto", async () => {
     const b = new DemoBackend();

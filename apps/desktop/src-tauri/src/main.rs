@@ -8,6 +8,7 @@ mod ipc_tests;
 mod mail;
 mod ml;
 mod sii;
+mod woo;
 
 use nucleo_app::AppService;
 use nucleo_app::keys::OsKeyStore;
@@ -109,6 +110,12 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         ml::ml_sync,
         ml::ml_orders,
         ml::ml_link_item,
+        woo::woo_status,
+        woo::woo_connect,
+        woo::woo_disconnect,
+        woo::woo_sync,
+        woo::woo_orders,
+        woo::woo_push,
         mail::mail_status,
         mail::mail_presets,
         mail::mail_save,

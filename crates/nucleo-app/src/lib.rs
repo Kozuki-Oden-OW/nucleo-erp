@@ -36,6 +36,7 @@ pub mod sii_ops;
 pub mod sii_print;
 pub mod sii_venta;
 pub mod sync_ops;
+pub mod woo_ops;
 
 pub use company::{CompanySession, NewCustomer};
 pub use error::{AppError, AppResult};

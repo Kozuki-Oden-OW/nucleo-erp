@@ -13,9 +13,9 @@ con las mismas reglas, permisos y auditoría del programa.
 
    | Nivel | Puede |
    |---|---|
-   | Solo ver | `ver_pantalla`, `ir_a`, `desplazar` y las consultas (`resumen_negocio`, `buscar*`, `listar_*`, `datos_de_apoyo`, `listar_documentos_sii`, `consultar_estado_sii`, `consultar_libro_sii`) |
+   | Solo ver | `ver_pantalla`, `ir_a`, `desplazar` y las consultas (`resumen_negocio`, `buscar*`, `listar_*`, `datos_de_apoyo`, `listar_documentos_sii`, `consultar_estado_sii`, `consultar_libro_sii`, `pedidos_woocommerce`, `comparar_woocommerce`) |
    | Crear borradores | Lo anterior + `crear_cliente`, `crear_proveedor`, `crear_producto`, `crear_venta_borrador`, `registrar_gasto` (queda por pagar), `registrar_envio` |
-   | Acceso completo | Lo anterior + `clic`, `escribir`, `elegir`, `tecla`, `confirmar_venta`, `registrar_cobro`, gastos pagados y la facturación SII (`cargar_folios_sii`, `emitir_documento_sii`, `enviar_documentos_sii`, `crear_libro_sii`, `enviar_libro_sii`, `responder_intercambio_sii`). Enviar al SII es irreversible: Claude muestra el resumen y espera la confirmación de la persona en el chat |
+   | Acceso completo | Lo anterior + `clic`, `escribir`, `elegir`, `tecla`, `confirmar_venta`, `registrar_cobro`, gastos pagados y la facturación SII (`cargar_folios_sii`, `emitir_documento_sii`, `enviar_documentos_sii`, `crear_libro_sii`, `enviar_libro_sii`, `responder_intercambio_sii`) y `sincronizar_woocommerce`. Enviar stock o precios a la tienda WooCommerce no es una herramienta: lo confirma la persona en la pantalla. Enviar al SII es irreversible: Claude muestra el resumen y espera la confirmación de la persona en el chat |
 
    Siempre valen además los permisos del usuario con que está abierta la sesión.
 3. «Instalar en Claude» abre en la app de Claude la extensión **NucleoERP.mcpb** (formato MCPB) y la
@@ -101,6 +101,7 @@ construyen después de la certificación del SII.
 | 7 | **Ingreso automático del robot** | NÚCLEO entra solo con el usuario de lectura, descarga cartola y ventas y las deja importadas; el agente cuadra desde NÚCLEO sin entrar al banco | Por construir |
 | 8 | **Folios y consultas en sii.cl** | Ayuda a descargar folios (CAF) y a consultar la empresa con la sesión que inició la persona | Por construir (con la extensión de Chrome) |
 | 9 | **Asistente NÚCLEO (plan Premium)** | El mismo conjunto de herramientas, dentro de NÚCLEO, con la API de Anthropic | Idea |
+| 10 | **Tienda WooCommerce** | Sincroniza los pedidos pagados (cliente, venta que descuenta stock y envío por despachar), lista los pedidos y compara stock y precios con la tienda. Enviar cambios a la tienda lo confirma la persona | Construido el 23-11-2026 (falta probar en la tienda real) |
 
 ### Funciones del gestor de contraseñas
 
