@@ -174,13 +174,17 @@ body {
   .no-print { display: none !important; }
 }
 
+@page sii { size: letter; margin: 0; }
+
 /* Documento tributario impreso (Facturación SII): mientras su vista previa está abierta, al imprimir
    sale solo el documento, una hoja por ejemplar. */
 .sii-print-root { display: none; }
 @media print {
   html.sii-printing body > *:not(.sii-print-root) { display: none !important; }
   html.sii-printing .sii-print-root { display: block; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  html.sii-printing .sii-page { break-after: page; page-break-after: always; max-width: none; }
+  /* Hoja carta sin márgenes del navegador (así no salen la fecha ni la dirección de la página en el
+     encabezado y pie); el margen lo pone la propia hoja. */
+  html.sii-printing .sii-page { page: sii; break-after: page; page-break-after: always; max-width: none; box-sizing: border-box; height: 10.9in; min-height: 0; padding: 12mm 14mm; }
   html.sii-printing .sii-page:last-child { break-after: auto; page-break-after: auto; }
 }
 
