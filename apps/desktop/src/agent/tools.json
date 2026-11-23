@@ -1209,6 +1209,28 @@
     }
   },
   {
+    "name": "emitir_venta_sii",
+    "nivel": "completo",
+    "description": "Timbra y firma la factura electrónica (afecta o exenta) de una venta efectuada de NÚCLEO, con el receptor, las líneas, la forma de pago y las referencias de la venta. Sin «confirmar» solo muestra el borrador para revisarlo con la persona; con confirmar=true la timbra (consume un folio, no la envía al SII). En producción la venta queda documentada con el folio.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "venta": {
+          "type": "string",
+          "description": "Número o identificador de la venta"
+        },
+        "confirmar": {
+          "type": "boolean",
+          "description": "true para timbrar; sin esto solo muestra el borrador"
+        }
+      },
+      "required": [
+        "venta"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "enviar_documentos_sii",
     "nivel": "completo",
     "description": "Envía al SII, en un sobre firmado, documentos ya timbrados (estado «firmado»). IRREVERSIBLE: solo úsala después de que la persona confirme en el chat la lista exacta de documentos a enviar. Devuelve el track id.",
@@ -1396,6 +1418,41 @@
       },
       "required": [
         "libro"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "responder_intercambio_sii",
+    "nivel": "completo",
+    "description": "Intercambio de información (etapa de certificación del SII o documentos de un proveedor): lee un sobre de documentos recibido (EnvioDTE, ruta del .xml en el computador). Sin «carpeta» solo muestra qué trae y cómo se respondería. Con «carpeta» y «recinto» firma y guarda ahí las tres respuestas: 1_RecepcionEnvio, 2_ResultadoDTE y 3_EnvioRecibos (los documentos dirigidos a otro RUT se informan como no recibidos).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "ruta": {
+          "type": "string",
+          "description": "Ruta completa del .xml recibido"
+        },
+        "carpeta": {
+          "type": "string",
+          "description": "Carpeta donde guardar las respuestas (debe existir)"
+        },
+        "recinto": {
+          "type": "string",
+          "description": "Lugar donde se recibieron las mercaderías o servicios (para el recibo)"
+        },
+        "contacto": {
+          "type": "string"
+        },
+        "fono": {
+          "type": "string"
+        },
+        "mail": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ruta"
       ],
       "additionalProperties": false
     }

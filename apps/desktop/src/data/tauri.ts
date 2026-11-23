@@ -23,7 +23,7 @@ import type {
   PurchaseSummary, ReceiveLine, NewSupplier, Supplier, SupplierDetail, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow, SaleDetail, SaleInput,
   SaleSummary, SearchHit,
   SecuritySettings, SequenceRow, SessionInfo, UserPatch, UserRow,
-  SiiDocument, SiiIssueInput, SiiLibro, SiiLibroInput, SiiPrintDoc, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
+  SiiDocument, SiiIssueInput, SiiIntercambioGuardado, SiiIntercambioInput, SiiIntercambioResumen, SiiLibro, SiiLibroInput, SiiPrintDoc, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
 } from "./types";
 
 interface CommandError { code: string; message: string }
@@ -171,6 +171,7 @@ export class TauriBackend implements Backend {
   siiTestConnection() { return call<string>("sii_test_connection"); }
   siiDocuments(limit?: number) { return call<SiiDocument[]>("sii_documents", { limit: limit ?? null }); }
   siiIssue(input: SiiIssueInput) { return call<SiiDocument>("sii_issue", { input }); }
+  siiSaleDraft(saleUid: string) { return call<SiiIssueInput>("sii_sale_draft", { saleUid }); }
   siiSend(ids: number[]) { return call<SiiDocument[]>("sii_send", { ids }); }
   siiCheck(id: number) { return call<SiiDocument[]>("sii_check", { id }); }
   async siiExportXml(doc: SiiDocument): Promise<boolean> {
@@ -180,6 +181,8 @@ export class TauriBackend implements Backend {
     return true;
   }
   siiPrintData(id: number) { return call<SiiPrintDoc>("sii_document_print", { id }); }
+  siiIntercambioLeer(path: string) { return call<SiiIntercambioResumen>("sii_intercambio_leer", { path }); }
+  siiIntercambioResponder(path: string, carpeta: string, input: SiiIntercambioInput) { return call<SiiIntercambioGuardado>("sii_intercambio_responder", { path, carpeta, input }); }
   siiLibroCreate(input: SiiLibroInput) { return call<SiiLibro>("sii_libro_create", { input }); }
   siiLibros() { return call<SiiLibro[]>("sii_libros"); }
   siiLibroSend(id: number) { return call<SiiLibro>("sii_libro_send", { id }); }

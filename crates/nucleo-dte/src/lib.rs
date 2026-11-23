@@ -9,6 +9,7 @@ pub mod caf;
 pub mod crypto;
 pub mod dte;
 pub mod envio;
+pub mod intercambio;
 pub mod libro;
 mod pdf417_tabla;
 pub mod sii;

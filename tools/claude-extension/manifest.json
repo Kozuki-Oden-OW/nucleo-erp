@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "nucleo-erp",
   "display_name": "NÚCLEO ERP",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Permite que Claude use NÚCLEO ERP en este computador: ve la pantalla, la recorre con su propio cursor y registra ventas, gastos, clientes y cobros.",
   "long_description": "Conecta Claude con NÚCLEO ERP, el sistema de gestión local y gratuito para pymes chilenas. NÚCLEO debe estar abierto con Configuración → Claude activado; ahí eliges si Claude solo mira, crea borradores o tiene acceso completo. La extensión solo se comunica con NÚCLEO dentro del mismo computador (127.0.0.1): los datos del negocio siguen guardados solo en tu equipo.",
   "author": {
@@ -153,6 +153,10 @@
       "description": "Timbra y firma en NÚCLEO un documento tributario (33 factura, 34 exenta, 61 nota de crédito, 56 nota de débito, 52 guía) con el siguiente folio del CAF. Consume un folio pero NO lo envía al SII (eso e"
     },
     {
+      "name": "emitir_venta_sii",
+      "description": "Timbra y firma la factura electrónica (afecta o exenta) de una venta efectuada de NÚCLEO, con el receptor, las líneas, la forma de pago y las referencias de la venta. Sin «confirmar» solo muestra el b"
+    },
+    {
       "name": "enviar_documentos_sii",
       "description": "Envía al SII, en un sobre firmado, documentos ya timbrados (estado «firmado»). IRREVERSIBLE: solo úsala después de que la persona confirme en el chat la lista exacta de documentos a enviar. Devuelve e"
     },
@@ -171,6 +175,10 @@
     {
       "name": "consultar_libro_sii",
       "description": "Consulta en el SII el estado de un libro enviado (LOK = libro cuadrado; otros códigos = rechazado o no cuadra) y lo actualiza en NÚCLEO."
+    },
+    {
+      "name": "responder_intercambio_sii",
+      "description": "Intercambio de información (etapa de certificación del SII o documentos de un proveedor): lee un sobre de documentos recibido (EnvioDTE, ruta del .xml en el computador). Sin «carpeta» solo muestra qué"
     }
   ],
   "keywords": [

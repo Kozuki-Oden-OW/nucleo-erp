@@ -762,3 +762,86 @@ fn timbre_pdf417() {
     std::fs::write(format!("{dir}/timbre.svg"), p.svg()).unwrap();
     std::fs::write(format!("{dir}/timbre.txt"), &ted).unwrap();
 }
+
+/// Intercambio: un proveedor nos manda un sobre con dos facturas (una dirigida a otro RUT). Se lee,
+/// se revisan las firmas y se arman las tres respuestas (acuse, resultado comercial y recibos).
+#[test]
+fn intercambio_recibir_y_responder() {
+    use nucleo_dte::crypto::FirmaEstado;
+    use nucleo_dte::intercambio::*;
+    let (cert_prov, _) = certificado();
+    let (caf33, _) = caf(33, 1, 10);
+    let buena = factura(1)
+        .sign(&caf33, &cert_prov, "2026-11-22T15:00:00")
+        .unwrap();
+    let mut otra = factura(2);
+    otra.receptor.rut = "99999999-9".into();
+    let otra = otra
+        .sign(&caf33, &cert_prov, "2026-11-22T15:00:01")
+        .unwrap();
+    let mut car = Caratula::al_sii(RUT, "11111111-1", "2026-11-22", 0);
+    car.rut_receptor = "77777777-7".into();
+    let sobre = envio_dte(&car, &[buena, otra], &cert_prov, "2026-11-22T15:01:00").unwrap();
+
+    let envio = leer_envio(&sobre).unwrap();
+    assert_eq!(
+        (
+            envio.set_id.as_str(),
+            envio.rut_emisor.as_str(),
+            envio.rut_receptor.as_str()
+        ),
+        ("SetDoc", RUT, "77777777-7")
+    );
+    assert_eq!(envio.firma, FirmaEstado::Valida);
+    assert!(envio.digest.as_deref().is_some_and(|d| d.len() == 28));
+    assert_eq!(envio.dtes.len(), 2);
+    assert!(envio.dtes.iter().all(|d| d.firma == FirmaEstado::Valida));
+    assert_eq!(
+        (envio.dtes[0].tipo, envio.dtes[0].folio, envio.dtes[0].total),
+        (33, 1, 113_038)
+    );
+    let estados: Vec<u8> = envio
+        .dtes
+        .iter()
+        .map(|d| estado_recepcion(d, "77.777.777-7"))
+        .collect();
+    assert_eq!(estados, vec![0, 3]);
+
+    // Un sobre alterado después de firmado se detecta.
+    let alterado =
+        from_latin1(&sobre).replace("<MntTotal>113038</MntTotal>", "<MntTotal>113039</MntTotal>");
+    let malo = leer_envio(&latin1(&alterado)).unwrap();
+    assert_eq!(malo.firma, FirmaEstado::Invalida);
+    assert!(malo.dtes.iter().all(|d| d.firma == FirmaEstado::Invalida));
+    assert!(leer_envio(b"<?xml version=\"1.0\"?><Otro/>").is_err());
+
+    let (cert, _) = certificado();
+    let r = Responde {
+        rut: "77777777-7".into(),
+        contacto: Some("Persona de Prueba".into()),
+        fono: Some("+56 2 2222 2222".into()),
+        mail: Some("facturas@ejemplo.cl".into()),
+    };
+    let ts = "2026-11-22T16:00:00";
+    let a =
+        respuesta_recepcion(&envio, "ENVIO_DTE_1234.xml", &r, 1, 0, &estados, &cert, ts).unwrap();
+    let b = respuesta_resultado(&envio, &r, 2, &[(0, 0)], &cert, ts).unwrap();
+    let c = envio_recibos(&envio, &r, "Bodega central", "11111111-1", &[0], &cert, ts).unwrap();
+    let ta = from_latin1(&a).replace('\n', "");
+    assert!(ta.contains("<EstadoRecepEnv>0</EstadoRecepEnv><RecepEnvGlosa>Envio Recibido Conforme</RecepEnvGlosa><NroDTE>2</NroDTE>"));
+    assert!(ta.contains("<EstadoRecepDTE>3</EstadoRecepDTE><RecepDTEGlosa>DTE No Recibido - Error en RUT Receptor</RecepDTEGlosa>"));
+    assert!(
+        from_latin1(&b)
+            .replace('\n', "")
+            .contains("<EstadoDTE>0</EstadoDTE><EstadoDTEGlosa>DTE Aceptado OK</EstadoDTEGlosa>")
+    );
+    assert!(from_latin1(&c).contains(DECLARACION));
+    assert!(respuesta_recepcion(&envio, "x.xml", &r, 1, 0, &[0], &cert, ts).is_err());
+    assert!(envio_recibos(&envio, &r, " ", "11111111-1", &[0], &cert, ts).is_err());
+    let dir = concat!(env!("CARGO_TARGET_TMPDIR"), "/dte");
+    std::fs::create_dir_all(dir).unwrap();
+    std::fs::write(format!("{dir}/intercambio_recibido.xml"), &sobre).unwrap();
+    std::fs::write(format!("{dir}/intercambio_1_recepcion.xml"), &a).unwrap();
+    std::fs::write(format!("{dir}/intercambio_2_resultado.xml"), &b).unwrap();
+    std::fs::write(format!("{dir}/intercambio_3_recibos.xml"), &c).unwrap();
+}

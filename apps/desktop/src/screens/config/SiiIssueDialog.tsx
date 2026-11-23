@@ -45,12 +45,14 @@ export function lineAmounts(l: LineForm) {
   return { q, p, pct, desc, monto: bruto - desc };
 }
 
-export function SiiIssueDialog({ open, onClose, folios, ambiente, onIssued }: {
+export function SiiIssueDialog({ open, onClose, folios, ambiente, onIssued, initial = null }: {
   open: boolean;
   onClose: () => void;
   folios: SiiFolios[];
   ambiente: string;
   onIssued: (d: SiiDocument) => void;
+  /** Borrador ya armado (por ejemplo, desde una venta): se revisa y se timbra. */
+  initial?: SiiIssueInput | null;
 }) {
   const backend = useBackend();
   const disponibles = useMemo(() => new Set(folios.filter((f) => f.ambiente === ambiente && f.restantes > 0).map((f) => f.tipo)), [folios, ambiente]);
@@ -69,16 +71,29 @@ export function SiiIssueDialog({ open, onClose, folios, ambiente, onIssued }: {
   useEffect(() => { void backend.business().then((b) => setTaxPpm(b.tax_enabled ? b.tax_rate_ppm ?? 0 : 0)).catch(() => setTaxPpm(0)); }, [backend]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Con un borrador de venta, las líneas que no se tocan se timbran con sus montos exactos.
+  const [tocado, setTocado] = useState(false);
+  useEffect(() => {
+    if (!open || !initial) return;
+    const r0 = initial.receptor;
+    setTipo(initial.tipo); setFecha(initial.fecha ?? "");
+    setRec({ rut: r0.rut, razon_social: r0.razon_social, giro: r0.giro ?? "", direccion: r0.direccion ?? "", comuna: r0.comuna ?? "", ciudad: r0.ciudad ?? "", correo: r0.correo ?? "" });
+    setFormaPago(String(initial.forma_pago ?? 1)); setVenc(initial.vencimiento ?? "");
+    setLines(initial.detalle.map((l) => ({ nombre: l.nombre, cantidad: l.cantidad_milli == null ? "" : String(l.cantidad_milli / 1000).replace(".", ","), precio: l.precio == null ? "" : String(l.precio),
+      descuento: l.descuento_pct ? String(l.descuento_pct).replace(".", ",") : "", unidad: l.unidad ?? "", exento: l.exento })));
+    setRefs(initial.referencias.map((x) => ({ ...x })));
+    setDg(""); setTocado(false); setError(null);
+  }, [open, initial]);
 
   const isNota = tipo === 61 || tipo === 56;
-  const amounts = lines.map(lineAmounts);
+  const amounts = lines.map((l, i) => { const a = lineAmounts(l); const fijo = initial && !tocado ? initial.detalle[i] : undefined; return a && fijo ? { ...a, monto: fijo.monto } : a; });
   const netoLineas = lines.reduce((a, l, i) => a + (!l.exento && tipo !== 34 ? amounts[i]?.monto ?? 0 : 0), 0);
   const dgPct = Number(dg.replace(",", ".")) || 0;
   const dgMonto = dgPct > 0 ? Math.round((netoLineas * dgPct) / 100) : 0;
   const neto = netoLineas - dgMonto;
   const exento = lines.reduce((a, l, i) => a + (l.exento || tipo === 34 ? amounts[i]?.monto ?? 0 : 0), 0);
   const iva = Math.round((neto * taxPpm) / 1_000_000);
-  const setLine = (i: number, p: Partial<LineForm>) => setLines(lines.map((l, j) => (j === i ? { ...l, ...p } : l)));
+  const setLine = (i: number, p: Partial<LineForm>) => { setTocado(true); setLines(lines.map((l, j) => (j === i ? { ...l, ...p } : l))); };
   const setRef = (i: number, p: Partial<SiiReferencia>) => setRefs(refs.map((r, j) => (j === i ? { ...r, ...p } : r)));
   const r = (k: keyof typeof rec) => ({ value: rec[k], onChange: (e: React.ChangeEvent<HTMLInputElement>) => setRec({ ...rec, [k]: e.target.value }) });
   const opt = (s: string) => (s.trim() ? s.trim() : null);
@@ -86,7 +101,7 @@ export function SiiIssueDialog({ open, onClose, folios, ambiente, onIssued }: {
   const submit = async () => {
     setError(null);
     try {
-      const detalle: SiiDetalle[] = lines.filter((l) => l.nombre.trim() || l.precio).map((l, i) => {
+      const detalle: SiiDetalle[] = initial && !tocado ? initial.detalle.map((l) => ({ ...l, exento: l.exento || tipo === 34 })) : lines.filter((l) => l.nombre.trim() || l.precio).map((l, i) => {
         const a = lineAmounts(l);
         if (!l.nombre.trim()) throw new Error(`Falta el nombre en la línea ${i + 1}.`);
         if (!a) throw new Error(`Revisa cantidad, precio o descuento en la línea ${i + 1}.`);
@@ -108,7 +123,7 @@ export function SiiIssueDialog({ open, onClose, folios, ambiente, onIssued }: {
         descuentos_globales: dgPct > 0 ? [{ recargo: false, glosa: "Descuento global", porcentaje: dgPct, monto: null, exento: false }] : [],
         forma_pago: tipo === 52 ? null : Number(formaPago), vencimiento: formaPago === "2" ? venc || null : null,
         ind_traslado: tipo === 52 ? Number(traslado) : null, tipo_despacho: tipo === 52 && despacho ? Number(despacho) : null,
-        sale_uid: null,
+        sale_uid: initial?.sale_uid ?? null,
       };
       setBusy(true);
       const d = await backend.siiIssue(input);
@@ -166,13 +181,13 @@ export function SiiIssueDialog({ open, onClose, folios, ambiente, onIssued }: {
               <Field label={i === 0 ? "Desc. %" : undefined} aria-label="Descuento en porcentaje" inputMode="decimal" value={l.descuento} onChange={(e) => setLine(i, { descuento: e.target.value })} />
               <div className="flex items-center gap-1 pb-1">
                 <span className="w-20 text-right text-sm tabular-nums">{amounts[i] ? formatCLP(amounts[i]!.monto) : "—"}</span>
-                <IconButton icon={Trash2} label="Quitar línea" onClick={() => setLines(lines.length > 1 ? lines.filter((_, j) => j !== i) : [emptyLine()])} />
+                <IconButton icon={Trash2} label="Quitar línea" onClick={() => { setTocado(true); setLines(lines.length > 1 ? lines.filter((_, j) => j !== i) : [emptyLine()]); }} />
               </div>
               {tipo !== 34 && tipo !== 52 && <div className="col-span-5 -mt-1"><Checkbox label="Línea exenta de IVA" checked={l.exento} onChange={(v) => setLine(i, { exento: v })} /></div>}
             </div>
           ))}
           <div className="flex flex-wrap items-end gap-3">
-            <Button size="sm" variant="ghost" icon={Plus} onClick={() => setLines([...lines, emptyLine()])}>Agregar línea</Button>
+            <Button size="sm" variant="ghost" icon={Plus} onClick={() => { setTocado(true); setLines([...lines, emptyLine()]); }}>Agregar línea</Button>
             {tipo !== 34 && <Field className="w-44" label="Descuento global %" inputMode="decimal" value={dg} onChange={(e) => setDg(e.target.value)} optional hint="Sobre las líneas afectas." />}
           </div>
         </fieldset>

@@ -4,7 +4,7 @@
 import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "../backend";
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
-  SiiDocument, SiiIssueInput, SiiLibro, SiiLibroInput, SiiPrintDoc, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
+  SiiDocument, SiiIssueInput, SiiIntercambioGuardado, SiiIntercambioInput, SiiIntercambioResumen, SiiLibro, SiiLibroInput, SiiPrintDoc, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
   MlBilling, MlOrderRow, MlStatus, MlSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput, StatementLineView, BankSuggestion,
@@ -2016,6 +2016,26 @@ export class DemoBackend implements Backend {
     this.siiInputs.set(doc.id, structuredClone(input));
     return wait(doc);
   }
+  async siiSaleDraft(saleUid: string): Promise<SiiIssueInput> {
+    this.require("ventas.documentar");
+    const v = await this.sale(saleUid);
+    if (!["efectuada", "cerrada"].includes(v.commercial_state)) throw new AppError("estado", "Solo se emite el documento de una venta efectuada.");
+    if ([...this.siiInputs.entries()].some(([id, i]) => i.sale_uid === saleUid && this.siiDocs.some((d) => d.id === id && d.estado !== "rechazado"))) throw new AppError("validacion", "Esta venta ya tiene su documento tributario.");
+    const f = this.customers.find((c) => c.uid === v.customer_uid);
+    const t0 = v.terms?.receiver;
+    const r = { rut: t0?.rut ?? f?.rut ?? null, name: t0?.name ?? f?.name ?? null, activity: t0?.activity ?? f?.business_activity ?? null, address: t0?.address ?? f?.address ?? null,
+      commune: t0?.commune ?? f?.commune ?? null, city: t0?.city ?? f?.city ?? null, contact: t0?.contact ?? f?.contact_name ?? null, email: t0?.email ?? f?.invoice_email ?? f?.email ?? null };
+    const afecta = v.totals.tax_minor > 0;
+    const credito = v.terms?.payment === "credito";
+    return wait({
+      tipo: afecta ? 33 : 34, fecha: null,
+      receptor: { rut: r.rut ?? "", razon_social: r.name ?? v.customer_name, giro: r.activity, direccion: r.address, comuna: r.commune, ciudad: r.city, contacto: r.contact, correo: r.email },
+      detalle: v.lines.map((l) => ({ codigo: null, nombre: l.description.slice(0, 80), descripcion: null, cantidad_milli: l.qty_milli, unidad: null, precio: l.unit_price_minor,
+        descuento_pct: l.discount_ppm ? l.discount_ppm / 10_000 : null, descuento_monto: l.discount_minor || null, monto: l.net_minor, exento: !afecta || !l.taxable })),
+      referencias: (v.terms?.references ?? []).map((x) => ({ tipo: x.kind.slice(0, 3), folio: x.folio, fecha: x.date ?? v.issue_date, codigo: null, razon: x.note ?? null })),
+      descuentos_globales: [], forma_pago: credito ? 2 : 1, vencimiento: credito ? v.terms?.due_date ?? v.due_date ?? null : null, ind_traslado: null, tipo_despacho: null, sale_uid: saleUid,
+    });
+  }
   async siiSend(ids: number[]): Promise<SiiDocument[]> {
     const track = String(Date.now()).slice(-10);
     for (const d of this.siiDocs) if (ids.includes(d.id) && d.estado === "firmado") { d.estado = "enviado"; d.track_id = track; d.glosa = "Demostración: en el escritorio el sobre va al SII."; }
@@ -2025,6 +2045,21 @@ export class DemoBackend implements Backend {
     const d = this.siiDocs.find((x) => x.id === id);
     if (d?.estado === "enviado") { d.estado = "aceptado"; d.glosa = "Demostración: documento aceptado."; }
     return this.siiDocuments();
+  }
+  async siiIntercambioLeer(path: string): Promise<SiiIntercambioResumen> {
+    if (!/\.xml$/i.test(path)) throw new AppError("validacion", "Elige el archivo .xml del envío recibido.");
+    const b = await this.business();
+    const rut = (b.rut ?? "76.000.000-0").replace(/\./g, "");
+    const doc = (folio: number, receptor: string, total: number) => ({ tipo: 33, tipo_nombre: "Factura electrónica", folio, fecha: this.today, rut_emisor: "88888888-8", razon_social: "PROVEEDOR DE DEMOSTRACIÓN",
+      rut_receptor: receptor, total, firma: "valida" as const, estado: receptor === rut ? 0 : 3, glosa: receptor === rut ? "DTE Recibido OK" : "DTE No Recibido - Error en RUT Receptor" });
+    return wait({ set_id: "SetDoc", rut_emisor: "88888888-8", rut_receptor: rut, firma: "valida", estado_envio: 0, glosa_envio: "Envio Recibido Conforme", documentos: [doc(101, rut, 119_000), doc(102, "99999999-9", 59_500)] });
+  }
+  async siiIntercambioResponder(path: string, carpeta: string, input: SiiIntercambioInput): Promise<SiiIntercambioGuardado> {
+    this.require("ventas.documentar");
+    if (!input.recinto.trim()) throw new AppError("validacion", "Indica el recinto donde se recibieron las mercaderías o servicios.");
+    if (!this.sii.cert) throw new AppError("validacion", "Carga primero el certificado digital.");
+    const resumen = await this.siiIntercambioLeer(path);
+    return wait({ resumen, archivos: ["1_RecepcionEnvio", "2_ResultadoDTE", "3_EnvioRecibos"].map((n) => `${carpeta}/${n}_demo.xml`) });
   }
   private siiLibrosList: SiiLibro[] = [];
   async siiLibroCreate(input: SiiLibroInput): Promise<SiiLibro> {

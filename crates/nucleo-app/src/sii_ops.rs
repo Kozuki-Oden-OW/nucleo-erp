@@ -114,7 +114,7 @@ pub struct SiiDocument {
 }
 
 /// Documento a emitir (sin folio: lo asigna NÚCLEO desde los CAF cargados).
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SiiIssueInput {
     pub tipo: u16,
     /// AAAA-MM-DD; vacío = hoy.
@@ -659,7 +659,7 @@ impl CompanySession {
         self.sii_status()
     }
 
-    fn sii_credentials(&self, c: &ConfigRow) -> AppResult<SiiCredentials> {
+    pub(crate) fn sii_credentials(&self, c: &ConfigRow) -> AppResult<SiiCredentials> {
         let p12 = c
             .cert_p12
             .clone()
@@ -685,7 +685,7 @@ impl CompanySession {
         self.sii_credentials(&c)
     }
 
-    fn sii_now(&self) -> AppResult<String> {
+    pub(crate) fn sii_now(&self) -> AppResult<String> {
         Ok(self.db.conn().query_row(
             "SELECT strftime('%Y-%m-%dT%H:%M:%S', 'now', 'localtime')",
             [],
@@ -790,7 +790,11 @@ impl CompanySession {
             None,
         )?;
         tx.commit()?;
-        self.sii_document(id)
+        let doc = self.sii_document(id)?;
+        if let Some(u) = input.sale_uid.as_deref().filter(|u| !u.is_empty()) {
+            self.sii_document_sale(u, &doc)?;
+        }
+        Ok(doc)
     }
 
     fn sii_document(&self, id: i64) -> AppResult<SiiDocument> {

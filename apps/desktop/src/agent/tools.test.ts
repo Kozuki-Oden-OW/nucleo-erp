@@ -191,5 +191,30 @@ describe("Envíos con datos del courier (demostración)", () => {
     expect(txt(lc)).toMatch(/retenido \$2\.051, total \$10\.793/);
     expect(txt(await runTool(b, "completo", "enviar_libro_sii", { libro: 1 }))).toMatch(/enviado/);
     expect(txt(await runTool(b, "ver", "consultar_libro_sii", { libro: 1 }))).toMatch(/aceptado/);
+    const il = await runTool(b, "completo", "responder_intercambio_sii", { ruta: "C:/x/ENVIO_DTE.xml" });
+    expect(txt(il)).toMatch(/Error en RUT Receptor/);
+    expect(txt(il)).toMatch(/indica «carpeta» y «recinto»/);
+    expect((await runTool(b, "completo", "responder_intercambio_sii", { ruta: "C:/x/ENVIO_DTE.xml", carpeta: "C:/x" })).isError).toBe(true);
+    expect(txt(await runTool(b, "completo", "responder_intercambio_sii", { ruta: "C:/x/ENVIO_DTE.xml", carpeta: "C:/x", recinto: "Oficina" }))).toMatch(/3_EnvioRecibos_demo\.xml/);
+  });
+
+  it("factura del SII desde una venta: primero el borrador, después timbra", async () => {
+    const b = new DemoBackend();
+    await b.siiSaleDraft("no-existe").catch(() => undefined);
+    await b.siiSaveSetup({ ambiente: "certificacion", emisor: { giro: "Software", actecos: [620100], direccion: "Guardia Vieja 202", comuna: "Providencia", ciudad: "Santiago", sucursal: null, rut_envia: "", unidad_sii: "" }, resolucion_fecha: "2026-11-22", resolucion_numero: 0 });
+    await b.siiLoadCertificate("demo.pfx", "1234");
+    await b.siiLoadCaf("demo.xml");
+    await runTool(b, "borradores", "crear_cliente", { nombre: "Panadería La Espiga", rut: "76.123.456-0" });
+    const v = await runTool(b, "borradores", "crear_venta_borrador", { cliente: "76.123.456-0", lineas: [{ descripcion: "Instalación", precio_neto: 10000, cantidad: 2 }] });
+    const uid = txt(v).match(/Identificador: (\S+)/)![1]!;
+    expect((await runTool(b, "completo", "emitir_venta_sii", { venta: uid })).isError).toBe(true);
+    await runTool(b, "completo", "confirmar_venta", { venta: uid, modo: "credito" });
+    const borrador = await runTool(b, "completo", "emitir_venta_sii", { venta: uid });
+    expect(txt(borrador)).toMatch(/Borrador: aún no se timbra/);
+    expect(txt(borrador)).toMatch(/Instalación: 2 × \$10\.000 = \$20\.000/);
+    expect(txt(await runTool(b, "ver", "listar_documentos_sii", {}))).toMatch(/Aún no hay documentos/);
+    const ok = await runTool(b, "completo", "emitir_venta_sii", { venta: uid, confirmar: true });
+    expect(txt(ok)).toMatch(/33-1 .*\$23\.800 · firmado/);
+    expect((await runTool(b, "completo", "emitir_venta_sii", { venta: uid, confirmar: true })).isError).toBe(true);
   });
 });

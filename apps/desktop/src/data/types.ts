@@ -1758,6 +1758,33 @@ export interface SiiPrintDoc {
   cedible: boolean;
 }
 
+export type SiiFirmaEstado = "valida" | "invalida" | "sin_verificar";
+
+/** Sobre de documentos recibido de otro contribuyente y cómo se responde. */
+export interface SiiIntercambioResumen {
+  set_id: string;
+  rut_emisor: string;
+  rut_receptor: string;
+  firma: SiiFirmaEstado;
+  /** 0 conforme; 3 dirigido a otro RUT. */
+  estado_envio: number;
+  glosa_envio: string;
+  documentos: { tipo: number; tipo_nombre: string; folio: number; fecha: string; rut_emisor: string; razon_social: string; rut_receptor: string; total: number;
+    firma: SiiFirmaEstado; estado: number; glosa: string }[];
+}
+
+export interface SiiIntercambioInput {
+  contacto: string | null;
+  fono: string | null;
+  mail: string | null;
+  recinto: string;
+}
+
+export interface SiiIntercambioGuardado {
+  resumen: SiiIntercambioResumen;
+  archivos: string[];
+}
+
 export interface SiiLineaLibro {
   tipo: number;
   folio: number;

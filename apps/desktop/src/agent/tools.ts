@@ -3,7 +3,7 @@
 // valen las mismas reglas, permisos y auditoría.
 import type { Backend } from "../data";
 import { errorMessage } from "../data";
-import type { Customer, HistoricalSale, SiiDocument, SiiLibro, SiiLineaLibro, LineInput, Product, SaleSummary, SaleTerms, ShipmentInput, ShipmentSize, Supplier } from "../data/types";
+import type { Customer, HistoricalSale, SiiDocument, SiiIntercambioResumen, SiiLibro, SiiLineaLibro, LineInput, Product, SaleSummary, SaleTerms, ShipmentInput, ShipmentSize, Supplier } from "../data/types";
 import { EMPTY_TERMS } from "../data/saleTerms";
 import { formatMoney, todayIso } from "../lib/format";
 import { navigate } from "../lib/router";
@@ -72,6 +72,12 @@ async function findSiiDoc(backend: Backend, ref: string): Promise<SiiDocument> {
 const siiLine = (d: SiiDocument) => `- ${d.tipo}-${d.folio} ${d.tipo_nombre} N° ${d.folio} · ${d.fecha} · ${d.receptor} (${d.receptor_rut}) · ${pesos(d.total_minor)} · ${d.estado}${d.track_id ? ` · track ${d.track_id}` : ""}${d.glosa ? ` · ${d.glosa}` : ""}${d.ambiente === "certificacion" ? " · certificación" : ""}`;
 
 const libroLine = (l: SiiLibro) => `- libro ${l.id}: ${l.operacion === "venta" ? "ventas" : "compras"} ${l.periodo} · ${l.tipo_libro}${l.folio_notificacion ? ` (notificación ${l.folio_notificacion})` : ""} · ${l.documentos} docs · ${l.estado}${l.track_id ? ` · track ${l.track_id}` : ""}${l.glosa ? ` · ${l.glosa}` : ""}`;
+
+const FIRMA_TXT = { valida: "firma válida", invalida: "FIRMA NO VÁLIDA", sin_verificar: "firma sin verificar" } as const;
+const intercambioText = (r: SiiIntercambioResumen) => [
+  `Envío ${r.set_id} de ${r.rut_emisor} para ${r.rut_receptor} · ${FIRMA_TXT[r.firma]} · ${r.glosa_envio}`,
+  ...r.documentos.map((d) => `- ${d.tipo}-${d.folio} ${d.tipo_nombre} · ${d.fecha} · ${d.razon_social} (${d.rut_emisor}) → ${d.rut_receptor} · ${pesos(d.total)} · ${FIRMA_TXT[d.firma]} · ${d.glosa}`),
+].join("\n");
 
 const METHOD: Record<string, string> = { efectivo: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta de débito", cheque: "Cheque", credito: "" };
 
@@ -517,6 +523,26 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
         ...(await backend.siiLibros()).map(libroLine),
       ].join("\n"));
     }
+    case "emitir_venta_sii": {
+      const ref = str(a, "venta");
+      const ventas = await backend.listSales({ view: "todas", query: ref });
+      const v = ventas.find((x) => x.uid === ref || norm(x.number) === norm(ref)) ?? (ventas.length === 1 ? ventas[0] : undefined)
+        ?? (await backend.listSales({ view: "todas", query: "" })).find((x) => x.uid === ref);
+      if (!v) throw new Error(`No encontré la venta «${ref}».`);
+      const b = await backend.siiSaleDraft(v.uid);
+      const neto = b.detalle.filter((l) => !l.exento).reduce((x, l) => x + l.monto, 0), exento = b.detalle.filter((l) => l.exento).reduce((x, l) => x + l.monto, 0);
+      const borrador = [
+        `${b.tipo === 34 ? "Factura exenta" : "Factura electrónica"} de la venta ${v.number} (total venta ${pesos(v.total_minor)})`,
+        `Receptor: ${b.receptor.razon_social} · RUT ${b.receptor.rut || "FALTA"} · giro ${b.receptor.giro ?? "FALTA"} · ${[b.receptor.direccion ?? "FALTA dirección", b.receptor.comuna ?? "FALTA comuna"].join(", ")}`,
+        ...b.detalle.map((l) => `- ${l.nombre}: ${l.cantidad_milli == null ? "" : `${l.cantidad_milli / 1000} × ${pesos(l.precio ?? 0)}`}${l.descuento_monto ? ` − ${pesos(l.descuento_monto)}` : ""} = ${pesos(l.monto)}${l.exento ? " (exento)" : ""}`),
+        `Neto afecto ${pesos(neto)} · exento ${pesos(exento)} · forma de pago ${b.forma_pago === 2 ? `crédito, vence ${b.vencimiento ?? "?"}` : "contado"}`,
+        ...b.referencias.map((r) => `Referencia ${r.tipo} N° ${r.folio} del ${r.fecha}`),
+      ].join("\n");
+      if (a.confirmar !== true) return text(`${borrador}\nBorrador: aún no se timbra. Muéstraselo a la persona y, si está de acuerdo, repite con confirmar=true.`);
+      const d = await backend.siiIssue(b);
+      dataChanged();
+      return text(`${borrador}\nTimbrado y firmado (aún NO enviado al SII):\n${siiLine(d)}`);
+    }
     case "cargar_folios_sii": {
       const ruta = str(a, "ruta");
       if (!/\.xml$/i.test(ruta)) throw new Error("Indica la ruta completa del archivo .xml de folios.");
@@ -607,6 +633,13 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
       const l = await backend.siiLibroCheck(Math.round(num(a, "libro") ?? 0));
       dataChanged();
       return text(libroLine(l));
+    }
+    case "responder_intercambio_sii": {
+      const ruta = str(a, "ruta"), carpeta = str(a, "carpeta");
+      if (!carpeta) return text(`${intercambioText(await backend.siiIntercambioLeer(ruta))}\nPara firmar las respuestas indica «carpeta» y «recinto».`);
+      const g = await backend.siiIntercambioResponder(ruta, carpeta, { contacto: str(a, "contacto") || null, fono: str(a, "fono") || null, mail: str(a, "mail") || null, recinto: str(a, "recinto") });
+      dataChanged();
+      return text(`${intercambioText(g.resumen)}\nRespuestas firmadas y guardadas:\n${g.archivos.map((f) => `- ${f}`).join("\n")}`);
     }
     case "registrar_cobro": {
       const s = await findSale(backend, str(a, "venta"), "por_cobrar");

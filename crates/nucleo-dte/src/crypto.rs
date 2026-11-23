@@ -168,3 +168,66 @@ pub fn verify_sha1_pem(public_pem: &[u8], data: &[u8], sig: &[u8]) -> DteResult<
     v.update(data)?;
     Ok(v.verify(sig)?)
 }
+
+/// Resultado de revisar una firma XML recibida.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FirmaEstado {
+    Valida,
+    /// El contenido no coincide con lo firmado o la firma no corresponde al certificado.
+    Invalida,
+    /// No se pudo revisar (firma con otro formato, sin certificado, etc.).
+    SinVerificar,
+}
+
+/// Revisa la firma XML `sig` sobre `signed` (elemento con ID), dados los espacios de nombres que
+/// `signed` hereda de sus ancestros. Usa el certificado (o la llave RSA) que trae la propia firma: dice
+/// si el documento no fue alterado, no quién lo firmó.
+pub fn verify_xml_signature(
+    sig: &El,
+    signed: &El,
+    scope: &BTreeMap<String, String>,
+) -> FirmaEstado {
+    let limpio = |e: Option<&El>| -> Option<Vec<u8>> {
+        let t: String = e?.text_content().split_whitespace().collect();
+        BASE64.decode(t.as_bytes()).ok()
+    };
+    let Some(si) = sig.find("SignedInfo") else {
+        return FirmaEstado::SinVerificar;
+    };
+    let Some(digest) = limpio(si.find("Reference").and_then(|r| r.find("DigestValue"))) else {
+        return FirmaEstado::SinVerificar;
+    };
+    let Ok(real) = hash(MessageDigest::sha1(), signed.canonical(scope).as_bytes()) else {
+        return FirmaEstado::SinVerificar;
+    };
+    if real.as_ref() != digest.as_slice() {
+        return FirmaEstado::Invalida;
+    }
+    let Some(valor) = limpio(sig.find("SignatureValue")) else {
+        return FirmaEstado::SinVerificar;
+    };
+    let ki = sig.find("KeyInfo");
+    let llave = limpio(
+        ki.and_then(|k| k.find("X509Data"))
+            .and_then(|x| x.find("X509Certificate")),
+    )
+    .and_then(|der| X509::from_der(&der).ok())
+    .and_then(|c| c.public_key().ok());
+    let Some(llave) = llave else {
+        return FirmaEstado::SinVerificar;
+    };
+    let mut si_scope = scope.clone();
+    si_scope.insert(String::new(), NS_DSIG.into());
+    let ok = Verifier::new(MessageDigest::sha1(), &llave)
+        .and_then(|mut v| {
+            v.update(si.canonical(&si_scope).as_bytes())?;
+            v.verify(&valor)
+        })
+        .unwrap_or(false);
+    if ok {
+        FirmaEstado::Valida
+    } else {
+        FirmaEstado::Invalida
+    }
+}

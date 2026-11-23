@@ -4,8 +4,8 @@
 // en la fase F6 (docs/SII_FACTURACION_PROPIA.md).
 import { useCallback, useEffect, useState } from "react";
 import { open as openFile } from "@tauri-apps/plugin-dialog";
-import { BadgeCheck, BookOpen, FileCode2, FileKey2, FilePlus2, FileText, PlugZap, Printer, RefreshCw, Save, Send, Upload } from "lucide-react";
-import { errorMessage, useBackend, type SiiAmbiente, type SiiDocument, type SiiFolios, type SiiLibro, type SiiSetup, type SiiStatus } from "../../data";
+import { ArrowLeftRight, BadgeCheck, BookOpen, FileCode2, FileKey2, FilePlus2, FileText, PlugZap, Printer, RefreshCw, Save, Send, Upload } from "lucide-react";
+import { errorMessage, useBackend, type SiiAmbiente, type SiiDocument, type SiiFolios, type SiiIntercambioResumen, type SiiLibro, type SiiSetup, type SiiStatus } from "../../data";
 import { formatCLP, formatDate } from "../../lib/format";
 import { useSession } from "../../lib/session";
 import { Badge, Button, Card, Field, IconButton, Notice, Segmented, Select, Spinner } from "../../ui/kit";
@@ -20,6 +20,19 @@ const ESTADO: Record<SiiDocument["estado"], { label: string; tone: "neutral" | "
   aceptado: { label: "Aceptado", tone: "success" },
   reparos: { label: "Con reparos", tone: "warning" },
   rechazado: { label: "Rechazado", tone: "danger" },
+};
+
+async function pickFolder(): Promise<string | null> {
+  try {
+    const f = await openFile({ multiple: false, directory: true, title: "Carpeta donde guardar las respuestas" });
+    return typeof f === "string" ? f : null;
+  } catch {
+    return "demo";
+  }
+}
+
+const FIRMA: Record<string, { label: string; tone: "success" | "danger" | "neutral" }> = {
+  valida: { label: "Firma válida", tone: "success" }, invalida: { label: "Firma no válida", tone: "danger" }, sin_verificar: { label: "Sin verificar", tone: "neutral" },
 };
 
 async function pick(name: string, extensions: string[]): Promise<string | null> {
@@ -48,6 +61,8 @@ export function SiiSection() {
   const [issuing, setIssuing] = useState(false);
   const [toSend, setToSend] = useState<SiiDocument[] | null>(null);
   const [printing, setPrinting] = useState<SiiDocument | null>(null);
+  const [inter, setInter] = useState<{ path: string; resumen: SiiIntercambioResumen; archivos: string[] } | null>(null);
+  const [interForm, setInterForm] = useState({ contacto: "", fono: "", mail: "", recinto: "" });
   const [libros, setLibros] = useState<SiiLibro[]>([]);
   const [libroForm, setLibroForm] = useState<{ periodo: string; tipo: "MENSUAL" | "ESPECIAL"; folio: string } | null>(null);
   const [libroSend, setLibroSend] = useState<SiiLibro | null>(null);
@@ -140,6 +155,21 @@ export function SiiSection() {
       </div>
     ) },
   ];
+  const abrirIntercambio = () => run("inter", async () => {
+    const p = await pick("Envío de documentos recibido (XML)", ["xml"]);
+    if (!p) return;
+    const resumen = await backend.siiIntercambioLeer(p);
+    setInterForm((f) => ({ ...f, contacto: f.contacto || st.certificado?.nombre || "", recinto: f.recinto || [form.emisor.direccion, form.emisor.comuna].filter(Boolean).join(", ") }));
+    setInter({ path: p, resumen, archivos: [] });
+  });
+  const responderIntercambio = () => run("interok", async () => {
+    if (!inter) return;
+    const carpeta = await pickFolder();
+    if (!carpeta) return;
+    const g = await backend.siiIntercambioResponder(inter.path, carpeta, { contacto: interForm.contacto || null, fono: interForm.fono || null, mail: interForm.mail || null, recinto: interForm.recinto });
+    setInter({ ...inter, resumen: g.resumen, archivos: g.archivos });
+    toast("success", `Respuestas firmadas y guardadas (${g.archivos.length} archivos).`);
+  });
   const firmados = docs.filter((d) => d.estado === "firmado" && d.ambiente === st.ambiente);
 
   const ready = st.faltantes.length === 0;
@@ -280,6 +310,52 @@ export function SiiSection() {
       <Dialog open={!!libroSend} onClose={() => setLibroSend(null)} title="¿Enviar el libro al SII?"
         footer={<><Button variant="ghost" onClick={() => setLibroSend(null)}>Cancelar</Button><Button icon={Send} onClick={enviarLibro} disabled={!!busy}>{busy === "lsend" ? "Enviando…" : "Enviar al SII"}</Button></>}>
         {libroSend && <p className="text-sm">Libro de {libroSend.operacion}s {libroSend.periodo} ({libroSend.documentos} documentos{libroSend.folio_notificacion ? `, notificación ${libroSend.folio_notificacion}` : ""}) a <strong>{ambLabel}</strong>. Un libro enviado no se borra: se corrige con uno rectificatorio.</p>}
+      </Dialog>
+
+      {st.certificado && (
+        <Card title="Intercambio con otros contribuyentes" subtitle="Lee un envío de documentos recibido (de un proveedor, o el de prueba que entrega el SII en la certificación) y arma las tres respuestas firmadas: acuse de recibo, resultado comercial y recibo de mercaderías."
+          actions={can("ventas.documentar") ? <Button size="sm" variant="secondary" icon={ArrowLeftRight} onClick={abrirIntercambio} disabled={!!busy}>{busy === "inter" ? "Leyendo…" : "Responder un envío recibido"}</Button> : undefined}>
+          <p className="text-sm text-muted">Los documentos dirigidos a tu RUT se reciben y aceptan; los dirigidos a otro RUT se informan como no recibidos.</p>
+        </Card>
+      )}
+
+      <Dialog open={!!inter} onClose={() => setInter(null)} size="lg" title="Envío recibido"
+        footer={<><Button variant="ghost" onClick={() => setInter(null)}>Cerrar</Button>
+          {inter && inter.archivos.length === 0 && <Button icon={Send} onClick={responderIntercambio} disabled={!!busy || !interForm.recinto.trim()}>{busy === "interok" ? "Firmando…" : "Firmar y guardar respuestas"}</Button>}</>}>
+        {inter && (
+          <div className="flex flex-col gap-3 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span>De <strong>{inter.resumen.rut_emisor}</strong> para <strong>{inter.resumen.rut_receptor}</strong></span>
+              <Badge tone={FIRMA[inter.resumen.firma]?.tone ?? "neutral"}>{FIRMA[inter.resumen.firma]?.label ?? inter.resumen.firma}</Badge>
+              <Badge tone={inter.resumen.estado_envio === 0 ? "success" : "danger"}>{inter.resumen.glosa_envio}</Badge>
+            </div>
+            <table className="w-full border-collapse text-[13px]">
+              <thead><tr className="border-b border-line text-left text-muted"><th className="py-1 pr-2">Documento</th><th className="py-1 pr-2">Emisor</th><th className="py-1 pr-2">Receptor</th><th className="py-1 pr-2 text-right">Total</th><th className="py-1">Respuesta</th></tr></thead>
+              <tbody>{inter.resumen.documentos.map((d) => (
+                <tr key={`${d.tipo}-${d.folio}`} className="border-b border-line align-top">
+                  <td className="py-1 pr-2">{d.tipo_nombre} N° {d.folio}<div className="text-xs text-muted">{formatDate(d.fecha)}</div></td>
+                  <td className="py-1 pr-2">{d.razon_social}<div className="text-xs text-muted">{d.rut_emisor}</div></td>
+                  <td className="py-1 pr-2">{d.rut_receptor}</td>
+                  <td className="py-1 pr-2 text-right tabular-nums">{formatCLP(d.total)}</td>
+                  <td className="py-1"><Badge tone={d.estado === 0 ? "success" : "warning"}>{d.glosa}</Badge>{d.firma !== "valida" && <div className="text-xs text-muted">{FIRMA[d.firma]?.label}</div>}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+            {inter.archivos.length ? (
+              <Notice tone="success" title="Respuestas guardadas">
+                <ul className="list-disc pl-5">{inter.archivos.map((a) => <li key={a} className="break-all">{a}</li>)}</ul>
+                En la certificación, súbelas en sii.cl → «Intercambio de información», en ese orden.
+              </Notice>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Recinto de recepción" value={interForm.recinto} maxLength={80} onChange={(e) => setInterForm({ ...interForm, recinto: e.target.value })} hint="Dónde se recibieron las mercaderías o servicios (va en el recibo)." />
+                <Field label="Contacto" value={interForm.contacto} maxLength={40} onChange={(e) => setInterForm({ ...interForm, contacto: e.target.value })} optional />
+                <Field label="Teléfono" value={interForm.fono} maxLength={40} onChange={(e) => setInterForm({ ...interForm, fono: e.target.value })} optional />
+                <Field label="Correo" type="email" value={interForm.mail} maxLength={80} onChange={(e) => setInterForm({ ...interForm, mail: e.target.value })} optional />
+              </div>
+            )}
+          </div>
+        )}
       </Dialog>
 
       <SiiPrintDialog doc={printing} onClose={() => setPrinting(null)} />

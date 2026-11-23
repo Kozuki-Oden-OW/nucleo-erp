@@ -13,6 +13,7 @@ import { Badge, Button, Card, DefinitionList, Notice, PageHeader, Spinner } from
 import { useToast } from "../../ui/overlay";
 import { DocumentDialog, EffectDialog, PaymentDialog, VoidDialog } from "./dialogs";
 import { PrintButton, PrintDoc } from "./PrintDoc";
+import { SaleSiiButton } from "./SaleSii";
 import { paymentText, referenceLabel } from "../../data/saleTerms";
 import type { SaleTerms } from "../../data";
 import { formatRut } from "../../lib/format";
@@ -91,6 +92,7 @@ export function SaleView({ uid }: { uid: string }) {
             {editable && <Button variant="secondary" icon={Pencil} onClick={() => navigate(`/ventas/${s.uid}/editar`)}>Editar</Button>}
             {editable && <Button icon={BadgeCheck} onClick={() => setOpen("effect")}>Venta efectuada</Button>}
             {effected && due > 0 && <Button icon={HandCoins} onClick={() => setOpen("pay")}>Registrar pago</Button>}
+            <SaleSiiButton sale={s} onChanged={load} />
             {s.commercial_state !== "anulada" && !editable && <PrintButton kind={s.doc_type} doc={s} biz={biz} />}
             {s.commercial_state !== "anulada" && <Button variant="ghost" icon={Ban} onClick={() => setOpen("void")}>Anular</Button>}
           </>

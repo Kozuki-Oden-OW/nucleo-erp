@@ -22,7 +22,7 @@ import type {
   PermissionRow, PriceHistoryRow, Product, ProductCategory, ProductPatch, PurchaseDetail, PurchaseInput, PurchaseOrderDetail, PurchaseOrderInput,
   PurchaseOrderSummary, PurchaseSummary, ReceiveLine, NewSupplier, Supplier, SupplierDetail, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow,
   SaleDetail, SaleInput, SaleSummary, SearchHit, SecuritySettings, SequenceRow, SessionInfo, UserPatch, UserRow,
-  SiiDocument, SiiIssueInput, SiiLibro, SiiLibroInput, SiiPrintDoc, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
+  SiiDocument, SiiIssueInput, SiiIntercambioGuardado, SiiIntercambioInput, SiiIntercambioResumen, SiiLibro, SiiLibroInput, SiiPrintDoc, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
 } from "./types";
 
 /** Archivo elegido para adjuntar: ruta en el escritorio o archivo del navegador en la demostración. */
@@ -175,6 +175,8 @@ export interface Backend {
   siiDocuments(limit?: number): Promise<SiiDocument[]>;
   /** Timbra y firma un documento con el siguiente folio (no lo envía al SII). */
   siiIssue(input: SiiIssueInput): Promise<SiiDocument>;
+  /** Borrador de la factura de una venta efectuada (receptor, líneas, forma de pago y referencias). */
+  siiSaleDraft(saleUid: string): Promise<SiiIssueInput>;
   /** Envía al SII los documentos firmados (irreversible). */
   siiSend(ids: number[]): Promise<SiiDocument[]>;
   /** Consulta en el SII el estado del envío de ese documento. */
@@ -183,6 +185,10 @@ export interface Backend {
   siiExportXml(doc: SiiDocument): Promise<boolean>;
   /** Datos para imprimir el documento (ejemplar tributario y cedible, con el timbre PDF417). */
   siiPrintData(id: number): Promise<SiiPrintDoc>;
+  /** Lee un sobre recibido (ruta del XML) y dice qué trae; no firma nada. */
+  siiIntercambioLeer(path: string): Promise<SiiIntercambioResumen>;
+  /** Firma las respuestas (acuse, resultado y recibos) y las guarda en la carpeta. */
+  siiIntercambioResponder(path: string, carpeta: string, input: SiiIntercambioInput): Promise<SiiIntercambioGuardado>;
   /** Arma y firma un libro de compras o ventas (IECV), sin enviarlo. */
   siiLibroCreate(input: SiiLibroInput): Promise<SiiLibro>;
   siiLibros(): Promise<SiiLibro[]>;

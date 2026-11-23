@@ -448,3 +448,232 @@ fn muestra_impresa() {
     )
     .unwrap();
 }
+
+/// Intercambio: llega un sobre de un proveedor con una factura para esta empresa y otra para un RUT
+/// ajeno; NÚCLEO lo lee y arma las tres respuestas firmadas.
+#[test]
+fn intercambio_responde_un_sobre() {
+    use nucleo_app::sii_intercambio::IntercambioInput;
+    use nucleo_dte::envio::{Caratula, envio_dte};
+    use nucleo_dte::{Caf, Certificate, Dte, Emisor, TipoDte};
+    let (_d, _a, mut s) = session();
+    setup(&mut s);
+    s.sii_load_certificate(&pfx(), "clave").unwrap();
+
+    // El proveedor (otra empresa) emite y firma con sus propios folios y certificado.
+    let prov = "88888888-8";
+    let cert_prov = Certificate::from_pkcs12(&pfx(), "clave").unwrap();
+    let caf_prov = Caf::parse(&caf(prov, 33, 1, 5)).unwrap();
+    let doc = |folio: u64, receptor: &str| Dte {
+        tipo: TipoDte::Factura,
+        folio,
+        fecha: "2026-11-22".into(),
+        forma_pago: Some(1),
+        vencimiento: None,
+        ind_traslado: None,
+        tipo_despacho: None,
+        emisor: Emisor {
+            rut: prov.into(),
+            razon_social: "PROVEEDOR DE PRUEBA".into(),
+            giro: "Venta de insumos".into(),
+            actecos: vec![469000],
+            direccion: "Calle 2".into(),
+            comuna: "Santiago".into(),
+            ..Default::default()
+        },
+        receptor: Receptor {
+            rut: receptor.into(),
+            ..factura().receptor
+        },
+        detalle: factura().detalle,
+        referencias: vec![],
+        descuentos_globales: vec![],
+        tasa_iva_ppm: 190_000,
+    };
+    let firmados = vec![
+        doc(1, RUT)
+            .sign(&caf_prov, &cert_prov, "2026-11-22T09:00:00")
+            .unwrap(),
+        doc(2, "99999999-9")
+            .sign(&caf_prov, &cert_prov, "2026-11-22T09:00:01")
+            .unwrap(),
+    ];
+    let mut car = Caratula::al_sii(prov, "11111111-1", "2026-11-22", 0);
+    car.rut_receptor = RUT.into();
+    let sobre = envio_dte(&car, &firmados, &cert_prov, "2026-11-22T09:01:00").unwrap();
+
+    let r = s.sii_intercambio_leer(&sobre).unwrap();
+    assert_eq!((r.estado_envio, r.documentos.len()), (0, 2));
+    assert_eq!((r.documentos[0].estado, r.documentos[1].estado), (0, 3));
+    assert_eq!(r.documentos[0].razon_social, "PROVEEDOR DE PRUEBA");
+
+    let input = IntercambioInput {
+        contacto: Some("Persona de Prueba".into()),
+        mail: Some("facturas@ejemplo.cl".into()),
+        recinto: "Bodega".into(),
+        ..Default::default()
+    };
+    let out = s
+        .sii_intercambio_responder(&sobre, "ENVIO_DTE_77.xml", &input)
+        .unwrap();
+    let t = |b: &[u8]| String::from_utf8_lossy(b).replace('\n', "");
+    let a = t(&out.recepcion);
+    assert!(a.contains("<RutResponde>76000000-0</RutResponde><RutRecibe>88888888-8</RutRecibe>"));
+    assert!(
+        a.contains("<NmbEnvio>ENVIO_DTE_77.xml</NmbEnvio>") && a.contains("<NroDTE>2</NroDTE>")
+    );
+    assert!(
+        a.contains("<EstadoRecepDTE>0</EstadoRecepDTE>")
+            && a.contains("<EstadoRecepDTE>3</EstadoRecepDTE>")
+    );
+    let b = t(out.resultado.as_deref().unwrap());
+    assert_eq!(b.matches("<ResultadoDTE>").count(), 1);
+    assert!(b.contains("<Folio>1</Folio>") && b.contains("<EstadoDTE>0</EstadoDTE>"));
+    let c = t(out.recibos.as_deref().unwrap());
+    assert!(c.contains("<Recinto>Bodega</Recinto><RutFirma>11111111-1</RutFirma>"));
+    assert_eq!(c.matches("<DocumentoRecibo ").count(), 1);
+    // Sin recinto no hay recibo.
+    assert!(
+        s.sii_intercambio_responder(&sobre, "x.xml", &IntercambioInput::default())
+            .is_err()
+    );
+
+    // Un sobre dirigido a otro RUT se rechaza completo: solo hay acuse.
+    car.rut_receptor = "99999999-9".into();
+    let ajeno = envio_dte(&car, &firmados, &cert_prov, "2026-11-22T09:02:00").unwrap();
+    let out = s
+        .sii_intercambio_responder(&ajeno, "y.xml", &input)
+        .unwrap();
+    assert_eq!(out.resumen.estado_envio, 3);
+    assert!(out.resultado.is_none() && out.recibos.is_none());
+    assert!(t(&out.recepcion).contains("<EstadoRecepEnv>3</EstadoRecepEnv>"));
+}
+
+/// Factura desde una venta: el borrador toma el receptor de la ficha del cliente, las líneas con su
+/// descuento y la forma de pago; al timbrarla queda unida a la venta y no se emite dos veces.
+#[test]
+fn factura_desde_una_venta() {
+    use nucleo_app::NewCustomer;
+    use nucleo_app::sales_ops::{EffectInput, LineInput, SaleInput};
+    let (_d, _a, mut s) = session();
+    setup(&mut s);
+    s.sii_load_certificate(&pfx(), "clave").unwrap();
+    s.sii_load_caf(&caf(RUT, 33, 1, 5)).unwrap();
+    let c = s
+        .add_customer(&NewCustomer {
+            name: "Clínica Sur SpA".into(),
+            rut: Some("77.777.777-7".into()),
+            email: Some("pagos@clinicasur.cl".into()),
+            profile: nucleo_db::customers::CustomerProfile {
+                business_activity: Some("Servicios de salud".into()),
+                address: Some("Av. Lyon 1801".into()),
+                commune: Some("Curicó".into()),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .unwrap();
+    let v = s
+        .save_sale(
+            &SaleInput {
+                doc_type: "VEN".into(),
+                customer_uid: Some(c.uid.clone()),
+                issue_date: "2026-11-20".into(),
+                lines: vec![
+                    LineInput {
+                        product_uid: None,
+                        description: "Registrador de temperatura RC-5".into(),
+                        qty_milli: 3000,
+                        unit_price_minor: 25_000,
+                        discount_ppm: 100_000,
+                        taxable: true,
+                    },
+                    LineInput {
+                        product_uid: None,
+                        description: "Despacho".into(),
+                        qty_milli: 1000,
+                        unit_price_minor: 5_000,
+                        discount_ppm: 0,
+                        taxable: true,
+                    },
+                ],
+                notes: None,
+                terms: None,
+            },
+            None,
+        )
+        .unwrap();
+    let uid = v.summary.uid.clone();
+    // Una venta en borrador no se factura.
+    assert!(
+        s.sii_sale_draft(&uid)
+            .unwrap_err()
+            .to_string()
+            .contains("efectuada")
+    );
+    s.effect_sale(
+        &uid,
+        &EffectInput {
+            mode: "credito".into(),
+            method: String::new(),
+            due_date: Some("2026-12-20".into()),
+            account_uid: None,
+        },
+    )
+    .unwrap();
+    let b = s.sii_sale_draft(&uid).unwrap();
+    assert_eq!(b.tipo, 33);
+    assert_eq!(
+        (b.receptor.rut.as_str(), b.receptor.razon_social.as_str()),
+        ("77777777-7", "Clínica Sur SpA")
+    );
+    assert_eq!(b.receptor.giro.as_deref(), Some("Servicios de salud"));
+    assert_eq!(b.receptor.comuna.as_deref(), Some("Curicó"));
+    assert_eq!(b.detalle.len(), 2);
+    assert_eq!(
+        (
+            b.detalle[0].cantidad_milli,
+            b.detalle[0].precio,
+            b.detalle[0].descuento_pct,
+            b.detalle[0].descuento_monto,
+            b.detalle[0].monto
+        ),
+        (Some(3000), Some(25_000), Some(10.0), Some(7_500), 67_500)
+    );
+    assert_eq!(b.sale_uid.as_deref(), Some(uid.as_str()));
+    let antes = s.sale(&uid).unwrap().summary.documentation_state;
+    let d = s.sii_issue(&b).unwrap();
+    assert_eq!(
+        (d.folio, d.total_minor),
+        (1, s.sale(&uid).unwrap().summary.total_minor)
+    );
+    // En certificación la venta no cambia; y no se emite dos veces.
+    assert_eq!(s.sale(&uid).unwrap().summary.documentation_state, antes);
+    assert!(
+        s.sii_sale_draft(&uid)
+            .unwrap_err()
+            .to_string()
+            .contains("ya tiene factura electrónica N° 1")
+    );
+
+    // En producción (con resolución y folios reales) la venta queda documentada con el folio.
+    let st = s.sii_status().unwrap();
+    s.sii_save_setup(&SiiSetup {
+        ambiente: Ambiente::Produccion,
+        emisor: st.emisor.clone(),
+        resolucion_fecha: Some("2026-12-10".into()),
+        resolucion_numero: Some(80),
+    })
+    .unwrap();
+    s.sii_load_caf(&caf(RUT, 33, 100, 105)).unwrap();
+    let b = s.sii_sale_draft(&uid).unwrap();
+    let d = s.sii_issue(&b).unwrap();
+    assert_eq!((d.folio, d.ambiente), (100, Ambiente::Produccion));
+    let venta = s.sale(&uid).unwrap();
+    assert_eq!(venta.summary.documentation_state, "documentada");
+    let r = venta.external_ref.unwrap();
+    assert_eq!(
+        (r.doc_kind.as_deref(), r.external_number.as_deref()),
+        (Some("Factura electrónica"), Some("100"))
+    );
+}

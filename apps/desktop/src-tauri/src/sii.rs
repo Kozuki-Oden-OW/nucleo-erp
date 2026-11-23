@@ -3,6 +3,7 @@
 //! escribe ella en NÚCLEO. La red se usa sin tener tomada la sesión (preparar → SII → aplicar).
 
 use crate::commands::{AppState, CommandError};
+use nucleo_app::sii_intercambio::{IntercambioInput, IntercambioResumen};
 use nucleo_app::sii_ops::{
     self, SiiDocument, SiiIssueInput, SiiLibro, SiiLibroInput, SiiSetup, SiiStatus, UreqSii,
 };
@@ -163,4 +164,84 @@ pub fn sii_libro_export_xml(state: State<'_, AppState>, id: i64, path: String) -
 #[tauri::command]
 pub fn sii_document_print(state: State<'_, AppState>, id: i64) -> CmdResult<SiiPrintDoc> {
     with(&state, |s| s.sii_document_print(id))
+}
+
+/* ───────────── Intercambio con otros contribuyentes ───────────── */
+
+fn read_envio(path: &str) -> CmdResult<Vec<u8>> {
+    let meta =
+        std::fs::metadata(path).map_err(|e| err(format!("no se pudo leer el envío: {e}")))?;
+    if meta.len() > 20 * 1024 * 1024 {
+        return Err(err("el archivo del envío es demasiado grande"));
+    }
+    std::fs::read(path).map_err(|e| err(format!("no se pudo leer el envío: {e}")))
+}
+
+/// Lee un sobre recibido (EnvioDTE) y muestra qué trae y cómo se respondería.
+#[tauri::command]
+pub fn sii_intercambio_leer(
+    state: State<'_, AppState>,
+    path: String,
+) -> CmdResult<IntercambioResumen> {
+    let xml = read_envio(&path)?;
+    with(&state, |s| s.sii_intercambio_leer(&xml))
+}
+
+#[derive(serde::Serialize)]
+pub struct IntercambioGuardado {
+    pub resumen: IntercambioResumen,
+    pub archivos: Vec<String>,
+}
+
+/// Arma y firma las respuestas a un sobre recibido y las guarda en la carpeta indicada.
+#[tauri::command]
+pub fn sii_intercambio_responder(
+    state: State<'_, AppState>,
+    path: String,
+    carpeta: String,
+    input: IntercambioInput,
+) -> CmdResult<IntercambioGuardado> {
+    let xml = read_envio(&path)?;
+    let dir = std::path::PathBuf::from(&carpeta);
+    if !dir.is_dir() {
+        return Err(err("la carpeta de destino no existe"));
+    }
+    let nombre = std::path::Path::new(&path)
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "envio.xml".into());
+    let out = with(&state, |s| {
+        s.sii_intercambio_responder(&xml, &nombre, &input)
+    })?;
+    let base: String = nombre
+        .trim_end_matches(".xml")
+        .trim_end_matches(".XML")
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
+        .take(60)
+        .collect();
+    let mut archivos = Vec::new();
+    let mut guardar = |prefijo: &str, bytes: &[u8]| -> CmdResult<()> {
+        let p = dir.join(format!("{prefijo}_{base}.xml"));
+        std::fs::write(&p, bytes).map_err(|e| err(format!("no se pudo guardar: {e}")))?;
+        archivos.push(p.to_string_lossy().to_string());
+        Ok(())
+    };
+    guardar("1_RecepcionEnvio", &out.recepcion)?;
+    if let Some(b) = &out.resultado {
+        guardar("2_ResultadoDTE", b)?;
+    }
+    if let Some(b) = &out.recibos {
+        guardar("3_EnvioRecibos", b)?;
+    }
+    Ok(IntercambioGuardado {
+        resumen: out.resumen,
+        archivos,
+    })
+}
+
+/// Borrador del documento tributario de una venta efectuada (para revisarlo antes de timbrar).
+#[tauri::command]
+pub fn sii_sale_draft(state: State<'_, AppState>, sale_uid: String) -> CmdResult<SiiIssueInput> {
+    with(&state, |s| s.sii_sale_draft(&sale_uid))
 }
