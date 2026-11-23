@@ -69,13 +69,24 @@ struct Tot {
     exe: i64,
     neto: i64,
     iva: i64,
-    ops_iva: u64,
     no_rec: BTreeMap<u8, (u64, i64)>,
     ops_uso_comun: u64,
     uso_comun: i64,
     ops_ret_total: u64,
     ret_total: i64,
     total: i64,
+}
+
+/// Código de «IVA retenido total» en la tabla de otros impuestos del SII.
+const COD_IVA_RETENIDO_TOTAL: u16 = 15;
+
+/// Documentos electrónicos emitidos por el contribuyente: en el libro de ventas no llevan detalle.
+/// (Las facturas de compra, 45 y 46, sí lo llevan.)
+fn solo_resumen_en_ventas(tipo: u16) -> bool {
+    matches!(
+        tipo,
+        33 | 34 | 39 | 41 | 43 | 52 | 56 | 61 | 110 | 111 | 112
+    )
 }
 
 fn pct(p: f64) -> String {
@@ -142,9 +153,6 @@ pub fn libro_el(
         t.exe += l.exento;
         t.neto += l.neto;
         t.iva += l.iva;
-        if l.iva > 0 {
-            t.ops_iva += 1;
-        }
         if let Some((c, m)) = l.iva_no_recuperable {
             let e = t.no_rec.entry(c).or_default();
             e.0 += 1;
@@ -172,9 +180,6 @@ pub fn libro_el(
         e = e
             .child(El::text("TotMntExe", t.exe.to_string()))
             .child(El::text("TotMntNeto", t.neto.to_string()));
-        if compra && t.ops_iva > 0 {
-            e.push(El::text("TotOpIVARec", t.ops_iva.to_string()));
-        }
         e.push(El::text("TotMntIVA", t.iva.to_string()));
         for (c, (ops, m)) in &t.no_rec {
             e.push(
@@ -200,9 +205,19 @@ pub fn libro_el(
                 ));
         }
         if t.ops_ret_total > 0 {
-            e = e
-                .child(El::text("TotOpIVARetTotal", t.ops_ret_total.to_string()))
-                .child(El::text("TotIVARetTotal", t.ret_total.to_string()));
+            if compra {
+                // En el libro de compras la retención total del IVA (factura de compra) se informa
+                // como otro impuesto, código 15.
+                e.push(
+                    El::new("TotOtrosImp")
+                        .child(El::text("CodImp", COD_IVA_RETENIDO_TOTAL.to_string()))
+                        .child(El::text("TotMntImp", t.ret_total.to_string())),
+                );
+            } else {
+                e = e
+                    .child(El::text("TotOpIVARetTotal", t.ops_ret_total.to_string()))
+                    .child(El::text("TotIVARetTotal", t.ret_total.to_string()));
+            }
         }
         e.push(El::text("TotMntTotal", t.total.to_string()));
         resumen.push(e);
@@ -218,6 +233,11 @@ pub fn libro_el(
         envio.push(resumen);
     }
     for l in lineas {
+        // En el libro de ventas los documentos electrónicos emitidos van solo en el resumen: el SII ya
+        // tiene su detalle (y en la certificación rechaza el libro si se repite).
+        if !compra && solo_resumen_en_ventas(l.tipo) {
+            continue;
+        }
         let mut d = El::new("Detalle")
             .child(El::text("TpoDoc", l.tipo.to_string()))
             .child(El::text("NroDoc", l.folio.to_string()));
@@ -253,7 +273,16 @@ pub fn libro_el(
             d.push(El::text("IVAUsoComun", m.to_string()));
         }
         if let Some(m) = l.iva_retenido_total {
-            d.push(El::text("IVARetTotal", m.to_string()));
+            if compra {
+                d.push(
+                    El::new("OtrosImp")
+                        .child(El::text("CodImp", COD_IVA_RETENIDO_TOTAL.to_string()))
+                        .opt("TasaImp", l.tasa_iva.map(pct))
+                        .child(El::text("MntImp", m.to_string())),
+                );
+            } else {
+                d.push(El::text("IVARetTotal", m.to_string()));
+            }
         }
         d.push(El::text("MntTotal", l.total.to_string()));
         envio.push(d);

@@ -83,7 +83,14 @@ Tiempo estimado: F1–F2 de 3 a 6 semanas de desarrollo; F3–F5 depende de las 
    líneas de más de 4090 caracteres. NÚCLEO ahora escribe un elemento por línea (firmado así) y parte el
    base64 de la firma en líneas de 76. El detalle del rechazo llega al «mail contacto SII» como
    `DTEMAIL<track>.txt/.xml`.
-3. Un documento ya enviado no se reenvía con el mismo folio desde NÚCLEO: se firma de nuevo con el folio
+3. **Libros «CONTENIDO NO CORRESPONDE A LO ESPERADO»** (revisión del avance, 23-11-2026; el set básico quedó
+   «REVISADO CONFORME»): aunque la subida respondió «LOK – cuadrado», la revisión los rechazó. Diferencias
+   con los ejemplos aceptados por el SII: en el **libro de ventas** los documentos electrónicos emitidos van
+   solo en el resumen (sin `Detalle`); en el **libro de compras** la factura de compra con retención total
+   lleva `MntIVA` y `OtrosImp` código 15 (y `TotOtrosImp` en el resumen), no `IVARetTotal`. Un libro ya
+   enviado no se reenvía en el mismo período: el corregido va en otro período (en certificación sirve
+   cualquiera).
+4. Un documento ya enviado no se reenvía con el mismo folio desde NÚCLEO: se firma de nuevo con el folio
    siguiente (en certificación sobran folios).
 
 ## Diseño técnico

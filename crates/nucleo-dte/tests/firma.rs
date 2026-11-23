@@ -530,6 +530,16 @@ fn libro_de_compras_set() {
         &bytes,
     )
     .unwrap();
+    // La factura de compra con retención total va como otro impuesto, código 15, y resta del total.
+    assert!(xml.contains("<MntNeto>10793</MntNeto><MntIVA>2051</MntIVA><OtrosImp><CodImp>15</CodImp><TasaImp>19</TasaImp><MntImp>2051</MntImp></OtrosImp><MntTotal>10793</MntTotal>"));
+    assert!(xml.contains("<TotOtrosImp><CodImp>15</CodImp><TotMntImp>2051</TotMntImp></TotOtrosImp><TotMntTotal>10793</TotMntTotal>"));
+    assert!(!xml.contains("IVARetTotal"));
+    // El mismo libro como ventas: los documentos electrónicos van solo en el resumen.
+    let mut venta = car.clone();
+    venta.operacion = Operacion::Venta;
+    let v =
+        from_latin1(&libro_cv(&venta, &lineas[1..2], None, &cert, "2026-11-22T13:00:00").unwrap());
+    assert!(v.contains("<TotalesPeriodo>") && !v.contains("<Detalle>"));
     // Sin factor de proporcionalidad no se puede declarar IVA de uso común.
     assert!(libro_cv(&car, &lineas, None, &cert, "2026-11-22T13:00:00").is_err());
 }
