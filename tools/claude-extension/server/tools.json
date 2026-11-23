@@ -842,6 +842,127 @@
     }
   },
   {
+    "name": "registrar_ventas_mercadolibre",
+    "nivel": "completo",
+    "description": "Registra en NÚCLEO ventas de Mercado Libre leídas en el portal de vendedores (detalle de cada venta), sin la conexión automática. Por cada venta: con «factura» (folio ya emitido) se enlaza a esa venta de NÚCLEO sin crear otra; sin factura y con descontar_stock, crea la venta al contado que descuenta stock (factura «por facturar» si trae razón social); sin factura y sin descontar_stock, queda anotada «por revisar» para cuadrar el cobro. Guarda total, comisión, envío y neto a recibir de Mercado Pago. No duplica: una venta ya registrada no cambia. «producto» es el código (SKU) del producto EN NÚCLEO. descontar_stock solo para lo despachado que el stock de NÚCLEO aún no refleja.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "ventas": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 50,
+          "items": {
+            "type": "object",
+            "properties": {
+              "venta": {
+                "type": "string",
+                "description": "N.º de venta de Mercado Libre (solo dígitos)"
+              },
+              "fecha": {
+                "type": "string",
+                "description": "AAAA-MM-DD"
+              },
+              "cancelada": {
+                "type": "boolean",
+                "description": "La venta se canceló en Mercado Libre"
+              },
+              "comprador": {
+                "type": "string",
+                "description": "Nombre del comprador"
+              },
+              "rut": {
+                "type": "string",
+                "description": "RUT del comprador o de la empresa"
+              },
+              "razon_social": {
+                "type": "string",
+                "description": "Si es empresa"
+              },
+              "giro": {
+                "type": "string",
+                "description": "Giro comercial"
+              },
+              "direccion": {
+                "type": "string",
+                "description": "Dirección de facturación"
+              },
+              "comuna": {
+                "type": "string",
+                "description": "Comuna"
+              },
+              "lineas": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "producto": {
+                      "type": "string",
+                      "description": "SKU del producto en NÚCLEO (ej. P-00004)"
+                    },
+                    "titulo": {
+                      "type": "string",
+                      "description": "Título de la publicación"
+                    },
+                    "cantidad": {
+                      "type": "number",
+                      "description": "Unidades"
+                    },
+                    "precio": {
+                      "type": "number",
+                      "description": "Precio unitario con IVA"
+                    }
+                  },
+                  "required": [
+                    "producto",
+                    "cantidad",
+                    "precio"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "comision": {
+                "type": "number",
+                "description": "Cargos por venta, en pesos"
+              },
+              "envio": {
+                "type": "number",
+                "description": "Envíos que cobra Mercado Libre, en pesos"
+              },
+              "anulaciones": {
+                "type": "number",
+                "description": "Reembolsos o anulaciones, en pesos"
+              },
+              "cobro": {
+                "type": "string",
+                "description": "N.º de cobro de Mercado Pago"
+              },
+              "factura": {
+                "type": "string",
+                "description": "Folio de la factura ya emitida (ej. 514)"
+              },
+              "descontar_stock": {
+                "type": "boolean",
+                "description": "Descontar del stock lo despachado (por defecto no)"
+              }
+            },
+            "required": [
+              "venta",
+              "fecha",
+              "lineas"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "ventas"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "pedidos_mercadolibre",
     "nivel": "ver",
     "description": "Lista los pedidos de Mercado Libre ya vistos por NÚCLEO: fecha, comprador, total, comisión, envío, neto a recibir de Mercado Pago, estado (importada, por revisar, cancelada), si pide factura y la venta enlazada. Sirve para cuadrar los depósitos de Mercado Pago con el banco.",

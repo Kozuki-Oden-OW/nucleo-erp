@@ -72,6 +72,21 @@ ganancia                 = queda antes del costo − costo de los productos (cos
    con el costo de NÚCLEO, la ganancia.
 7. Cruce con NÚCLEO: qué ventas ya están (por la referencia ML o el folio de la factura) y cuáles faltan.
 
+## Registrar en NÚCLEO
+
+Con la herramienta `registrar_ventas_mercadolibre` (una llamada con todas las ventas leídas):
+
+| Venta | Cómo se registra |
+|---|---|
+| Con factura subida (`514-dl.pdf`) | `factura: "514"`: se enlaza a la venta FE-514 que ya está en NÚCLEO. No crea otra venta |
+| Por despachar o despachada después del último conteo de stock, sin factura | `descontar_stock: true`: venta al contado que descuenta stock; con razón social queda «por facturar» |
+| Antigua, sin factura | Sin `factura` ni `descontar_stock`: queda «por revisar» (falta su boleta o factura) |
+
+Decisiones del dueño (Data Logger, 23-11-2026): se descuenta stock **solo de lo despachado desde el
+23-11-2026** (el stock de NÚCLEO ya refleja lo anterior) y el «RC-5+» de Mercado Libre (SKU
+EFI255100000, con o sin sonda) es el producto **P-00004** de NÚCLEO. Los demás: Tlog-10E = P-00001,
+RC-51H = P-00011, GSP-6 Pro = P-00003, RCW-800 THE = P-00007.
+
 ## Límites
 
 - Sesión de **colaborador de solo lectura**. No se responde mensajes, no se imprime ni se cambia nada (salvo

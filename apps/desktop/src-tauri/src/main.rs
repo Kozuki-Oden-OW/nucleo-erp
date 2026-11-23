@@ -110,6 +110,7 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         ml::ml_disconnect,
         ml::ml_sync,
         ml::ml_orders,
+        ml::ml_register_manual,
         ml::ml_link_item,
         access::accesses,
         access::save_access,

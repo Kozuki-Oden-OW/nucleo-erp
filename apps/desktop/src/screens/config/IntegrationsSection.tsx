@@ -74,7 +74,7 @@ function MercadoLibreCard() {
       setSt(s);
       setClientId(s.client_id ?? "");
       setRedirect(s.redirect_uri);
-      if (s.connected) setOrders(await backend.mlOrders(300));
+      setOrders(await backend.mlOrders(300));
     } catch (e) { setErr(errorMessage(e)); }
   }, [backend]);
   useEffect(() => { void load(); }, [load]);
@@ -115,7 +115,7 @@ function MercadoLibreCard() {
     setSt(await backend.mlStatus());
     toast(r.to_review ? "warning" : "success", `Ventas nuevas ${r.imported} · completadas ${r.completed} · por revisar ${r.to_review} · por facturar ${r.to_invoice}`);
   });
-  const disconnect = () => run("disconnect", async () => { setSt(await backend.mlDisconnect()); setOrders([]); });
+  const disconnect = () => run("disconnect", async () => { setSt(await backend.mlDisconnect()); });
   const link = (p: Product | null) => {
     if (!p || !linking) return;
     void run("link", async () => {
@@ -190,14 +190,18 @@ function MercadoLibreCard() {
           </>
         )}
 
-        {st.connected && (
+        {(st.connected || orders.length > 0) && (
           <>
-            <div className="flex flex-wrap items-end gap-3">
-              <Field label="Desde" type="date" value={from} onChange={(e) => setFrom(e.target.value)} hint="Vacío: últimos 15 días." />
-              <Button icon={RefreshCw} onClick={sync} disabled={!!busy}>{busy === "sync" ? "Sincronizando…" : "Sincronizar ventas"}</Button>
-              {editable && <Button variant="ghost" icon={Unplug} onClick={disconnect} disabled={!!busy}>Desconectar</Button>}
-              <span className="text-xs text-muted">{st.last_sync_at ? `Última sincronización: ${new Date(st.last_sync_at).toLocaleString("es-CL")}` : "Aún no sincronizas."}</span>
-            </div>
+            {st.connected ? (
+              <div className="flex flex-wrap items-end gap-3">
+                <Field label="Desde" type="date" value={from} onChange={(e) => setFrom(e.target.value)} hint="Vacío: últimos 15 días." />
+                <Button icon={RefreshCw} onClick={sync} disabled={!!busy}>{busy === "sync" ? "Sincronizando…" : "Sincronizar ventas"}</Button>
+                {editable && <Button variant="ghost" icon={Unplug} onClick={disconnect} disabled={!!busy}>Desconectar</Button>}
+                <span className="text-xs text-muted">{st.last_sync_at ? `Última sincronización: ${new Date(st.last_sync_at).toLocaleString("es-CL")}` : "Aún no sincronizas."}</span>
+              </div>
+            ) : (
+              <p className="text-sm text-muted">Estas ventas se registraron leyendo el portal de vendedores, sin la conexión automática.</p>
+            )}
             {pending.length > 0 && (
               <Notice tone="warning" title={`Para revisar (${pending.length})`}>
                 <ul className="flex flex-col gap-2">

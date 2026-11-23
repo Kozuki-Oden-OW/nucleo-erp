@@ -7,7 +7,7 @@ import type {
   AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput,
-  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
+  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
@@ -150,6 +150,8 @@ export interface Backend {
   mlDisconnect(): Promise<MlStatus>;
   mlSync(from?: string | null): Promise<MlSyncReport>;
   mlOrders(limit?: number): Promise<MlOrderRow[]>;
+  /** Registra ventas leídas en el portal de vendedores (sin la conexión por API). No duplica. */
+  mlRegisterManual(orders: MlManualOrder[]): Promise<MlSyncReport>;
   mlLinkItem(itemId: string, variationId: string | null, productUid: string, title?: string | null): Promise<void>;
   // Accesos de solo lectura a sitios web (gestor de contraseñas). La clave nunca vuelve a la interfaz.
   accesses(): Promise<AccessRow[]>;

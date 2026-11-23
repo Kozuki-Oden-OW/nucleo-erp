@@ -554,6 +554,48 @@ pub fn fetch(http: &dyn MlHttp, plan: &mut SyncPlan) -> Result<Vec<MlOrder>, Htt
     Ok(out)
 }
 
+/* ─────────────────────────────── Ventas leídas en el portal ─────────────────────────────── */
+
+/// Línea de una venta leída en el portal de vendedores.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct MlManualLine {
+    /// Código (SKU) del producto **en NÚCLEO**.
+    pub sku: String,
+    pub title: String,
+    pub qty: i64,
+    /// Precio unitario con IVA, en pesos.
+    pub unit_price_minor: i64,
+}
+
+/// Venta de Mercado Libre leída en el portal de vendedores (por el asistente o por la persona), para
+/// registrarla sin la conexión por API. `move_stock` indica si lo despachado todavía no está
+/// descontado del stock de NÚCLEO.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct MlManualOrder {
+    pub order_id: String,
+    /// AAAA-MM-DD.
+    pub date: String,
+    pub cancelled: bool,
+    pub buyer: Option<String>,
+    pub buyer_rut: Option<String>,
+    pub business_name: Option<String>,
+    pub activity: Option<String>,
+    pub address: Option<String>,
+    pub commune: Option<String>,
+    pub lines: Vec<MlManualLine>,
+    /// Cargos por venta (comisión) y envío que cobra Mercado Libre, en pesos.
+    pub sale_fee_minor: i64,
+    pub shipping_cost_minor: i64,
+    /// Reembolsos o anulaciones.
+    pub refunded_minor: i64,
+    pub payment_id: Option<String>,
+    /// Folio de la factura electrónica ya emitida por esta venta (si la hay).
+    pub invoice_folio: Option<String>,
+    pub move_stock: bool,
+}
+
 /* ─────────────────────────────── Resultado ─────────────────────────────── */
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -1193,6 +1235,269 @@ impl CompanySession {
             [id],
             |r| r.get(0),
         )?))
+    }
+
+    /// Registra ventas leídas en el portal de vendedores, sin la conexión por API. Tres casos:
+    /// - con factura ya emitida: se enlaza a esa venta de NÚCLEO (no se crea otra) y, si corresponde,
+    ///   se descuenta el stock con un ajuste;
+    /// - sin factura y con stock por descontar: venta al contado que descuenta stock (como la
+    ///   sincronización), factura «por facturar» si el comprador es empresa;
+    /// - sin factura y sin stock por descontar: queda anotada «por revisar» para cuadrar el cobro,
+    ///   sin crear una venta.
+    ///
+    /// No duplica: una venta ya registrada no cambia.
+    pub fn ml_register_manual(&mut self, orders: &[MlManualOrder]) -> AppResult<MlSyncReport> {
+        self.require("ventas.crear")?;
+        let mut report = MlSyncReport::default();
+        for o in orders {
+            if let Err(e) = self.ml_register_one(o, &mut report) {
+                report
+                    .messages
+                    .push(format!("Venta {}: {e}", o.order_id.trim()));
+            }
+        }
+        Ok(report)
+    }
+
+    fn ml_register_one(&mut self, o: &MlManualOrder, report: &mut MlSyncReport) -> AppResult<()> {
+        let id = o.order_id.trim().trim_start_matches('#').to_string();
+        if id.is_empty() || id.len() > 30 || !id.chars().all(|c| c.is_ascii_digit()) {
+            return Err(AppError::Validation(
+                "el número de venta de Mercado Libre son solo dígitos".into(),
+            ));
+        }
+        let date = crate::sales_ops::parse_date("la fecha de la venta", o.date.trim())?;
+        if o.lines.is_empty()
+            || o.lines
+                .iter()
+                .any(|l| l.qty <= 0 || l.unit_price_minor < 0 || l.sku.trim().is_empty())
+        {
+            return Err(AppError::Validation(
+                "cada línea necesita el código del producto en NÚCLEO, la cantidad y el precio"
+                    .into(),
+            ));
+        }
+        let now = now_utc();
+        let state = db::order_state(self.db.conn(), &id)?;
+        if matches!(&state, Some((_, st)) if st == "importada" || st == "cancelada") {
+            report.unchanged += 1;
+            return Ok(());
+        }
+        let total: i64 = o.lines.iter().map(|l| l.qty * l.unit_price_minor).sum();
+        let billing = MlBilling {
+            doc_type: o.buyer_rut.as_ref().map(|_| "RUT".to_string()),
+            doc_number: o.buyer_rut.clone(),
+            name: o.buyer.clone(),
+            business_name: o.business_name.clone(),
+            activity: o.activity.clone(),
+            address: o.address.clone(),
+            commune: o.commune.clone(),
+            city: None,
+            region: None,
+        };
+        let order = MlOrder {
+            id: id.clone(),
+            pack_id: None,
+            status: if o.cancelled { "cancelled" } else { "paid" }.into(),
+            date: date.clone(),
+            buyer_nickname: None,
+            buyer_name: o.buyer.clone().or(o.business_name.clone()),
+            items: o
+                .lines
+                .iter()
+                .enumerate()
+                .map(|(i, l)| MlItem {
+                    item_id: format!("PORTAL-{}", l.sku.trim().to_uppercase()),
+                    variation_id: String::new(),
+                    title: if l.title.trim().is_empty() {
+                        l.sku.trim().to_string()
+                    } else {
+                        l.title.trim().to_string()
+                    },
+                    seller_sku: Some(l.sku.trim().to_string()),
+                    qty: l.qty,
+                    unit_price_minor: l.unit_price_minor,
+                    // La comisión viene por venta: se anota en la primera línea.
+                    sale_fee_minor: if i == 0 { o.sale_fee_minor.max(0) } else { 0 },
+                })
+                .collect(),
+            total_minor: total,
+            shipping_paid_minor: 0,
+            payment_id: o.payment_id.clone(),
+            shipping_id: None,
+            shipping_cost_minor: o.shipping_cost_minor.max(0),
+            billing: Some(billing.clone()),
+        };
+        if o.cancelled {
+            if state.is_some() {
+                self.ml_mark(
+                    &order,
+                    state.and_then(|(s, _)| s),
+                    "cancelada",
+                    Some("Cancelada en Mercado Libre"),
+                    &now,
+                )?;
+                report.cancelled += 1;
+            }
+            return Ok(());
+        }
+        let refund_note = (o.refunded_minor > 0)
+            .then(|| format!("Mercado Libre anuló o reembolsó ${}", o.refunded_minor));
+        let folio = o
+            .invoice_folio
+            .as_deref()
+            .map(|f| f.trim().trim_start_matches("FE-").to_string())
+            .filter(|f| !f.is_empty());
+
+        // Sin factura y con stock por descontar: venta nueva, igual que la sincronización.
+        if folio.is_none() && o.move_stock {
+            self.ml_apply_group(&id, &[&order], report)?;
+            // Con reembolso parcial, la venta queda señalada para que la persona la revise.
+            if let (Some(n), Some((sale_id, _))) =
+                (&refund_note, db::order_state(self.db.conn(), &id)?)
+            {
+                let issue = format!("{n}: revisa la venta");
+                self.ml_mark(&order, sale_id, "por_revisar", Some(&issue), &now)?;
+                report.messages.push(format!("Venta {id}: {issue}"));
+            }
+            return Ok(());
+        }
+
+        let write = |s: &mut Self,
+                     sale_id: Option<i64>,
+                     status: &str,
+                     issue: Option<&str>|
+         -> AppResult<()> {
+            let bjson = serde_json::to_string(&billing).ok();
+            db::upsert_order(
+                s.db.conn(),
+                &MlOrderWrite {
+                    order_id: &id,
+                    pack_id: None,
+                    sale_id,
+                    date_created: &date,
+                    buyer: order.buyer_name.as_deref(),
+                    ml_status: "paid",
+                    status,
+                    total_minor: total - o.refunded_minor.max(0),
+                    sale_fee_minor: o.sale_fee_minor.max(0),
+                    shipping_cost_minor: o.shipping_cost_minor.max(0),
+                    needs_invoice: billing.wants_invoice(),
+                    billing_json: bjson.as_deref(),
+                    issue,
+                    now: &now,
+                },
+            )?;
+            Ok(())
+        };
+
+        let Some(folio) = folio else {
+            // Sin factura y sin stock por descontar: solo queda anotada para cuadrar el cobro.
+            let issue = format!(
+                "Sin venta en NÚCLEO: falta anotar su {}{}",
+                if billing.wants_invoice() {
+                    "factura"
+                } else {
+                    "boleta o factura"
+                },
+                refund_note
+                    .as_ref()
+                    .map(|n| format!(". {n}"))
+                    .unwrap_or_default()
+            );
+            write(self, None, "por_revisar", Some(&issue))?;
+            report.to_review += 1;
+            if billing.wants_invoice() {
+                report.to_invoice += 1;
+            }
+            return Ok(());
+        };
+
+        // Con factura: se enlaza a la venta que ya existe.
+        let found =
+            nucleo_db::sales::sale_with_external(self.db.conn(), "Factura electrónica", &folio)?;
+        let Some(sale_uid) = found else {
+            let issue = format!(
+                "La factura N° {folio} no está en NÚCLEO: impórtala (o corrige el folio) y registra la venta otra vez"
+            );
+            write(self, None, "por_revisar", Some(&issue))?;
+            report.to_review += 1;
+            report.messages.push(format!("Venta {id}: {issue}"));
+            return Ok(());
+        };
+        let sale_id = nucleo_db::sales::sale_by_uid(self.db.conn(), &sale_uid)?.map(|s| s.id);
+        let mut issue = refund_note.clone();
+        if o.move_stock {
+            // La factura histórica no movió stock: se descuenta con un ajuste que la nombra.
+            match self.ml_stock_exit(o, &id, &folio, &date) {
+                Ok(()) => {}
+                Err(e) => {
+                    let m = format!("El stock no se descontó ({e})");
+                    report.messages.push(format!("Venta {id}: {m}"));
+                    issue = Some(match issue {
+                        Some(n) => format!("{m}. {n}"),
+                        None => m,
+                    });
+                }
+            }
+        }
+        let status = if issue.is_some() {
+            "por_revisar"
+        } else {
+            "importada"
+        };
+        write(self, sale_id, status, issue.as_deref())?;
+        if status == "importada" {
+            report.imported += 1;
+        } else {
+            report.to_review += 1;
+        }
+        Ok(())
+    }
+
+    /// Descuenta del stock lo despachado por una venta que ya tenía su factura en NÚCLEO.
+    fn ml_stock_exit(
+        &mut self,
+        o: &MlManualOrder,
+        order_id: &str,
+        folio: &str,
+        date: &str,
+    ) -> AppResult<()> {
+        use crate::inventory_ops::{AdjustmentInput, StockLineInput};
+        let warehouse = self
+            .warehouses()?
+            .into_iter()
+            .find(|w| w.is_default && !w.archived)
+            .ok_or_else(|| AppError::Validation("no hay una bodega principal".into()))?;
+        let mut lines = Vec::new();
+        for l in &o.lines {
+            let uid: Option<String> = self
+                .db
+                .conn()
+                .query_row(
+                    "SELECT uid FROM products WHERE lower(sku) = lower(?1) AND archived_at IS NULL",
+                    [l.sku.trim()],
+                    |r| r.get(0),
+                )
+                .optional()?;
+            let uid = uid.ok_or_else(|| {
+                AppError::Validation(format!("no hay un producto con el código {}", l.sku.trim()))
+            })?;
+            lines.push(StockLineInput {
+                product_uid: uid,
+                qty_milli: -l.qty * 1000,
+            });
+        }
+        self.adjust_stock(&AdjustmentInput {
+            warehouse_uid: warehouse.uid,
+            date: date.to_string(),
+            kind: "ajuste".into(),
+            reason: format!(
+                "Despacho de la venta de Mercado Libre {order_id} (factura N° {folio}, ya registrada)"
+            ),
+            lines,
+        })?;
+        Ok(())
     }
 
     pub fn ml_orders(&self, limit: Option<i64>) -> AppResult<Vec<MlOrderRow>> {

@@ -330,3 +330,144 @@ fn comprador_con_factura_y_token_renovado() {
     let _ = sync(&mut s, &fake);
     assert_eq!(*fake.refreshed.borrow(), before + 1);
 }
+
+/// Ventas leídas en el portal de vendedores (sin la conexión por API).
+fn manual(id: &str, sku: &str, qty: i64, price: i64) -> ml_ops::MlManualOrder {
+    ml_ops::MlManualOrder {
+        order_id: id.into(),
+        date: "2026-11-22".into(),
+        buyer: Some("Jorge Parra".into()),
+        buyer_rut: Some("16531719-K".into()),
+        lines: vec![ml_ops::MlManualLine {
+            sku: sku.into(),
+            title: "Elitech Rc-5+ Datalogger".into(),
+            qty,
+            unit_price_minor: price,
+        }],
+        sale_fee_minor: 3_588 * qty,
+        shipping_cost_minor: 3_050 * qty,
+        payment_id: Some("191064002454".into()),
+        move_stock: true,
+        ..Default::default()
+    }
+}
+
+#[test]
+fn ventas_leidas_en_el_portal() {
+    let (_d, _app, mut s) = session();
+    product(&mut s, "P-00004", 10);
+    let ventas = |s: &CompanySession| {
+        s.list_sales(&SaleFilter {
+            query: None,
+            view: Some("todas".into()),
+        })
+        .unwrap()
+        .len()
+    };
+    // Una factura ya emitida por una venta de Mercado Libre, importada como historial (no mueve stock).
+    let factura: nucleo_app::history_ops::HistoricalSale = serde_json::from_value(json!({
+        "doc_kind": "Factura electrónica", "number": "514", "issue_date": "2026-11-16",
+        "customer": {"name": "Horizonte Patagon SpA", "rut": "78286433-5"},
+        "lines": [{"product_sku": "P-00004", "description": "RC-5+", "qty_milli": 3000,
+                   "unit_price_minor": 25126, "net_minor": 75378}],
+        "net_minor": 75378, "tax_minor": 14322, "total_minor": 89700
+    }))
+    .unwrap();
+    s.import_historical_sales(&[factura]).unwrap();
+    assert_eq!((stock(&s, "P-00004"), ventas(&s)), (10, 1));
+
+    // 1) Venta de hoy, sin factura: venta nueva que descuenta stock, con comisión y envío.
+    let hoy = manual("2000016197919421", "P-00004", 1, 29_900);
+    // 2) Venta de empresa por despachar: queda como factura «por facturar».
+    let mut empresa = manual("2000016193546005", "P-00004", 1, 29_900);
+    empresa.buyer = Some("Paola Valenzuela".into());
+    empresa.buyer_rut = Some("78270468-0".into());
+    empresa.business_name = Some("Tobar y Valenzuela Limitada".into());
+    empresa.activity = Some("Atención de enfermería".into());
+    // 3) Venta antigua con factura ya emitida: se enlaza a esa venta, sin mover stock.
+    let mut facturada = manual("2000016058167709", "P-00004", 3, 29_900);
+    facturada.invoice_folio = Some("514".into());
+    facturada.move_stock = false;
+    // 4) Venta antigua sin factura: solo queda anotada por revisar.
+    let mut antigua = manual("2000015857847519", "P-00004", 1, 35_900);
+    antigua.move_stock = false;
+    // 5) Factura que NÚCLEO no tiene.
+    let mut sin_factura = manual("2000015203388493", "P-00004", 1, 59_900);
+    sin_factura.invoice_folio = Some("FE-999".into());
+    sin_factura.move_stock = false;
+
+    let r = s
+        .ml_register_manual(&[
+            hoy.clone(),
+            empresa,
+            facturada.clone(),
+            antigua,
+            sin_factura,
+        ])
+        .unwrap();
+    assert_eq!(
+        (r.imported, r.to_review, r.to_invoice),
+        (3, 2, 1),
+        "{:?}",
+        r.messages
+    );
+    // Solo las dos de hoy descontaron stock; se crearon dos ventas nuevas (la facturada no se duplica).
+    assert_eq!((stock(&s, "P-00004"), ventas(&s)), (8, 3));
+    let orders = s.ml_orders(None).unwrap();
+    let by = |id: &str| orders.iter().find(|o| o.order_id == id).unwrap();
+    let o = by("2000016197919421");
+    assert_eq!(
+        (
+            o.status.as_str(),
+            o.total_minor,
+            o.sale_fee_minor,
+            o.shipping_cost_minor,
+            o.net_minor
+        ),
+        ("importada", 29_900, 3_588, 3_050, 23_262)
+    );
+    assert!(by("2000016193546005").needs_invoice);
+    let f = by("2000016058167709");
+    assert_eq!(
+        (f.status.as_str(), f.net_minor),
+        ("importada", 89_700 - 3 * 6_638)
+    );
+    assert_eq!(
+        s.sale(f.sale_uid.as_deref().unwrap())
+            .unwrap()
+            .external_ref
+            .unwrap()
+            .external_number
+            .as_deref(),
+        Some("514")
+    );
+    let a = by("2000015857847519");
+    assert!(a.status == "por_revisar" && a.sale_uid.is_none());
+    assert!(a.issue.as_deref().unwrap().contains("Sin venta en NÚCLEO"));
+    assert!(
+        by("2000015203388493")
+            .issue
+            .as_deref()
+            .unwrap()
+            .contains("factura N° 999 no está en NÚCLEO")
+    );
+
+    // Otra vez: nada se duplica.
+    let r = s.ml_register_manual(&[hoy, facturada.clone()]).unwrap();
+    assert_eq!((r.imported, r.unchanged), (0, 2));
+    assert_eq!((stock(&s, "P-00004"), ventas(&s)), (8, 3));
+
+    // Una venta ya facturada cuyo despacho aún no se descuenta: ajuste de stock que nombra la factura.
+    let mut despacho = facturada;
+    despacho.order_id = "2000016058167710".into();
+    despacho.move_stock = true;
+    let r = s.ml_register_manual(&[despacho]).unwrap();
+    assert_eq!(r.imported, 1, "{:?}", r.messages);
+    assert_eq!((stock(&s, "P-00004"), ventas(&s)), (5, 3));
+
+    // Datos incompletos: se informa y no se registra.
+    let mut mala = manual("ABC", "P-00004", 1, 100);
+    mala.lines[0].qty = 0;
+    let r = s.ml_register_manual(&[mala]).unwrap();
+    assert_eq!(r.messages.len(), 1);
+}

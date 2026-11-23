@@ -119,6 +119,29 @@ describe("historial a crédito", () => {
   });
 });
 
+describe("Mercado Libre leído en el portal", () => {
+  it("registra ventas sin duplicar: con stock, con factura y por revisar", async () => {
+    const b = new DemoBackend();
+    const [p] = (await b.searchProducts("")).filter((x) => x.kind === "producto" && x.on_hand_milli >= 3000);
+    const before = p!.on_hand_milli;
+    const venta = (n: string, extra: Record<string, unknown>) => ({ venta: n, fecha: "2026-11-22", comprador: "Jorge Parra", rut: "16531719-K", lineas: [{ producto: p!.sku, titulo: "Publicación", cantidad: 1, precio: 29900 }], comision: 3588, envio: 3050, ...extra });
+    const r = await runTool(b, "completo", "registrar_ventas_mercadolibre", { ventas: [
+      venta("2000016197919421", { descontar_stock: true }),
+      venta("2000015857847519", {}),
+      venta("2000015203388493", { factura: "999999" }),
+    ] });
+    expect(txt(r)).toMatch(/registradas 1 · por revisar 2/);
+    expect(txt(r)).toMatch(/factura N° 999999 no está en NÚCLEO/);
+    expect((await b.searchProducts(p!.sku)).find((x) => x.uid === p!.uid)!.on_hand_milli).toBe(before - 1000);
+    const again = await runTool(b, "completo", "registrar_ventas_mercadolibre", { ventas: [venta("2000016197919421", { descontar_stock: true })] });
+    expect(txt(again)).toMatch(/sin cambios 1/);
+    expect((await b.searchProducts(p!.sku)).find((x) => x.uid === p!.uid)!.on_hand_milli).toBe(before - 1000);
+    const o = (await b.mlOrders()).find((x) => x.order_id === "2000016197919421")!;
+    expect([o.total_minor, o.sale_fee_minor, o.shipping_cost_minor, o.net_minor]).toEqual([29900, 3588, 3050, 23262]);
+    expect((await runTool(b, "borradores", "registrar_ventas_mercadolibre", { ventas: [venta("1", {})] })).isError).toBe(true);
+  });
+});
+
 describe("Accesos (gestor de contraseñas)", () => {
   it("guarda accesos de solo lectura y nunca entrega la clave", async () => {
     const b = new DemoBackend();

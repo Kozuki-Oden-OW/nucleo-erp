@@ -1666,6 +1666,30 @@ export interface WooPushReport {
   messages: string[];
 }
 
+/** Venta de Mercado Libre leída en el portal de vendedores, para registrarla sin la conexión por API. */
+export interface MlManualOrder {
+  order_id: string;
+  /** AAAA-MM-DD */
+  date: string;
+  cancelled?: boolean;
+  buyer?: string | null;
+  buyer_rut?: string | null;
+  business_name?: string | null;
+  activity?: string | null;
+  address?: string | null;
+  commune?: string | null;
+  /** `sku` es el código del producto en NÚCLEO; el precio es unitario con IVA. */
+  lines: { sku: string; title: string; qty: number; unit_price_minor: number }[];
+  sale_fee_minor: number;
+  shipping_cost_minor: number;
+  refunded_minor?: number;
+  payment_id?: string | null;
+  /** Folio de la factura electrónica ya emitida por esta venta. */
+  invoice_folio?: string | null;
+  /** Lo despachado aún no está descontado del stock de NÚCLEO. */
+  move_stock: boolean;
+}
+
 /* ───────── Correo de la empresa (SMTP) ───────── */
 
 export interface MailStatus {

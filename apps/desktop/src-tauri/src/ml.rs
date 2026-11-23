@@ -6,7 +6,7 @@
 //! redirige ahí con el código. Si eso falla, la persona pega el código o la dirección.
 
 use crate::commands::{AppState, CommandError};
-use nucleo_app::ml_ops::{self, MlStatus, MlSyncReport, UreqHttp};
+use nucleo_app::ml_ops::{self, MlManualOrder, MlStatus, MlSyncReport, UreqHttp};
 use nucleo_app::nucleo_db::integrations::MlOrderRow;
 use nucleo_app::{AppError, CompanySession};
 use std::io::{Read, Write};
@@ -198,6 +198,15 @@ pub async fn ml_sync(state: State<'_, AppState>, from: Option<String>) -> CmdRes
     .map_err(|e| err(e.to_string()))?;
     let orders = orders.map_err(|e| err(e.to_string()))?;
     with(&state, |s| s.ml_apply(&plan, &orders))
+}
+
+/// Registra ventas leídas en el portal de vendedores (sin la conexión por API): no usa la red.
+#[tauri::command]
+pub fn ml_register_manual(
+    state: State<'_, AppState>,
+    orders: Vec<MlManualOrder>,
+) -> CmdResult<MlSyncReport> {
+    with(&state, |s| s.ml_register_manual(&orders))
 }
 
 #[tauri::command]

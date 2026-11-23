@@ -235,6 +235,23 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
         ...r.messages.map((m) => `- ${m}`),
       ].join("\n"));
     }
+    case "registrar_ventas_mercadolibre": {
+      const list = Array.isArray(a.ventas) ? (a.ventas as Record<string, unknown>[]) : [];
+      if (!list.length) throw new Error("Indica al menos una venta.");
+      const orders = list.map((v) => ({
+        order_id: str(v, "venta"), date: str(v, "fecha"), cancelled: v.cancelada === true,
+        buyer: str(v, "comprador") || null, buyer_rut: str(v, "rut") || null, business_name: str(v, "razon_social") || null,
+        activity: str(v, "giro") || null, address: str(v, "direccion") || null, commune: str(v, "comuna") || null,
+        lines: (Array.isArray(v.lineas) ? (v.lineas as Record<string, unknown>[]) : []).map((l) => ({ sku: str(l, "producto"), title: str(l, "titulo"), qty: num(l, "cantidad") || 0, unit_price_minor: Math.round(num(l, "precio") || 0) })),
+        sale_fee_minor: Math.round(num(v, "comision") || 0), shipping_cost_minor: Math.round(num(v, "envio") || 0), refunded_minor: Math.round(num(v, "anulaciones") || 0),
+        payment_id: str(v, "cobro") || null, invoice_folio: str(v, "factura") || null, move_stock: v.descontar_stock === true,
+      }));
+      const r = await backend.mlRegisterManual(orders);
+      return text([
+        `Mercado Libre (portal): registradas ${r.imported} · por revisar ${r.to_review} · por facturar ${r.to_invoice} · canceladas ${r.cancelled} · sin cambios ${r.unchanged}.`,
+        ...r.messages.map((m) => `- ${m}`),
+      ].join("\n"));
+    }
     case "pedidos_mercadolibre": {
       const r = (await backend.mlOrders(Math.min(Math.max(num(a, "limite") || 50, 1), 300)));
       return text(r.length

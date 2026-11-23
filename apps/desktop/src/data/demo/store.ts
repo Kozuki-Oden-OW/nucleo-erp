@@ -5,7 +5,7 @@ import { AppError, type Backend, type Feature, type FileSource, type ImportView,
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
   SiiDocument, SiiIssueInput, SiiIntercambioGuardado, SiiIntercambioInput, SiiIntercambioResumen, SiiLibro, SiiLibroInput, SiiPrintDoc, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
-  MlBilling, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
+  MlBilling, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput, StatementLineView, BankSuggestion,
   F22Inputs, F22View,
@@ -2240,6 +2240,57 @@ export class DemoBackend implements Backend {
     const applied = apply && changes.length > 0;
     if (applied) this.log("integracion.editar", "integracion", "woocommerce");
     return wait({ changes, applied, matched: inStore.length, not_in_store: goods.length - inStore.length, not_in_nucleo: 1, prices_with_tax: prices ? true : null, messages: [] });
+  }
+  /** Ventas leídas en el portal: con stock por descontar crean una venta; con factura se enlazan; el resto queda por revisar. */
+  async mlRegisterManual(orders: MlManualOrder[]): Promise<MlSyncReport> {
+    this.require("ventas.crear");
+    const tax = this.taxPpm() ?? 0;
+    const net = (g: number) => Math.round((g * 1_000_000) / (1_000_000 + tax));
+    const r: MlSyncReport = { imported: 0, to_review: 0, completed: 0, cancelled: 0, unchanged: 0, to_invoice: 0, messages: [] };
+    for (const o of orders) {
+      const id = o.order_id.trim().replace(/^#/, "");
+      try {
+        if (!/^\d{1,30}$/.test(id)) throw new AppError("validacion", "El número de venta de Mercado Libre son solo dígitos.");
+        if (!o.lines.length || o.lines.some((l) => l.qty <= 0 || !l.sku.trim())) throw new AppError("validacion", "Cada línea necesita el código del producto en NÚCLEO, la cantidad y el precio.");
+        const known = this.ml.orders.find((x) => x.order_id === id);
+        if (known && known.status !== "por_revisar") { r.unchanged++; continue; }
+        if (o.cancelled) continue;
+        const total = o.lines.reduce((a, l) => a + l.qty * l.unit_price_minor, 0);
+        const company = !!o.business_name?.trim();
+        const buyer = o.business_name?.trim() || o.buyer?.trim() || "Comprador de Mercado Libre";
+        const folio = o.invoice_folio?.trim().replace(/^FE-/, "") || null;
+        let saleUid: string | null = null;
+        let status: MlOrderRow["status"] = "por_revisar";
+        let issue: string | null = null;
+        if (folio) {
+          const s = this.sales.find((x) => x.number === `FE-${folio}`);
+          if (s) { saleUid = s.uid; status = "importada"; }
+          else issue = `La factura N° ${folio} no está en NÚCLEO: impórtala (o corrige el folio) y registra la venta otra vez`;
+        } else if (o.move_stock) {
+          const lines = o.lines.map((l) => ({ product_uid: this.products.find((p) => p.sku.toLowerCase() === l.sku.trim().toLowerCase())?.uid ?? null, description: l.title || l.sku, qty_milli: l.qty * 1000, unit_price_minor: net(l.unit_price_minor), discount_ppm: 0, taxable: true }));
+          const customers = await this.searchCustomers(buyer);
+          const customer = customers.find((c) => c.name.toLowerCase() === buyer.toLowerCase()) ?? await this.addCustomer({ name: buyer, kind: company ? "empresa" : "persona" } as NewCustomer);
+          const sale = await this.saveSale({ doc_type: company ? "FV" : "VEN", customer_uid: customer.uid, issue_date: o.date, lines,
+            notes: `Mercado Libre · venta ${id} · total ML $${total} · comisión $${o.sale_fee_minor} · envío vendedor $${o.shipping_cost_minor}`,
+            terms: { ...EMPTY_TERMS, payment: "transferencia", references: [{ kind: "ML", folio: id, date: o.date, note: null }] } });
+          saleUid = sale.uid;
+          if (lines.some((l) => !l.product_uid)) issue = `No hay un producto de NÚCLEO con el código ${o.lines.find((l) => !this.products.some((p) => p.sku.toLowerCase() === l.sku.trim().toLowerCase()))?.sku}`;
+          else {
+            try { await this.effectSale(sale.uid, { mode: "contado", method: "Transferencia", due_date: null }); status = "importada"; }
+            catch (e) { issue = `No se pudo confirmar: ${(e as Error).message}`; }
+          }
+        } else issue = `Sin venta en NÚCLEO: falta anotar su ${company ? "factura" : "boleta o factura"}`;
+        const refund = o.refunded_minor ?? 0;
+        const row: MlOrderRow = { order_id: id, pack_id: null, sale_uid: saleUid, sale_number: null, sale_state: null, date_created: o.date, buyer, ml_status: "paid", status,
+          total_minor: total - refund, sale_fee_minor: o.sale_fee_minor, shipping_cost_minor: o.shipping_cost_minor, net_minor: total - refund - o.sale_fee_minor - o.shipping_cost_minor,
+          needs_invoice: company, billing: null, issue };
+        this.ml.orders = [...this.ml.orders.filter((x) => x.order_id !== id), row];
+        if (company && !folio) r.to_invoice++;
+        if (status === "importada") r.imported++;
+        else { r.to_review++; if (issue) r.messages.push(`Venta ${id}: ${issue}`); }
+      } catch (e) { r.messages.push(`Venta ${id}: ${(e as Error).message}`); }
+    }
+    return wait(r);
   }
   async siiLibroExportXml(): Promise<boolean> { throw new AppError("validacion", "En la demostración no hay XML firmado."); }
   async siiExportXml(): Promise<boolean> { throw new AppError("validacion", "En la demostración no hay XML firmado."); }
