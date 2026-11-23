@@ -241,6 +241,12 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
         ? `${r.length} pedidos de Mercado Libre:\n${r.map((o) => `- ${o.date_created} · ${o.pack_id ?? o.order_id} · ${o.buyer ?? "—"} · total ${pesos(o.total_minor)} · comisión ${pesos(o.sale_fee_minor)} · envío ${pesos(o.shipping_cost_minor)} · a recibir ${pesos(o.net_minor)} · ${o.status}${o.needs_invoice ? " · por facturar" : ""}${o.sale_number ? ` · ${o.sale_number}` : ""}${o.issue ? ` · ${o.issue}` : ""}`).join("\n")}`
         : "Aún no hay pedidos de Mercado Libre en NÚCLEO.");
     }
+    case "listar_accesos": {
+      const r = await backend.accesses();
+      return text(r.length
+        ? `${r.length} ${r.length === 1 ? "acceso guardado" : "accesos guardados"} (la clave no se muestra):\n${r.map((x) => `- ${x.name} · ${x.login_url} · usuario ${x.username} · ${x.kind === "lectura" ? "solo lectura" : "operador sin pagos"}${x.has_password ? " · clave guardada" : " · sin clave"}${x.notes ? ` · ${x.notes}` : ""}`).join("\n")}`
+        : "No hay accesos guardados. Se agregan en Configuración → Integraciones → Accesos (la clave la escribe la persona).");
+    }
     case "sincronizar_woocommerce": {
       const r = await backend.wooSync(str(a, "desde") || null);
       return text([

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, ExternalLink, Landmark, Link2, RefreshCw, ShoppingBag, Truck, Unplug } from "lucide-react";
 import { MailCard } from "./MailCard";
 import { WooCard } from "./WooCard";
+import { AccessCard } from "./AccessCard";
 import { errorMessage, useBackend, type MlOrderRow, type MlStatus, type MlSyncReport, type Product } from "../../data";
 import { formatCLP, formatDate } from "../../lib/format";
 import { navigate } from "../../lib/router";
@@ -31,6 +32,7 @@ export function IntegrationsSection() {
       <MailCard />
       <MercadoLibreCard />
       <WooCard />
+      <AccessCard />
       <Card title="Couriers" subtitle="Crear órdenes de transporte desde Envíos con la etiqueta y el seguimiento, y avisar al cliente por correo." actions={<Badge icon={Truck}>Próximamente</Badge>}>
         <ul className="flex flex-col gap-1.5 text-sm text-muted">
           <li><strong className="text-ink">Bluexpress:</strong> pide a tu ejecutivo la documentación de la API y la llave de tu cuenta empresa (o instala su plugin en WooCommerce).</li>

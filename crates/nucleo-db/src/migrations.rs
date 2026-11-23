@@ -220,6 +220,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "woocommerce",
         sql: include_str!("../migrations/0042_woocommerce.sql"),
     },
+    Migration {
+        version: 43,
+        name: "accesos",
+        sql: include_str!("../migrations/0043_accesos.sql"),
+    },
 ];
 
 pub fn latest_version() -> i64 {

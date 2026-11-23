@@ -3,6 +3,7 @@
 //! Casos de uso de NÚCLEO ERP. Cada operación que modifica datos corre en **una sola
 //! transacción** que incluye el cambio y su registro de auditoría (Blueprint §2.3).
 
+pub mod access_ops;
 pub mod accounting_ops;
 pub mod auth;
 pub mod bank_ops;

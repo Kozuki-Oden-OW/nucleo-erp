@@ -13,7 +13,7 @@ con las mismas reglas, permisos y auditoría del programa.
 
    | Nivel | Puede |
    |---|---|
-   | Solo ver | `ver_pantalla`, `ir_a`, `desplazar` y las consultas (`resumen_negocio`, `buscar*`, `listar_*`, `datos_de_apoyo`, `listar_documentos_sii`, `consultar_estado_sii`, `consultar_libro_sii`, `pedidos_woocommerce`, `comparar_woocommerce`) |
+   | Solo ver | `ver_pantalla`, `ir_a`, `desplazar` y las consultas (`resumen_negocio`, `buscar*`, `listar_*`, `datos_de_apoyo`, `listar_documentos_sii`, `consultar_estado_sii`, `consultar_libro_sii`, `pedidos_woocommerce`, `comparar_woocommerce`, `listar_accesos`) |
    | Crear borradores | Lo anterior + `crear_cliente`, `crear_proveedor`, `crear_producto`, `crear_venta_borrador`, `registrar_gasto` (queda por pagar), `registrar_envio` |
    | Acceso completo | Lo anterior + `clic`, `escribir`, `elegir`, `tecla`, `confirmar_venta`, `registrar_cobro`, gastos pagados y la facturación SII (`cargar_folios_sii`, `emitir_documento_sii`, `enviar_documentos_sii`, `crear_libro_sii`, `enviar_libro_sii`, `responder_intercambio_sii`) y `sincronizar_woocommerce`. Enviar stock o precios a la tienda WooCommerce no es una herramienta: lo confirma la persona en la pantalla. Enviar al SII es irreversible: Claude muestra el resumen y espera la confirmación de la persona en el chat |
 
@@ -92,11 +92,11 @@ construyen después de la certificación del SII.
 
 | # | Tarea | Qué hace el agente | Estado |
 |---|---|---|---|
-| 1 | **Gestor de contraseñas de NÚCLEO** | Pide ingresos a sitios con usuarios de solo lectura, sin ver ni escribir la clave (funciones abajo) | Por construir |
+| 1 | **Gestor de contraseñas de NÚCLEO** | Pide ingresos a sitios con usuarios de solo lectura, sin ver ni escribir la clave (funciones abajo) | Guardar accesos y `listar_accesos`: construido el 23-11-2026. Pedir y autorizar el ingreso: por construir (con la extensión) |
 | 2 | **Aviso de autorización** | Cada ingreso pedido por el agente avisa al dueño con «Autorizo / No autorizo»: en el PC, por correo, por WhatsApp y en la app del celular | Por construir (PC primero, luego correo, luego WhatsApp) |
 | 3 | **Extensión de Chrome para NÚCLEO** | Conecta Chrome con NÚCLEO para trabajar en sitios sin API con la sesión de la empresa | Por construir |
 | 4 | **Revisar cartolas del banco** | Con el usuario de solo lectura (BCI primero): saldo, ingresos, egresos y glosa; propone qué venta quedó pagada. Nunca transferencias ni pagos | Espera el usuario de lectura que creará el dueño |
-| 5 | **Revisar Mercado Libre** | Con el colaborador de solo lectura: ventas, por facturar y pagos, para cuadrar con NÚCLEO | Espera el colaborador que creará el dueño |
+| 5 | **Revisar Mercado Libre** | Con el colaborador de solo lectura: abre el **detalle de cada venta** (cliente, RUT, giro, factura subida, reclamos, cobro) y cuadra con NÚCLEO. Receta en `docs/recetas/mercadolibre-revision-ventas.md` | Colaborador creado; primera revisión a mano el 23-11-2026 |
 | 6 | **Crear órdenes de transporte** | Desde un envío de NÚCLEO, crea la OT en el courier (Bluexpress primero: Punto Market Plaza Ñuñoa, talla S hasta 16 equipos y M desde 17, sin mercancías peligrosas); se detiene antes de pagar | Por construir (receta Bluexpress escrita) |
 | 7 | **Ingreso automático del robot** | NÚCLEO entra solo con el usuario de lectura, descarga cartola y ventas y las deja importadas; el agente cuadra desde NÚCLEO sin entrar al banco | Por construir |
 | 8 | **Folios y consultas en sii.cl** | Ayuda a descargar folios (CAF) y a consultar la empresa con la sesión que inició la persona | Por construir (con la extensión de Chrome) |

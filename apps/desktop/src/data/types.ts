@@ -1557,6 +1557,32 @@ export interface MlSyncReport {
   messages: string[];
 }
 
+/* ───────── Accesos a sitios (gestor de contraseñas) ───────── */
+
+/** Acceso guardado a un sitio web. La clave nunca viene: solo si hay una guardada. */
+export interface AccessRow {
+  uid: string;
+  name: string;
+  login_url: string;
+  username: string;
+  kind: "lectura" | "operador";
+  notes: string | null;
+  has_password: boolean;
+  updated_at: string;
+}
+
+/** Al cambiar un acceso, la clave vacía conserva la guardada. */
+export interface AccessInput {
+  name: string;
+  login_url: string;
+  username: string;
+  password: string;
+  kind: "lectura" | "operador";
+  notes?: string | null;
+  /** La persona declara que la cuenta no puede pagar ni transferir. */
+  no_payments: boolean;
+}
+
 /* ───────── WooCommerce (tienda propia) ───────── */
 
 export interface WooStatus {

@@ -119,6 +119,25 @@ describe("historial a crédito", () => {
   });
 });
 
+describe("Accesos (gestor de contraseñas)", () => {
+  it("guarda accesos de solo lectura y nunca entrega la clave", async () => {
+    const b = new DemoBackend();
+    expect(txt(await runTool(b, "ver", "listar_accesos", {}))).toMatch(/No hay accesos guardados/);
+    const base = { name: "Mercado Libre", login_url: "https://www.mercadolibre.cl/", username: "colaborador@ejemplo.cl", password: "clave-de-ejemplo", kind: "lectura" as const, no_payments: true };
+    await expect(b.saveAccess(null, { ...base, no_payments: false })).rejects.toThrow(/no puede pagar ni transferir/);
+    await expect(b.saveAccess(null, { ...base, login_url: "https://zeusr.sii.cl/" })).rejects.toThrow(/Clave Tributaria/);
+    await expect(b.saveAccess(null, { ...base, password: "" })).rejects.toThrow(/clave/);
+    const a = await b.saveAccess(null, base);
+    expect(JSON.stringify(await b.accesses())).not.toMatch(/clave-de-ejemplo/);
+    const listed = txt(await runTool(b, "ver", "listar_accesos", {}));
+    expect(listed).toMatch(/Mercado Libre .* usuario colaborador@ejemplo\.cl · solo lectura · clave guardada/);
+    expect(listed).not.toMatch(/clave-de-ejemplo/);
+    await expect(b.saveAccess(null, base)).rejects.toThrow(/Ya hay un acceso/);
+    expect((await b.saveAccess(a.uid, { ...base, password: "", username: "otro@ejemplo.cl" })).username).toBe("otro@ejemplo.cl");
+    expect(await b.deleteAccess(a.uid)).toHaveLength(0);
+  });
+});
+
 describe("WooCommerce (demostración)", () => {
   it("conecta, trae pedidos con su envío sin duplicar y compara stock y precios sin enviar", async () => {
     const b = new DemoBackend();

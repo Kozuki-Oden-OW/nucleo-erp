@@ -7,7 +7,7 @@ import type {
   AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput,
-  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlOrderRow, MlStatus, MlSyncReport, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
+  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
@@ -151,6 +151,10 @@ export interface Backend {
   mlSync(from?: string | null): Promise<MlSyncReport>;
   mlOrders(limit?: number): Promise<MlOrderRow[]>;
   mlLinkItem(itemId: string, variationId: string | null, productUid: string, title?: string | null): Promise<void>;
+  // Accesos de solo lectura a sitios web (gestor de contraseñas). La clave nunca vuelve a la interfaz.
+  accesses(): Promise<AccessRow[]>;
+  saveAccess(uid: string | null, input: AccessInput): Promise<AccessRow>;
+  deleteAccess(uid: string): Promise<AccessRow[]>;
   // WooCommerce (Configuración → Integraciones)
   wooStatus(): Promise<WooStatus>;
   /** Prueba las llaves contra la tienda y, si responde bien, guarda la conexión. */

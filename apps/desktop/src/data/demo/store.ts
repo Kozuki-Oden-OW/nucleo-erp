@@ -5,7 +5,7 @@ import { AppError, type Backend, type Feature, type FileSource, type ImportView,
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
   SiiDocument, SiiIssueInput, SiiIntercambioGuardado, SiiIntercambioInput, SiiIntercambioResumen, SiiLibro, SiiLibroInput, SiiPrintDoc, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
-  MlBilling, MlOrderRow, MlStatus, MlSyncReport, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
+  MlBilling, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput, StatementLineView, BankSuggestion,
   F22Inputs, F22View,
@@ -2087,6 +2087,41 @@ export class DemoBackend implements Backend {
     if (l.estado === "enviado") { l.estado = "aceptado"; l.glosa = "LOK Libro Cuadrado (demostración)"; }
     return wait(l);
   }
+  /* ───────────── Accesos a sitios (la clave no se guarda en la demostración) ───────────── */
+
+  private accessList: AccessRow[] = [];
+
+  async accesses(): Promise<AccessRow[]> {
+    return wait([...this.accessList].sort((a, b) => a.name.localeCompare(b.name, "es")));
+  }
+  async saveAccess(u: string | null, input: AccessInput): Promise<AccessRow> {
+    this.require("config.editar");
+    const name = input.name.trim();
+    const url = input.login_url.trim();
+    const username = input.username.trim();
+    if (!name) throw new AppError("validacion", "Escribe el nombre del sitio (ej. «Mercado Libre»).");
+    if (!url.startsWith("https://")) throw new AppError("validacion", "La dirección de ingreso debe empezar con https:// (cópiala de la página donde inicias sesión).");
+    const both = `${name} ${url}`.toLowerCase();
+    if (both.includes("google.com")) throw new AppError("validacion", "La cuenta de Google no se guarda: inicia sesión tú en el navegador.");
+    if (both.includes("sii.cl") || both.includes("clave tributaria")) throw new AppError("validacion", "La Clave Tributaria del SII no se guarda: entra tú con tu certificado o tu clave.");
+    if (!username) throw new AppError("validacion", "Escribe el usuario o correo con que se inicia sesión.");
+    if (!input.no_payments) throw new AppError("validacion", "Confirma que esta cuenta no puede pagar ni transferir: NÚCLEO solo guarda accesos de consulta.");
+    const cur = u ? this.accessList.find((a) => a.uid === u) : undefined;
+    if (u && !cur) throw new AppError("no_encontrado", "No encontramos ese acceso.");
+    if (!cur && !input.password) throw new AppError("validacion", "Escribe la clave de la cuenta.");
+    if (this.accessList.some((a) => a.uid !== u && a.name.toLowerCase() === name.toLowerCase())) throw new AppError("validacion", "Ya hay un acceso con ese nombre.");
+    const row: AccessRow = { uid: cur?.uid ?? uid("acc"), name, login_url: url, username, kind: input.kind || "lectura", notes: input.notes?.trim() || null, has_password: true, updated_at: now() };
+    this.accessList = [...this.accessList.filter((a) => a.uid !== row.uid), row];
+    this.log("acceso.guardar", "acceso", name);
+    return wait(row);
+  }
+  async deleteAccess(u: string): Promise<AccessRow[]> {
+    this.require("config.editar");
+    if (!this.accessList.some((a) => a.uid === u)) throw new AppError("no_encontrado", "No encontramos ese acceso.");
+    this.accessList = this.accessList.filter((a) => a.uid !== u);
+    return this.accesses();
+  }
+
   /* ───────────── WooCommerce (simulado) ───────────── */
 
   private woo = {

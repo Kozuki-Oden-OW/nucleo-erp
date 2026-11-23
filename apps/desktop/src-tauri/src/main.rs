@@ -1,6 +1,7 @@
 // Sin consola extra en Windows en modo release.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod access;
 mod agent;
 mod commands;
 #[cfg(test)]
@@ -110,6 +111,9 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         ml::ml_sync,
         ml::ml_orders,
         ml::ml_link_item,
+        access::accesses,
+        access::save_access,
+        access::delete_access,
         woo::woo_status,
         woo::woo_connect,
         woo::woo_disconnect,

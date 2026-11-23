@@ -7,7 +7,7 @@ import type {
   AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput,
-  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlOrderRow, MlStatus, MlSyncReport, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
+  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
@@ -154,6 +154,9 @@ export class TauriBackend implements Backend {
   mlSync(from?: string | null) { return call<MlSyncReport>("ml_sync", { from: from ?? null }); }
   mlOrders(limit?: number) { return call<MlOrderRow[]>("ml_orders", { limit: limit ?? null }); }
   async mlLinkItem(itemId: string, variationId: string | null, productUid: string, title?: string | null) { await call<null>("ml_link_item", { itemId, variationId, productUid, title: title ?? null }); }
+  accesses() { return call<AccessRow[]>("accesses"); }
+  saveAccess(uid: string | null, input: AccessInput) { return call<AccessRow>("save_access", { uid, input }); }
+  deleteAccess(uid: string) { return call<AccessRow[]>("delete_access", { uid }); }
   wooStatus() { return call<WooStatus>("woo_status"); }
   wooConnect(input: WooConnectInput) { return call<WooStatus>("woo_connect", { input }); }
   wooDisconnect() { return call<WooStatus>("woo_disconnect"); }
