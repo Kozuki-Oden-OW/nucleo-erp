@@ -31,18 +31,50 @@ Algunas filas del listado dicen «No pudimos mostrar la información de esta ven
 
 El RUT viene sin puntos ni guion (`782864335` = 78.286.433-5).
 
+## Mensajes de la venta
+
+`https://vendedores.mercadolibre.cl/ventas/nueva/mensajeria/<n.º de venta>` (o «Ver mensajes» en el detalle).
+Se leen **todos** los de las ventas con mensajes, no solo los nuevos: ahí el comprador pide boleta o
+factura, entrega otros datos de facturación (otra razón social o RUT que los del portal) o reclama.
+
+- Abrir la conversación la marca como leída. Después de leer se presiona **«Marcar como no leído»** para
+  que el dueño conserve el aviso.
+- No se responde ni se adjunta nada sin que el dueño lo pida.
+- Lo aprendido el 23-11-2026: las facturas que se suben tarde terminan en reclamo y «reputación afectada»
+  (dos casos). Conviene facturar y adjuntar el mismo día de la venta.
+
+## Lo que deja cada venta
+
+Con los montos de la sección «Cobro» (pesos con IVA):
+
+```
+recibido en Mercado Pago = precio − cargos por venta − envíos − anulaciones
+IVA de la venta          = precio × tasa ÷ (1 + tasa)        (tasa de IVA de la empresa en NÚCLEO)
+queda antes del costo    = recibido − IVA de la venta
+ganancia                 = queda antes del costo − costo de los productos (costo en NÚCLEO)
+```
+
+- Los cargos y envíos que cobra Mercado Libre traen su propia factura: su IVA es crédito fiscal y baja el
+  IVA a pagar. Se confirma en «Facturación» del portal antes de contarlo.
+- El envío se cobra **por unidad** en los productos bajo cierto precio (40 unidades = 40 envíos): en
+  ventas de muchas unidades es el cargo que más pesa. Revisarlo siempre.
+- Una venta con reembolso parcial trae «Anulaciones»: se informa aparte.
+
 ## Qué informar
 
 1. **Por despachar hoy**, con la hora límite y si la etiqueta ya está impresa.
 2. **Con factura subida:** folio, cliente, RUT, producto y total (se cruza con la factura en NÚCLEO).
 3. **Empresas sin factura subida** (traen razón social y giro): candidatas a facturar.
 4. **Personas con «Adjuntar factura» sin archivo** y ventas con boleta.
-5. Reclamos, reembolsos (monto anulado) y mensajes sin leer.
-6. Cruce con NÚCLEO: qué ventas ya están (por la referencia ML o el folio de la factura) y cuáles faltan.
+5. Reclamos, reembolsos (monto anulado) y **qué pide cada comprador en los mensajes** (factura o boleta
+   pendiente, datos de facturación distintos a los del portal).
+6. Lo que deja cada venta y el total del período: precio, comisión, envío, recibido, IVA y lo que queda;
+   con el costo de NÚCLEO, la ganancia.
+7. Cruce con NÚCLEO: qué ventas ya están (por la referencia ML o el folio de la factura) y cuáles faltan.
 
 ## Límites
 
-- Sesión de **colaborador de solo lectura**. No se responde mensajes, no se imprime ni se cambia nada, no se
-  adjuntan facturas ni se aceptan cookies opcionales sin que el dueño lo pida.
+- Sesión de **colaborador de solo lectura**. No se responde mensajes, no se imprime ni se cambia nada (salvo
+  volver a marcar como no leído lo que se abrió), no se adjuntan facturas ni se aceptan cookies opcionales sin que el dueño lo pida.
 - La clave del colaborador no la escribe el asistente: la sesión la inicia la persona o NÚCLEO con su
   autorización (Configuración → Integraciones → Accesos).
