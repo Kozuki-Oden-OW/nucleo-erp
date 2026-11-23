@@ -210,6 +210,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "sii_libros",
         sql: include_str!("../migrations/0040_sii_libros.sql"),
     },
+    Migration {
+        version: 41,
+        name: "sii_folios_reutilizados",
+        sql: include_str!("../migrations/0041_sii_folios_reutilizados.sql"),
+    },
 ];
 
 pub fn latest_version() -> i64 {

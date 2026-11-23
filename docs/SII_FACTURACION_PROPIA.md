@@ -90,8 +90,13 @@ Tiempo estimado: F1–F2 de 3 a 6 semanas de desarrollo; F3–F5 depende de las 
    lleva `MntIVA` y `OtrosImp` código 15 (y `TotOtrosImp` en el resumen), no `IVARetTotal`. Un libro ya
    enviado no se reenvía en el mismo período: el corregido va en otro período (en certificación sirve
    cualquiera).
-4. Un documento ya enviado no se reenvía con el mismo folio desde NÚCLEO: se firma de nuevo con el folio
-   siguiente (en certificación sobran folios).
+4. Un documento ya enviado y **rechazado** no quedó registrado en el SII: su folio sigue disponible allá.
+   NÚCLEO lo reutiliza en el siguiente documento del mismo tipo (D-SII-04) y guarda el rechazado como
+   historial. Darlos por gastados fue un error del primer día: al pedir más folios de nota de crédito el
+   SII autorizó solo 1, porque «la empresa posee folios disponibles o sin utilizar por un total de 7»
+   (los 6 de los dos envíos rechazados más el último del CAF). No se reutiliza un rechazo por repetido.
+5. La revisión del avance del set (libros) no es inmediata: quedó «EN REVISION» varias horas después de
+   declarar. La sesión de maullin vence en poco rato y volver a entrar pide el certificado.
 
 ## Diseño técnico
 

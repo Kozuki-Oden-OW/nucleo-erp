@@ -83,3 +83,57 @@ los avisos, el contenido —las tablas como filas «celda | celda»— y cada co
 - Probado en Windows con la extensión (2026-11-18): resumen y lectura de pantalla desde Claude.
 - Captura de imagen de la ventana como herramienta opcional (hoy la pantalla se entrega como texto).
 - Herramientas para compras, inventario e importaciones.
+
+## 7. Tareas nuevas del agente (pedidas por el dueño el 22 y 23-11-2026)
+
+Lista de trabajo para el agente (Claude por la extensión hoy; el Asistente NÚCLEO después). El diseño de
+cada una está en `docs/INTEGRACIONES.md` (I4, I7) y `docs/ROADMAP.md` («Ideas para más adelante»). Se
+construyen después de la certificación del SII.
+
+| # | Tarea | Qué hace el agente | Estado |
+|---|---|---|---|
+| 1 | **Gestor de contraseñas de NÚCLEO** | Pide ingresos a sitios con usuarios de solo lectura, sin ver ni escribir la clave (funciones abajo) | Por construir |
+| 2 | **Aviso de autorización** | Cada ingreso pedido por el agente avisa al dueño con «Autorizo / No autorizo»: en el PC, por correo, por WhatsApp y en la app del celular | Por construir (PC primero, luego correo, luego WhatsApp) |
+| 3 | **Extensión de Chrome para NÚCLEO** | Conecta Chrome con NÚCLEO para trabajar en sitios sin API con la sesión de la empresa | Por construir |
+| 4 | **Revisar cartolas del banco** | Con el usuario de solo lectura (BCI primero): saldo, ingresos, egresos y glosa; propone qué venta quedó pagada. Nunca transferencias ni pagos | Espera el usuario de lectura que creará el dueño |
+| 5 | **Revisar Mercado Libre** | Con el colaborador de solo lectura: ventas, por facturar y pagos, para cuadrar con NÚCLEO | Espera el colaborador que creará el dueño |
+| 6 | **Crear órdenes de transporte** | Desde un envío de NÚCLEO, crea la OT en el courier (Bluexpress primero: Punto Market Plaza Ñuñoa, talla S hasta 16 equipos y M desde 17, sin mercancías peligrosas); se detiene antes de pagar | Por construir (receta Bluexpress escrita) |
+| 7 | **Ingreso automático del robot** | NÚCLEO entra solo con el usuario de lectura, descarga cartola y ventas y las deja importadas; el agente cuadra desde NÚCLEO sin entrar al banco | Por construir |
+| 8 | **Folios y consultas en sii.cl** | Ayuda a descargar folios (CAF) y a consultar la empresa con la sesión que inició la persona | Por construir (con la extensión de Chrome) |
+| 9 | **Asistente NÚCLEO (plan Premium)** | El mismo conjunto de herramientas, dentro de NÚCLEO, con la API de Anthropic | Idea |
+
+### Funciones del gestor de contraseñas
+
+Lo que hace la persona (en Configuración → Integraciones → Accesos):
+
+- Guarda un acceso por sitio: nombre, dirección de ingreso, usuario, clave y tipo (**solo lectura** u
+  operador sin facultad de pago). La clave se escribe en NÚCLEO, se guarda en la base cifrada y nunca
+  se muestra de vuelta (solo «guardada»).
+- Elige por acceso quién puede pedirlo (el robot programado, el agente, ambos) y por dónde llega el
+  aviso (PC, correo, WhatsApp, app).
+- Cambia la clave, desactiva o borra el acceso, y ve el historial de ingresos.
+
+Lo que puede hacer el agente (herramientas nuevas):
+
+| Herramienta | Qué hace |
+|---|---|
+| `listar_accesos` | Sitios con acceso guardado, usuario y tipo. Nunca la clave |
+| `pedir_ingreso {acceso, motivo}` | Crea una solicitud de un solo uso que vence en minutos y dispara el aviso al dueño |
+| `estado_ingreso {solicitud}` | Pendiente, autorizada (sesión abierta), rechazada o vencida |
+| `cerrar_sesion {acceso}` | Cierra la sesión del sitio al terminar la tarea |
+
+Lo que hace NÚCLEO solo:
+
+- Con la autorización, completa usuario y clave en el navegador del robot o de la extensión, **solo si
+  la dirección de la página es la guardada en el acceso** (protege de páginas falsas).
+- Registra en la auditoría cada solicitud: quién la pidió, para qué, quién autorizó o rechazó y desde
+  qué canal.
+- Avisa cuando una clave dejó de funcionar o el sitio pide cambiarla.
+
+Límites que no cambian:
+
+- No hay herramienta que entregue una clave al agente, ni un botón que el agente pueda pulsar para
+  completarla: la autorización es siempre de la persona.
+- Solo accesos de solo lectura u operador sin pago. No se guardan claves de apoderado del banco, de
+  Google, de la Clave Tributaria ni datos de tarjetas.
+- Segundo factor, captchas, códigos de verificación y pagos los hace la persona.

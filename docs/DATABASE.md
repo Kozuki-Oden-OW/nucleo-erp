@@ -67,6 +67,7 @@ Todo es entero: las sumas y los reportes se hacen en SQL sin perder exactitud y 
 | 38 | `0038_conexiones_correo.sql` | `integrations` acepta cualquier proveedor (correo, couriers, bancos, WooCommerce) y `email_log` (cada correo enviado desde NÚCLEO: tipo, destinatario, asunto, cliente, referencia, enviado o fallido, usuario y fecha) |
 | 39 | `0039_envios_courier.sql` | `shipments` con los datos que pide el courier: correo, calle, número, depto, referencia, tipo de entrega (domicilio o punto), punto de origen, servicio, contenido, valor declarado, talla (XS/S/M/L), peso y medidas, declaración «no contiene mercancías peligrosas», costo pagado y n.º de transacción. Los envíos admiten adjuntos (etiqueta, comprobantes) |
 | 40 | `0040_sii_libros.sql` | `sii_libros`: libros de compras y ventas electrónicos (IECV) enviados al SII — operación, período, tipo de libro (mensual, especial, rectifica), folio de notificación, XML firmado, estado y número de seguimiento |
+| 41 | `0041_sii_folios_reutilizados.sql` | `sii_documents_reemplazados`: documentos que el SII rechazó y cuyo folio se volvió a usar; salen de `sii_documents` (folio único) y quedan aquí como historial, con el XML tal como se envió, su seguimiento y la glosa del rechazo |
 
 Las migraciones son transaccionales y versionadas con `PRAGMA user_version`. **Pre-1.0:** se pueden
 reescribir (en la Fase 2 se reemplazó la tabla mínima de clientes de la Fase 1); desde la primera beta

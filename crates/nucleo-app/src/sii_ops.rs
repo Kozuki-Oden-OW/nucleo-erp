@@ -68,6 +68,15 @@ pub struct SiiCertInfo {
     pub vence: Option<String>,
 }
 
+/// Condición SQL (sobre `sii_documents`) de un documento cuyo folio se puede volver a usar: el SII lo
+/// rechazó, así que no quedó registrado allá. Se excluye el rechazo «por repetido» (RPT), que
+/// significa justo lo contrario: ese folio ya está ocupado en el SII.
+const FOLIO_REUTILIZABLE: &str = "estado = 'rechazado' AND COALESCE(glosa, '') NOT LIKE 'RPT%' \
+     AND lower(COALESCE(glosa, '')) NOT LIKE '%repetid%'";
+
+/// Documento rechazado cuyo folio se reutiliza: id del documento, folio, id del CAF, XML del CAF y glosa.
+type FolioRechazado = (i64, i64, i64, Vec<u8>, Option<String>);
+
 #[derive(Debug, Clone, Serialize)]
 pub struct SiiFolios {
     pub id: i64,
@@ -76,8 +85,12 @@ pub struct SiiFolios {
     pub tipo_nombre: String,
     pub desde: u64,
     pub hasta: u64,
+    /// Próximo folio que se va a usar (el menor reutilizable, o el siguiente sin usar).
     pub siguiente: u64,
+    /// Folios disponibles: los sin usar más los reutilizables.
     pub restantes: u64,
+    /// Folios de documentos que el SII rechazó (no quedaron registrados allá) y se vuelven a usar.
+    pub reutilizables: u64,
     pub autorizado: String,
 }
 
@@ -410,12 +423,26 @@ impl CompanySession {
                 hasta: hasta as u64,
                 siguiente: sig as u64,
                 restantes: (hasta - sig + 1).max(0) as u64,
+                reutilizables: 0,
                 autorizado: r.get(6)?,
             })
         })?;
         let mut out = Vec::new();
         for f in rows {
-            let f = f?;
+            let mut f = f?;
+            let (n, menor): (i64, Option<i64>) = self.db.conn().query_row(
+                &format!(
+                    "SELECT COUNT(*), MIN(folio) FROM sii_documents
+                     WHERE ambiente = ?1 AND tipo = ?2 AND folio BETWEEN ?3 AND ?4 AND {FOLIO_REUTILIZABLE}"
+                ),
+                params![f.ambiente.as_str(), f.tipo, f.desde as i64, f.hasta as i64],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )?;
+            f.reutilizables = n as u64;
+            f.restantes += f.reutilizables;
+            if let Some(m) = menor {
+                f.siguiente = m as u64;
+            }
             if amb.is_none_or(|a| a == f.ambiente) {
                 out.push(f);
             }
@@ -732,20 +759,46 @@ impl CompanySession {
         receptor.rut = fmt_rut(&receptor.rut);
         let amb = c.ambiente;
         let tx = self.db.conn_mut().transaction()?;
-        let caf_row: Option<(i64, Vec<u8>, i64)> = tx
+        // Primero los folios de documentos que el SII rechazó: allá siguen sin usar, y dejarlos
+        // botados hace que el SII autorice menos folios nuevos.
+        let reusar: Option<FolioRechazado> = tx
             .query_row(
-                "SELECT id, xml, siguiente FROM sii_cafs WHERE ambiente = ?1 AND tipo = ?2 AND siguiente <= hasta
-                 ORDER BY desde LIMIT 1",
+                &format!(
+                    "SELECT d.id, d.folio, c.id, c.xml, d.glosa FROM sii_documents d
+                     JOIN sii_cafs c ON c.ambiente = d.ambiente AND c.tipo = d.tipo
+                          AND d.folio BETWEEN c.desde AND c.hasta
+                     WHERE d.ambiente = ?1 AND d.tipo = ?2 AND {FOLIO_REUTILIZABLE}
+                     ORDER BY d.folio LIMIT 1"
+                ),
                 params![amb.as_str(), input.tipo],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
             )
             .optional()?;
-        let (caf_id, caf_xml, folio) = caf_row.ok_or_else(|| {
-            AppError::Validation(format!(
-                "no quedan folios de {} — descarga un CAF nuevo en el SII",
-                tipo.name()
-            ))
-        })?;
+        let (caf_id, caf_xml, folio, reemplaza) = match reusar {
+            Some((doc_id, folio, caf_id, xml, glosa)) => (
+                caf_id,
+                xml,
+                folio,
+                Some((doc_id, glosa.unwrap_or_default())),
+            ),
+            None => {
+                let caf_row: Option<(i64, Vec<u8>, i64)> = tx
+                    .query_row(
+                        "SELECT id, xml, siguiente FROM sii_cafs WHERE ambiente = ?1 AND tipo = ?2 AND siguiente <= hasta
+                         ORDER BY desde LIMIT 1",
+                        params![amb.as_str(), input.tipo],
+                        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+                    )
+                    .optional()?;
+                let (caf_id, xml, folio) = caf_row.ok_or_else(|| {
+                    AppError::Validation(format!(
+                        "no quedan folios de {} — descarga un CAF nuevo en el SII",
+                        tipo.name()
+                    ))
+                })?;
+                (caf_id, xml, folio, None)
+            }
+        };
         let caf = Caf::parse(&caf_xml)?;
         let dte = Dte {
             tipo,
@@ -763,11 +816,25 @@ impl CompanySession {
             tasa_iva_ppm: tasa,
         };
         let signed = dte.sign(&caf, &cert, &now)?;
-        tx.execute(
-            "UPDATE sii_cafs SET siguiente = siguiente + 1 WHERE id = ?1",
-            [caf_id],
-        )?;
         let ts = now_utc();
+        match &reemplaza {
+            // El documento rechazado deja su folio y queda guardado como historial.
+            Some((doc_id, _)) => {
+                tx.execute(
+                    "INSERT INTO sii_documents_reemplazados (documento_id, ambiente, tipo, folio, sale_id, fecha, receptor_rut, receptor, total_minor, xml, track_id, glosa, created_at, reemplazado_at)
+                     SELECT id, ambiente, tipo, folio, sale_id, fecha, receptor_rut, receptor, total_minor, xml, track_id, glosa, created_at, ?2
+                     FROM sii_documents WHERE id = ?1",
+                    params![doc_id, ts],
+                )?;
+                tx.execute("DELETE FROM sii_documents WHERE id = ?1", [doc_id])?;
+            }
+            None => {
+                tx.execute(
+                    "UPDATE sii_cafs SET siguiente = siguiente + 1 WHERE id = ?1",
+                    [caf_id],
+                )?;
+            }
+        }
         tx.execute(
             "INSERT INTO sii_documents (ambiente, tipo, folio, sale_id, fecha, receptor_rut, receptor, total_minor, xml, estado, created_at, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'firmado', ?10, ?10)",
@@ -781,11 +848,16 @@ impl CompanySession {
             "sii",
             &format!("{}-{}", input.tipo, folio),
             &format!(
-                "Firmó {} N° {folio} a {} por ${} ({})",
+                "Firmó {} N° {folio} a {} por ${} ({}){}",
                 tipo.name(),
                 receptor.razon_social,
                 signed.totales.total,
-                amb.as_str()
+                amb.as_str(),
+                match &reemplaza {
+                    Some((_, glosa)) =>
+                        format!("; reutiliza el folio de un documento que el SII rechazó ({glosa})"),
+                    None => String::new(),
+                }
             ),
             None,
         )?;

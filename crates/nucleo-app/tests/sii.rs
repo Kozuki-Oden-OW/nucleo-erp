@@ -677,3 +677,66 @@ fn factura_desde_una_venta() {
         (Some("Factura electrónica"), Some("100"))
     );
 }
+
+#[test]
+fn folio_de_un_documento_rechazado_se_reutiliza() {
+    let (_d, _a, mut s) = session();
+    setup(&mut s);
+    s.sii_load_certificate(&pfx(), "clave").unwrap();
+    s.sii_load_caf(&caf(RUT, 33, 1, 3)).unwrap();
+    let d1 = s.sii_issue(&factura()).unwrap();
+    let d2 = s.sii_issue(&factura()).unwrap();
+    assert_eq!((d1.folio, d2.folio), (1, 2));
+
+    // El SII rechaza el envío completo: esos documentos no quedaron registrados allá.
+    let fake = FakeSii::default();
+    let plan = s.sii_send_plan(&[d1.id, d2.id]).unwrap();
+    let track = sii_ops::send(&fake, &plan).unwrap();
+    s.sii_send_apply(&plan, &track).unwrap();
+    *fake.estado.borrow_mut() = "<SII:RESP_HDR><ESTADO>RSC</ESTADO><GLOSA>Rechazado por Error en Schema</GLOSA></SII:RESP_HDR>".into();
+    let (cred, t) = s.sii_status_plan(d1.id).unwrap();
+    let e = sii_ops::check(&fake, &cred, &t).unwrap();
+    let docs = s.sii_status_apply(&t, &e).unwrap();
+    assert!(docs.iter().all(|d| d.estado == "rechazado"));
+
+    // Los folios vuelven a estar disponibles: 1 sin usar + 2 reutilizables; el próximo es el 1.
+    let f = &s.sii_status().unwrap().folios[0];
+    assert_eq!((f.siguiente, f.restantes, f.reutilizables), (1, 3, 2));
+
+    // Se reutilizan de menor a mayor y después sigue el folio nuevo.
+    let n1 = s.sii_issue(&factura()).unwrap();
+    assert_eq!((n1.folio, n1.estado.as_str()), (1, "firmado"));
+    assert_ne!(n1.id, d1.id);
+    let f = &s.sii_status().unwrap().folios[0];
+    assert_eq!((f.siguiente, f.restantes, f.reutilizables), (2, 2, 1));
+    assert_eq!(s.sii_issue(&factura()).unwrap().folio, 2);
+    assert_eq!(s.sii_issue(&factura()).unwrap().folio, 3);
+    assert!(
+        s.sii_issue(&factura())
+            .unwrap_err()
+            .to_string()
+            .contains("no quedan folios")
+    );
+    // Quedan los tres vigentes; los dos rechazados ya no están en la lista ni se pueden reenviar.
+    let lista = s.sii_documents(None).unwrap();
+    assert_eq!(lista.len(), 3);
+    assert!(lista.iter().all(|d| d.estado == "firmado"));
+    assert!(s.sii_send_plan(&[d1.id]).is_err());
+
+    // Rechazo «por repetido»: ese folio ya existe en el SII y no se vuelve a usar.
+    s.sii_load_caf(&caf(RUT, 33, 4, 5)).unwrap();
+    let r = s.sii_issue(&factura()).unwrap();
+    assert_eq!(r.folio, 4);
+    let plan = s.sii_send_plan(&[r.id]).unwrap();
+    s.sii_send_apply(&plan, "9001").unwrap();
+    *fake.estado.borrow_mut() =
+        "<SII:RESP_HDR><ESTADO>RPT</ESTADO><GLOSA>Rechazado por Envio Repetido</GLOSA></SII:RESP_HDR>".into();
+    let e = sii_ops::check(&fake, &cred, "9001").unwrap();
+    // El número de seguimiento es el mismo del sobre anterior, que ya no tiene documentos vigentes.
+    let docs = s.sii_status_apply("9001", &e).unwrap();
+    assert_eq!(docs.len(), 1);
+    assert_eq!(docs[0].estado, "rechazado");
+    let f = s.sii_status().unwrap().folios;
+    assert_eq!(f.iter().map(|x| x.reutilizables).sum::<u64>(), 0);
+    assert_eq!(s.sii_issue(&factura()).unwrap().folio, 5);
+}

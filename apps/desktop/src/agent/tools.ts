@@ -518,7 +518,7 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
       return text([
         `Ambiente: ${st.ambiente === "certificacion" ? "certificación (maullin)" : "producción (palena)"} · emisor ${st.razon_social ?? "?"} ${st.rut ?? ""}`,
         st.faltantes.length ? `Falta para emitir: ${st.faltantes.join("; ")}.` : "Listo para emitir.",
-        `Folios: ${st.folios.length ? st.folios.map((f) => `${f.tipo} ${f.tipo_nombre} (${f.ambiente}) ${f.desde}–${f.hasta}, siguiente ${f.siguiente}, quedan ${f.restantes}`).join("; ") : "ninguno"}.`,
+        `Folios: ${st.folios.length ? st.folios.map((f) => `${f.tipo} ${f.tipo_nombre} (${f.ambiente}) ${f.desde}–${f.hasta}, siguiente ${f.siguiente}, quedan ${f.restantes}${f.reutilizables ? ` (${f.reutilizables} de documentos rechazados por el SII, que se reutilizan)` : ""}`).join("; ") : "ninguno"}.`,
         docs.length ? `Documentos (${docs.length}):\n${docs.map(siiLine).join("\n")}` : "Aún no hay documentos.",
         ...(await backend.siiLibros()).map(libroLine),
       ].join("\n"));

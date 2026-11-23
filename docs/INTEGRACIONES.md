@@ -287,6 +287,41 @@ En la banca empresas, el administrador puede crear usuarios adicionales con perf
 Se revisa con cada banco y courier que sus condiciones permitan el acceso automatizado con el usuario
 de la propia empresa.
 
+### Ingresos con aprobación (decisión del dueño, 23-11-2026)
+
+El dueño va a crear usuarios de **solo lectura** en BCI (operador con solo saldos y cartolas) y en
+Mercado Libre (colaborador). Con ellos hay dos formas de entrar, y se construyen las dos:
+
+1. **NÚCLEO entra solo y el asistente lee desde NÚCLEO** (camino principal para bancos). El robot inicia
+   sesión con el usuario de solo lectura guardado en la base cifrada, a la hora programada o cuando la
+   persona lo lanza; descarga cartola y ventas y las deja en NÚCLEO. El asistente (Claude por la
+   extensión, o el Asistente NÚCLEO) cuadra pagos con lo ya importado y **no entra al banco**.
+2. **Ingreso con aprobación** (para sitios donde el asistente necesita navegar, p. ej. crear una orden
+   de transporte). El asistente **pide** el ingreso a NÚCLEO; NÚCLEO avisa a la persona («El asistente
+   pide entrar a BCI con el usuario de lectura»), con botones **Autorizo / No autorizo**; si autoriza,
+   NÚCLEO completa usuario y clave en el navegador del robot. El asistente **nunca ve ni escribe la
+   clave**, y no existe un botón que el propio asistente pueda pulsar para completarla.
+
+Reglas del ingreso con aprobación:
+
+- Solo para credenciales marcadas como **solo lectura** (o de operador sin facultad de pago). Las de
+  apoderado, Google o SII no se guardan ni se ofrecen.
+- Cada solicitud es de **un solo uso**, vence a los pocos minutos y dice quién pide, qué sitio, con qué
+  usuario y para qué. Queda en la auditoría (pedida, autorizada o rechazada, por quién y desde dónde).
+- El segundo factor, los captchas y los pagos siguen siendo de la persona.
+
+Dónde llega el aviso (pedido del dueño: correo o WhatsApp, con botón de sí y no):
+
+| Canal | Cómo | Qué necesita | Orden |
+|---|---|---|---|
+| NÚCLEO en el PC | Ventana y notificación del sistema con los dos botones | Nada extra; funciona sin internet | 1.º |
+| Correo | Correo con «Autorizo» y «No autorizo»; cada botón abre una página de confirmación (un clic más), para que los filtros de correo que abren enlaces no aprueben solos | Un **relevo** pequeño en nucleoerp.cl que solo lleva el sí o el no de una solicitud firmada; no recibe claves ni datos del negocio. NÚCLEO consulta el relevo | 2.º |
+| WhatsApp | Mensaje con botones de respuesta rápida | Lo mismo que el correo, más la API de WhatsApp Business (verificación de la empresa en Meta, plantilla aprobada y costo por mensaje) | 3.º |
+| App del celular de NÚCLEO | Aviso en la app | La app (plan S); por la red local no necesita relevo | Con la app |
+
+Por definir: si el relevo es parte de NÚCLEO gratuito o del plan Premium (tiene costo de servidor), y si
+se ofrece Telegram como alternativa gratuita a WhatsApp.
+
 ### Primeros pasos
 
 1. **Bluexpress:** recorrer juntos el flujo real (entrar, crear envío, medidas, pago) para escribir la

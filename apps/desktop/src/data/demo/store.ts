@@ -1959,7 +1959,7 @@ export class DemoBackend implements Backend {
     this.require("config.editar");
     const n = this.sii.folios.length;
     const desde = n * 50 + 1;
-    this.sii.folios.push({ id: n + 1, ambiente: this.sii.setup.ambiente, tipo: 33, tipo_nombre: "Factura electrónica", desde, hasta: desde + 49, siguiente: desde, restantes: 50, autorizado: this.today });
+    this.sii.folios.push({ id: n + 1, ambiente: this.sii.setup.ambiente, tipo: 33, tipo_nombre: "Factura electrónica", desde, hasta: desde + 49, siguiente: desde, restantes: 50, reutilizables: 0, autorizado: this.today });
     return this.siiStatus();
   }
   async siiTestConnection(): Promise<string> {

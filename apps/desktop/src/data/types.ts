@@ -1643,8 +1643,12 @@ export interface SiiFolios {
   tipo_nombre: string;
   desde: number;
   hasta: number;
+  /** Próximo folio que se usará (el menor reutilizable, o el siguiente sin usar). */
   siguiente: number;
+  /** Disponibles: sin usar más reutilizables. */
   restantes: number;
+  /** Folios de documentos que el SII rechazó y que se vuelven a usar. */
+  reutilizables: number;
   autorizado: string;
 }
 

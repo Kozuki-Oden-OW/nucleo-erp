@@ -179,7 +179,7 @@ export function SiiSection() {
     { key: "amb", header: "Ambiente", width: "7.5rem", render: (f) => f.ambiente === "certificacion" ? "Certificación" : "Producción" },
     { key: "rango", header: "Folios", width: "8rem", render: (f) => `${f.desde}–${f.hasta}` },
     { key: "sig", header: "Siguiente", align: "right", width: "5.5rem", render: (f) => f.restantes ? f.siguiente : "—" },
-    { key: "rest", header: "Quedan", align: "right", width: "5rem", render: (f) => <Badge tone={f.restantes === 0 ? "danger" : f.restantes < 10 ? "warning" : "success"}>{f.restantes}</Badge> },
+    { key: "rest", header: "Quedan", align: "right", width: "5rem", render: (f) => <span title={f.reutilizables ? `${f.reutilizables} de documentos que el SII rechazó: no quedaron registrados allá y se vuelven a usar` : undefined}><Badge tone={f.restantes === 0 ? "danger" : f.restantes < 10 ? "warning" : "success"}>{f.restantes}</Badge></span> },
   ];
   const docCols: Column<SiiDocument>[] = [
     { key: "fecha", header: "Fecha", width: "6.5rem", render: (d) => formatDate(d.fecha) },
