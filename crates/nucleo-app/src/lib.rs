@@ -32,6 +32,7 @@ pub mod sale_terms;
 pub mod sales_ops;
 pub mod ship_ops;
 pub mod sii_ops;
+pub mod sii_print;
 pub mod sync_ops;
 
 pub use company::{CompanySession, NewCustomer};

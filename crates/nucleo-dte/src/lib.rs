@@ -10,7 +10,9 @@ pub mod crypto;
 pub mod dte;
 pub mod envio;
 pub mod libro;
+mod pdf417_tabla;
 pub mod sii;
+pub mod timbre;
 pub mod xml;
 
 pub use caf::Caf;

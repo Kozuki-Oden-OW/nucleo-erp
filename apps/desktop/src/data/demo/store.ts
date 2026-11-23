@@ -4,7 +4,7 @@
 import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "../backend";
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
-  SiiDocument, SiiIssueInput, SiiLibro, SiiLibroInput, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
+  SiiDocument, SiiIssueInput, SiiLibro, SiiLibroInput, SiiPrintDoc, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
   MlBilling, MlOrderRow, MlStatus, MlSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput, StatementLineView, BankSuggestion,
@@ -1923,7 +1923,7 @@ export class DemoBackend implements Backend {
   }
   /* Facturación electrónica propia (simulada: no hay SII en la demostración). */
   private sii = {
-    setup: { ambiente: "certificacion", emisor: { giro: "", actecos: [], direccion: "", comuna: "", ciudad: "", sucursal: null, rut_envia: "" }, resolucion_fecha: null, resolucion_numero: null } as SiiSetup,
+    setup: { ambiente: "certificacion", emisor: { giro: "", actecos: [], direccion: "", comuna: "", ciudad: "", sucursal: null, rut_envia: "", unidad_sii: "" }, resolucion_fecha: null, resolucion_numero: null } as SiiSetup,
     cert: null as SiiStatus["certificado"],
     folios: [] as SiiStatus["folios"],
   };
@@ -1967,6 +1967,35 @@ export class DemoBackend implements Backend {
     return wait("Demostración: en el escritorio NÚCLEO pide semilla y token al SII con tu certificado.");
   }
   private siiDocs: SiiDocument[] = [];
+  private siiInputs = new Map<number, SiiIssueInput>();
+  async siiPrintData(id: number): Promise<SiiPrintDoc> {
+    const d = this.siiDocs.find((x) => x.id === id);
+    const input = this.siiInputs.get(id);
+    if (!d || !input) throw new AppError("no_encontrado", "No existe el documento.");
+    const b = await this.business();
+    const e = this.sii.setup.emisor;
+    const ppm = input.tipo === 34 ? 0 : this.taxPpm() ?? 0;
+    const netoL = input.detalle.filter((l) => !l.exento).reduce((a, l) => a + l.monto, 0);
+    const exento = input.detalle.filter((l) => l.exento).reduce((a, l) => a + l.monto, 0);
+    const neto = netoL - input.descuentos_globales.filter((g) => !g.exento).reduce((a, g) => a + (g.porcentaje ? Math.round((netoL * g.porcentaje) / 100) : g.monto ?? 0) * (g.recargo ? -1 : 1), 0);
+    const iva = Math.round((neto * ppm) / 1_000_000);
+    // Timbre de muestra: barras sin significado (el real lo arma el programa instalado).
+    let bars = "", x = 0;
+    for (let i = 0; x < 300; i++) { const w = 1 + ((i * 7 + id * 3) % 4); if (i % 2 === 0) bars += `M${x} 0h${w}v100h-${w}z`; x += w; }
+    return wait({
+      id, ambiente: d.ambiente, tipo: d.tipo, tipo_nombre: d.tipo_nombre, folio: d.folio, fecha: d.fecha, vencimiento: input.vencimiento, forma_pago: input.forma_pago, ind_traslado: input.ind_traslado,
+      emisor: { rut: (b.rut ?? "").replace(/\./g, ""), razon_social: b.legal_name ?? b.name, giro: e.giro, direccion: e.direccion || b.address, comuna: e.comuna, ciudad: e.ciudad || null, telefono: b.phone, correo: b.email, contacto: null },
+      receptor: { ...input.receptor, telefono: null },
+      lineas: input.detalle.map((l) => ({ codigo: l.codigo, nombre: l.nombre, descripcion: l.descripcion, cantidad: l.cantidad_milli == null ? null : l.cantidad_milli / 1000, unidad: l.unidad, precio: l.precio,
+        descuento_pct: l.descuento_pct, descuento_monto: l.descuento_monto, monto: l.monto, exento: l.exento })),
+      globales: input.descuentos_globales.map((g) => ({ recargo: g.recargo, glosa: g.glosa, tipo_valor: g.porcentaje ? "%" : "$", valor: g.porcentaje ?? g.monto ?? 0, exento: g.exento })),
+      referencias: input.referencias.map((r) => ({ tipo: r.tipo, tipo_nombre: r.tipo === "SET" ? "Set de pruebas" : `Documento ${r.tipo}`, folio: r.folio, fecha: r.fecha, codigo: r.codigo, razon: r.razon })),
+      totales: { neto: netoL > 0 || exento === 0 ? neto : null, exento: exento || null, tasa_iva: ppm ? ppm / 10_000 : null, iva: netoL > 0 || exento === 0 ? iva : null, total: d.total_minor },
+      unidad_sii: e.unidad_sii, resolucion_numero: this.sii.setup.resolucion_numero ?? 0, resolucion_anio: (this.sii.setup.resolucion_fecha ?? "").slice(0, 4),
+      timbre_svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 100" shape-rendering="crispEdges"><rect width="300" height="100" fill="#fff"/><path fill="#000" d="${bars}"/></svg>`,
+      cedible: [33, 34, 52].includes(d.tipo),
+    });
+  }
   async siiDocuments(): Promise<SiiDocument[]> { return wait([...this.siiDocs].reverse()); }
   async siiIssue(input: SiiIssueInput): Promise<SiiDocument> {
     this.require("ventas.documentar");
@@ -1984,6 +2013,7 @@ export class DemoBackend implements Backend {
       fecha: input.fecha || this.today, receptor_rut: input.receptor.rut, receptor: input.receptor.razon_social, total_minor: total, estado: "firmado", track_id: null, glosa: null, created_at: new Date().toISOString() };
     f.siguiente += 1; f.restantes -= 1;
     this.siiDocs.push(doc);
+    this.siiInputs.set(doc.id, structuredClone(input));
     return wait(doc);
   }
   async siiSend(ids: number[]): Promise<SiiDocument[]> {

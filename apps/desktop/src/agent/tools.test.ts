@@ -162,7 +162,7 @@ describe("Envíos con datos del courier (demostración)", () => {
 
   it("factura del SII: firma sin enviar, envía y consulta", async () => {
     const b = new DemoBackend();
-    await b.siiSaveSetup({ ambiente: "certificacion", emisor: { giro: "Software", actecos: [620100], direccion: "Guardia Vieja 202", comuna: "Providencia", ciudad: "Santiago", sucursal: null, rut_envia: "" }, resolucion_fecha: "2026-11-22", resolucion_numero: 0 });
+    await b.siiSaveSetup({ ambiente: "certificacion", emisor: { giro: "Software", actecos: [620100], direccion: "Guardia Vieja 202", comuna: "Providencia", ciudad: "Santiago", sucursal: null, rut_envia: "", unidad_sii: "" }, resolucion_fecha: "2026-11-22", resolucion_numero: 0 });
     await b.siiLoadCertificate("demo.pfx", "1234");
     await b.siiLoadCaf("demo.xml");
     const e = await runTool(b, "completo", "emitir_documento_sii", {

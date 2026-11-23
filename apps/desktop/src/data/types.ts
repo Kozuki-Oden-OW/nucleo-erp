@@ -1625,6 +1625,8 @@ export interface SiiEmisor {
   ciudad: string;
   sucursal: number | null;
   rut_envia: string;
+  /** Unidad del SII de la casa matriz («SANTIAGO ORIENTE»); va en el documento impreso. */
+  unidad_sii: string;
 }
 
 export interface SiiSetup {
@@ -1716,6 +1718,44 @@ export interface SiiIssueInput {
   ind_traslado: number | null;
   tipo_despacho: number | null;
   sale_uid: string | null;
+}
+
+export interface SiiPrintParte {
+  rut: string;
+  razon_social: string;
+  giro: string | null;
+  direccion: string | null;
+  comuna: string | null;
+  ciudad: string | null;
+  telefono: string | null;
+  correo: string | null;
+  contacto: string | null;
+}
+
+/** Datos de un documento emitido para imprimirlo (leídos del XML firmado). */
+export interface SiiPrintDoc {
+  id: number;
+  ambiente: SiiAmbiente;
+  tipo: number;
+  tipo_nombre: string;
+  folio: number;
+  fecha: string;
+  vencimiento: string | null;
+  forma_pago: number | null;
+  ind_traslado: number | null;
+  emisor: SiiPrintParte;
+  receptor: SiiPrintParte;
+  lineas: { codigo: string | null; nombre: string; descripcion: string | null; cantidad: number | null; unidad: string | null; precio: number | null;
+    descuento_pct: number | null; descuento_monto: number | null; monto: number; exento: boolean }[];
+  globales: { recargo: boolean; glosa: string | null; tipo_valor: string; valor: number; exento: boolean }[];
+  referencias: { tipo: string; tipo_nombre: string; folio: string; fecha: string; codigo: number | null; razon: string | null }[];
+  totales: { neto: number | null; exento: number | null; tasa_iva: number | null; iva: number | null; total: number };
+  unidad_sii: string;
+  resolucion_numero: number;
+  resolucion_anio: string;
+  /** Timbre electrónico como código PDF417 (SVG). */
+  timbre_svg: string;
+  cedible: boolean;
 }
 
 export interface SiiLineaLibro {

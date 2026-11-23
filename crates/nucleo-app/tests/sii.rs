@@ -290,6 +290,32 @@ fn emite_envia_y_consulta() {
     assert_eq!(docs.len(), 2);
     assert!(docs.iter().all(|d| d.estado == "aceptado"));
 
+    // Representación impresa: se lee del XML firmado y trae el timbre como PDF417.
+    let p = s.sii_document_print(d1.id).unwrap();
+    assert_eq!((p.tipo, p.folio, p.totales.total), (33, 1, 23_800));
+    assert_eq!(
+        (p.totales.neto, p.totales.iva, p.totales.tasa_iva),
+        (Some(20_000), Some(3_800), Some(19.0))
+    );
+    assert_eq!(p.emisor.rut, "76000000-0");
+    assert_eq!(p.receptor.razon_social, "Cliente de Prueba Ltda.");
+    assert_eq!(p.receptor.comuna.as_deref(), Some("Ñuñoa"));
+    assert_eq!(
+        (
+            p.lineas.len(),
+            p.lineas[0].cantidad,
+            p.lineas[0].precio,
+            p.lineas[0].monto
+        ),
+        (1, Some(2.0), Some(10_000.0), 20_000)
+    );
+    assert_eq!(p.referencias[0].tipo_nombre, "Set de pruebas");
+    assert!(p.cedible && p.timbre_svg.starts_with("<svg"));
+    assert_eq!(
+        (p.resolucion_numero, p.resolucion_anio.as_str()),
+        (0, "2026")
+    );
+
     // Libro de ventas con lo enviado del período (el folio 3 sigue firmado y no entra).
     let libro = s
         .sii_libro_create(&sii_ops::SiiLibroInput {
@@ -352,4 +378,73 @@ fn emite_envia_y_consulta() {
             .contains("<RUTDoc>11111111-1</RUTDoc>")
     );
     assert_eq!(s.sii_libros().unwrap().len(), 2);
+}
+
+/// Muestra de impresión del caso 4 del set (descuento global, línea exenta, unidad del SII): los datos
+/// salen del XML firmado. Deja el JSON en el directorio temporal para revisar la página a ojo.
+#[test]
+fn muestra_impresa() {
+    let (_d, _a, mut s) = session();
+    setup(&mut s);
+    let mut st = s.sii_status().unwrap();
+    st.emisor.unidad_sii = "santiago oriente".into();
+    s.sii_save_setup(&SiiSetup {
+        ambiente: Ambiente::Certificacion,
+        emisor: st.emisor.clone(),
+        resolucion_fecha: Some("2026-11-22".into()),
+        resolucion_numero: Some(0),
+    })
+    .unwrap();
+    s.sii_load_certificate(&pfx(), "clave").unwrap();
+    s.sii_load_caf(&caf(RUT, 33, 1, 5)).unwrap();
+    let l = |n: &str, q: i64, p: i64, pct: f64, exento: bool| {
+        let bruto = q * p;
+        let desc = (bruto as f64 * pct / 100.0).round() as i64;
+        Detalle {
+            nombre: n.into(),
+            cantidad_milli: Some(q * 1000),
+            precio: Some(p),
+            descuento_pct: (pct > 0.0).then_some(pct),
+            descuento_monto: (desc > 0).then_some(desc),
+            monto: bruto - desc,
+            exento,
+            ..Default::default()
+        }
+    };
+    let mut f = factura();
+    f.detalle = vec![
+        l("ITEM 1 AFECTO", 100, 1910, 0.0, false),
+        l("Pañuelo AFECTO", 43, 1730, 4.0, false),
+        l("ITEM 3 SERVICIO EXENTO", 2, 6771, 0.0, true),
+    ];
+    f.descuentos_globales = vec![nucleo_dte::DescuentoGlobal {
+        glosa: Some("Descuento global".into()),
+        porcentaje: Some(7.0),
+        ..Default::default()
+    }];
+    f.forma_pago = Some(2);
+    f.vencimiento = Some("2026-12-22".into());
+    let d = s.sii_issue(&f).unwrap();
+    let p = s.sii_document_print(d.id).unwrap();
+    assert_eq!(p.unidad_sii, "SANTIAGO ORIENTE");
+    assert_eq!(
+        (
+            p.globales.len(),
+            p.globales[0].tipo_valor.as_str(),
+            p.globales[0].valor
+        ),
+        (1, "%", 7.0)
+    );
+    assert_eq!(p.lineas[1].descuento_monto, Some(2_976));
+    assert!(p.lineas[2].exento && !p.lineas[0].exento);
+    assert_eq!(
+        (p.forma_pago, p.vencimiento.as_deref()),
+        (Some(2), Some("2026-12-22"))
+    );
+    assert_eq!(p.totales.total, d.total_minor);
+    std::fs::write(
+        concat!(env!("CARGO_TARGET_TMPDIR"), "/muestra_impresa.json"),
+        serde_json::to_string(&p).unwrap(),
+    )
+    .unwrap();
 }

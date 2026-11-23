@@ -174,6 +174,16 @@ body {
   .no-print { display: none !important; }
 }
 
+/* Documento tributario impreso (Facturación SII): mientras su vista previa está abierta, al imprimir
+   sale solo el documento, una hoja por ejemplar. */
+.sii-print-root { display: none; }
+@media print {
+  html.sii-printing body > *:not(.sii-print-root) { display: none !important; }
+  html.sii-printing .sii-print-root { display: block; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html.sii-printing .sii-page { break-after: page; page-break-after: always; max-width: none; }
+  html.sii-printing .sii-page:last-child { break-after: auto; page-break-after: auto; }
+}
+
 /* Color por empresa (Mi negocio → Color de la empresa). Turquesa es el de NÚCLEO. */
 :root[data-accent="azul"] { --accent: #1d5fd1; --accent-hover: #174fb0; --accent-soft: #e3ecfb; --accent-contrast: #ffffff; }
 :root[data-accent="verde"] { --accent: #12805c; --accent-hover: #0e6a4c; --accent-soft: #e0f3ec; --accent-contrast: #ffffff; }

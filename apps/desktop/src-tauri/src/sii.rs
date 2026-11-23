@@ -6,6 +6,7 @@ use crate::commands::{AppState, CommandError};
 use nucleo_app::sii_ops::{
     self, SiiDocument, SiiIssueInput, SiiLibro, SiiLibroInput, SiiSetup, SiiStatus, UreqSii,
 };
+use nucleo_app::sii_print::SiiPrintDoc;
 use nucleo_app::{AppError, CompanySession};
 use tauri::State;
 
@@ -156,4 +157,10 @@ pub async fn sii_libro_check(state: State<'_, AppState>, id: i64) -> CmdResult<S
 pub fn sii_libro_export_xml(state: State<'_, AppState>, id: i64, path: String) -> CmdResult<()> {
     let xml = with(&state, |s| s.sii_libro_xml(id))?;
     std::fs::write(&path, xml).map_err(|e| err(format!("no se pudo guardar: {e}")))
+}
+
+/// Datos del documento para imprimirlo (ejemplar tributario y cedible, con el timbre PDF417).
+#[tauri::command]
+pub fn sii_document_print(state: State<'_, AppState>, id: i64) -> CmdResult<SiiPrintDoc> {
+    with(&state, |s| s.sii_document_print(id))
 }

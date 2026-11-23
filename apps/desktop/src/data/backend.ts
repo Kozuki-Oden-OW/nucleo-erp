@@ -22,7 +22,7 @@ import type {
   PermissionRow, PriceHistoryRow, Product, ProductCategory, ProductPatch, PurchaseDetail, PurchaseInput, PurchaseOrderDetail, PurchaseOrderInput,
   PurchaseOrderSummary, PurchaseSummary, ReceiveLine, NewSupplier, Supplier, SupplierDetail, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow,
   SaleDetail, SaleInput, SaleSummary, SearchHit, SecuritySettings, SequenceRow, SessionInfo, UserPatch, UserRow,
-  SiiDocument, SiiIssueInput, SiiLibro, SiiLibroInput, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
+  SiiDocument, SiiIssueInput, SiiLibro, SiiLibroInput, SiiPrintDoc, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
 } from "./types";
 
 /** Archivo elegido para adjuntar: ruta en el escritorio o archivo del navegador en la demostración. */
@@ -181,6 +181,8 @@ export interface Backend {
   siiCheck(id: number): Promise<SiiDocument[]>;
   /** Guarda el XML firmado donde la persona elija; false si cancela. */
   siiExportXml(doc: SiiDocument): Promise<boolean>;
+  /** Datos para imprimir el documento (ejemplar tributario y cedible, con el timbre PDF417). */
+  siiPrintData(id: number): Promise<SiiPrintDoc>;
   /** Arma y firma un libro de compras o ventas (IECV), sin enviarlo. */
   siiLibroCreate(input: SiiLibroInput): Promise<SiiLibro>;
   siiLibros(): Promise<SiiLibro[]>;

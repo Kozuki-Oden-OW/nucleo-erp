@@ -731,3 +731,34 @@ fn set_basico_completo() {
     let largo = from_latin1(&bytes).lines().map(|l| l.len()).max().unwrap();
     assert!(largo < 1000, "línea de {largo} caracteres");
 }
+
+/// El timbre de una factura como PDF417: se escribe el símbolo (PBM y SVG) y el texto esperado para
+/// leerlo con un decodificador independiente (zxing) fuera de las pruebas.
+#[test]
+fn timbre_pdf417() {
+    use nucleo_dte::timbre::{ALTO_FILA, pdf417};
+    let (cert, _) = certificado();
+    let (caf, _) = caf(33, 1, 100);
+    let s = factura(7).sign(&caf, &cert, "2026-11-22T10:15:00").unwrap();
+    let ted = s.ted_latin1();
+    assert!(ted.starts_with(b"<TED version=\"1.0\"><DD><RE>") && ted.ends_with(b"</FRMT></TED>"));
+    assert!(!ted.contains(&b'\n'), "el timbre va aplanado");
+    let p = pdf417(&ted).unwrap();
+    let dir = concat!(env!("CARGO_TARGET_TMPDIR"), "/dte");
+    std::fs::create_dir_all(dir).unwrap();
+    let (esc, q) = (3usize, 6usize);
+    let (w, h) = (p.ancho * esc + 2 * q, p.filas * ALTO_FILA * esc + 2 * q);
+    let mut pbm = format!("P1\n{w} {h}\n");
+    for y in 0..h {
+        for x in 0..w {
+            let dentro = x >= q && y >= q && x < w - q && y < h - q;
+            let negro =
+                dentro && p.modulos[((y - q) / (ALTO_FILA * esc)) * p.ancho + (x - q) / esc];
+            pbm.push(if negro { '1' } else { '0' });
+        }
+        pbm.push('\n');
+    }
+    std::fs::write(format!("{dir}/timbre.pbm"), pbm).unwrap();
+    std::fs::write(format!("{dir}/timbre.svg"), p.svg()).unwrap();
+    std::fs::write(format!("{dir}/timbre.txt"), &ted).unwrap();
+}

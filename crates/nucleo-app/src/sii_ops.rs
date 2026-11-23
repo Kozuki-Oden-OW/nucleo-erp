@@ -49,6 +49,8 @@ pub struct SiiEmisor {
     pub sucursal: Option<u32>,
     /// RUT de la persona dueña del certificado, si el certificado no lo trae.
     pub rut_envia: String,
+    /// Unidad del SII de la casa matriz («SANTIAGO ORIENTE»): va bajo el recuadro del documento impreso.
+    pub unidad_sii: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -282,11 +284,11 @@ pub fn check(http: &dyn SiiHttp, cred: &SiiCredentials, track_id: &str) -> AppRe
 
 /* ─────────────────────────────── Sesión ─────────────────────────────── */
 
-struct ConfigRow {
-    ambiente: Ambiente,
-    emisor: SiiEmisor,
-    resolucion_fecha: Option<String>,
-    resolucion_numero: Option<u32>,
+pub(crate) struct ConfigRow {
+    pub(crate) ambiente: Ambiente,
+    pub(crate) emisor: SiiEmisor,
+    pub(crate) resolucion_fecha: Option<String>,
+    pub(crate) resolucion_numero: Option<u32>,
     cert_p12: Option<Vec<u8>>,
     cert_password: Option<String>,
     cert_name: Option<String>,
@@ -294,7 +296,7 @@ struct ConfigRow {
     cert_expires: Option<String>,
 }
 
-fn tipo_nombre(t: u16) -> String {
+pub(crate) fn tipo_nombre(t: u16) -> String {
     TipoDte::from_code(t)
         .map(|t| t.name().to_string())
         .unwrap_or_else(|| format!("tipo {t}"))
@@ -322,7 +324,7 @@ fn valid_date(d: &str) -> bool {
 }
 
 impl CompanySession {
-    fn sii_row(&self) -> AppResult<ConfigRow> {
+    pub(crate) fn sii_row(&self) -> AppResult<ConfigRow> {
         let row = self
             .db
             .conn()
@@ -489,6 +491,13 @@ impl CompanySession {
         e.comuna = e.comuna.trim().chars().take(20).collect();
         e.ciudad = e.ciudad.trim().chars().take(20).collect();
         e.rut_envia = e.rut_envia.trim().to_string();
+        e.unidad_sii = e
+            .unidad_sii
+            .trim()
+            .to_uppercase()
+            .chars()
+            .take(40)
+            .collect();
         e.actecos.retain(|a| *a > 0);
         e.actecos.dedup();
         if e.actecos.len() > 4 {
@@ -1059,7 +1068,7 @@ fn signed_from_xml(xml: &[u8]) -> AppResult<nucleo_dte::SignedDte> {
     })
 }
 
-fn roxmltree_parse(s: &str) -> AppResult<nucleo_dte::xml::RoxDocument<'_>> {
+pub(crate) fn roxmltree_parse(s: &str) -> AppResult<nucleo_dte::xml::RoxDocument<'_>> {
     nucleo_dte::xml::parse(s)
         .map_err(|e| AppError::Validation(format!("documento guardado dañado: {e}")))
 }

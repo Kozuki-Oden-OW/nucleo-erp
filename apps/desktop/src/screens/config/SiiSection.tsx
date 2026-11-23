@@ -4,7 +4,7 @@
 // en la fase F6 (docs/SII_FACTURACION_PROPIA.md).
 import { useCallback, useEffect, useState } from "react";
 import { open as openFile } from "@tauri-apps/plugin-dialog";
-import { BadgeCheck, BookOpen, FileCode2, FileKey2, FilePlus2, FileText, PlugZap, RefreshCw, Save, Send, Upload } from "lucide-react";
+import { BadgeCheck, BookOpen, FileCode2, FileKey2, FilePlus2, FileText, PlugZap, Printer, RefreshCw, Save, Send, Upload } from "lucide-react";
 import { errorMessage, useBackend, type SiiAmbiente, type SiiDocument, type SiiFolios, type SiiLibro, type SiiSetup, type SiiStatus } from "../../data";
 import { formatCLP, formatDate } from "../../lib/format";
 import { useSession } from "../../lib/session";
@@ -12,6 +12,7 @@ import { Badge, Button, Card, Field, IconButton, Notice, Segmented, Select, Spin
 import { DataTable, type Column } from "../../ui/table";
 import { Dialog, useToast } from "../../ui/overlay";
 import { SiiIssueDialog } from "./SiiIssueDialog";
+import { SiiPrintDialog } from "./SiiPrint";
 
 const ESTADO: Record<SiiDocument["estado"], { label: string; tone: "neutral" | "info" | "success" | "warning" | "danger" }> = {
   firmado: { label: "Firmado", tone: "neutral" },
@@ -46,6 +47,7 @@ export function SiiSection() {
   const [password, setPassword] = useState("");
   const [issuing, setIssuing] = useState(false);
   const [toSend, setToSend] = useState<SiiDocument[] | null>(null);
+  const [printing, setPrinting] = useState<SiiDocument | null>(null);
   const [libros, setLibros] = useState<SiiLibro[]>([]);
   const [libroForm, setLibroForm] = useState<{ periodo: string; tipo: "MENSUAL" | "ESPECIAL"; folio: string } | null>(null);
   const [libroSend, setLibroSend] = useState<SiiLibro | null>(null);
@@ -156,10 +158,11 @@ export function SiiSection() {
     { key: "total", header: "Total", align: "right", width: "6.5rem", render: (d) => formatCLP(d.total_minor) },
     { key: "estado", header: "Estado", width: "8rem", render: (d) => <span title={d.glosa ?? undefined}><Badge tone={ESTADO[d.estado].tone}>{ESTADO[d.estado].label}</Badge></span> },
     { key: "track", header: "Track id", width: "7rem", render: (d) => <span className="text-xs text-muted tabular-nums">{d.track_id ?? "—"}</span> },
-    { key: "acc", header: "", width: "9.5rem", align: "right", render: (d) => (
+    { key: "acc", header: "", width: "11.5rem", align: "right", render: (d) => (
       <div className="flex justify-end gap-1">
         {d.estado === "firmado" && <Button size="sm" variant="secondary" icon={Send} onClick={() => setToSend([d])} disabled={!!busy}>Enviar</Button>}
         {d.track_id && d.estado !== "aceptado" && <Button size="sm" variant="secondary" icon={RefreshCw} onClick={() => check(d)} disabled={!!busy}>{busy === `chk${d.id}` ? "…" : "Estado"}</Button>}
+        <IconButton icon={Printer} label="Imprimir o guardar PDF" onClick={() => setPrinting(d)} />
         <IconButton icon={FileCode2} label="Guardar XML firmado" onClick={() => exportXml(d)} />
       </div>
     ) },
@@ -199,6 +202,8 @@ export function SiiSection() {
               hint="En certificación, la fecha de la postulación." />
             <Field label="Número de resolución" inputMode="numeric" value={form.resolucion_numero ?? ""} onChange={(e) => setForm({ ...form, resolucion_numero: e.target.value === "" ? null : Number(e.target.value.replace(/\D/g, "")) })}
               disabled={!editable} hint="En certificación es 0." />
+            <Field label="Unidad del SII" value={form.emisor.unidad_sii ?? ""} maxLength={40} onChange={(e) => emisor({ unidad_sii: e.target.value.toUpperCase() })} disabled={!editable}
+              optional placeholder="SANTIAGO ORIENTE" hint="Va bajo el recuadro del documento impreso («S.I.I. – …»). Está en Mi SII → Mis datos." />
             <Field label="RUT del dueño del certificado" value={form.emisor.rut_envia} onChange={(e) => emisor({ rut_envia: e.target.value })} disabled={!editable}
               optional hint="Solo si el certificado no lo trae." />
           </div>
@@ -276,6 +281,8 @@ export function SiiSection() {
         footer={<><Button variant="ghost" onClick={() => setLibroSend(null)}>Cancelar</Button><Button icon={Send} onClick={enviarLibro} disabled={!!busy}>{busy === "lsend" ? "Enviando…" : "Enviar al SII"}</Button></>}>
         {libroSend && <p className="text-sm">Libro de {libroSend.operacion}s {libroSend.periodo} ({libroSend.documentos} documentos{libroSend.folio_notificacion ? `, notificación ${libroSend.folio_notificacion}` : ""}) a <strong>{ambLabel}</strong>. Un libro enviado no se borra: se corrige con uno rectificatorio.</p>}
       </Dialog>
+
+      <SiiPrintDialog doc={printing} onClose={() => setPrinting(null)} />
 
       <SiiIssueDialog open={issuing} onClose={() => setIssuing(false)} folios={st.folios} ambiente={st.ambiente}
         onIssued={(d) => { setIssuing(false); toast("success", `${d.tipo_nombre} N° ${d.folio} firmada por ${formatCLP(d.total_minor)}. Revísala y envíala al SII.`); void load(); }} />

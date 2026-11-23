@@ -134,6 +134,7 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         sii::sii_libro_send,
         sii::sii_libro_check,
         sii::sii_libro_export_xml,
+        sii::sii_document_print,
         commands::pending_dispatches,
         commands::dispatch_items,
         commands::warehouse_stock,

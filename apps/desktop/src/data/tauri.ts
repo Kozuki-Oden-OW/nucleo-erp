@@ -23,7 +23,7 @@ import type {
   PurchaseSummary, ReceiveLine, NewSupplier, Supplier, SupplierDetail, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow, SaleDetail, SaleInput,
   SaleSummary, SearchHit,
   SecuritySettings, SequenceRow, SessionInfo, UserPatch, UserRow,
-  SiiDocument, SiiIssueInput, SiiLibro, SiiLibroInput, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
+  SiiDocument, SiiIssueInput, SiiLibro, SiiLibroInput, SiiPrintDoc, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
 } from "./types";
 
 interface CommandError { code: string; message: string }
@@ -179,6 +179,7 @@ export class TauriBackend implements Backend {
     await call<void>("sii_export_xml", { id: doc.id, path });
     return true;
   }
+  siiPrintData(id: number) { return call<SiiPrintDoc>("sii_document_print", { id }); }
   siiLibroCreate(input: SiiLibroInput) { return call<SiiLibro>("sii_libro_create", { input }); }
   siiLibros() { return call<SiiLibro[]>("sii_libros"); }
   siiLibroSend(id: number) { return call<SiiLibro>("sii_libro_send", { id }); }
