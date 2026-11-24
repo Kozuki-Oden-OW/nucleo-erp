@@ -16,6 +16,20 @@ saltos y eso está bien: se continúa después del número más alto, no se rell
 - La numeración de NÚCLEO quedó en prefijo `COT`, 4 dígitos (`COT-1524`), igual que la serie del dueño.
 - Nunca se reutiliza un número ni se emite sobre un archivo de otra cotización.
 
+## Precios: siempre netos
+
+Regla del dueño (24-11-2026): **las cotizaciones deben salir con el precio correcto**. Ese día los 17
+productos tenían el precio con IVA guardado como neto y la cotización sumaba el IVA dos veces; se
+corrigieron contra la lista de precios de Data Logger.
+
+- En NÚCLEO el precio de lista es **neto**; el IVA lo agrega el documento. La lista del dueño trae las
+  dos columnas («Precio NETO» y «Con IVA»): se copia la neta, o se escribe el valor con IVA en el campo
+  «Precio de venta (Con IVA)» de la ficha, que calcula el neto solo.
+- Antes de emitir, el agente comprueba cada línea: precio unitario × (1 + IVA) debe dar el «Con IVA» de
+  la lista (RC-5+ con sonda: neto $23.445 → $27.900). Si no calza, se detiene y avisa; no emite.
+- El envío es un servicio aparte: «Envio» $5.000 neto.
+- Un producto que no está en NÚCLEO no se inventa: se pide el precio al dueño y se crea con su neto.
+
 ## Pasos
 
 1. Cliente: buscarlo por RUT o nombre; si no existe, crearlo con RUT, razón social, giro, dirección y
