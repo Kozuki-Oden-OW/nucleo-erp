@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, ArrowRightLeft, Check, Pencil, Send, X } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, Check, FileDown, Pencil, Send, X } from "lucide-react";
 import { useBackend, errorMessage, type BusinessSettings, type QuoteDetail } from "../../data";
 import { formatDate, formatMoney, formatPpm, formatQty } from "../../lib/format";
-import { goBack, navigate } from "../../lib/router";
+import { goBack, navigate, useRoute } from "../../lib/router";
 import { QuoteStatusBadge } from "../../ui/doc";
 import { Button, Card, Notice, PageHeader, Spinner } from "../../ui/kit";
 import { useToast } from "../../ui/overlay";
 import { PrintButton, PrintDoc } from "./PrintDoc";
+import { EmitQuoteDialog } from "./EmitQuoteDialog";
 
 export function QuoteView({ uid }: { uid: string }) {
   const backend = useBackend();
@@ -15,6 +16,9 @@ export function QuoteView({ uid }: { uid: string }) {
   const [biz, setBiz] = useState<BusinessSettings | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Desde el editor, «Emitir documento» llega aquí con ?emitir=1 y abre el diálogo de inmediato.
+  const route = useRoute();
+  const [emitting, setEmitting] = useState(() => route.query.get("emitir") === "1");
 
   const load = useCallback(() => { backend.quote(uid).then(setQ).catch((e) => setErr(errorMessage(e))); }, [backend, uid]);
   useEffect(load, [load]);
@@ -39,6 +43,7 @@ export function QuoteView({ uid }: { uid: string }) {
   return (
     <>
       <PrintDoc kind="COT" doc={q} biz={biz} />
+      <EmitQuoteDialog open={emitting} onClose={() => setEmitting(false)} quote={q} biz={biz} />
       <div className="anim-in print:hidden">
         <PageHeader
           back={<button onClick={() => goBack("/ventas?tab=cotizaciones")} className="mb-2 inline-flex items-center gap-1 text-sm text-muted hover:text-ink"><ArrowLeft size={15} /> Cotizaciones</button>}
@@ -50,6 +55,7 @@ export function QuoteView({ uid }: { uid: string }) {
               {q.status === "borrador" && <Button variant="secondary" icon={Send} onClick={() => status("enviada")}>Marcar enviada</Button>}
               {(q.status === "borrador" || q.status === "enviada") && <Button variant="secondary" icon={Check} onClick={() => status("aceptada")}>Cliente aceptó</Button>}
               {open && <Button icon={ArrowRightLeft} onClick={convert} disabled={busy}>Convertir en venta</Button>}
+              <Button variant={open ? "secondary" : "primary"} icon={FileDown} onClick={() => setEmitting(true)}>Emitir documento (PDF)</Button>
               <PrintButton kind="COT" doc={q} biz={biz} />
               {open && <Button variant="ghost" icon={X} onClick={() => status("rechazada")}>Rechazada</Button>}
             </>

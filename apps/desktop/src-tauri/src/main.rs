@@ -8,6 +8,7 @@ mod commands;
 mod ipc_tests;
 mod mail;
 mod ml;
+mod quotedoc;
 mod sii;
 mod sync;
 mod woo;
@@ -113,6 +114,11 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         ml::ml_orders,
         ml::ml_register_manual,
         ml::ml_link_item,
+        quotedoc::quote_doc_settings,
+        quotedoc::save_quote_doc_settings,
+        quotedoc::quote_terms,
+        quotedoc::save_quote_terms,
+        quotedoc::save_quote_pdf,
         sync::sync_status,
         sync::sync_enable,
         sync::sync_pair_start,

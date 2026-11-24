@@ -7,7 +7,7 @@ import type {
   AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput,
-  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
+  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, QuoteDocSettings, QuoteEmitted, QuoteTerms, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
@@ -155,6 +155,16 @@ export class TauriBackend implements Backend {
   mlOrders(limit?: number) { return call<MlOrderRow[]>("ml_orders", { limit: limit ?? null }); }
   mlRegisterManual(orders: MlManualOrder[]) { return call<MlSyncReport>("ml_register_manual", { orders }); }
   async mlLinkItem(itemId: string, variationId: string | null, productUid: string, title?: string | null) { await call<null>("ml_link_item", { itemId, variationId, productUid, title: title ?? null }); }
+  quoteDocSettings() { return call<QuoteDocSettings>("quote_doc_settings"); }
+  saveQuoteDocSettings(settings: QuoteDocSettings) { return call<QuoteDocSettings>("save_quote_doc_settings", { settings }); }
+  quoteTerms(uid: string) { return call<QuoteTerms>("quote_terms", { uid }); }
+  saveQuoteTerms(uid: string, terms: QuoteTerms) { return call<QuoteTerms>("save_quote_terms", { uid, terms }); }
+  saveQuotePdf(uid: string, _fileName: string, pdf: Uint8Array) {
+    // Los bytes viajan en base64; el nombre del archivo lo decide el escritorio (número y cliente).
+    let bin = "";
+    for (let i = 0; i < pdf.length; i += 0x8000) bin += String.fromCharCode(...pdf.subarray(i, i + 0x8000));
+    return call<QuoteEmitted>("save_quote_pdf", { uid, data: btoa(bin) });
+  }
   syncStatus() { return call<SyncView>("sync_status"); }
   syncEnable(on: boolean) { return call<SyncView>("sync_enable", { on }); }
   syncPairStart() { return call<SyncPairingCode>("sync_pair_start"); }

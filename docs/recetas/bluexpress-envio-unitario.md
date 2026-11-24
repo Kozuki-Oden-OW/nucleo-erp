@@ -44,3 +44,26 @@ cuenta corriente empresa (sin paso de pago).
   inscribir la empresa para factura y, si Bluexpress lo ofrece, cuenta corriente con pago mensual.
 - Origen por defecto en Ñuñoa (RM): revisar si es la bodega desde donde se despacha.
 - El envío a domicilio permite «pre-pago o por pagar».
+
+## Actualización del 24-11-2026: primer envío hecho de punta a punta por el agente
+
+Envío 2482288653 (OC 253199, Pudahuel, talla S), con la sesión que abrió el dueño (Google) y su
+confirmación en el chat antes de pagar.
+
+- **Pago:** el dueño inscribió una tarjeta en **Webpay OneClick**. Con OneClick no hay página de
+  Transbank ni QR: al pulsar «Pagar» el envío queda confirmado de inmediato. Por eso la pausa
+  obligatoria es **antes** de «Pagar»: se muestra destinatario, dirección, talla y total, y se espera el
+  «sí» del dueño por cada envío (también cubre marcar «Acepto términos y condiciones»).
+- **Cupón:** `VAMOSMIPYME` descuenta 30 % (de $4.200 a $2.940). Se escribe en «Agrega un código de
+  descuento» y «Aplicar»; la página responde «Cupón de descuento aplicado» y cambia el total.
+- **Direcciones directas:** `app.bluex.cl/envio-unitario/origen` (nuevo envío) y
+  `app.bluex.cl/shipments/list` (lista con destinatario, comuna, fecha, medio de pago, valor,
+  seguimiento y estado; «Descargar Excel»).
+- **Trucos del formulario:** los campos de texto se llenan con clic y tecleo. Las listas de Región y
+  Comuna del ingreso manual no reaccionan si se les asigna el valor por programa: hay que hacer clic,
+  teclear el nombre («Región Metropolitana», «Pudahuel») y Enter. El medio de pago se elige haciendo
+  clic en el logo (el botón de radio está oculto).
+- **Origen:** viene precargado; en la lista hay que elegir «Punto Blue Express Market Plaza Ñuñoa».
+- **Después de pagar:** leer número de seguimiento, monto y n.º de transacción y registrarlos con
+  `registrar_envio`. La etiqueta se descarga solo con permiso del dueño; hay 5 días para dejar el
+  paquete en el Punto.

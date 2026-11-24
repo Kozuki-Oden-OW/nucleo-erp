@@ -12,9 +12,30 @@
 | Sesión de Mercado Libre abierta (colaborador de solo lectura) | Dueño | Inicia sesión en Chrome; dura días o semanas |
 | Sesión del banco abierta | Dueño | Inicia sesión justo antes de pedir el cierre: dura pocos minutos |
 
+**Pestañas.** Cada vez que haga falta mirar Mercado Libre o el banco, el agente abre la pestaña que
+corresponde: ventas de Mercado Libre en `https://vendedores.mercadolibre.cl/ventas/omni/listado` y el
+banco en `https://www.bci.cl/corporativo/banco-en-linea/pyme`. Si aparece el formulario de ingreso, deja
+la pestaña abierta y avisa al dueño.
+
 **Cómo se entra a los sitios.** El agente no escribe claves ni pulsa botones que las completen. Si una
 sesión está cerrada, lo dice y espera: el dueño entra (con la clave guardada en el gestor de Chrome son
 dos clics) y el agente sigue. Códigos de verificación y captchas los resuelve el dueño.
+
+## 0. Correos: transferencias recibidas (método acordado el 24-11-2026)
+
+No necesita sesión del banco: los bancos de los clientes avisan por correo cada transferencia.
+
+1. Con la extensión de correo Titan, `buscar_correos` con el texto «transferencia» en las cuatro
+   cuentas (`ventas@elitechchile.cl` concentra casi todos los avisos; `contacto@elitechchile.cl` recibe
+   los de Banco de Chile; en las de `datalogger.cl` llegan comprobantes que envían los clientes), desde
+   la fecha del último cierre.
+2. Abre solo los avisos de bancos (BCI, Banco de Chile, BancoEstado, Santander, Itaú, BICE, Falabella)
+   y anota: fecha, quién transfiere y su RUT, monto, mensaje (OC, cotización o factura) y número de
+   operación. No marca nada como leído.
+3. Cruza con `listar_ventas` (por cobrar y por nombre del cliente): pago de una venta por cobrar →
+   proponer el cobro; pago sin venta en NÚCLEO → avisar que falta registrar o facturar.
+4. Límite: solo aparecen las transferencias cuyo banco de origen envía aviso. Depósitos de Mercado
+   Pago, Webpay y transferencias sin aviso se ven en el banco (paso 2).
 
 ## 1. Mercado Libre
 

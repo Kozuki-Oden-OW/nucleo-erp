@@ -341,6 +341,25 @@ export interface QuoteDetail extends QuoteSummary {
   sale_uid: string | null;
   sale_number: string | null;
 }
+/* ───── La cotización como documento (PDF con plantilla) ───── */
+
+export type QuoteTemplate = "clasica" | "moderna" | "compacta" | "elegante";
+/** Condiciones que acompañan a una cotización. */
+export interface QuoteTerms { delivery: string; warranty: string; payment: string }
+/** Datos del negocio para que el cliente pague por transferencia. */
+export interface QuoteBank { show: boolean; holder: string; rut: string; bank: string; account_type: string; account: string; email: string }
+export interface QuoteDocSettings {
+  template: QuoteTemplate;
+  /** Carpeta del computador donde se guardan los PDF emitidos. */
+  folder: string | null;
+  /** Condiciones habituales: se proponen en cada cotización. */
+  terms: QuoteTerms;
+  contact_note: string;
+  footer: string;
+  bank: QuoteBank;
+}
+export interface QuoteEmitted { path: string; file_name: string; folder: string }
+
 export interface QuoteInput {
   customer_uid: string | null;
   prospect_name?: string;

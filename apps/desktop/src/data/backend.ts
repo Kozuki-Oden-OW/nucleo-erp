@@ -7,7 +7,7 @@ import type {
   AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput,
-  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
+  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, QuoteDocSettings, QuoteEmitted, QuoteTerms, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
@@ -153,6 +153,13 @@ export interface Backend {
   /** Registra ventas leídas en el portal de vendedores (sin la conexión por API). No duplica. */
   mlRegisterManual(orders: MlManualOrder[]): Promise<MlSyncReport>;
   mlLinkItem(itemId: string, variationId: string | null, productUid: string, title?: string | null): Promise<void>;
+  // La cotización como documento: plantilla, carpeta y condiciones (Configuración → Cotizaciones)
+  quoteDocSettings(): Promise<QuoteDocSettings>;
+  saveQuoteDocSettings(settings: QuoteDocSettings): Promise<QuoteDocSettings>;
+  quoteTerms(uid: string): Promise<QuoteTerms>;
+  saveQuoteTerms(uid: string, terms: QuoteTerms): Promise<QuoteTerms>;
+  /** Guarda el PDF emitido en la carpeta de cotizaciones (escritorio) o lo descarga (demostración). */
+  saveQuotePdf(uid: string, fileName: string, pdf: Uint8Array): Promise<QuoteEmitted>;
   // Sincronización con el celular por la red local (Configuración → Celular)
   syncStatus(): Promise<SyncView>;
   syncEnable(on: boolean): Promise<SyncView>;

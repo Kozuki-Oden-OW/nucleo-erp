@@ -1,7 +1,7 @@
 // Editor de cotización, venta o factura interna. Pensado para digitar rápido con el teclado:
 // buscar producto → Enter → ajustar cantidad → siguiente producto.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, BadgePercent, CheckCircle2, Info, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, BadgePercent, CheckCircle2, FileDown, Info, Save, Trash2 } from "lucide-react";
 import { applyPromotions } from "../../data/promos";
 import { useBackend, errorMessage, type BusinessSettings, type Customer, type LineInput, type Product, type Promotion, type QuoteDetail, type Receiver, type SaleDetail, type SaleTerms } from "../../data";
 import { EMPTY_TERMS, receiverFromCustomer } from "../../data/saleTerms";
@@ -124,7 +124,7 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   }
 
-  async function save() {
+  async function save(emit = false) {
     setErr(null);
     const lines: LineInput[] = rows.map(({ product_uid, description, qty_milli, unit_price_minor, discount_ppm, taxable }) => ({ product_uid, description, qty_milli, unit_price_minor, discount_ppm, taxable }));
     setBusy(true);
@@ -132,7 +132,7 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
       if (kind === "COT") {
         const q = await backend.saveQuote({ customer_uid: customer?.uid ?? null, prospect_name: prospect || undefined, issue_date: date, valid_until: validUntil, lines, notes: notes || undefined }, existing?.uid);
         toast("success", `${q.number} guardada.`);
-        navigate(`/cotizaciones/${q.uid}`, { replace: true });
+        navigate(`/cotizaciones/${q.uid}${emit ? "?emitir=1" : ""}`, { replace: true });
       } else {
         if (saveToCustomer && customer && terms.receiver) {
           const r = terms.receiver;
@@ -167,7 +167,10 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
         back={<button onClick={() => goBack("/ventas")} className="mb-2 inline-flex items-center gap-1 text-sm text-muted hover:text-ink"><ArrowLeft size={15} /> Volver</button>}
         title={title}
         subtitle={kind === "FV" ? "Se imprime con el título FACTURA INTERNA y la leyenda “Documento interno — no tributario”." : kind === "COT" ? "No mueve stock ni dinero. Cuando el cliente acepte, conviértela en venta sin volver a digitar." : "Queda como borrador hasta que la marques como efectuada."}
-        actions={<Button icon={Save} onClick={save} disabled={busy || rows.length === 0} kbd="Ctrl Enter">{kind === "COT" ? "Guardar cotización" : "Guardar y continuar"}</Button>}
+        actions={<>
+          {kind === "COT" && <Button variant="secondary" icon={FileDown} onClick={() => save(true)} disabled={busy || rows.length === 0}>Emitir documento</Button>}
+          <Button icon={Save} onClick={() => save()} disabled={busy || rows.length === 0} kbd="Ctrl Enter">{kind === "COT" ? "Guardar cotización" : "Guardar y continuar"}</Button>
+        </>}
       />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex min-w-0 flex-col gap-6">
@@ -311,7 +314,7 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
             </Card>
           )}
           {err && <Notice tone="danger">{err}</Notice>}
-          <Button size="lg" icon={Save} onClick={save} disabled={busy || rows.length === 0}>{busy ? "Guardando…" : kind === "COT" ? "Guardar cotización" : "Guardar y continuar"}</Button>
+          <Button size="lg" icon={Save} onClick={() => save()} disabled={busy || rows.length === 0}>{busy ? "Guardando…" : kind === "COT" ? "Guardar cotización" : "Guardar y continuar"}</Button>
         </aside>
       </div>
       <NewCustomerDrawer

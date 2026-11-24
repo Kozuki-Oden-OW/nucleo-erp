@@ -5,7 +5,7 @@ import { AppError, type Backend, type Feature, type FileSource, type ImportView,
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
   SiiDocument, SiiIssueInput, SiiIntercambioGuardado, SiiIntercambioInput, SiiIntercambioResumen, SiiLibro, SiiLibroInput, SiiPrintDoc, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
-  MlBilling, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, SyncNetReport, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncPeer, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
+  MlBilling, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, QuoteDocSettings, QuoteEmitted, QuoteTerms, SyncNetReport, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncPeer, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput, StatementLineView, BankSuggestion,
   F22Inputs, F22View,
@@ -2087,6 +2087,43 @@ export class DemoBackend implements Backend {
     if (l.estado === "enviado") { l.estado = "aceptado"; l.glosa = "LOK Libro Cuadrado (demostración)"; }
     return wait(l);
   }
+  /* ───────────── La cotización como documento (en la demostración el PDF se descarga) ───────────── */
+
+  private quoteDoc: QuoteDocSettings = {
+    template: "clasica", folder: null, terms: { delivery: "2 días hábiles", warranty: "6 meses", payment: "Contado" },
+    contact_note: "Si tiene alguna pregunta acerca de esta cotización, escríbanos o llámenos.", footer: "Gracias por confiar en nosotros",
+    bank: { show: true, holder: "Ferretería Los Andes SpA", rut: "76.123.456-0", bank: "Banco de ejemplo", account_type: "Cuenta corriente", account: "00-000-00000", email: "pagos@ejemplo.cl" },
+  };
+  private quoteTermsByUid = new Map<string, QuoteTerms>();
+
+  async quoteDocSettings(): Promise<QuoteDocSettings> { return wait(structuredClone(this.quoteDoc)); }
+  async saveQuoteDocSettings(v: QuoteDocSettings): Promise<QuoteDocSettings> {
+    this.require("config.editar");
+    if (!["clasica", "moderna", "compacta", "elegante"].includes(v.template)) throw new AppError("validacion", "Elige una de las plantillas de cotización.");
+    this.quoteDoc = structuredClone({ ...v, folder: v.folder?.trim() || null });
+    this.log("cotizacion.ajustes", "cotizaciones", null);
+    return this.quoteDocSettings();
+  }
+  async quoteTerms(u: string): Promise<QuoteTerms> { this.findQuote(u); return wait({ ...(this.quoteTermsByUid.get(u) ?? this.quoteDoc.terms) }); }
+  async saveQuoteTerms(u: string, t: QuoteTerms): Promise<QuoteTerms> {
+    this.findQuote(u);
+    const clean = { delivery: t.delivery.trim(), warranty: t.warranty.trim(), payment: t.payment.trim() };
+    this.quoteTermsByUid.set(u, clean);
+    return wait({ ...clean });
+  }
+  async saveQuotePdf(u: string, fileName: string, pdf: Uint8Array): Promise<QuoteEmitted> {
+    const q = this.findQuote(u);
+    if (typeof document !== "undefined" && typeof URL.createObjectURL === "function") {
+      const url = URL.createObjectURL(new Blob([pdf as BlobPart], { type: "application/pdf" }));
+      const a = document.createElement("a");
+      a.href = url; a.download = fileName;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    }
+    this.log("cotizacion.emitir", "cotizacion", q.number);
+    return wait({ path: fileName, file_name: fileName, folder: this.quoteDoc.folder ?? "Descargas" });
+  }
+
   /* ───────────── Sincronización con el celular (simulada: no hay red en la demostración) ───────────── */
 
   private syncOn = false;

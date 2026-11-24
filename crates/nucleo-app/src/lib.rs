@@ -27,6 +27,7 @@ pub mod ml_ops;
 pub mod payroll_ops;
 pub mod promo_ops;
 pub mod purchase_ops;
+pub mod quote_doc_ops;
 pub mod registry;
 pub mod report_ops;
 pub mod sale_terms;
