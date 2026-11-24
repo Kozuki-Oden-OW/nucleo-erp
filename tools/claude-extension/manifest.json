@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "nucleo-erp",
   "display_name": "NÚCLEO ERP",
-  "version": "0.8.5",
+  "version": "0.8.6",
   "description": "Permite que Claude use NÚCLEO ERP en este computador: ve la pantalla, la recorre con su propio cursor y registra ventas, gastos, clientes y cobros.",
   "long_description": "Conecta Claude con NÚCLEO ERP, el sistema de gestión local y gratuito para pymes chilenas. NÚCLEO debe estar abierto con Configuración → Claude activado; ahí eliges si Claude solo mira, crea borradores o tiene acceso completo. La extensión solo se comunica con NÚCLEO dentro del mismo computador (127.0.0.1): los datos del negocio siguen guardados solo en tu equipo.",
   "author": {
@@ -131,6 +131,22 @@
     {
       "name": "registrar_ventas_mercadolibre",
       "description": "Registra en NÚCLEO ventas de Mercado Libre leídas en el portal de vendedores (detalle de cada venta), sin la conexión automática. Por cada venta: con «factura» (folio ya emitido) se enlaza a esa venta"
+    },
+    {
+      "name": "cuentas_dinero",
+      "description": "Lista las cajas y cuentas bancarias de NÚCLEO con su saldo. Sirve para saber en qué cuenta registrar los movimientos del banco."
+    },
+    {
+      "name": "registrar_movimientos_banco",
+      "description": "Guarda en la conciliación bancaria de NÚCLEO los movimientos de una cuenta leídos en el portal del banco (con la sesión que abrió la persona, solo lectura) o en una cartola. No duplica los que ya esta"
+    },
+    {
+      "name": "conciliacion_banco",
+      "description": "Muestra la conciliación de una cuenta bancaria: saldo según el banco y según NÚCLEO, y los movimientos del banco con su estado. Para cada movimiento pendiente entrega las sugerencias de NÚCLEO (qué ve"
+    },
+    {
+      "name": "conciliar_movimiento_banco",
+      "description": "Resuelve un movimiento pendiente de la conciliación bancaria. Acciones: «cobrar» (el abono paga una venta por cobrar: registra el cobro), «vincular» (ya existe ese cobro o pago en NÚCLEO), «vincular_t"
     },
     {
       "name": "pedidos_mercadolibre",

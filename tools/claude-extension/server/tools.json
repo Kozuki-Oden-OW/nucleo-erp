@@ -963,6 +963,151 @@
     }
   },
   {
+    "name": "cuentas_dinero",
+    "nivel": "ver",
+    "description": "Lista las cajas y cuentas bancarias de NÚCLEO con su saldo. Sirve para saber en qué cuenta registrar los movimientos del banco.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "registrar_movimientos_banco",
+    "nivel": "completo",
+    "description": "Guarda en la conciliación bancaria de NÚCLEO los movimientos de una cuenta leídos en el portal del banco (con la sesión que abrió la persona, solo lectura) o en una cartola. No duplica los que ya estaban y concilia solo los evidentes (un único cobro o pago posible por el mismo monto). No mueve dinero ni crea cobros: para eso se usa conciliar_movimiento_banco. Copia cada movimiento tal como aparece en el banco: fecha, glosa completa, número de operación y monto.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "cuenta": {
+          "type": "string",
+          "description": "Nombre o identificador de la cuenta en NÚCLEO (ver cuentas_dinero)"
+        },
+        "origen": {
+          "type": "string",
+          "description": "De dónde se leyeron, por ejemplo «BCI, últimos movimientos, 24-11-2026»"
+        },
+        "movimientos": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "fecha": {
+                "type": "string",
+                "description": "AAAA-MM-DD"
+              },
+              "descripcion": {
+                "type": "string",
+                "description": "Glosa completa del banco (incluye el nombre de quien transfiere si aparece)"
+              },
+              "referencia": {
+                "type": "string",
+                "description": "Número de operación o documento, si aparece"
+              },
+              "monto": {
+                "type": "number",
+                "description": "Positivo si es abono (entra dinero), negativo si es cargo (sale dinero)"
+              },
+              "saldo": {
+                "type": "number",
+                "description": "Saldo después del movimiento, si el banco lo muestra"
+              }
+            },
+            "required": [
+              "fecha",
+              "descripcion",
+              "monto"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "cuenta",
+        "movimientos"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "conciliacion_banco",
+    "nivel": "ver",
+    "description": "Muestra la conciliación de una cuenta bancaria: saldo según el banco y según NÚCLEO, y los movimientos del banco con su estado. Para cada movimiento pendiente entrega las sugerencias de NÚCLEO (qué venta por cobrar, compra o gasto podría ser, con su puntaje) y los identificadores que usa conciliar_movimiento_banco. También lista los cobros y pagos de NÚCLEO que no aparecen en el banco.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "cuenta": {
+          "type": "string",
+          "description": "Nombre o identificador de la cuenta en NÚCLEO"
+        },
+        "ver": {
+          "type": "string",
+          "enum": [
+            "pendientes",
+            "todos"
+          ],
+          "default": "pendientes"
+        }
+      },
+      "required": [
+        "cuenta"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "conciliar_movimiento_banco",
+    "nivel": "completo",
+    "description": "Resuelve un movimiento pendiente de la conciliación bancaria. Acciones: «cobrar» (el abono paga una venta por cobrar: registra el cobro), «vincular» (ya existe ese cobro o pago en NÚCLEO), «vincular_traspaso», «pagar_compra», «pagar_gasto», «gasto» (crea un gasto pagado con la categoría indicada), «traspaso» (a otra cuenta propia), «ignorar» y «deshacer». Usa el identificador del movimiento y el destino que entrega conciliacion_banco. Registra dinero en NÚCLEO: muestra antes a la persona qué movimiento y contra qué documento, y espera su confirmación.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "movimiento": {
+          "type": "string",
+          "description": "Identificador del movimiento del banco (de conciliacion_banco)"
+        },
+        "accion": {
+          "type": "string",
+          "enum": [
+            "cobrar",
+            "vincular",
+            "vincular_traspaso",
+            "pagar_compra",
+            "pagar_gasto",
+            "gasto",
+            "traspaso",
+            "ignorar",
+            "deshacer"
+          ]
+        },
+        "destino": {
+          "type": "string",
+          "description": "Identificador del documento o cuenta de destino (de la sugerencia); no se usa en «gasto», «ignorar» ni «deshacer»"
+        },
+        "categoria": {
+          "type": "number",
+          "description": "Para «gasto»: identificador de la categoría (de la sugerencia)"
+        },
+        "descripcion": {
+          "type": "string",
+          "description": "Para «gasto»: descripción del gasto"
+        },
+        "con_iva": {
+          "type": "boolean",
+          "description": "Para «gasto»: el monto incluye IVA"
+        },
+        "nota": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "movimiento",
+        "accion"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "pedidos_mercadolibre",
     "nivel": "ver",
     "description": "Lista los pedidos de Mercado Libre ya vistos por NÚCLEO: fecha, comprador, total, comisión, envío, neto a recibir de Mercado Pago, estado (importada, por revisar, cancelada), si pide factura y la venta enlazada. Sirve para cuadrar los depósitos de Mercado Pago con el banco.",

@@ -3,7 +3,7 @@
 // valen las mismas reglas, permisos y auditoría.
 import type { Backend } from "../data";
 import { errorMessage } from "../data";
-import type { Customer, HistoricalSale, SiiDocument, SiiIntercambioResumen, SiiLibro, SiiLineaLibro, LineInput, Product, SaleSummary, SaleTerms, ShipmentInput, ShipmentSize, Supplier } from "../data/types";
+import type { Customer, HistoricalSale, MoneyAccount, ReconcileKind, SiiDocument, SiiIntercambioResumen, SiiLibro, SiiLineaLibro, LineInput, Product, SaleSummary, SaleTerms, ShipmentInput, ShipmentSize, Supplier } from "../data/types";
 import { EMPTY_TERMS } from "../data/saleTerms";
 import { formatMoney, todayIso } from "../lib/format";
 import { navigate } from "../lib/router";
@@ -62,6 +62,18 @@ async function searchBoth<T extends { uid: string }>(search: (q: string) => Prom
 }
 
 /** Documento del SII por «tipo-folio» (33-1) o id interno. */
+/** Cuenta de dinero por identificador o por nombre (o banco); si hay una sola cuenta bancaria, sirve vacío. */
+async function bankAccount(backend: Backend, ref: string): Promise<MoneyAccount> {
+  const all = (await backend.moneyAccounts()).filter((c) => !c.archived);
+  const q = ref.toLowerCase();
+  const exact = all.find((c) => c.uid === ref);
+  if (exact) return exact;
+  const hits = q ? all.filter((c) => [c.name, c.bank_name ?? "", c.account_label ?? ""].some((t) => t.toLowerCase().includes(q))) : all.filter((c) => c.kind === "banco");
+  if (hits.length === 1 && hits[0]) return hits[0];
+  if (!hits.length) throw new Error(`No hay una cuenta que coincida con «${ref}». Cuentas: ${all.map((c) => c.name).join(", ") || "ninguna"}.`);
+  throw new Error(`Hay varias cuentas que coinciden: ${hits.map((c) => `${c.name} (id ${c.uid})`).join(", ")}. Indica el identificador.`);
+}
+
 async function findSiiDoc(backend: Backend, ref: string): Promise<SiiDocument> {
   const docs = await backend.siiDocuments(1000);
   const m = ref.trim().match(/^(\d{2,3})\s*[-–]\s*(\d+)$/);
@@ -251,6 +263,65 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
         `Mercado Libre (portal): registradas ${r.imported} · por revisar ${r.to_review} · por facturar ${r.to_invoice} · canceladas ${r.cancelled} · sin cambios ${r.unchanged}.`,
         ...r.messages.map((m) => `- ${m}`),
       ].join("\n"));
+    }
+    case "cuentas_dinero": {
+      const r = (await backend.moneyAccounts()).filter((c) => !c.archived);
+      return text(r.length
+        ? `${r.length} ${r.length === 1 ? "cuenta" : "cuentas"}:\n${r.map((c) => `- ${c.name} · ${c.kind}${c.bank_name ? ` · ${c.bank_name}` : ""}${c.account_label ? ` ${c.account_label}` : ""} · saldo ${pesos(c.balance_minor)} · id ${c.uid}`).join("\n")}`
+        : "No hay cuentas creadas. Se agregan en Dinero → Cuentas.");
+    }
+    case "registrar_movimientos_banco": {
+      const account = await bankAccount(backend, str(a, "cuenta"));
+      const list = Array.isArray(a.movimientos) ? (a.movimientos as Record<string, unknown>[]) : [];
+      if (!list.length) throw new Error("Indica al menos un movimiento.");
+      const lines = list.map((m, i) => {
+        const date = str(m, "fecha");
+        const amount = num(m, "monto");
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error(`Movimiento ${i + 1}: la fecha debe ser AAAA-MM-DD.`);
+        if (amount === null || amount === 0) throw new Error(`Movimiento ${i + 1}: falta el monto (positivo si es abono, negativo si es cargo).`);
+        const balance = num(m, "saldo");
+        return { date, description: str(m, "descripcion"), reference: str(m, "referencia") || null, amount_minor: Math.round(amount), balance_minor: balance === null ? null : Math.round(balance) };
+      });
+      const r = await backend.importBankStatement(account.uid, str(a, "origen") || "Leído en el portal del banco", lines);
+      dataChanged();
+      const v = await backend.bankReconciliation(account.uid);
+      return text(`${account.name}: ${r.added} ${r.added === 1 ? "movimiento nuevo" : "movimientos nuevos"} · ${r.duplicates} ya estaban · ${r.auto_matched} conciliados solos. Quedan ${v.pending} pendientes de conciliar (ver conciliacion_banco).`);
+    }
+    case "conciliacion_banco": {
+      const account = await bankAccount(backend, str(a, "cuenta"));
+      const v = await backend.bankReconciliation(account.uid);
+      const all = str(a, "ver") === "todos";
+      const rows = v.lines.filter((l) => all || l.status === "pendiente").slice(0, 80);
+      const head = [
+        `${account.name}: ${v.pending} pendientes · ${v.reconciled} conciliados · ${v.ignored} ignorados.`,
+        v.statement_balance_minor !== null ? `Saldo según el banco al ${v.statement_date}: ${pesos(v.statement_balance_minor)} · según NÚCLEO: ${v.nucleo_balance_minor !== null ? pesos(v.nucleo_balance_minor) : "—"}${v.nucleo_balance_minor !== null && v.nucleo_balance_minor !== v.statement_balance_minor ? ` · diferencia ${pesos(v.statement_balance_minor - v.nucleo_balance_minor)}` : ""}.` : "Aún no hay saldo informado por el banco.",
+      ];
+      const body = rows.map((l) => [
+        `- ${l.date} · ${l.amount_minor > 0 ? "abono" : "cargo"} ${pesos(Math.abs(l.amount_minor))} · ${l.description}${l.reference ? ` · ref ${l.reference}` : ""} · ${l.status}${l.matched ? ` con ${l.matched.label}` : ""} · movimiento ${l.uid}`,
+        ...(l.status === "pendiente" ? l.suggestions.slice(0, 4).map((g) => `    · sugerencia ${g.score}%: ${g.action} → ${g.label} (${g.detail})${g.target_uid ? ` · destino ${g.target_uid}` : ""}${g.category_id !== null ? ` · categoría ${g.category_id} ${g.category ?? ""}` : ""}`) : []),
+      ].join("\n"));
+      const missing = v.unmatched.slice(0, 30).map((u) => `- ${u.date} · ${u.document} · ${u.detail} · ${pesos(u.amount_minor)}`);
+      return text([
+        ...head,
+        rows.length ? (all ? "Movimientos del banco:" : "Pendientes de conciliar:") : (all ? "No hay movimientos del banco cargados." : "No hay movimientos pendientes."),
+        ...body,
+        ...(missing.length ? ["En NÚCLEO pero no en el banco:", ...missing] : []),
+      ].join("\n"));
+    }
+    case "conciliar_movimiento_banco": {
+      const line = str(a, "movimiento");
+      const kind = str(a, "accion") as ReconcileKind;
+      if (!line || !kind) throw new Error("Indica el movimiento y la acción.");
+      const needsTarget: ReconcileKind[] = ["cobrar", "vincular", "vincular_traspaso", "pagar_compra", "pagar_gasto", "traspaso"];
+      if (needsTarget.includes(kind) && !str(a, "destino")) throw new Error("Falta el destino: usa el identificador que entrega la sugerencia de conciliacion_banco.");
+      if (kind === "gasto" && num(a, "categoria") === null) throw new Error("Para crear un gasto indica la categoría (identificador de la sugerencia).");
+      const v = await backend.reconcileBankLine(line, {
+        kind, target_uid: str(a, "destino") || null, category_id: num(a, "categoria"), description: str(a, "descripcion") || null,
+        tax_included: typeof a.con_iva === "boolean" ? a.con_iva : null, note: str(a, "nota") || null,
+      });
+      dataChanged();
+      const done = v.lines.find((l) => l.uid === line);
+      return text(`${v.account.name}: movimiento ${done ? `${done.date} ${pesos(Math.abs(done.amount_minor))} «${done.description}» quedó ${done.status}${done.matched ? ` con ${done.matched.label}` : ""}` : "actualizado"}. Quedan ${v.pending} pendientes.`);
     }
     case "pedidos_mercadolibre": {
       const r = (await backend.mlOrders(Math.min(Math.max(num(a, "limite") || 50, 1), 300)));

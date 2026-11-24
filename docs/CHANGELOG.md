@@ -4,6 +4,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+- **Banco para el agente:** Claude puede cargar en la conciliación los movimientos que lee en el portal del banco (con la sesión que abre la persona, solo lectura), ver los pendientes con las sugerencias de NÚCLEO y, con la aprobación de la persona, dejar cobrada la venta que corresponde a cada abono. Herramientas `cuentas_dinero`, `registrar_movimientos_banco`, `conciliacion_banco` y `conciliar_movimiento_banco` (extensión 0.8.6). Receta del cierre diario en `docs/recetas/cierre-diario.md`.
+
 - **Celular: emparejar y sincronizar por la red local (fase S1).** En Configuración → Celular, «Emparejar un celular» muestra un código de un solo uso (QR y 8 grupos de letras, vence en 10 minutos). El celular lo usa estando en la misma WiFi (o unido por el cable) y queda emparejado con una llave propia; desde ahí sincroniza directo con el computador, cifrado y sin internet. Se puede apagar la sincronización y quitar un dispositivo (su llave se borra). La app para Android aún no está publicada: esta versión deja lista la parte del computador.
 - **Modelo de precios** (decisión del dueño): programa de computador gratis; app del celular $4.900 con IVA, pago único; plan Facturación $15.000 neto al mes (incluye NÚCLEO en línea); plan Agente IA $25.000 neto al mes.
 

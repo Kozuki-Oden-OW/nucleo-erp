@@ -289,3 +289,38 @@ describe("Envíos con datos del courier (demostración)", () => {
     expect((await runTool(b, "completo", "emitir_venta_sii", { venta: uid, confirmar: true })).isError).toBe(true);
   });
 });
+
+describe("Banco leído en el portal (demostración)", () => {
+  it("guarda los movimientos sin duplicar, sugiere la venta que pagan y la deja cobrada", async () => {
+    const b = new DemoBackend();
+    const cuentas = await runTool(b, "ver", "cuentas_dinero", {});
+    expect(txt(cuentas)).toMatch(/cuentas?:/);
+    const banco = (await b.moneyAccounts()).find((c) => c.kind === "banco" && !c.archived)!;
+    const porCobrar = (await b.listSales({ view: "por_cobrar" }))[0]!;
+    const monto = porCobrar.total_minor - porCobrar.paid_minor;
+    const movs = [
+      { fecha: "2026-11-23", descripcion: `Transferencia de ${porCobrar.customer_name}`, referencia: "88112233", monto, saldo: 5_000_000 },
+      { fecha: "2026-11-23", descripcion: "Comisión mantención cuenta", monto: -4990 },
+    ];
+    // Sin acceso completo no se puede escribir.
+    expect((await runTool(b, "borradores", "registrar_movimientos_banco", { cuenta: banco.uid, movimientos: movs })).isError).toBe(true);
+    const r1 = await runTool(b, "completo", "registrar_movimientos_banco", { cuenta: banco.name, origen: "BCI, últimos movimientos", movimientos: movs });
+    expect(txt(r1)).toMatch(/2 movimientos nuevos · 0 ya estaban/);
+    const r2 = await runTool(b, "completo", "registrar_movimientos_banco", { cuenta: banco.uid, movimientos: movs });
+    expect(txt(r2)).toMatch(/0 movimientos nuevos · 2 ya estaban/);
+
+    const view = txt(await runTool(b, "ver", "conciliacion_banco", { cuenta: banco.uid }));
+    expect(view).toMatch(/abono .*Transferencia de/);
+    expect(view).toMatch(/cargo \$4\.990 · Comisión mantención cuenta/);
+    const linea = (await b.bankReconciliation(banco.uid)).lines.find((l) => l.reference === "88112233")!;
+    const cobrar = linea.suggestions.find((g) => g.action === "cobrar" && g.target_uid);
+    expect(cobrar, "NÚCLEO sugiere la venta por cobrar del mismo monto").toBeTruthy();
+    expect(view).toContain(`destino ${cobrar!.target_uid}`);
+
+    expect((await runTool(b, "completo", "conciliar_movimiento_banco", { movimiento: linea.uid, accion: "cobrar" })).isError).toBe(true);
+    const done = await runTool(b, "completo", "conciliar_movimiento_banco", { movimiento: linea.uid, accion: "cobrar", destino: cobrar!.target_uid });
+    expect(txt(done)).toMatch(/quedó conciliado/);
+    expect((await b.listSales({ view: "por_cobrar" })).some((s) => s.uid === porCobrar.uid && s.total_minor - s.paid_minor === monto)).toBe(false);
+    expect((await runTool(b, "ver", "conciliacion_banco", { cuenta: "no existe" })).isError).toBe(true);
+  });
+});
