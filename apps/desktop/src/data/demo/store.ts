@@ -5,7 +5,7 @@ import { AppError, type Backend, type Feature, type FileSource, type ImportView,
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
   SiiDocument, SiiIssueInput, SiiIntercambioGuardado, SiiIntercambioInput, SiiIntercambioResumen, SiiLibro, SiiLibroInput, SiiPrintDoc, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
-  MlBilling, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, QuoteDocSettings, QuoteEmitted, QuoteTerms, SyncNetReport, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncPeer, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
+  MlBilling, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, SyncNetReport, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncPeer, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput, StatementLineView, BankSuggestion,
   F22Inputs, F22View,
@@ -2090,9 +2090,10 @@ export class DemoBackend implements Backend {
   /* ───────────── La cotización como documento (en la demostración el PDF se descarga) ───────────── */
 
   private quoteDoc: QuoteDocSettings = {
-    template: "clasica", folder: null, terms: { delivery: "2 días hábiles", warranty: "6 meses", payment: "Contado" },
+    template: "clasica", folder: null, follow_folder: true, terms: { delivery: "2 días hábiles", warranty: "6 meses", payment: "Contado" },
     contact_note: "Si tiene alguna pregunta acerca de esta cotización, escríbanos o llámenos.", footer: "Gracias por confiar en nosotros",
     bank: { show: true, holder: "Ferretería Los Andes SpA", rut: "76.123.456-0", bank: "Banco de ejemplo", account_type: "Cuenta corriente", account: "00-000-00000", email: "pagos@ejemplo.cl" },
+    card: { show: true, url: "https://www.webpay.cl/company/000000", label: "Pagar con tarjeta (Webpay)" },
   };
   private quoteTermsByUid = new Map<string, QuoteTerms>();
 
@@ -2100,9 +2101,18 @@ export class DemoBackend implements Backend {
   async saveQuoteDocSettings(v: QuoteDocSettings): Promise<QuoteDocSettings> {
     this.require("config.editar");
     if (!["clasica", "moderna", "compacta", "elegante"].includes(v.template)) throw new AppError("validacion", "Elige una de las plantillas de cotización.");
-    this.quoteDoc = structuredClone({ ...v, folder: v.folder?.trim() || null });
+    const url = v.card.url.trim();
+    if (url && (!url.startsWith("https://") || /\s/.test(url))) throw new AppError("validacion", "El enlace de pago con tarjeta debe ser una dirección completa que empiece con https://");
+    if (v.card.show && !url) throw new AppError("validacion", "Pega el enlace de pago con tarjeta, o desmarca «Mostrar el botón de pago con tarjeta».");
+    this.quoteDoc = structuredClone({ ...v, folder: v.folder?.trim() || null, card: { show: v.card.show, url, label: v.card.label.trim() || "Pagar con tarjeta (Webpay)" } });
     this.log("cotizacion.ajustes", "cotizaciones", null);
     return this.quoteDocSettings();
+  }
+  /** En la demostración no hay carpeta que mirar: la numeración es la del programa. */
+  async quoteNumbering(): Promise<QuoteNumbering> {
+    const q = (await this.sequences()).find((x) => x.doc_type === "COT");
+    const n = q?.next_number ?? 1, width = q?.width ?? 6, prefix = q?.prefix ?? "COT";
+    return { prefix, width, next_number: n, next_label: `${prefix}-${String(n).padStart(width, "0")}`, folder_last: null };
   }
   async quoteTerms(u: string): Promise<QuoteTerms> { this.findQuote(u); return wait({ ...(this.quoteTermsByUid.get(u) ?? this.quoteDoc.terms) }); }
   async saveQuoteTerms(u: string, t: QuoteTerms): Promise<QuoteTerms> {

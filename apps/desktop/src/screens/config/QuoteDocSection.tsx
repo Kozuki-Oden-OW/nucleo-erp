@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { open as pickFolder } from "@tauri-apps/plugin-dialog";
 import { Check, FolderOpen, Save } from "lucide-react";
-import { errorMessage, useBackend, type BusinessSettings, type QuoteDocSettings, type QuoteTemplate } from "../../data";
+import { errorMessage, useBackend, type BusinessSettings, type QuoteDocSettings, type QuoteNumbering, type QuoteTemplate } from "../../data";
 import { QUOTE_TEMPLATES } from "../../lib/quotePdf";
 import { useSession } from "../../lib/session";
 import { Button, Card, Checkbox, Field, Notice, Spinner, TextArea, cx } from "../../ui/kit";
@@ -40,9 +40,11 @@ export function QuoteDocSection({ onChanged }: { onChanged: () => void }) {
   const [biz, setBiz] = useState<BusinessSettings | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [num, setNum] = useState<QuoteNumbering | null>(null);
 
   useEffect(() => {
     Promise.all([backend.quoteDocSettings(), backend.business()]).then(([q, b]) => { setS(q); setBiz(b); }).catch((e) => setErr(errorMessage(e)));
+    backend.quoteNumbering().then(setNum).catch(() => setNum(null));
   }, [backend]);
 
   if (err) return <Notice tone="danger">{err}</Notice>;
@@ -51,6 +53,7 @@ export function QuoteDocSection({ onChanged }: { onChanged: () => void }) {
   const set = (patch: Partial<QuoteDocSettings>) => setS((v) => v && { ...v, ...patch });
   const terms = (patch: Partial<QuoteDocSettings["terms"]>) => setS((v) => v && { ...v, terms: { ...v.terms, ...patch } });
   const bank = (patch: Partial<QuoteDocSettings["bank"]>) => setS((v) => v && { ...v, bank: { ...v.bank, ...patch } });
+  const card = (patch: Partial<QuoteDocSettings["card"]>) => setS((v) => v && { ...v, card: { ...v.card, ...patch } });
   const choose = async () => {
     try {
       const dir = await pickFolder({ directory: true, multiple: false, title: "Carpeta para guardar las cotizaciones" });
@@ -61,6 +64,7 @@ export function QuoteDocSection({ onChanged }: { onChanged: () => void }) {
     setBusy(true);
     try {
       setS(await backend.saveQuoteDocSettings(s));
+      backend.quoteNumbering().then(setNum).catch(() => setNum(null));
       toast("success", "Ajustes de cotizaciones guardados.");
     } catch (e) { toast("danger", errorMessage(e)); } finally { setBusy(false); }
   };
@@ -92,6 +96,18 @@ export function QuoteDocSection({ onChanged }: { onChanged: () => void }) {
             {editable && <Button variant="secondary" icon={FolderOpen} onClick={choose}>Elegir carpeta</Button>}
           </div>
         ) : <Notice tone="info">En la demostración el PDF se descarga con el navegador. En el programa de escritorio eliges aquí la carpeta.</Notice>}
+        <div className="mt-4 flex flex-col gap-2">
+          <Checkbox label="Seguir la numeración de los archivos de esta carpeta" checked={s.follow_folder} onChange={(v) => { if (editable) set({ follow_folder: v }); }}
+            hint="Antes de numerar una cotización nueva, NÚCLEO mira la carpeta y continúa después del número más alto que encuentre (por ejemplo, después de COT-1523.pdf viene la 1524). Sirve si también haces cotizaciones fuera de NÚCLEO." />
+          {num && (
+            <p className="text-sm" aria-live="polite">
+              La próxima cotización será la <strong>{num.next_label}</strong>
+              {num.folder_last != null ? <span className="text-muted"> · el número más alto en la carpeta es el {num.folder_last}</span>
+                : s.follow_folder && s.folder ? <span className="text-muted"> · en la carpeta no hay cotizaciones con el prefijo {num.prefix}, o no se pudo leer</span> : null}
+              <span className="block text-xs text-muted">El prefijo y el largo del número se cambian en Configuración → Numeración.</span>
+            </p>
+          )}
+        </div>
       </Card>
 
       <Card title="Condiciones habituales" subtitle="Se proponen en cada cotización y se pueden cambiar al emitirla.">
@@ -117,6 +133,17 @@ export function QuoteDocSection({ onChanged }: { onChanged: () => void }) {
             <Field label="Tipo de cuenta" value={s.bank.account_type} onChange={(e) => bank({ account_type: e.target.value })} placeholder="Cuenta corriente" disabled={!editable} />
             <Field label="Número de cuenta" value={s.bank.account} onChange={(e) => bank({ account: e.target.value })} disabled={!editable} autoComplete="off" />
             <Field label="Correo para el comprobante" value={s.bank.email} onChange={(e) => bank({ email: e.target.value })} disabled={!editable} />
+          </div>
+        </div>
+      </Card>
+
+      <Card title="Pago con tarjeta" subtitle="Si tu cliente prefiere pagar con tarjeta: pega aquí tu enlace de pago (por ejemplo, el de Webpay) y la cotización lleva un botón que lo abre.">
+        <div className="flex flex-col gap-3">
+          <Checkbox label="Mostrar el botón de pago con tarjeta en la cotización" checked={s.card.show} onChange={(v) => { if (editable) card({ show: v }); }} />
+          <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
+            <Field label="Enlace de pago" value={s.card.url} onChange={(e) => card({ url: e.target.value })} placeholder="https://www.webpay.cl/company/…" disabled={!editable} autoComplete="off"
+              hint="La dirección completa, con https://. NÚCLEO no cobra ni ve el pago: el botón solo abre esa página." />
+            <Field label="Texto del botón" value={s.card.label} onChange={(e) => card({ label: e.target.value })} placeholder="Pagar con tarjeta (Webpay)" disabled={!editable} />
           </div>
         </div>
       </Card>

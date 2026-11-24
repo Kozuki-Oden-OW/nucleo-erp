@@ -37,6 +37,20 @@ No necesita sesión del banco: los bancos de los clientes avisan por correo cada
 4. Límite: solo aparecen las transferencias cuyo banco de origen envía aviso. Depósitos de Mercado
    Pago, Webpay y transferencias sin aviso se ven en el banco (paso 2).
 
+## WhatsApp (regla del dueño, 24-11-2026)
+
+- El WhatsApp Business del negocio está **siempre vinculado en el Chrome del gato: el perfil «Agente
+  MP»**. No hay que escanear nada: se elige ese navegador (en la lista de navegadores conectados es el
+  que abre `web.whatsapp.com` directo en los chats; el otro muestra el código QR) y se abre una pestaña.
+- En el otro navegador están Mercado Libre, Bluexpress, el banco y el SII.
+- La lista de chats se puede leer sin abrirlos (número, hora y último mensaje). **Abrir un chat lo marca
+  como leído**: después de leerlo se deja «Marcar como no leído», igual que en Mercado Libre.
+- La pestaña del agente **se deja abierta** para trabajar en ella (decisión del dueño, 24-11-2026).
+  WhatsApp Web funciona en una sola pestaña a la vez: si el dueño quiere usar la suya, pulsa «Usar
+  aquí» y el agente vuelve a tomarla la próxima vez que revise.
+- Nunca se responde solo: el agente propone el texto y lo envía únicamente con el «sí» del dueño, mensaje
+  por mensaje. No se abren chats personales.
+
 ## 1. Mercado Libre
 
 Sigue `mercadolibre-revision-ventas.md`:

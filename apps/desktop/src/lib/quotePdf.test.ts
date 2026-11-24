@@ -44,6 +44,24 @@ describe("PDF de la cotización", () => {
     expect(raw).toContain("TOTAL");
   });
 
+  it("el botón de pago con tarjeta lleva el enlace y se puede quitar", async () => {
+    const f = await fixture();
+    const card = { show: true, url: "https://www.webpay.cl/company/000000?utm_source=prueba", label: "Pagar con tarjeta (Webpay)" };
+    for (const t of QUOTE_TEMPLATES) {
+      // Con un logo horizontal (lo habitual) todo cabe en una hoja; aquí va sin logo.
+      const raw = new TextDecoder("latin1").decode(buildQuotePdf({ ...f, biz: { ...f.biz, logo: null }, settings: { ...f.settings, card }, template: t.id }));
+      expect(raw, t.id).toContain("/URI (https://www.webpay.cl/company/000000?utm_source=prueba)");
+      expect(raw, t.id).toContain("Pagar con tarjeta \\(Webpay\\)");
+      expect(raw, t.id).toContain("www.webpay.cl/company/000000) Tj");
+      expect((raw.match(/\/Type \/Page\b/g) ?? []).length, t.id).toBe(1);
+    }
+    const off = new TextDecoder("latin1").decode(buildQuotePdf({ ...f, settings: { ...f.settings, card: { ...card, show: false } } }));
+    expect(off).not.toContain("/URI");
+    // Un enlace que no es https no se dibuja (no debería llegar: NÚCLEO lo rechaza al guardar).
+    const bad = new TextDecoder("latin1").decode(buildQuotePdf({ ...f, settings: { ...f.settings, card: { ...card, url: "javascript:alert(1)" } } }));
+    expect(bad).not.toContain("/URI");
+  });
+
   it("el nombre del archivo lleva número y cliente, sin caracteres que Windows rechaza", async () => {
     const f = await fixture();
     const name = quoteFileName({ ...f.quote, customer_name: 'Soc. de Inv. / Desarrollo: "I+D" <Chile>?' });

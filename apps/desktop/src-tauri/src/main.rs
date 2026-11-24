@@ -116,6 +116,7 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         ml::ml_link_item,
         quotedoc::quote_doc_settings,
         quotedoc::save_quote_doc_settings,
+        quotedoc::quote_numbering,
         quotedoc::quote_terms,
         quotedoc::save_quote_terms,
         quotedoc::save_quote_pdf,

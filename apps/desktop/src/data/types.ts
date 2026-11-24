@@ -348,15 +348,22 @@ export type QuoteTemplate = "clasica" | "moderna" | "compacta" | "elegante";
 export interface QuoteTerms { delivery: string; warranty: string; payment: string }
 /** Datos del negocio para que el cliente pague por transferencia. */
 export interface QuoteBank { show: boolean; holder: string; rut: string; bank: string; account_type: string; account: string; email: string }
+/** Enlace para pagar con tarjeta (el «link de pago» de Webpay, por ejemplo): sale como botón en el PDF. */
+export interface QuoteCard { show: boolean; url: string; label: string }
+/** Cómo va la numeración de cotizaciones, contando los archivos de la carpeta. */
+export interface QuoteNumbering { prefix: string; width: number; next_number: number; next_label: string; folder_last: number | null }
 export interface QuoteDocSettings {
   template: QuoteTemplate;
   /** Carpeta del computador donde se guardan los PDF emitidos. */
   folder: string | null;
+  /** La numeración continúa después del número más alto que haya en los archivos de la carpeta. */
+  follow_folder: boolean;
   /** Condiciones habituales: se proponen en cada cotización. */
   terms: QuoteTerms;
   contact_note: string;
   footer: string;
   bank: QuoteBank;
+  card: QuoteCard;
 }
 export interface QuoteEmitted { path: string; file_name: string; folder: string }
 

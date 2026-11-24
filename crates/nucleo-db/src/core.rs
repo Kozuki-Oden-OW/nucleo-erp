@@ -81,6 +81,15 @@ pub fn take_number(conn: &Connection, doc_type: &str) -> DbResult<String> {
     Ok(format!("{prefix}-{n:0width$}", width = width as usize))
 }
 
+/// Adelanta el siguiente número de un tipo de documento; nunca lo retrocede. Devuelve si cambió.
+pub fn raise_sequence(conn: &Connection, doc_type: &str, next_number: i64) -> DbResult<bool> {
+    Ok(conn.execute(
+        "UPDATE numbering_sequences SET next_number = ?2
+         WHERE doc_type = ?1 AND branch_id IS NULL AND next_number < ?2",
+        (doc_type, next_number),
+    )? > 0)
+}
+
 /// Cambia prefijo, siguiente número y ancho. Rechaza retroceder bajo lo ya usado.
 pub fn update_sequence(
     conn: &Connection,

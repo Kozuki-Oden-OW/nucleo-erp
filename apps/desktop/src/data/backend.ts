@@ -7,7 +7,7 @@ import type {
   AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput,
-  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, QuoteDocSettings, QuoteEmitted, QuoteTerms, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
+  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
@@ -156,6 +156,8 @@ export interface Backend {
   // La cotización como documento: plantilla, carpeta y condiciones (Configuración → Cotizaciones)
   quoteDocSettings(): Promise<QuoteDocSettings>;
   saveQuoteDocSettings(settings: QuoteDocSettings): Promise<QuoteDocSettings>;
+  /** Qué número tomará la próxima cotización (mira también los archivos de la carpeta). */
+  quoteNumbering(): Promise<QuoteNumbering>;
   quoteTerms(uid: string): Promise<QuoteTerms>;
   saveQuoteTerms(uid: string, terms: QuoteTerms): Promise<QuoteTerms>;
   /** Guarda el PDF emitido en la carpeta de cotizaciones (escritorio) o lo descarga (demostración). */

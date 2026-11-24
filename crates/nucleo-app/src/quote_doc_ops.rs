@@ -9,7 +9,7 @@ use crate::{AppError, AppResult, CompanySession};
 use data_encoding::BASE64;
 use nucleo_db::audit;
 use nucleo_db::core as dbcore;
-use rusqlite::OptionalExtension;
+use rusqlite::{Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::{Path, PathBuf};
@@ -17,6 +17,9 @@ use std::path::{Path, PathBuf};
 pub const TEMPLATES: [&str; 4] = ["clasica", "moderna", "compacta", "elegante"];
 const SETTING: &str = "cotizaciones";
 const MAX_PDF: usize = 15 * 1024 * 1024;
+const CARD_LABEL: &str = "Pagar con tarjeta (Webpay)";
+/// Un número de archivo con más dígitos que esto no es un correlativo (es una fecha, un RUT…).
+const MAX_FILE_DIGITS: usize = 7;
 
 /// Condiciones que acompañan a una cotización.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -42,6 +45,39 @@ pub struct QuoteBank {
     pub email: String,
 }
 
+/// Enlace para pagar con tarjeta (por ejemplo, el «link de pago» de Webpay del negocio). En el PDF
+/// aparece como un botón que se puede pulsar.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct QuoteCard {
+    pub show: bool,
+    pub url: String,
+    /// Texto del botón.
+    pub label: String,
+}
+
+impl Default for QuoteCard {
+    fn default() -> Self {
+        Self {
+            show: false,
+            url: String::new(),
+            label: CARD_LABEL.into(),
+        }
+    }
+}
+
+/// Cómo va la numeración de cotizaciones, contando los archivos de la carpeta.
+#[derive(Debug, Clone, Serialize)]
+pub struct QuoteNumbering {
+    pub prefix: String,
+    pub width: i64,
+    /// El número que tomará la próxima cotización.
+    pub next_number: i64,
+    pub next_label: String,
+    /// Número más alto entre los archivos de la carpeta (si se sigue la carpeta y se pudo leer).
+    pub folder_last: Option<i64>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct QuoteDocSettings {
@@ -49,6 +85,9 @@ pub struct QuoteDocSettings {
     pub template: String,
     /// Carpeta del computador donde se guardan los PDF emitidos.
     pub folder: Option<String>,
+    /// La numeración continúa después del número más alto que haya en los archivos de la carpeta
+    /// (sirve cuando también se hacen cotizaciones fuera de NÚCLEO).
+    pub follow_folder: bool,
     /// Condiciones habituales: se proponen en cada cotización nueva.
     pub terms: QuoteTerms,
     /// Línea de contacto («Si tiene alguna pregunta…»).
@@ -56,6 +95,7 @@ pub struct QuoteDocSettings {
     /// Frase de cierre.
     pub footer: String,
     pub bank: QuoteBank,
+    pub card: QuoteCard,
 }
 
 impl Default for QuoteDocSettings {
@@ -63,10 +103,12 @@ impl Default for QuoteDocSettings {
         Self {
             template: TEMPLATES[0].into(),
             folder: None,
+            follow_folder: true,
             terms: QuoteTerms::default(),
             contact_note: String::new(),
             footer: "Gracias por confiar en nosotros".into(),
             bank: QuoteBank::default(),
+            card: QuoteCard::default(),
         }
     }
 }
@@ -112,12 +154,108 @@ pub fn safe_file_name(text: &str) -> String {
     cut.trim_end_matches(['.', ' ']).to_string()
 }
 
+/// Número de cotización escrito en el nombre de un archivo: «COT-1523.pdf», «COT 1498C.pdf»,
+/// «cot-000012 Cliente.pdf». Solo cuenta si el nombre empieza con el prefijo.
+pub fn number_in_file_name(name: &str, prefix: &str) -> Option<i64> {
+    let head = name.get(..prefix.len())?;
+    if prefix.is_empty() || !head.eq_ignore_ascii_case(prefix) {
+        return None;
+    }
+    let rest = name[prefix.len()..].trim_start_matches(['-', '_', ' ', '.']);
+    let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+    if digits.is_empty() || digits.len() > MAX_FILE_DIGITS {
+        return None;
+    }
+    digits.parse().ok()
+}
+
+/// Número más alto entre los archivos de la carpeta. `None` si la carpeta no existe, no se puede
+/// leer o no tiene cotizaciones con ese prefijo.
+pub fn folder_last_number(folder: &Path, prefix: &str) -> Option<i64> {
+    std::fs::read_dir(folder)
+        .ok()?
+        .flatten()
+        .filter(|e| e.file_type().map(|t| t.is_file()).unwrap_or(false))
+        .filter_map(|e| number_in_file_name(&e.file_name().to_string_lossy(), prefix))
+        .max()
+}
+
+fn settings_of(conn: &Connection) -> AppResult<QuoteDocSettings> {
+    Ok(dbcore::get_setting(conn, SETTING)?
+        .and_then(|v| serde_json::from_value(v).ok())
+        .unwrap_or_default())
+}
+
+fn cot_sequence(conn: &Connection) -> AppResult<dbcore::SequenceRow> {
+    dbcore::sequences(conn)?
+        .into_iter()
+        .find(|s| s.doc_type == "COT")
+        .ok_or_else(|| AppError::NotFound("la numeración de cotizaciones".into()))
+}
+
+fn folder_last(conn: &Connection, prefix: &str) -> AppResult<Option<i64>> {
+    let s = settings_of(conn)?;
+    Ok(match s.folder {
+        Some(f) if s.follow_folder => folder_last_number(Path::new(&f), prefix),
+        _ => None,
+    })
+}
+
+/// Antes de numerar una cotización nueva: si en la carpeta hay un número más alto que el que
+/// NÚCLEO iba a usar, la numeración salta al siguiente. Nunca retrocede. Si la carpeta no está
+/// disponible (disco desconectado), se numera como siempre.
+pub(crate) fn follow_folder_numbering(conn: &Connection, user: &str) -> AppResult<()> {
+    let seq = cot_sequence(conn)?;
+    let Some(last) = folder_last(conn, &seq.prefix)? else {
+        return Ok(());
+    };
+    if last < seq.next_number || last + 1 >= 10_i64.pow(seq.width.clamp(1, 12) as u32) {
+        return Ok(());
+    }
+    dbcore::raise_sequence(conn, "COT", last + 1)?;
+    audit::append(
+        conn,
+        &audit::AuditEntry {
+            user_name: user,
+            action: "numeracion.seguir_carpeta",
+            entity: "numeracion",
+            entity_id: Some("COT"),
+            before_json: Some(json!({ "next_number": seq.next_number }).to_string()),
+            after_json: Some(json!({ "next_number": last + 1, "folder_last": last }).to_string()),
+            ..Default::default()
+        },
+    )?;
+    Ok(())
+}
+
 impl CompanySession {
+    /// Qué número tomará la próxima cotización, contando los archivos de la carpeta.
+    pub fn quote_numbering(&self) -> AppResult<QuoteNumbering> {
+        self.require("ventas.ver")?;
+        let conn = self.db.conn();
+        let seq = cot_sequence(conn)?;
+        let folder_last = folder_last(conn, &seq.prefix)?;
+        let fits = |n: i64| n + 1 < 10_i64.pow(seq.width.clamp(1, 12) as u32);
+        let next_number = match folder_last {
+            Some(last) if last >= seq.next_number && fits(last) => last + 1,
+            _ => seq.next_number,
+        };
+        Ok(QuoteNumbering {
+            next_label: format!(
+                "{}-{next_number:0width$}",
+                seq.prefix,
+                width = seq.width as usize
+            ),
+            prefix: seq.prefix,
+            width: seq.width,
+            next_number,
+            folder_last,
+        })
+    }
+
     pub fn quote_doc_settings(&self) -> AppResult<QuoteDocSettings> {
         self.require("ventas.ver")?;
-        Ok(dbcore::get_setting(self.db.conn(), SETTING)?
-            .and_then(|v| serde_json::from_value(v).ok())
-            .unwrap_or_default())
+        settings_of(self.db.conn())
     }
 
     pub fn save_quote_doc_settings(&mut self, v: &QuoteDocSettings) -> AppResult<QuoteDocSettings> {
@@ -141,9 +279,26 @@ impl CompanySession {
             }
             None => None,
         };
+        let card_url = short("el enlace de pago con tarjeta", &v.card.url, 300)?;
+        if !card_url.is_empty()
+            && (!card_url.starts_with("https://")
+                || card_url.len() < 12
+                || card_url.chars().any(char::is_whitespace))
+        {
+            return Err(AppError::Validation(
+                "el enlace de pago con tarjeta debe ser una dirección completa que empiece con https://".into(),
+            ));
+        }
+        if v.card.show && card_url.is_empty() {
+            return Err(AppError::Validation(
+                "pega el enlace de pago con tarjeta, o desmarca «Mostrar el botón de pago con tarjeta»".into(),
+            ));
+        }
+        let card_label = short("el texto del botón de pago", &v.card.label, 60)?;
         let clean = QuoteDocSettings {
             template: v.template.clone(),
             folder,
+            follow_folder: v.follow_folder,
             terms: clean_terms(&v.terms)?,
             contact_note: short("la línea de contacto", &v.contact_note, 400)?,
             footer: short("la frase de cierre", &v.footer, 200)?,
@@ -155,6 +310,15 @@ impl CompanySession {
                 account_type: short("el tipo de cuenta", &v.bank.account_type, 60)?,
                 account: short("el número de cuenta", &v.bank.account, 40)?,
                 email: short("el correo de avisos de pago", &v.bank.email, 120)?,
+            },
+            card: QuoteCard {
+                show: v.card.show,
+                url: card_url,
+                label: if card_label.is_empty() {
+                    CARD_LABEL.into()
+                } else {
+                    card_label
+                },
             },
         };
         let conn = self.db.conn();
@@ -278,5 +442,24 @@ mod tests {
             "COT-000002 Clínica Ñuñoa S.A"
         );
         assert!(safe_file_name(&"x".repeat(300)).chars().count() <= 90);
+    }
+
+    #[test]
+    fn lee_el_numero_del_nombre_del_archivo() {
+        for (name, n) in [
+            ("COT-1523.pdf", Some(1523)),
+            ("COT-000001 Universidad de los Andes.pdf", Some(1)),
+            ("COT-1498C.pdf", Some(1498)),
+            ("COT-1295 (1).pdf", Some(1295)),
+            ("cot 77.xlsx", Some(77)),
+            ("COT_0042.pdf", Some(42)),
+            ("COT-20261124.pdf", None), // una fecha no es un correlativo
+            ("COTIZACION.pdf", None),
+            ("Plantilla_Cotizacion.xlsx", None),
+            ("OC-1523.pdf", None),
+            ("ÑU", None),
+        ] {
+            assert_eq!(number_in_file_name(name, "COT"), n, "{name}");
+        }
     }
 }

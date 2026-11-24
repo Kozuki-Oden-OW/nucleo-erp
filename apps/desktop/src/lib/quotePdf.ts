@@ -231,6 +231,31 @@ export function buildQuotePdf(input: QuotePdfInput): Uint8Array {
     y = ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y) + 5;
   }
 
+  /* ── Pago con tarjeta: botón con enlace (se puede pulsar en el PDF) ── */
+  const card = settings.card;
+  const cardUrl = card?.show ? clean(card.url) : "";
+  if (/^https:\/\/\S+$/.test(cardUrl)) {
+    const label = clean(card.label) || "Pagar con tarjeta";
+    const shown = cardUrl.replace(/^https:\/\//, "").replace(/[?#].*$/, "").replace(/\/$/, "");
+    const bh = template === "compacta" ? 7.5 : 9;
+    need(bh + 9);
+    text("PAGO CON TARJETA", left, y + 2, { size: 7.5, bold: true, color: L.accent });
+    y += 4.5;
+    doc.setFont("helvetica", "bold").setFontSize(template === "compacta" ? 9 : 10);
+    const bw = Math.min(width * 0.5, doc.getTextWidth(label) + 14);
+    doc.setFillColor(...L.accent);
+    doc.roundedRect(left, y, bw, bh, 1.8, 1.8, "F");
+    text(label, left + bw / 2, y + bh / 2 + 1.25, { size: template === "compacta" ? 9 : 10, bold: true, color: [255, 255, 255], align: "center" });
+    doc.link(left, y, bw, bh, { url: cardUrl });
+    // Al lado, la dirección a la vista: sirve si la cotización se imprime o el lector no abre enlaces.
+    const tx2 = left + bw + 5, tw = right - tx2;
+    text("Pulse el botón para pagar en línea, o entre a:", tx2, y + bh / 2 - 0.9, { size: L.body - 1.5, color: L.muted, maxWidth: tw });
+    const fit = doc.setFont("helvetica", "bold").setFontSize(L.body - 0.5).splitTextToSize(shown, tw) as string[];
+    text(fit[0] ?? shown, tx2, y + bh / 2 + 3, { size: L.body - 0.5, bold: true, color: L.accent });
+    doc.link(tx2, y + bh / 2, Math.min(tw, doc.getTextWidth(fit[0] ?? shown)), 4, { url: cardUrl });
+    y += bh + 5;
+  }
+
   /* ── Pie en todas las páginas ── */
   const pages = doc.getNumberOfPages();
   for (let p = 1; p <= pages; p++) {

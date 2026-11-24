@@ -2,7 +2,7 @@
 //! cotización y guardado del PDF emitido.
 
 use crate::commands::{AppState, CommandError};
-use nucleo_app::quote_doc_ops::{QuoteDocSettings, QuoteEmitted, QuoteTerms};
+use nucleo_app::quote_doc_ops::{QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms};
 use nucleo_app::{AppError, CompanySession};
 use tauri::State;
 
@@ -32,6 +32,12 @@ pub fn save_quote_doc_settings(
     settings: QuoteDocSettings,
 ) -> CmdResult<QuoteDocSettings> {
     with(&state, |s| s.save_quote_doc_settings(&settings))
+}
+
+/// Qué número tomará la próxima cotización (mira también los archivos de la carpeta).
+#[tauri::command]
+pub fn quote_numbering(state: State<'_, AppState>) -> CmdResult<QuoteNumbering> {
+    with(&state, |s| s.quote_numbering())
 }
 
 #[tauri::command]

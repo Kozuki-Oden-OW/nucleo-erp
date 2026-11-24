@@ -2,7 +2,7 @@
 //! transferencia), condiciones de cada cotización y guardado del PDF emitido en la carpeta elegida.
 
 use data_encoding::BASE64;
-use nucleo_app::quote_doc_ops::{QuoteBank, QuoteDocSettings, QuoteTerms};
+use nucleo_app::quote_doc_ops::{QuoteBank, QuoteCard, QuoteDocSettings, QuoteTerms};
 use nucleo_app::sales_ops::{LineInput, QuoteInput};
 use nucleo_app::{AppService, BusinessProfile, CompanySession, MemoryKeyStore};
 
@@ -73,6 +73,7 @@ fn ajustes_condiciones_y_pdf_en_la_carpeta() {
                 account: "00000000".into(),
                 ..Default::default()
             },
+            ..Default::default()
         })
         .unwrap();
     assert_eq!(saved.terms.delivery, "2 días hábiles");
@@ -162,4 +163,115 @@ fn se_rechaza_lo_que_no_corresponde() {
             .is_err()
     );
     assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
+}
+
+#[test]
+fn la_numeracion_sigue_a_la_carpeta() {
+    let (data, _app, mut s) = session();
+    let folder = data.path().join("Cotizaciones");
+    std::fs::create_dir_all(&folder).unwrap();
+    // Cotizaciones hechas antes fuera de NÚCLEO (con saltos, una copia y un archivo que no cuenta).
+    for name in [
+        "COT-1001.pdf",
+        "COT-1522.pdf",
+        "COT-1523.pdf",
+        "COT-1498C.pdf",
+        "COT-1295 (1).pdf",
+        "Plantilla_Cotizacion.xlsx",
+        "COT-20261124.pdf",
+    ] {
+        std::fs::write(folder.join(name), b"x").unwrap();
+    }
+    std::fs::create_dir_all(folder.join("COT-9000 carpeta")).unwrap();
+
+    // Sin carpeta elegida, NÚCLEO numera por su cuenta.
+    let n = s.quote_numbering().unwrap();
+    assert_eq!((n.next_number, n.folder_last), (1, None));
+
+    s.save_quote_doc_settings(&QuoteDocSettings {
+        folder: Some(folder.to_string_lossy().to_string()),
+        ..Default::default()
+    })
+    .unwrap();
+    s.update_sequence("COT", "COT", 1, 4).unwrap();
+    let n = s.quote_numbering().unwrap();
+    assert_eq!(n.folder_last, Some(1523));
+    assert_eq!(n.next_label, "COT-1524");
+
+    // La cotización nueva continúa después del último archivo; la siguiente, después de ella.
+    let a = quote(&mut s, "Alphalab");
+    assert_eq!(s.quote(&a).unwrap().summary.number, "COT-1524");
+    let b = quote(&mut s, "Otro cliente");
+    assert_eq!(s.quote(&b).unwrap().summary.number, "COT-1525");
+    assert!(
+        s.audit_log("", None)
+            .unwrap()
+            .iter()
+            .any(|x| x.action == "numeracion.seguir_carpeta")
+    );
+
+    // Alguien hace una a mano mientras tanto: NÚCLEO salta sobre ella.
+    std::fs::write(folder.join("COT-1530.pdf"), b"x").unwrap();
+    let c = quote(&mut s, "Tercero");
+    assert_eq!(s.quote(&c).unwrap().summary.number, "COT-1531");
+
+    // Nunca retrocede, y se puede dejar de seguir la carpeta.
+    std::fs::remove_file(folder.join("COT-1530.pdf")).unwrap();
+    assert_eq!(s.quote_numbering().unwrap().next_label, "COT-1532");
+    let mut d = s.quote_doc_settings().unwrap();
+    d.follow_folder = false;
+    s.save_quote_doc_settings(&d).unwrap();
+    std::fs::write(folder.join("COT-1600.pdf"), b"x").unwrap();
+    assert_eq!(s.quote_numbering().unwrap().folder_last, None);
+    let e = quote(&mut s, "Cuarto");
+    assert_eq!(s.quote(&e).unwrap().summary.number, "COT-1532");
+
+    // Con la carpeta desconectada (no existe) se numera igual.
+    d.follow_folder = true;
+    d.folder = Some(data.path().join("no existe").to_string_lossy().to_string());
+    s.save_quote_doc_settings(&d).unwrap();
+    let f = quote(&mut s, "Quinto");
+    assert_eq!(s.quote(&f).unwrap().summary.number, "COT-1533");
+}
+
+#[test]
+fn el_enlace_de_pago_con_tarjeta_se_valida() {
+    let (_data, _app, mut s) = session();
+    let with = |url: &str, show: bool| QuoteDocSettings {
+        card: QuoteCard {
+            show,
+            url: url.into(),
+            label: String::new(),
+        },
+        ..Default::default()
+    };
+    for bad in [
+        "www.webpay.cl/company/1",
+        "http://www.webpay.cl/company/1",
+        "https://web pay.cl/x",
+        "javascript:alert(1)",
+    ] {
+        let e = s
+            .save_quote_doc_settings(&with(bad, true))
+            .unwrap_err()
+            .to_string();
+        assert!(e.contains("https://"), "{bad}: {e}");
+    }
+    let e = s
+        .save_quote_doc_settings(&with("", true))
+        .unwrap_err()
+        .to_string();
+    assert!(e.contains("pega el enlace"), "{e}");
+    let ok = s
+        .save_quote_doc_settings(&with(" https://www.webpay.cl/company/000000 ", true))
+        .unwrap();
+    assert_eq!(ok.card.url, "https://www.webpay.cl/company/000000");
+    assert_eq!(ok.card.label, "Pagar con tarjeta (Webpay)");
+    // Guardado sin botón: no exige enlace.
+    assert!(
+        !s.save_quote_doc_settings(&with("", false))
+            .unwrap()
+            .card
+            .show
+    );
 }

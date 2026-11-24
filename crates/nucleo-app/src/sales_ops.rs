@@ -940,6 +940,7 @@ impl CompanySession {
             }
             None => {
                 let quid = uuid::Uuid::now_v7().to_string();
+                crate::quote_doc_ops::follow_folder_numbering(&tx, &user)?;
                 let number = dbcore::take_number(&tx, "COT")?;
                 (
                     db::insert_quote(&tx, &quid, &number, &w, user_id, &now)?,
