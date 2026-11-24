@@ -29,9 +29,12 @@ export function Expense() {
   useEffect(() => { backend.expenseCategories().then((c) => setCats(c.filter((x) => !x.archived))).catch(() => {}); }, [backend]);
   useEffect(() => {
     if (!photo) { setPreview(null); return; }
-    const url = URL.createObjectURL(photo);
-    setPreview(url);
-    return () => URL.revokeObjectURL(url);
+    // «data:» y no «blob:»: es lo que deja mostrar la política de seguridad de la aplicación.
+    let alive = true;
+    const r = new FileReader();
+    r.onload = () => { if (alive && typeof r.result === "string") setPreview(r.result); };
+    r.readAsDataURL(photo);
+    return () => { alive = false; };
   }, [photo]);
 
   const category = cats.find((c) => c.id === cat);

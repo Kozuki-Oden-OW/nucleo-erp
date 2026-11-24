@@ -13,33 +13,38 @@ export const LOGO_EVENT = "nucleo:logo";
 
 /** Lee la imagen y la reduce (sin agrandarla) a un máximo de 600 × 300 px, en PNG si tiene transparencia. */
 async function shrink(file: File): Promise<string> {
-  if (!/^image\/(png|jpeg|webp)$/.test(file.type)) throw new Error("Usa una imagen PNG, JPG o WebP.");
+  // Windows a veces no informa el tipo del archivo: entonces se decide por la extensión.
+  const known = file.type ? /^image\/(png|jpeg|webp)$/.test(file.type) : /\.(png|jpe?g|webp)$/i.test(file.name);
+  if (!known) throw new Error("Usa una imagen PNG, JPG o WebP.");
   if (file.size > 15 * 1024 * 1024) throw new Error("La imagen es demasiado grande (máximo 15 MB).");
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise<HTMLImageElement>((ok, fail) => {
-      const i = new Image();
-      i.onload = () => ok(i);
-      i.onerror = () => fail(new Error("No se pudo leer la imagen."));
-      i.src = url;
-    });
-    const k = Math.min(1, MAX_W / img.naturalWidth, MAX_H / img.naturalHeight);
-    const w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k));
-    const c = document.createElement("canvas");
-    c.width = w; c.height = h;
-    const ctx = c.getContext("2d");
-    if (!ctx) throw new Error("No se pudo procesar la imagen.");
-    ctx.drawImage(img, 0, 0, w, h);
-    const png = c.toDataURL("image/png");
-    // Si el PNG queda pesado (fotos), se usa JPEG sobre fondo blanco.
-    if (png.length < 400_000) return png;
-    ctx.globalCompositeOperation = "destination-over";
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, w, h);
-    return c.toDataURL("image/jpeg", 0.88);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+  // Se lee como «data:» y no como «blob:»: la política de seguridad del programa de escritorio solo
+  // deja mostrar imágenes propias o «data:» (con «blob:» la imagen no cargaba y no se podía subir).
+  const url = await new Promise<string>((ok, fail) => {
+    const r = new FileReader();
+    r.onload = () => (typeof r.result === "string" ? ok(r.result) : fail(new Error("No se pudo leer el archivo.")));
+    r.onerror = () => fail(new Error("No se pudo leer el archivo. Revisa que no esté abierto en otro programa."));
+    r.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((ok, fail) => {
+    const i = new Image();
+    i.onload = () => ok(i);
+    i.onerror = () => fail(new Error("El archivo no es una imagen que se pueda abrir. Prueba guardarlo de nuevo como PNG o JPG."));
+    i.src = url;
+  });
+  const k = Math.min(1, MAX_W / img.naturalWidth, MAX_H / img.naturalHeight);
+  const w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k));
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const ctx = c.getContext("2d");
+  if (!ctx) throw new Error("No se pudo procesar la imagen.");
+  ctx.drawImage(img, 0, 0, w, h);
+  const png = c.toDataURL("image/png");
+  // Si el PNG queda pesado (fotos), se usa JPEG sobre fondo blanco.
+  if (png.length < 400_000) return png;
+  ctx.globalCompositeOperation = "destination-over";
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, w, h);
+  return c.toDataURL("image/jpeg", 0.88);
 }
 
 export function LogoCard({ biz, onChange, editable }: { biz: BusinessSettings; onChange: (b: BusinessSettings) => void; editable: boolean }) {
