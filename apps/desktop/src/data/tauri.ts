@@ -7,7 +7,7 @@ import type {
   AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput,
-  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
+  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
@@ -155,6 +155,13 @@ export class TauriBackend implements Backend {
   mlOrders(limit?: number) { return call<MlOrderRow[]>("ml_orders", { limit: limit ?? null }); }
   mlRegisterManual(orders: MlManualOrder[]) { return call<MlSyncReport>("ml_register_manual", { orders }); }
   async mlLinkItem(itemId: string, variationId: string | null, productUid: string, title?: string | null) { await call<null>("ml_link_item", { itemId, variationId, productUid, title: title ?? null }); }
+  syncStatus() { return call<SyncView>("sync_status"); }
+  syncEnable(on: boolean) { return call<SyncView>("sync_enable", { on }); }
+  syncPairStart() { return call<SyncPairingCode>("sync_pair_start"); }
+  syncPairCancel() { return call<SyncView>("sync_pair_cancel"); }
+  syncRevoke(deviceUid: string) { return call<SyncView>("sync_revoke", { deviceUid }); }
+  syncJoin(code: string, name: string) { return call<SyncPairedDevice>("sync_join", { code, name }); }
+  syncNow() { return call<SyncOutcome>("sync_now"); }
   accesses() { return call<AccessRow[]>("accesses"); }
   saveAccess(uid: string | null, input: AccessInput) { return call<AccessRow>("save_access", { uid, input }); }
   deleteAccess(uid: string) { return call<AccessRow[]>("delete_access", { uid }); }

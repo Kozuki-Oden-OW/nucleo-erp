@@ -5,7 +5,7 @@ import { AppError, type Backend, type Feature, type FileSource, type ImportView,
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
   SiiDocument, SiiIssueInput, SiiIntercambioGuardado, SiiIntercambioInput, SiiIntercambioResumen, SiiLibro, SiiLibroInput, SiiPrintDoc, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
-  MlBilling, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
+  MlBilling, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, SyncNetReport, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncPeer, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput, StatementLineView, BankSuggestion,
   F22Inputs, F22View,
@@ -2087,6 +2087,70 @@ export class DemoBackend implements Backend {
     if (l.estado === "enviado") { l.estado = "aceptado"; l.glosa = "LOK Libro Cuadrado (demostración)"; }
     return wait(l);
   }
+  /* ───────────── Sincronización con el celular (simulada: no hay red en la demostración) ───────────── */
+
+  private syncOn = false;
+  private syncPeers: SyncPeer[] = [];
+  private syncPairingUntil = 0;
+  private syncDevice = uid("dev");
+
+  private syncView(): SyncView {
+    return {
+      enabled: this.syncOn, listening: this.syncOn, address: this.syncOn ? "192.168.1.20:47615" : null,
+      pairing_open: this.syncPairingUntil > Date.now(), device_uid: this.syncDevice, role: "escritorio",
+      peers: this.syncPeers.map((p) => ({ ...p })), conflicts: 0,
+    };
+  }
+  async syncStatus(): Promise<SyncView> { return wait(this.syncView()); }
+  async syncEnable(on: boolean): Promise<SyncView> {
+    this.require("config.editar");
+    this.syncOn = on;
+    if (!on) this.syncPairingUntil = 0;
+    this.log(on ? "sync.activar" : "sync.desactivar", "sincronizacion", "");
+    return wait(this.syncView());
+  }
+  async syncPairStart(): Promise<SyncPairingCode> {
+    this.require("config.editar");
+    this.syncOn = true;
+    const abc = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+    const rnd = crypto.getRandomValues(new Uint8Array(32));
+    const code = Array.from({ length: 8 }, (_, g) => Array.from({ length: 4 }, (_, i) => abc[(rnd[g * 4 + i] ?? 0) % 32]).join("")).join("-");
+    const until = Date.now() + 10 * 60_000;
+    this.syncPairingUntil = until;
+    // En la demostración «llega» un celular a los pocos segundos, para mostrar el recorrido completo.
+    setTimeout(() => {
+      if (this.syncPairingUntil !== until) return;
+      this.syncPairingUntil = 0;
+      const n = this.syncPeers.length + 1;
+      this.syncPeers = [...this.syncPeers, {
+        device_uid: uid("cel"), name: n === 1 ? "Celular de demostración" : `Celular de demostración ${n}`, role: "celular", paired_at: now(), revoked: false,
+        sent_hlc: "", received_hlc: "", last_sync_at: null, address: null, has_key: true,
+      }];
+      this.log("sync.emparejar", "dispositivo", "Celular de demostración");
+    }, 6000);
+    return wait({ code, qr: `nucleo-sync:${code}`, address: "192.168.1.20:47615", minutes: 10 });
+  }
+  async syncPairCancel(): Promise<SyncView> { this.syncPairingUntil = 0; return wait(this.syncView()); }
+  async syncRevoke(deviceUid: string): Promise<SyncView> {
+    this.require("config.editar");
+    const p = this.syncPeers.find((x) => x.device_uid === deviceUid && !x.revoked);
+    if (!p) throw new AppError("no_encontrado", "No encontramos ese dispositivo.");
+    p.revoked = true;
+    p.has_key = false;
+    this.log("sync.quitar", "dispositivo", p.name);
+    return wait(this.syncView());
+  }
+  async syncJoin(code: string, name: string): Promise<SyncPairedDevice> {
+    const clean = code.replace(/^nucleo-sync:/, "").replace(/[^a-z0-9]/gi, "");
+    if (clean.length !== 32) throw new AppError("validacion", "El código de emparejamiento no es válido: revisa que esté completo y bien escrito.");
+    if (!name.trim()) throw new AppError("validacion", "Ponle un nombre a este celular (por ejemplo «Celular de Ana»).");
+    return wait({ device_uid: this.syncDevice, name: "Computador de demostración", business: "Negocio de demostración", address: "192.168.1.20:47615" });
+  }
+  async syncNow(): Promise<SyncOutcome> {
+    const none: SyncNetReport = { changes: { applied: 0, skipped: 0, created: 0, conflicts: 0 }, ops_applied: 0, ops_repeated: 0, ops_failed: [], ops_confirmed: 0 };
+    return wait({ peer: "Computador de demostración", sent_changes: 0, sent_ops: 0, received_changes: 0, local: none, remote: none });
+  }
+
   /* ───────────── Accesos a sitios (la clave no se guarda en la demostración) ───────────── */
 
   private accessList: AccessRow[] = [];

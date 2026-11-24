@@ -2275,6 +2275,7 @@ dependencies = [
  "nucleo-dte",
  "nucleo-io",
  "openssl",
+ "ring",
  "rusqlite",
  "rust_decimal",
  "serde",

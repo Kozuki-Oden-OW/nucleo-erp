@@ -22,7 +22,7 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | 15 | Instalador → **MVP** | ⏳ |
 | 16 | Inteligencia comercial (V1.1) | ⏳ |
 | 17 | Fidelidad (V1.2) | ⏳ |
-| S | App móvil de pago único ($1.000), sin conexión, sincronizada por cable USB o WiFi local — diseño en `SINCRONIZACION.md` | 🚧 S0 hecho y pantallas en demostración (2026-10-24) |
+| S | App móvil de pago único ($4.900 con IVA), sin conexión, sincronizada por cable USB o WiFi local — diseño en `SINCRONIZACION.md` | 🚧 S0 hecho y pantallas en demostración (2026-10-24); S1 hecho: emparejamiento por código y sincronización cifrada en la red local (2026-11-23). Sigue S2: empaquetar para Android |
 
 ## Fase 1 — criterio de salida
 
@@ -156,6 +156,26 @@ Detalle completo en el Blueprint Maestro §17. Cada fase termina solo cuando cum
 | Sitio `www.nucleoerp.cl` (inicio, descarga, privacidad, 404), sin rastreadores | ✅ listo en `apps/web` |
 | Descarga directa desde el dominio con SHA-256 publicado | ✅ automatizado (`release.yml` + `web.yml`) |
 | Publicación | ✅ GitHub Pages con dominio www.nucleoerp.cl (HTTPS al emitirse el certificado) |
+
+## Modelo de precios (decisión del dueño, 23-11-2026)
+
+| Qué | Precio | Qué incluye |
+|---|---|---|
+| NÚCLEO en el computador | **Gratis** | Todo el programa local (AGPL), sin facturación electrónica propia |
+| App del celular | **$4.900 con IVA, pago único** | Se compra y queda en el celular, como el programa en el computador. No está en línea: se sincroniza con el computador por cable, WiFi de la misma red o código de emparejamiento |
+| Plan Facturación | **$15.000 neto al mes** | Facturación y boletas electrónicas integradas (SII) + **NÚCLEO en línea** (plataforma web cifrada) + opción en la app para sincronizar por internet |
+| Plan Agente IA | **$25.000 neto al mes** | Lo del plan Facturación + el Asistente NÚCLEO (agente): Mercado Libre, cartolas del banco, envíos |
+
+- Reemplaza lo anterior: app a $1.000 y NÚCLEO en línea gratis para todos (I3).
+- NÚCLEO en línea ya no es gratuito: lo financian los planes, que son los que pagan el servidor.
+- El código sigue abierto; lo que se cobra en los planes es servicio (certificación ante el SII,
+  actualizaciones normativas, servidor, IA y soporte), no el desbloqueo de una función.
+- Costo estimado del servidor para 1.000 empresas (23-11-2026, precios de lista de Hetzner y Cloudflare
+  R2, sin soporte ni IA): US$ 50 a 150 al mes, es decir menos del 1 % de lo que pagarían 1.000 planes de
+  facturación. El costo que pesa es el soporte, la comisión del medio de pago y el uso de IA del plan
+  Agente (que necesita tope de uso).
+- Por definir: medio de cobro de los planes mensuales, tope de uso del agente y qué pasa con los datos
+  en línea si alguien deja de pagar (propuesta: pasan a solo lectura y se pueden bajar al computador).
 
 ## Ideas para más adelante (anotadas por Kozuki)
 

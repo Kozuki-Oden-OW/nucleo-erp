@@ -36,6 +36,7 @@ pub mod sii_intercambio;
 pub mod sii_ops;
 pub mod sii_print;
 pub mod sii_venta;
+pub mod sync_net;
 pub mod sync_ops;
 pub mod woo_ops;
 

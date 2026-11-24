@@ -2,8 +2,10 @@
 
 > Estado: **en construcción** (diseño aprobado el 2026-10-10). S0 terminado el 2026-10-24: registro de
 > cambios con reloj lógico híbrido, paquete de sincronización y fusión probados en
-> `crates/nucleo-app/tests/sincronizacion.rs`. Las pantallas de la app (S2) ya funcionan en modo
-> demostración (`apps/desktop/movil.html`); falta empaquetarlas para Android y el transporte (S1).
+> `crates/nucleo-app/tests/sincronizacion.rs`. **S1 terminado el 2026-11-23**: emparejamiento por
+> código y canal cifrado en la red local (`nucleo-app::sync_net`, pruebas en
+> `tests/sincronizacion_red.rs`), con la pantalla Configuración → Celular. Las pantallas de la app (S2)
+> funcionan en modo demostración (`apps/desktop/movil.html`); falta empaquetarlas para Android.
 >
 > Decisiones del dueño: «solo cobramos a la persona que quiera obtener la app en su celular; que también
 > funcione sin internet y luego se sincronice a través de un cable con el PC o por WiFi de la misma
@@ -12,7 +14,7 @@
 ## 1. Qué se quiere lograr
 
 - El programa de escritorio sigue **gratis, de código abierto y local**, sin cuenta y sin internet.
-- Quien quiera, compra la **app de NÚCLEO para el celular por $1.000** (pago único en Google Play o
+- Quien quiera, compra la **app de NÚCLEO para el celular por $4.900** (antes $1.000; decisión del dueño, 23-11-2026) (pago único en Google Play o
   App Store). Es la fuente de ingresos del proyecto.
 - La app **funciona sin conexión**: guarda sus datos cifrados en el celular y se puede usar en terreno
   (ver el resumen del negocio, stock, clientes; registrar una venta rápida, un gasto con la foto de la
@@ -26,7 +28,8 @@
 ## 2. Cómo se ve para la persona
 
 1. En el escritorio: **Configuración → Celular → Emparejar un celular**. El escritorio muestra un
-   código QR (válido 10 minutos). La app lo escanea y quedan emparejados. Sin correo ni contraseña.
+   código QR (válido 10 minutos) y el mismo código en 8 grupos de 4 letras. La app lo escanea o la
+   persona lo escribe, y quedan emparejados. Sin correo ni contraseña.
 2. Para sincronizar, la persona elige en el escritorio **«Sincronizar ahora»** (o lo deja automático
    mientras el celular esté conectado):
    - **Con cable:** conecta el celular al computador. NÚCLEO lo detecta y sincroniza.
@@ -43,7 +46,7 @@
 ```
  Escritorio (Tauri, Windows)                               App móvil (Tauri 2: Android e iOS)
  SQLCipher + registro de cambios   ⇄  cable USB o WiFi local  ⇄   SQLCipher + registro de cambios
- autoridad de numeración y documentos    (TLS con llaves fijadas al emparejar)     borradores y consultas
+ autoridad de numeración y documentos    (canal cifrado con la llave del dispositivo)  borradores y consultas
 ```
 
 - **Misma base de código:** la app es la misma interfaz React y el mismo núcleo Rust compilados con
@@ -51,8 +54,9 @@
 - **Registro de cambios (op-log):** cada tabla sincronizable escribe una fila en `change_log` en la
   misma transacción (entidad, `uid` estable, campos cambiados, reloj lógico híbrido y dispositivo).
   Todas las entidades ya tienen `uid` y la auditoría encadenada registra cada cambio.
-- **Un solo protocolo sobre dos caminos:** el escritorio y la app conversan por TCP con TLS mutuo
-  (cada lado conoce la llave del otro desde el emparejamiento). El camino cambia, el protocolo no:
+- **Un solo protocolo sobre dos caminos:** el escritorio y la app conversan por TCP con un canal
+  cifrado propio (ambos lados comparten una llave desde el emparejamiento; ver §4 y D-SYNC-06). El
+  camino cambia, el protocolo no:
 
 | Camino | Android | iPhone |
 |---|---|---|
@@ -63,12 +67,13 @@
 
 | Elemento | Diseño |
 |---|---|
-| Llave del negocio | Simétrica (XChaCha20-Poly1305), generada en el escritorio |
-| Emparejamiento | El QR lleva un secreto de un solo uso y la llave pública del escritorio; intercambio X25519; la llave del negocio viaja cifrada al celular |
-| Conexión | TLS mutuo con llaves fijadas: un tercero en la misma WiFi no puede leer ni hacerse pasar por el celular o el computador |
+| Código de emparejamiento | De un solo uso, vence en 10 minutos y se cierra a los 5 intentos fallidos. Lleva la dirección del computador, un secreto de 96 bits y un verificador contra errores de tipeo. Se muestra como QR y como 8 grupos de 4 letras |
+| Llave del dispositivo | 32 bytes al azar, distinta para cada celular. El computador la entrega dentro del canal cifrado del emparejamiento; queda en la base cifrada de ambos equipos y nunca se muestra |
+| Conexión | Cada conexión acuerda llaves nuevas (X25519 efímero mezclado con el secreto compartido, HKDF-SHA256) y sella cada mensaje con ChaCha20-Poly1305 y un contador por sentido. Un tercero en la misma WiFi no puede leer, alterar ni hacerse pasar por el celular o el computador, y grabar el tráfico de hoy no sirve si mañana se filtra una llave |
+| Qué escucha el computador | Solo en la red local, solo mientras NÚCLEO está abierto y la sincronización está activada en ese negocio (puerto 47615, o uno libre si está ocupado). El celular es quien llama |
 | Datos en el celular | Base cifrada (SQLCipher) con la llave guardada en el almacén seguro del sistema (Keystore de Android, Keychain de iOS) |
 | Internet | No se usa para sincronizar. Solo la tienda necesita internet al comprar la app |
-| Revocación | Quitar un dispositivo cambia la llave y el escritorio deja de aceptarlo |
+| Revocación | Quitar un dispositivo borra su llave: el escritorio deja de aceptarlo. Los demás dispositivos no se ven afectados |
 | Respaldos | Siguen siendo los `.erpbackup` locales del escritorio |
 | Datos personales | NÚCLEO (el proveedor) no recibe ningún dato del negocio |
 
@@ -112,13 +117,19 @@
 
 | | Escritorio | App móvil |
 |---|---|---|
-| Precio | Gratis (AGPL) | **$1.000 pago único**, con IVA incluido, en Google Play y App Store |
+| Precio | Gratis (AGPL) | **$4.900 pago único**, con IVA incluido, en Google Play y App Store (en Apple puede tener que ser $4.990) |
 | Quién paga | — | Solo quien quiera la app en su celular. La sincronización por cable o WiFi está incluida |
 | Cobro y boleta | — | Los hace la tienda; FAVOR SpA recibe el pago neto de comisión |
-| Ingreso neto estimado | — | Del precio se descuenta el IVA y la comisión de la tienda (15 % en los programas para desarrolladores pequeños, por verificar): cerca de $700 por compra |
+| Ingreso neto estimado | — | Del precio se descuenta el IVA y la comisión de la tienda (15 % en los programas para desarrolladores pequeños, por verificar): cerca de $3.400 a $3.500 por compra |
 | Costo de operación | — | Prácticamente cero: no hay servidor |
 | Licencia de la compra | — | Se valida dentro del celular con la firma de la tienda (Google Play y StoreKit 2 entregan compras firmadas verificables sin conexión) |
 
+- **La app se compra y queda en el celular, igual que el programa en el computador:** no está en línea.
+  Se sincroniza solo con el computador (cable o WiFi de la misma red; el emparejamiento es por código QR
+  o un código escrito a mano).
+- **Opción en línea (planes de pago):** quien tenga el plan de facturación puede activar en la app la
+  conexión con NÚCLEO en línea (I3 en `INTEGRACIONES.md`) y sincronizar por internet. Ver «Modelo de
+  precios» en `ROADMAP.md`.
 - Más adelante se puede evaluar una versión «Pro» o funciones adicionales, pero el pago único cubre la
   app y la sincronización.
 - **Licencia en iOS:** la App Store no es compatible con la AGPL cuando el código tiene aportes de
@@ -131,10 +142,24 @@
 | Fase | Entrega | Criterio de salida |
 |---|---|---|
 | S0 | `change_log` con reloj lógico híbrido en las tablas sincronizables; exportar e importar cambios a un archivo | Dos bases quedan iguales intercambiando archivos, con pruebas de conflictos |
-| S1 | Protocolo de sincronización con TLS mutuo y emparejamiento por QR, probado entre dos escritorios en la misma red | Dos computadores sincronizan sin internet; un tercero en la red no puede leer ni inyectar datos |
+| S1 ✅ | Protocolo de sincronización con canal cifrado y emparejamiento por código (QR o letras), probado con un servidor real en la misma máquina | Dos equipos sincronizan sin internet; un tercero en la red no puede leer ni inyectar datos. Falta la prueba con dos equipos físicos en una WiFi real (llega con la app de S2) |
 | S2 | App Android: datos sin conexión, resumen, stock, clientes, venta rápida, gasto con foto, cobro; sincronización por WiFi y por cable | Cinco pymes la usan una semana sin perder datos |
 | S3 | App iOS con sincronización por WiFi y por cable | Aprobada en la App Store |
-| S4 | Publicación de pago ($1.000) en Google Play y App Store, gestión de dispositivos | Compras validadas sin conexión |
+| S4 | Publicación de pago ($4.900) en Google Play y App Store, gestión de dispositivos | Compras validadas sin conexión |
+
+### Cómo está hecho (S1)
+
+- **`nucleo-app::sync_net`**: `SyncServer` (hilo que escucha y atiende una conexión a la vez), el código
+  de emparejamiento (`encode_code` / `parse_code`) y los casos de uso `sync_join` y `sync_now` (lado del
+  celular), `sync_accept_pairing` y `sync_exchange` (lado del computador).
+- **Una vuelta por sincronización:** el celular envía su paquete (cambios de fichas y operaciones en
+  cola); el computador lo aplica y responde con el suyo, que ya confirma las operaciones recibidas.
+- **Migración 44**: `sync_peers.secret` y `sync_peers.address`.
+- **Escritorio:** comandos `sync_status`, `sync_enable`, `sync_pair_start`, `sync_pair_cancel`,
+  `sync_revoke` (y `sync_join`, `sync_now` para la app). El código en pantalla está marcado como
+  secreto para el agente (Claude no lo ve) y quitar un dispositivo lo confirma la persona.
+- **Pendiente de S1 para más adelante:** encontrar el computador solo si la red le cambia la dirección
+  (hoy se vuelve a emparejar) y elegir la interfaz cuando hay varias (WiFi y cable a la vez).
 
 ## 8. Riesgos y pendientes
 
@@ -144,6 +169,6 @@
    accesorios (AOA) o la WiFi.
 3. **Conflictos de inventario** al vender el mismo producto en ambos lados sin sincronizar: se acepta
    stock negativo con aviso (ya existe la opción) y el escritorio concilia.
-4. **Tiendas:** confirmar que existe el tramo de precio de $1.000 en Chile y el porcentaje de comisión.
+4. **Tiendas:** confirmar que existe el tramo de precio de $4.900 en Chile (Apple: $4.990) y el porcentaje de comisión.
 5. **Sin servidor no hay recuperación remota:** si se pierden el computador y el respaldo, los datos no
    se pueden recuperar (es la promesa de privacidad).

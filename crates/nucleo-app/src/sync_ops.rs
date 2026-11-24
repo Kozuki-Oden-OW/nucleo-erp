@@ -38,7 +38,7 @@ pub struct SyncPackage {
     pub ack_ops: Vec<String>,
 }
 
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SyncReport {
     pub changes: ApplyReport,
     pub ops_applied: usize,

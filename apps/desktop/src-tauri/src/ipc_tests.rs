@@ -24,7 +24,8 @@ impl Ipc {
         let service = AppService::open(dir.path(), Box::new(MemoryKeyStore::default())).unwrap();
         app.manage(AppState {
             service: Mutex::new(service),
-            session: Mutex::new(None),
+            session: std::sync::Arc::new(Mutex::new(None)),
+            sync: Mutex::new(None),
             backups_dir: dir.path().join("respaldos"),
         });
         let webview = tauri::WebviewWindowBuilder::new(&app, "main", Default::default())

@@ -295,7 +295,7 @@ fn json_to_sql(v: &Value) -> rusqlite::types::Value {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApplyReport {
     /// Campos que cambiaron en esta base.
     pub applied: usize,
@@ -585,6 +585,10 @@ pub struct Peer {
     pub sent_hlc: String,
     pub received_hlc: String,
     pub last_sync_at: Option<String>,
+    /// Dónde encontrar a ese equipo en la red local (lo guarda el celular).
+    pub address: Option<String>,
+    /// Tiene llave de sincronización (se emparejó por código, no solo por archivo).
+    pub has_key: bool,
 }
 
 pub fn pair(conn: &Connection, device_uid: &str, name: &str, role: &str) -> DbResult<()> {
@@ -598,7 +602,7 @@ pub fn pair(conn: &Connection, device_uid: &str, name: &str, role: &str) -> DbRe
 
 pub fn revoke(conn: &Connection, device_uid: &str) -> DbResult<usize> {
     Ok(conn.execute(
-        "UPDATE sync_peers SET revoked_at = ?2 WHERE device_uid = ?1 AND revoked_at IS NULL",
+        "UPDATE sync_peers SET revoked_at = ?2, secret = NULL WHERE device_uid = ?1 AND revoked_at IS NULL",
         params![device_uid, now_utc()],
     )?)
 }
@@ -606,9 +610,9 @@ pub fn revoke(conn: &Connection, device_uid: &str) -> DbResult<usize> {
 pub fn peer(conn: &Connection, device_uid: &str) -> DbResult<Option<Peer>> {
     Ok(conn
         .query_row(
-            "SELECT device_uid, name, role, paired_at, revoked_at IS NOT NULL, sent_hlc, received_hlc, last_sync_at FROM sync_peers WHERE device_uid = ?1",
+            "SELECT device_uid, name, role, paired_at, revoked_at IS NOT NULL, sent_hlc, received_hlc, last_sync_at, address, secret IS NOT NULL FROM sync_peers WHERE device_uid = ?1",
             [device_uid],
-            |r| Ok(Peer { device_uid: r.get(0)?, name: r.get(1)?, role: r.get(2)?, paired_at: r.get(3)?, revoked: r.get(4)?, sent_hlc: r.get(5)?, received_hlc: r.get(6)?, last_sync_at: r.get(7)? }),
+            |r| Ok(Peer { device_uid: r.get(0)?, name: r.get(1)?, role: r.get(2)?, paired_at: r.get(3)?, revoked: r.get(4)?, sent_hlc: r.get(5)?, received_hlc: r.get(6)?, last_sync_at: r.get(7)?, address: r.get(8)?, has_key: r.get(9)? }),
         )
         .optional()?)
 }
@@ -622,6 +626,38 @@ pub fn peers(conn: &Connection) -> DbResult<Vec<Peer>> {
         .iter()
         .filter_map(|d| peer(conn, d).ok().flatten())
         .collect())
+}
+
+/// Guarda la llave acordada al emparejar y, en el celular, la dirección del computador.
+pub fn set_peer_key(
+    conn: &Connection,
+    device_uid: &str,
+    secret: &[u8],
+    address: Option<&str>,
+) -> DbResult<usize> {
+    Ok(conn.execute(
+        "UPDATE sync_peers SET secret = ?2, address = COALESCE(?3, address) WHERE device_uid = ?1 AND revoked_at IS NULL",
+        params![device_uid, secret, address],
+    )?)
+}
+
+/// Llave de un dispositivo emparejado y vigente.
+pub fn peer_key(conn: &Connection, device_uid: &str) -> DbResult<Option<Vec<u8>>> {
+    Ok(conn
+        .query_row(
+            "SELECT secret FROM sync_peers WHERE device_uid = ?1 AND revoked_at IS NULL",
+            [device_uid],
+            |r| r.get::<_, Option<Vec<u8>>>(0),
+        )
+        .optional()?
+        .flatten())
+}
+
+pub fn set_peer_address(conn: &Connection, device_uid: &str, address: &str) -> DbResult<usize> {
+    Ok(conn.execute(
+        "UPDATE sync_peers SET address = ?2 WHERE device_uid = ?1",
+        params![device_uid, address],
+    )?)
 }
 
 /// Registra el avance con un dispositivo: lo que confirmó haber recibido y lo que se recibió de él.

@@ -1559,6 +1559,68 @@ export interface MlSyncReport {
 
 /* ───────── Accesos a sitios (gestor de contraseñas) ───────── */
 
+/* ───────────── Sincronización con el celular (docs/SINCRONIZACION.md, fase S1) ───────────── */
+
+/** Dispositivo emparejado. Su llave nunca llega a la interfaz: solo si tiene una. */
+export interface SyncPeer {
+  device_uid: string;
+  name: string;
+  role: "escritorio" | "celular";
+  paired_at: string;
+  revoked: boolean;
+  sent_hlc: string;
+  received_hlc: string;
+  last_sync_at: string | null;
+  /** En el celular: dónde está el computador en la red local. */
+  address: string | null;
+  has_key: boolean;
+}
+
+export interface SyncView {
+  /** El negocio tiene activada la sincronización con celulares. */
+  enabled: boolean;
+  /** El computador está escuchando en la red local. */
+  listening: boolean;
+  address: string | null;
+  pairing_open: boolean;
+  device_uid: string;
+  role: "escritorio" | "celular";
+  peers: SyncPeer[];
+  conflicts: number;
+}
+
+/** Código de un solo uso para emparejar: 8 grupos de 4 letras, o el mismo dato como QR. */
+export interface SyncPairingCode {
+  code: string;
+  qr: string;
+  address: string;
+  minutes: number;
+}
+
+export interface SyncPairedDevice {
+  device_uid: string;
+  name: string;
+  business: string;
+  address: string;
+}
+
+export interface SyncNetReport {
+  changes: { applied: number; skipped: number; created: number; conflicts: number };
+  ops_applied: number;
+  ops_repeated: number;
+  ops_failed: [string, string][];
+  ops_confirmed: number;
+}
+
+export interface SyncOutcome {
+  peer: string;
+  sent_changes: number;
+  sent_ops: number;
+  received_changes: number;
+  local: SyncNetReport;
+  remote: SyncNetReport;
+}
+
 /** Acceso guardado a un sitio web. La clave nunca viene: solo si hay una guardada. */
 export interface AccessRow {
   uid: string;

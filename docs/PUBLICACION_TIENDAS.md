@@ -35,8 +35,9 @@ es para cuentas personales creadas después del 13-11-2023).
 
 ## 3. Precio y comisiones
 
-- **$1.000** es un precio válido en ambas tiendas (en Apple, Chile va de $190 a $11.999.990 con pasos
-  de $1.000 en ese tramo; también sirve $990).
+- Precio decidido por el dueño el 23-11-2026: **$4.900 con IVA incluido, pago único** (antes $1.000).
+  En Apple, Chile va de $190 a $11.999.990 con pasos de $1.000 en ese tramo y terminaciones en $990:
+  hay que confirmar en la consola si $4.900 existe o se usa $4.990.
 - Comisión: **15 %** en Google para el primer millón de dólares anual (tramo de 15 %) y **15 %** en
   Apple con el Small Business Program.
 - **IVA (revisar con el contador):** Google indica que si el desarrollador está en Chile, **él

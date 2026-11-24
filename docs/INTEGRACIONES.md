@@ -400,8 +400,11 @@ de pedidos de alto rendimiento.
 
 ## I3 · NÚCLEO en línea (cifrado de extremo a extremo)
 
-Objetivo: entrar desde cualquier navegador con usuario y contraseña a la información de la empresa,
-**gratis**, sin que NÚCLEO (FAVOR SpA) pueda leer los datos.
+Objetivo: entrar desde cualquier navegador con usuario y contraseña a la información de la empresa, sin
+que NÚCLEO (FAVOR SpA) pueda leer los datos. **Desde el 23-11-2026 no es gratuito:** viene incluido en
+el plan Facturación ($15.000 neto al mes) y en el plan Agente IA ($25.000 neto); el programa del
+computador sigue gratis. La app del celular puede usar esta misma conexión si la empresa tiene un plan
+(ver «Modelo de precios» en `ROADMAP.md`).
 
 | Pieza | Diseño |
 |---|---|

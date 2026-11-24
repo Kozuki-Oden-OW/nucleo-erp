@@ -2,12 +2,12 @@
 // ni servidor de NÚCLEO (docs/SINCRONIZACION.md). En la demostración se simula el intercambio.
 import { useState } from "react";
 import { Cable, CheckCircle2, HandCoins, Laptop, QrCode, Receipt, RefreshCw, ShieldCheck, ShoppingBag, UserPlus, Wifi } from "lucide-react";
-import { errorMessage } from "../../data";
+import { errorMessage, useBackend } from "../../data";
 import { formatMoney } from "../../lib/format";
 import { useToast } from "../../ui/overlay";
 import { useNav } from "../MobileApp";
 import { outbox, sinceText, useOutbox, type OutboxKind } from "../outbox";
-import { BigButton, Panel, Row, Section, Sheet, TopBar } from "../ui";
+import { BigButton, Input, Panel, Row, Section, Sheet, TopBar } from "../ui";
 
 const ICON: Record<OutboxKind, typeof Receipt> = { venta: ShoppingBag, gasto: Receipt, cobro: HandCoins, cliente: UserPlus };
 
@@ -16,15 +16,36 @@ export function Sync({ demo }: { demo: boolean }) {
   const toast = useToast();
   const box = useOutbox();
   const [busy, setBusy] = useState(false);
+  const backend = useBackend();
   const [pairing, setPairing] = useState(false);
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [computer, setComputer] = useState<string | null>(null);
 
   async function syncNow() {
     setBusy(true);
     try {
-      await new Promise((r) => setTimeout(r, 1200));
-      const n = box.items.length;
+      if (demo) await new Promise((r) => setTimeout(r, 1200));
+      // En la app instalada los cambios viajan cifrados al computador por la red local.
+      const out = demo ? null : await backend.syncNow();
+      const n = out ? out.sent_ops + out.sent_changes : box.items.length;
       await outbox.markSynced();
+      if (out) setComputer(out.peer);
       toast("success", n ? `${n} ${n === 1 ? "cambio enviado" : "cambios enviados"} al computador.` : "Todo al día con el computador.");
+    } catch (e) { toast("danger", errorMessage(e)); } finally { setBusy(false); }
+  }
+
+  /** Código escrito a mano: 8 grupos de 4 letras, con los guiones puestos solos. */
+  const typed = (v: string) => setCode((v.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 32).match(/.{1,4}/g) ?? []).join("-"));
+
+  async function join() {
+    setBusy(true);
+    try {
+      const paired = await backend.syncJoin(code, name);
+      setComputer(paired.name);
+      setPairing(false);
+      setCode("");
+      toast("success", `Emparejado con «${paired.name}» (${paired.business}). Toca «Sincronizar ahora» para traer tus datos.`);
     } catch (e) { toast("danger", errorMessage(e)); } finally { setBusy(false); }
   }
 
@@ -35,7 +56,7 @@ export function Sync({ demo }: { demo: boolean }) {
         <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-4 shadow-card">
           <span className="grid h-12 w-12 place-items-center rounded-xl bg-accent-soft text-accent"><Laptop size={24} /></span>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[16px] font-semibold text-ink">{demo ? "Computador de demostración" : "Computador emparejado"}</div>
+            <div className="truncate text-[16px] font-semibold text-ink">{computer ?? (demo ? "Computador de demostración" : "Computador emparejado")}</div>
             <div className="text-[13px] text-muted">Última sincronización: {sinceText(box.lastSync)}</div>
           </div>
           {box.items.length === 0 && box.lastSync && <CheckCircle2 size={22} className="text-success" />}
@@ -65,15 +86,20 @@ export function Sync({ demo }: { demo: boolean }) {
         </Panel>
       </Section>
 
-      <div className="px-4 pt-4"><BigButton variant="secondary" icon={QrCode} onClick={() => setPairing(true)}>Emparejar con otro computador</BigButton></div>
+      <div className="px-4 pt-4"><BigButton variant="secondary" icon={QrCode} onClick={() => setPairing(true)}>Emparejar con mi computador</BigButton></div>
 
       <Sheet open={pairing} onClose={() => setPairing(false)} title="Emparejar con tu computador">
         <ol className="space-y-3 text-[15px] text-ink">
           <li className="flex gap-3"><Step n={1} /><span>En el computador abre NÚCLEO y entra a <b>Configuración → Celular → Emparejar un celular</b>.</span></li>
-          <li className="flex gap-3"><Step n={2} /><span>Aparecerá un código QR. Apunta la cámara del celular al código.</span></li>
-          <li className="flex gap-3"><Step n={3} /><span>Listo: quedan emparejados, sin correo ni contraseña. Desde ahí sincronizan por WiFi o por cable.</span></li>
+          <li className="flex gap-3"><Step n={2} /><span>Conecta este celular a la <b>misma WiFi</b> que el computador (o únelos con el cable).</span></li>
+          <li className="flex gap-3"><Step n={3} /><span>Escribe aquí el código de 8 grupos de letras que muestra el computador. Sirve una sola vez.</span></li>
         </ol>
-        <div className="mt-5"><BigButton icon={QrCode} onClick={() => { setPairing(false); toast("info", demo ? "En la demostración ya estás emparejado con un computador de ejemplo." : "Abre la cámara apuntando al QR del computador."); }}>Escanear código QR</BigButton></div>
+        <div className="mt-5 space-y-3">
+          <Input label="Código del computador" value={code} onChange={(e) => typed(e.target.value)} placeholder="ABCD-EFGH-…" autoCapitalize="characters" autoCorrect="off" autoComplete="off" spellCheck={false} inputMode="text" />
+          <Input label="Nombre de este celular" value={name} onChange={(e) => setName(e.target.value)} placeholder="Celular de Ana" autoComplete="off" />
+          <BigButton icon={ShieldCheck} onClick={join} disabled={busy || code.length < 39 || !name.trim()}>{busy ? "Emparejando…" : "Emparejar"}</BigButton>
+          <p className="text-center text-[13px] text-muted">Escanear el código con la cámara llega con la app instalada.</p>
+        </div>
       </Sheet>
     </>
   );

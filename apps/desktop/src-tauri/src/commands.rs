@@ -65,8 +65,11 @@ use tauri::State;
 
 pub struct AppState {
     pub service: Mutex<AppService>,
-    pub session: Mutex<Option<CompanySession>>,
+    /// Compartida con el servidor de sincronización, que atiende a los celulares emparejados.
+    pub session: std::sync::Arc<Mutex<Option<CompanySession>>>,
     pub backups_dir: PathBuf,
+    /// Servidor de sincronización en la red local; existe solo si el negocio abierto la activó.
+    pub sync: Mutex<Option<nucleo_app::sync_net::SyncServer>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -244,6 +247,7 @@ pub fn open_company(state: State<'_, AppState>, uid: String) -> CmdResult<Sessio
         .session
         .lock()
         .map_err(|_| internal("sesión bloqueada"))? = Some(session);
+    crate::sync::reconcile(&state);
     Ok(info)
 }
 

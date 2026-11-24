@@ -9,6 +9,7 @@ mod ipc_tests;
 mod mail;
 mod ml;
 mod sii;
+mod sync;
 mod woo;
 
 use nucleo_app::AppService;
@@ -112,6 +113,13 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         ml::ml_orders,
         ml::ml_register_manual,
         ml::ml_link_item,
+        sync::sync_status,
+        sync::sync_enable,
+        sync::sync_pair_start,
+        sync::sync_pair_cancel,
+        sync::sync_revoke,
+        sync::sync_join,
+        sync::sync_now,
         access::accesses,
         access::save_access,
         access::delete_access,
@@ -303,7 +311,8 @@ fn main() {
             app.manage(agent);
             app.manage(commands::AppState {
                 service: Mutex::new(service),
-                session: Mutex::new(None),
+                session: std::sync::Arc::new(Mutex::new(None)),
+                sync: Mutex::new(None),
                 backups_dir,
             });
             Ok(())

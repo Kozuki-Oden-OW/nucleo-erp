@@ -70,6 +70,7 @@ Todo es entero: las sumas y los reportes se hacen en SQL sin perder exactitud y 
 | 41 | `0041_sii_folios_reutilizados.sql` | `sii_documents_reemplazados`: documentos que el SII rechazó y cuyo folio se volvió a usar; salen de `sii_documents` (folio único) y quedan aquí como historial, con el XML tal como se envió, su seguimiento y la glosa del rechazo |
 | 42 | `0042_woocommerce.sql` | `woo_orders`: pedidos de la tienda WooCommerce ya vistos — número, venta y envío enlazados, comprador y correo, estado en la tienda y en NÚCLEO (importada, por revisar, cancelada), total, envío, medio de pago, método de envío, si pide factura y el aviso por revisar. La conexión (dirección y llaves) va en `integrations` (proveedor `woocommerce`) |
 | 43 | `0043_accesos.sql` | `site_accesses`: accesos de solo lectura a sitios web (gestor de contraseñas) — nombre, dirección de ingreso, usuario, clave (en la base cifrada; nunca vuelve a la interfaz) y tipo (lectura u operador sin pagos) |
+| 44 | `0044_sync_transporte.sql` | `sync_peers.secret` (llave de 32 bytes de cada dispositivo emparejado; se borra al quitarlo) y `sync_peers.address` (en el celular, dirección del computador en la red local) |
 
 Las migraciones son transaccionales y versionadas con `PRAGMA user_version`. **Pre-1.0:** se pueden
 reescribir (en la Fase 2 se reemplazó la tabla mínima de clientes de la Fase 1); desde la primera beta
