@@ -408,6 +408,19 @@ impl CompanySession {
         Ok(clean)
     }
 
+    /// Número de la cotización y ruta donde queda (o quedaría) su PDF emitido.
+    pub(crate) fn quote_pdf_path(&self, uid: &str) -> AppResult<(String, PathBuf)> {
+        self.require("ventas.ver")?;
+        let (_, number, customer, _) = self.quote_ref(uid)?;
+        let folder = self.quote_doc_settings()?.folder.ok_or_else(|| {
+            AppError::Validation(
+                "elige primero la carpeta donde se guardan las cotizaciones (Configuración → Cotizaciones)".into(),
+            )
+        })?;
+        let file = format!("{}.pdf", safe_file_name(&format!("{number} {customer}")));
+        Ok((number, PathBuf::from(folder).join(file)))
+    }
+
     /// Guarda el PDF emitido en la carpeta de cotizaciones del negocio. Volver a emitir la misma
     /// cotización reemplaza el archivo anterior.
     pub fn save_quote_pdf(&mut self, uid: &str, pdf_base64: &str) -> AppResult<QuoteEmitted> {

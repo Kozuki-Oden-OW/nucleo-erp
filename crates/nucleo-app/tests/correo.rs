@@ -3,7 +3,8 @@
 
 use nucleo_app::core_ops::BusinessPatch;
 use nucleo_app::mail_ops::{MailDraft, MailSetup, MailTemplates, MailTransport, OutgoingMail};
-use nucleo_app::sales_ops::{EffectInput, LineInput, SaleInput};
+use nucleo_app::quote_doc_ops::QuoteDocSettings;
+use nucleo_app::sales_ops::{EffectInput, LineInput, QuoteInput, SaleInput};
 use nucleo_app::ship_ops::ShipmentInput;
 use nucleo_app::{AppService, BusinessProfile, CompanySession, MemoryKeyStore, NewCustomer};
 use std::cell::RefCell;
@@ -60,6 +61,7 @@ fn setup() -> MailSetup {
         from_email: "Ventas@DataLogger.cl".into(),
         reply_to: String::new(),
         bcc_self: true,
+        agent_send: false,
     }
 }
 
@@ -252,6 +254,7 @@ fn smtp_local() {
             from_email: "ventas@datalogger.cl".into(),
             reply_to: String::new(),
             bcc_self: false,
+            agent_send: false,
         },
         draft: MailDraft {
             kind: "prueba".into(),
@@ -261,10 +264,138 @@ fn smtp_local() {
             ..Default::default()
         },
         customer_id: None,
+        attachments: Vec::new(),
     };
     SmtpMail.send(&m).unwrap();
+    // Con una cotización adjunta: sale como correo de varias partes con el PDF.
+    let mut with_pdf = m.clone();
+    with_pdf.draft.subject = "Cotización COT-1524".into();
+    with_pdf.attachments = vec![nucleo_app::mail_ops::MailAttachment {
+        name: "COT-1524.pdf".into(),
+        data: b"%PDF-1.3\n% cotizacion de prueba\n%%EOF\n".to_vec(),
+    }];
+    SmtpMail.send(&with_pdf).unwrap();
     let mut bad = m.clone();
     bad.cfg.password = "otra".into();
     // Clave equivocada: falla (el texto depende de cómo responda el servidor).
     assert!(SmtpMail.send(&bad).is_err());
+}
+
+#[test]
+fn cotizacion_adjunta_y_permiso_de_claude() {
+    let (data, _app, mut s) = session();
+    s.mail_save(&setup()).unwrap();
+    let folder = data.path().join("Cotizaciones");
+    s.save_quote_doc_settings(&QuoteDocSettings {
+        folder: Some(folder.to_string_lossy().to_string()),
+        ..Default::default()
+    })
+    .unwrap();
+    let q = s
+        .save_quote(
+            &QuoteInput {
+                customer_uid: None,
+                prospect_name: Some("Laboratorio Alfa".into()),
+                issue_date: day(0),
+                valid_until: None,
+                lines: vec![LineInput {
+                    product_uid: None,
+                    description: "RC-5+ con sonda".into(),
+                    qty_milli: 2000,
+                    unit_price_minor: 23_445,
+                    discount_ppm: 0,
+                    taxable: true,
+                }],
+                notes: None,
+            },
+            None,
+        )
+        .unwrap();
+    let uid = q.summary.uid.clone();
+    let number = q.summary.number.clone();
+    let draft = MailDraft {
+        kind: "otro".into(),
+        to: "compras@alfa.cl".into(),
+        subject: format!("Cotización {number}"),
+        body: "Estimados, adjunto la cotización solicitada.".into(),
+        quote_uids: vec![uid.clone()],
+        ..Default::default()
+    };
+
+    // Sin emitir, no hay nada que adjuntar.
+    let e = s.mail_plan(&draft).unwrap_err().to_string();
+    assert!(e.contains("emítela primero"), "{e}");
+
+    let pdf = data_encoding::BASE64.encode(b"%PDF-1.3\n% cotizacion\n%%EOF\n");
+    s.save_quote_pdf(&uid, &pdf).unwrap();
+    let m = s.mail_plan(&draft).unwrap();
+    assert_eq!(m.attachments.len(), 1);
+    assert_eq!(m.attachments[0].name, format!("{number}.pdf"));
+    assert!(m.attachments[0].data.starts_with(b"%PDF-"));
+    // El registro queda con el número de la cotización.
+    assert_eq!(m.draft.reference.as_deref(), Some(number.as_str()));
+    let fake = Fake::default();
+    let r = fake.send(&m);
+    let row = s.mail_record(&m, &r).unwrap();
+    assert_eq!(
+        (row.status.as_str(), row.reference.as_deref()),
+        ("enviado", Some(number.as_str()))
+    );
+
+    // Una cotización que no existe, o demasiadas, se rechazan.
+    assert!(
+        s.mail_plan(&MailDraft {
+            quote_uids: vec!["no-existe".into()],
+            ..draft.clone()
+        })
+        .is_err()
+    );
+    let e = s
+        .mail_plan(&MailDraft {
+            quote_uids: vec![uid.clone(); 6],
+            ..draft.clone()
+        })
+        .unwrap_err()
+        .to_string();
+    assert!(e.contains("hasta 5"), "{e}");
+
+    // Claude: sin el permiso del dueño no envía, y no puede dárselo a sí mismo.
+    s.set_via_agent(true);
+    let e = s.mail_plan(&draft).unwrap_err().to_string();
+    assert!(e.contains("no tiene permiso"), "{e}");
+    let e = s
+        .mail_save(&MailSetup {
+            agent_send: true,
+            password: String::new(),
+            ..setup()
+        })
+        .unwrap_err()
+        .to_string();
+    assert!(e.contains("lo cambia la persona"), "{e}");
+    assert!(!s.mail_status().unwrap().agent_send);
+    s.set_via_agent(false);
+
+    // El dueño lo activa: ahora Claude puede enviar, y queda anotado quién lo hizo.
+    let st = s
+        .mail_save(&MailSetup {
+            agent_send: true,
+            password: String::new(),
+            ..setup()
+        })
+        .unwrap();
+    assert!(st.agent_send);
+    s.set_via_agent(true);
+    let m = s.mail_plan(&draft).unwrap();
+    let row = s.mail_record(&m, &Ok(())).unwrap();
+    assert!(row.user_name.contains("Claude"), "{}", row.user_name);
+    // Claude tampoco puede quitarse el permiso ni tocarlo al guardar otra cosa.
+    assert!(
+        s.mail_save(&MailSetup {
+            agent_send: false,
+            password: String::new(),
+            ..setup()
+        })
+        .is_err()
+    );
+    s.set_via_agent(false);
 }

@@ -36,6 +36,9 @@ pub struct MailConfig {
     pub reply_to: String,
     /// Enviar copia oculta a la misma casilla (para tener registro en «Enviados»).
     pub bcc_self: bool,
+    /// El dueño permite que Claude envíe correos cuando se lo pide (apagado de fábrica). Sin esto,
+    /// Claude solo puede preparar el texto y la persona lo envía.
+    pub agent_send: bool,
 }
 
 impl MailConfig {
@@ -57,6 +60,7 @@ pub struct MailStatus {
     pub from_email: String,
     pub reply_to: String,
     pub bcc_self: bool,
+    pub agent_send: bool,
     pub last_test_at: Option<String>,
 }
 
@@ -73,6 +77,7 @@ pub struct MailSetup {
     pub from_email: String,
     pub reply_to: String,
     pub bcc_self: bool,
+    pub agent_send: bool,
 }
 
 /// Valores conocidos de servidores comunes (la persona puede cambiarlos).
@@ -195,6 +200,15 @@ pub struct MailDraft {
     pub customer_uid: Option<String>,
     /// Envío o venta relacionada (número), para el registro.
     pub reference: Option<String>,
+    /// Cotizaciones cuyo PDF emitido se adjunta (se lee de la carpeta de cotizaciones del negocio).
+    pub quote_uids: Vec<String>,
+}
+
+/// Archivo adjunto de un correo (hoy, solo cotizaciones emitidas en PDF).
+#[derive(Debug, Clone)]
+pub struct MailAttachment {
+    pub name: String,
+    pub data: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -217,6 +231,7 @@ pub struct OutgoingMail {
     pub cfg: MailConfig,
     pub draft: MailDraft,
     pub customer_id: Option<i64>,
+    pub attachments: Vec<MailAttachment>,
 }
 
 pub trait MailTransport {
@@ -255,10 +270,20 @@ impl MailTransport for SmtpMail {
         if c.bcc_self {
             b = b.bcc(mailbox("", &c.from_email)?);
         }
-        let msg = b
-            .header(ContentType::TEXT_PLAIN)
-            .body(m.draft.body.clone())
-            .map_err(|e| format!("no se pudo armar el correo: {e}"))?;
+        let msg = if m.attachments.is_empty() {
+            b.header(ContentType::TEXT_PLAIN).body(m.draft.body.clone())
+        } else {
+            use lettre::message::{Attachment, MultiPart, SinglePart};
+            let pdf = ContentType::parse("application/pdf")
+                .map_err(|e| format!("no se pudo armar el adjunto: {e}"))?;
+            let mut parts = MultiPart::mixed().singlepart(SinglePart::plain(m.draft.body.clone()));
+            for a in &m.attachments {
+                parts = parts
+                    .singlepart(Attachment::new(a.name.clone()).body(a.data.clone(), pdf.clone()));
+            }
+            b.multipart(parts)
+        }
+        .map_err(|e| format!("no se pudo armar el correo: {e}"))?;
         let builder = match c.security.as_str() {
             "tls" => SmtpTransport::relay(&c.host),
             "starttls" => SmtpTransport::starttls_relay(&c.host),
@@ -298,6 +323,8 @@ fn valid_email(s: &str) -> bool {
 }
 
 const KINDS: &[&str] = &["prueba", "envio", "cobro", "promocion", "otro"];
+const MAX_ATTACHMENTS: usize = 5;
+const MAX_ATTACHMENT_BYTES: usize = 15 * 1024 * 1024;
 
 impl CompanySession {
     fn mail_row(&self) -> AppResult<IntegrationRow> {
@@ -333,6 +360,7 @@ impl CompanySession {
             from_email: c.from_email.clone(),
             reply_to: c.reply_to.clone(),
             bcc_self: c.bcc_self,
+            agent_send: c.agent_send,
             last_test_at: row.last_sync_at,
         })
     }
@@ -393,6 +421,13 @@ impl CompanySession {
         c.from_email = from.clone();
         c.reply_to = reply;
         c.bcc_self = s.bcc_self;
+        // El permiso para que Claude envíe lo da (o lo quita) la persona, nunca el propio Claude.
+        if self.via_agent && s.agent_send != c.agent_send {
+            return Err(AppError::Validation(
+                "el permiso para que Claude envíe correos lo cambia la persona en Configuración → Integraciones → Correo".into(),
+            ));
+        }
+        c.agent_send = s.agent_send;
         let mut row = self.mail_row()?;
         row.config_json =
             serde_json::to_string(&c).map_err(|e| AppError::Validation(e.to_string()))?;
@@ -551,6 +586,7 @@ impl CompanySession {
             body: render(&t.body, &vars),
             customer_uid: s.customer_uid.clone(),
             reference: Some(s.number.clone()),
+            quote_uids: Vec::new(),
         })
     }
 
@@ -622,6 +658,7 @@ impl CompanySession {
             body: render(&t.body, &vars),
             customer_uid: Some(c.uid.clone()),
             reference: None,
+            quote_uids: Vec::new(),
         })
     }
 
@@ -644,6 +681,7 @@ impl CompanySession {
             body: render(&t.body, &vars),
             customer_uid: Some(c.uid.clone()),
             reference: None,
+            quote_uids: Vec::new(),
         })
     }
 
@@ -675,6 +713,11 @@ impl CompanySession {
         let cfg = self.mail_config()?;
         if !cfg.configured() {
             return Err(AppError::Validation("configura primero el correo de la empresa (Configuración → Integraciones → Correo)".into()));
+        }
+        if self.via_agent && !cfg.agent_send {
+            return Err(AppError::Validation(
+                "Claude no tiene permiso para enviar correos en este negocio. La persona lo activa en Configuración → Integraciones → Correo («Permitir que Claude envíe los correos que le pidas»); mientras tanto, muéstrale el texto para que lo envíe ella".into(),
+            ));
         }
         if !KINDS.contains(&d.kind.as_str()) {
             return Err(AppError::Validation("tipo de correo no válido".into()));
@@ -709,13 +752,46 @@ impl CompanySession {
             ),
             None => None,
         };
+        // Adjuntos: solo el PDF ya emitido de cotizaciones de este negocio (nunca un archivo cualquiera).
+        if d.quote_uids.len() > MAX_ATTACHMENTS {
+            return Err(AppError::Validation(format!(
+                "hasta {MAX_ATTACHMENTS} cotizaciones adjuntas por correo"
+            )));
+        }
+        let mut attachments = Vec::new();
+        let mut numbers = Vec::new();
+        for uid in &d.quote_uids {
+            let (number, path) = self.quote_pdf_path(uid)?;
+            let data = std::fs::read(&path).map_err(|_| {
+                AppError::Validation(format!(
+                    "la cotización {number} aún no tiene su PDF en la carpeta: emítela primero («Emitir documento»)"
+                ))
+            })?;
+            if !data.starts_with(b"%PDF-") || data.len() > MAX_ATTACHMENT_BYTES {
+                return Err(AppError::Validation(format!(
+                    "el PDF de la cotización {number} no se puede adjuntar: vuelve a emitirla"
+                )));
+            }
+            attachments.push(MailAttachment {
+                name: format!("{number}.pdf"),
+                data,
+            });
+            numbers.push(number);
+        }
+        let reference = d
+            .reference
+            .clone()
+            .filter(|r| !r.trim().is_empty())
+            .or_else(|| Some(numbers.join(", ")).filter(|n| !n.is_empty()));
         Ok(OutgoingMail {
             cfg,
             draft: MailDraft {
                 to: to.join(", "),
+                reference,
                 ..d.clone()
             },
             customer_id,
+            attachments,
         })
     }
 

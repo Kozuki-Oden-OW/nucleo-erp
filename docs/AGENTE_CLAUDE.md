@@ -102,6 +102,9 @@ construyen después de la certificación del SII.
 | 8 | **Folios y consultas en sii.cl** | Ayuda a descargar folios (CAF) y a consultar la empresa con la sesión que inició la persona | Por construir (con la extensión de Chrome) |
 | 9 | **Asistente NÚCLEO (plan Premium)** | El mismo conjunto de herramientas, dentro de NÚCLEO, con la API de Anthropic | Idea |
 | 10 | **Tienda WooCommerce** | Sincroniza los pedidos pagados (cliente, venta que descuenta stock y envío por despachar), lista los pedidos y compara stock y precios con la tienda. Enviar cambios a la tienda lo confirma la persona | Construido el 23-11-2026 (falta probar en la tienda real) |
+| 11 | **Cotizar y enviar por correo** | Crea la cotización con precios de lista, emite el PDF y lo envía desde la casilla de la empresa, sin salir de NÚCLEO | Construido el 25-11-2026: `listar_cotizaciones`, `crear_cotizacion`, `emitir_cotizacion`, `enviar_correo`, `correos_enviados` (D-AGENT-07; receta `docs/recetas/cotizaciones.md`). Falta que el dueño conecte la casilla y marque el permiso |
+| 12 | **Navegador de NÚCLEO** | Ventanas propias de NÚCLEO para WhatsApp Web, Bluexpress, BCI y Mercado Libre, con sesión guardada, que el agente lee y maneja con herramientas de NÚCLEO (sin Chrome ni otra extensión) | Por construir: es el camino para «solo con NÚCLEO» en los sitios sin API |
+| 13 | **Leer el correo en NÚCLEO** | Bandeja de entrada por IMAP: pedidos de cotización y avisos de transferencia del banco, que pasan solos a la conciliación | Por construir |
 
 ### Funciones del gestor de contraseñas
 

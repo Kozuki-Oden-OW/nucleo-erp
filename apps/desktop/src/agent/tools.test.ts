@@ -324,3 +324,76 @@ describe("Banco leído en el portal (demostración)", () => {
     expect((await runTool(b, "ver", "conciliacion_banco", { cuenta: "no existe" })).isError).toBe(true);
   });
 });
+
+describe("Cotizar y enviar por correo solo con NÚCLEO (demostración)", () => {
+  const mail = { host: "smtp.ejemplo.cl", port: 465, security: "tls", username: "", password: "clave-de-prueba", from_name: "Ferretería Los Andes", from_email: "ventas@ejemplo.cl", reply_to: "", bcc_self: false };
+
+  it("crea la cotización con precios netos, la emite en PDF y la envía solo con el permiso del dueño", async () => {
+    const b = new DemoBackend();
+    const [p1, p2] = await b.searchProducts("");
+    const c = (await b.searchCustomers(""))[0]!;
+
+    // Nivel «Solo ver»: no crea nada.
+    expect((await runTool(b, "ver", "crear_cotizacion", { cliente: c.name, lineas: [{ producto: p1!.sku }] })).isError).toBe(true);
+
+    const made = await runTool(b, "borradores", "crear_cotizacion", {
+      cliente: c.name, validez_dias: 10,
+      lineas: [{ producto: p1!.sku, cantidad: 2 }, { producto: p2!.sku, cantidad: 1, precio_neto: p2!.price_minor - 1000 }, { descripcion: "Instalación en terreno", precio_neto: 25000 }],
+    });
+    expect(made.isError, txt(made)).toBeFalsy();
+    const number = /COT-\d+/.exec(txt(made))![0];
+    expect(txt(made)).toContain("con IVA");
+    // Avisa lo que se sale de la lista de precios, para revisarlo con la persona.
+    expect(txt(made)).toMatch(/distinto del de lista/);
+    expect(txt(made)).toMatch(/no es un producto de NÚCLEO/);
+    const q = (await b.listQuotes(number)).find((x) => x.number === number)!;
+    const detail = await b.quote(q.uid);
+    expect(detail.lines[0]!.unit_price_minor).toBe(p1!.price_minor);
+    expect(detail.status).toBe("borrador");
+
+    const list = await runTool(b, "ver", "listar_cotizaciones", { texto: number });
+    expect(txt(list)).toContain("TOTAL");
+
+    // Enviar exige «Acceso completo», correo configurado y el permiso del dueño; y el PDF emitido.
+    const args = { para: "compras@cliente.cl", asunto: `Cotización ${number}`, texto: "Estimados:\n\nAdjunto la cotización solicitada.\n\nSaludos", cotizaciones: [number] };
+    expect((await runTool(b, "borradores", "enviar_correo", args)).isError).toBe(true);
+    expect(txt(await runTool(b, "completo", "enviar_correo", args))).toMatch(/no está configurado/);
+    await b.mailSave({ ...mail, agent_send: false });
+    expect(txt(await runTool(b, "completo", "enviar_correo", args))).toMatch(/no tiene permiso/);
+    expect(txt(await runTool(b, "ver", "correos_enviados", {}))).toMatch(/NO tiene permiso/);
+    await b.mailSave({ ...mail, agent_send: true });
+    expect(txt(await runTool(b, "completo", "enviar_correo", args))).toMatch(/emítela primero/);
+    expect(await b.mailLog()).toHaveLength(0);
+
+    const emitted = await runTool(b, "borradores", "emitir_cotizacion", { cotizacion: number, plantilla: "moderna", plazo_entrega: "5 días hábiles" });
+    expect(emitted.isError, txt(emitted)).toBeFalsy();
+    expect(txt(emitted)).toContain(`${number} `);
+    expect(txt(emitted)).toContain("5 días hábiles");
+    expect((await b.quoteTerms(q.uid)).delivery).toBe("5 días hábiles");
+    expect((await runTool(b, "borradores", "emitir_cotizacion", { cotizacion: number, plantilla: "inventada" })).isError).toBe(true);
+    expect((await runTool(b, "borradores", "emitir_cotizacion", { cotizacion: "COT-999999" })).isError).toBe(true);
+
+    const sent = await runTool(b, "completo", "enviar_correo", args);
+    expect(sent.isError, txt(sent)).toBeFalsy();
+    expect(txt(sent)).toContain("compras@cliente.cl");
+    expect(txt(sent)).toContain(`${number}.pdf`);
+    expect((await b.quote(q.uid)).status).toBe("enviada");
+    const log = await b.mailLog();
+    expect(log).toHaveLength(1);
+    expect(log[0]!.reference).toBe(number);
+    expect(log[0]!.customer_name).toBe(c.name);
+    expect(txt(await runTool(b, "ver", "correos_enviados", { cliente: c.name }))).toContain(`Cotización ${number}`);
+
+    // Un correo sin asunto o sin texto no sale.
+    expect((await runTool(b, "completo", "enviar_correo", { para: "a@b.cl", asunto: "", texto: "hola" })).isError).toBe(true);
+  });
+
+  it("un prospecto que aún no es cliente también se puede cotizar", async () => {
+    const b = new DemoBackend();
+    const p = (await b.searchProducts(""))[0]!;
+    const r = await runTool(b, "borradores", "crear_cotizacion", { prospecto: "Laboratorio Alfa SpA", lineas: [{ producto: p.name }] });
+    expect(r.isError, txt(r)).toBeFalsy();
+    expect(txt(r)).toContain("Laboratorio Alfa SpA");
+    expect((await runTool(b, "borradores", "crear_cotizacion", { lineas: [{ producto: p.name }] })).isError).toBe(true);
+  });
+});

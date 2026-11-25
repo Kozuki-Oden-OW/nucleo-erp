@@ -1850,7 +1850,7 @@ export class DemoBackend implements Backend {
     const c = this.mail.cfg;
     return wait({
       configured: !!c, host: c?.host ?? "", port: c?.port ?? 465, security: c?.security ?? "tls", username: c?.username ?? "", has_password: !!c?.password,
-      from_name: c?.from_name ?? "", from_email: c?.from_email ?? "", reply_to: c?.reply_to ?? "", bcc_self: c?.bcc_self ?? false, last_test_at: this.mail.lastTest,
+      from_name: c?.from_name ?? "", from_email: c?.from_email ?? "", reply_to: c?.reply_to ?? "", bcc_self: c?.bcc_self ?? false, agent_send: c?.agent_send ?? false, last_test_at: this.mail.lastTest,
     });
   }
   async mailPresets(): Promise<MailPreset[]> {
@@ -1908,7 +1908,12 @@ export class DemoBackend implements Backend {
   async mailSend(d: MailDraft): Promise<MailLogRow> {
     if (!this.mail.cfg) throw new AppError("validacion", "Configura primero el correo de la empresa (Configuración → Integraciones → Correo).");
     if (!d.to.trim()) throw new AppError("validacion", "Falta el destinatario (el cliente no tiene correo en su ficha).");
-    const row: MailLogRow = { id: this.mail.log.length + 1, kind: d.kind, to_addr: d.to, subject: d.subject, customer_name: this.customers.find((c) => c.uid === d.customer_uid)?.name ?? null, reference: d.reference, status: "enviado", error: null, user_name: "demo", sent_at: new Date().toISOString() };
+    if (!d.subject.trim() || !d.body.trim()) throw new AppError("validacion", "El correo necesita asunto y texto.");
+    // Adjuntos: solo cotizaciones ya emitidas (en la demostración, las que pasaron por «Emitir documento»).
+    const attached = (d.quote_uids ?? []).map((u) => this.findQuote(u));
+    const missing = attached.find((q) => !this.quoteEmitted.has(q.uid));
+    if (missing) throw new AppError("validacion", `La cotización ${missing.number} aún no tiene su PDF en la carpeta: emítela primero («Emitir documento»).`);
+    const row: MailLogRow = { id: this.mail.log.length + 1, kind: d.kind, to_addr: d.to, subject: d.subject, customer_name: this.customers.find((c) => c.uid === d.customer_uid)?.name ?? null, reference: d.reference || attached.map((q) => q.number).join(", ") || null, status: "enviado", error: null, user_name: "demo", sent_at: new Date().toISOString() };
     this.mail.log.unshift(row);
     return wait(row);
   }
@@ -2097,6 +2102,8 @@ export class DemoBackend implements Backend {
     colors: { primary: "", secondary: "" }, show_name: false,
   };
   private quoteTermsByUid = new Map<string, QuoteTerms>();
+  /** Cotizaciones que ya tienen PDF emitido (para adjuntarlas a un correo). */
+  private quoteEmitted = new Set<string>();
 
   async quoteDocSettings(): Promise<QuoteDocSettings> { return wait(structuredClone(this.quoteDoc)); }
   async saveQuoteDocSettings(v: QuoteDocSettings): Promise<QuoteDocSettings> {
@@ -2133,6 +2140,7 @@ export class DemoBackend implements Backend {
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 5000);
     }
+    this.quoteEmitted.add(q.uid);
     this.log("cotizacion.emitir", "cotizacion", q.number);
     return wait({ path: fileName, file_name: fileName, folder: this.quoteDoc.folder ?? "Descargas" });
   }

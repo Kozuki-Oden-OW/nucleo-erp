@@ -562,6 +562,186 @@
     }
   },
   {
+    "name": "listar_cotizaciones",
+    "nivel": "ver",
+    "description": "Lista las cotizaciones: número, fecha, cliente, total y estado (borrador, enviada, aceptada, rechazada, vencida o convertida en venta). Con el número exacto muestra también las líneas.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "texto": {
+          "type": "string",
+          "description": "Número (COT-…) o parte del nombre del cliente"
+        }
+      }
+    }
+  },
+  {
+    "name": "crear_cotizacion",
+    "nivel": "borradores",
+    "description": "Crea una cotización (no mueve stock ni dinero). Indica el cliente (nombre o RUT de uno existente) o, si aún no es cliente, prospecto con su nombre. Cada línea lleva un producto por SKU o nombre, o una descripción libre con precio. precio_neto es por unidad y sin IVA; si se omite se usa el precio de lista. La respuesta muestra cada línea con su neto y su valor con IVA, y avisa si un precio difiere del de lista: revísalo con la persona antes de emitir.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "cliente": {
+          "type": "string",
+          "description": "Nombre o RUT de un cliente existente"
+        },
+        "prospecto": {
+          "type": "string",
+          "description": "Nombre de quien pide la cotización si todavía no es cliente"
+        },
+        "fecha": {
+          "type": "string",
+          "description": "AAAA-MM-DD; vacío = hoy"
+        },
+        "validez_dias": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 365,
+          "default": 15
+        },
+        "lineas": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "producto": {
+                "type": "string",
+                "description": "SKU o nombre del producto"
+              },
+              "descripcion": {
+                "type": "string"
+              },
+              "cantidad": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 1
+              },
+              "precio_neto": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Por unidad, sin IVA. Omítelo para usar el precio de lista del producto"
+              },
+              "descuento": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "afecto_iva": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "observaciones": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "lineas"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "emitir_cotizacion",
+    "nivel": "borradores",
+    "description": "Emite el documento de una cotización: crea el PDF con la plantilla, el logo, los colores, los datos de transferencia y el botón de pago del negocio, y lo guarda en la carpeta de cotizaciones. Se puede repetir (reemplaza el archivo). No envía nada al cliente: para enviarla usa enviar_correo.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "cotizacion": {
+          "type": "string",
+          "description": "Número de la cotización (COT-…)"
+        },
+        "plantilla": {
+          "type": "string",
+          "enum": [
+            "clasica",
+            "moderna",
+            "compacta",
+            "elegante"
+          ],
+          "description": "Vacío = la del negocio"
+        },
+        "plazo_entrega": {
+          "type": "string"
+        },
+        "garantia": {
+          "type": "string"
+        },
+        "forma_pago": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "cotizacion"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "enviar_correo",
+    "nivel": "completo",
+    "description": "Envía un correo desde la casilla de la empresa configurada en NÚCLEO, con el texto tal como se indica. Puede adjuntar el PDF de cotizaciones ya emitidas. Úsalo solo cuando la persona pidió enviar ese correo a ese destinatario; si el texto lo redactaste tú, muéstraselo antes. Requiere «Acceso completo» y que la persona haya activado «Permitir que Claude envíe los correos que le pidas» en Configuración → Integraciones → Correo. Las cotizaciones adjuntas quedan marcadas como enviadas.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "para": {
+          "type": "string",
+          "description": "Una o varias direcciones separadas por coma (hasta 10)"
+        },
+        "asunto": {
+          "type": "string"
+        },
+        "texto": {
+          "type": "string",
+          "description": "Cuerpo del correo en texto simple, con la firma incluida"
+        },
+        "cotizaciones": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 5,
+          "description": "Números de cotizaciones emitidas cuyo PDF se adjunta"
+        },
+        "cliente": {
+          "type": "string",
+          "description": "Nombre o RUT del cliente, para dejar el correo en su ficha (opcional)"
+        }
+      },
+      "required": [
+        "para",
+        "asunto",
+        "texto"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "correos_enviados",
+    "nivel": "ver",
+    "description": "Registro de los correos enviados desde NÚCLEO: fecha, destinatario, asunto, documento relacionado, quién lo envió y si salió o falló. También dice si el correo de la empresa está configurado y si Claude tiene permiso para enviar.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "cliente": {
+          "type": "string",
+          "description": "Nombre o RUT para ver solo los correos de ese cliente"
+        },
+        "limite": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "default": 20
+        }
+      }
+    }
+  },
+  {
     "name": "confirmar_venta",
     "nivel": "completo",
     "description": "Confirma una venta en borrador: le asigna número, descuenta stock y registra el cobro (contado) o la deja por cobrar (crédito).",

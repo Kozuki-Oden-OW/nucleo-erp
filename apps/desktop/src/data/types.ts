@@ -1796,6 +1796,8 @@ export interface MailStatus {
   from_email: string;
   reply_to: string;
   bcc_self: boolean;
+  /** El dueño permite que Claude envíe los correos que le pida. */
+  agent_send: boolean;
   last_test_at: string | null;
 }
 
@@ -1810,6 +1812,7 @@ export interface MailSetup {
   from_email: string;
   reply_to: string;
   bcc_self: boolean;
+  agent_send: boolean;
 }
 
 export interface MailPreset { name: string; host: string; port: number; security: string; note: string }
@@ -1824,6 +1827,8 @@ export interface MailDraft {
   body: string;
   customer_uid: string | null;
   reference: string | null;
+  /** Cotizaciones cuyo PDF emitido se adjunta. */
+  quote_uids?: string[];
 }
 
 export interface MailLogRow {

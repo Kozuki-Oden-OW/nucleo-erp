@@ -3,9 +3,10 @@
 // valen las mismas reglas, permisos y auditoría.
 import type { Backend } from "../data";
 import { errorMessage } from "../data";
-import type { Customer, HistoricalSale, MoneyAccount, ReconcileKind, SiiDocument, SiiIntercambioResumen, SiiLibro, SiiLineaLibro, LineInput, Product, SaleSummary, SaleTerms, ShipmentInput, ShipmentSize, Supplier } from "../data/types";
+import type { QuoteDetail, QuoteSummary, QuoteTemplate, Customer, HistoricalSale, MoneyAccount, ReconcileKind, SiiDocument, SiiIntercambioResumen, SiiLibro, SiiLineaLibro, LineInput, Product, SaleSummary, SaleTerms, ShipmentInput, ShipmentSize, Supplier } from "../data/types";
 import { EMPTY_TERMS } from "../data/saleTerms";
-import { formatMoney, todayIso } from "../lib/format";
+import { formatMoney, formatQty, todayIso } from "../lib/format";
+import { buildQuotePdf, QUOTE_TEMPLATES, quoteFileName } from "../lib/quotePdf";
 import { navigate } from "../lib/router";
 import { hitHref } from "../shell/CommandPalette";
 import { choose, click, key, resolveRoute, scroll, settle, snapshot, type } from "./dom";
@@ -151,6 +152,30 @@ const saleLine = (s: SaleSummary) =>
   `- ${s.number || "(borrador)"} · ${s.issue_date} · ${s.customer_name || "sin cliente"} · total ${pesos(s.total_minor)} · pagado ${pesos(s.paid_minor)} · ${s.commercial_state}/${s.payment_state}/${s.documentation_state}`;
 
 /** Avisa a la pantalla que cambiaron datos (para recargar listas, sin tocar un formulario a medio llenar). */
+
+const QUOTE_STATUS: Record<string, string> = { borrador: "borrador", enviada: "enviada", aceptada: "aceptada", rechazada: "rechazada", vencida: "vencida", anulada: "anulada", convertida: "convertida en venta" };
+const quoteLine = (q: QuoteSummary) => `- ${q.number} · ${q.issue_date} · ${q.customer_name || "sin cliente"} · ${pesos(q.total_minor)} · ${QUOTE_STATUS[q.status] ?? q.status}${q.valid_until ? ` · válida hasta ${q.valid_until}` : ""}`;
+
+/** Cotización por su número exacto (COT-1524). */
+async function findQuote(backend: Backend, ref: string): Promise<QuoteDetail> {
+  const k = norm(ref);
+  if (!k) throw new Error("Indica el número de la cotización (COT-…).");
+  const hit = (await backend.listQuotes(ref)).find((q) => norm(q.number) === k);
+  if (!hit) throw new Error(`No encontré la cotización «${ref}». Usa listar_cotizaciones para ver los números.`);
+  return backend.quote(hit.uid);
+}
+
+/** Detalle de una cotización con cada línea en neto y con IVA, para revisarla antes de emitir. */
+function quoteText(q: QuoteDetail, ratePpm: number | null): string {
+  const gross = (net: number, taxable: boolean) => (taxable && ratePpm ? Math.round(net * (1 + ratePpm / 1_000_000)) : net);
+  return [
+    `${q.number} · ${q.customer_name || "sin cliente"} · ${q.issue_date}${q.valid_until ? ` · válida hasta ${q.valid_until}` : ""} · ${QUOTE_STATUS[q.status] ?? q.status}`,
+    ...q.lines.map((l) => `- ${formatQty(l.qty_milli)} × ${l.description} · neto ${pesos(l.unit_price_minor)} c/u (${pesos(gross(l.unit_price_minor, l.taxable))} con IVA)${l.discount_ppm ? ` · descuento ${l.discount_ppm / 10_000} %` : ""} · línea ${pesos(l.net_minor)}`),
+    `Neto ${pesos(q.totals.net_minor)} · IVA ${pesos(q.totals.tax_minor)} · TOTAL ${pesos(q.total_minor)}`,
+    ...(q.notes ? [`Observaciones: ${q.notes}`] : []),
+  ].join("\n");
+}
+
 function dataChanged() { if (typeof window !== "undefined") window.dispatchEvent(new Event("nucleo:datos")); }
 
 async function screenAfter(done: string): Promise<ToolResult> {
@@ -543,7 +568,106 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
       return text(`Gasto ${g.number} registrado: ${g.description} · ${cat.name} · ${pesos(g.total_minor)} · ${g.paid_minor >= g.total_minor ? "pagado" : "por pagar"}.`);
     }
 
+    case "listar_cotizaciones": {
+      const q = str(a, "texto");
+      const list = await backend.listQuotes(q || undefined);
+      if (!list.length) return text(q ? `No hay cotizaciones que coincidan con «${q}».` : "Aún no hay cotizaciones.");
+      const exact = q ? list.find((x) => norm(x.number) === norm(q)) : undefined;
+      if (exact) return text(quoteText(await backend.quote(exact.uid), (await backend.business()).tax_rate_ppm ?? null));
+      return text([`${list.length} cotizaciones:`, ...list.slice(0, 40).map(quoteLine), ...(list.length > 40 ? [`… y ${list.length - 40} más: precisa el texto.`] : [])].join("\n"));
+    }
+    case "correos_enviados": {
+      const st = await backend.mailStatus();
+      let uid: string | null = null;
+      const cq = str(a, "cliente");
+      if (cq) uid = pickOne(await searchBoth((q) => backend.searchCustomers(q), cq), cq, (x) => x.rut ?? "", "cliente").uid;
+      const rows = (await backend.mailLog(uid, num(a, "limite") ?? 20)).slice(0, num(a, "limite") ?? 20);
+      const head = st.configured
+        ? `Correo de la empresa: ${st.from_email} · ${st.agent_send ? "Claude puede enviar los correos que la persona le pida" : "Claude NO tiene permiso para enviar (la persona lo activa en Configuración → Integraciones → Correo)"}.`
+        : "El correo de la empresa no está configurado (Configuración → Integraciones → Correo): la persona escribe ahí el servidor y la clave de la casilla.";
+      return text([head, rows.length ? `${rows.length} correos:` : "Sin correos enviados.", ...rows.map((r) => `- ${r.sent_at.slice(0, 16).replace("T", " ")} · ${r.to_addr} · «${r.subject}»${r.reference ? ` · ${r.reference}` : ""} · ${r.status}${r.error ? ` (${r.error})` : ""} · ${r.user_name}`)].join("\n"));
+    }
+    case "crear_cotizacion": {
+      let customer_uid: string | null = null;
+      const cq = str(a, "cliente");
+      const prospect = str(a, "prospecto");
+      if (cq) customer_uid = pickOne(await searchBoth((q) => backend.searchCustomers(q), cq), cq, (x) => x.rut ?? "", "cliente").uid;
+      else if (!prospect) throw new Error("Indica el cliente (nombre o RUT de uno existente) o prospecto con el nombre de quien pide la cotización.");
+      const raw = Array.isArray(a.lineas) ? (a.lineas as Args[]) : [];
+      if (!raw.length) throw new Error("La cotización necesita al menos una línea.");
+      const lines: LineInput[] = [];
+      const notes: string[] = [];
+      for (const [i, l] of raw.entries()) {
+        const qty = num(l, "cantidad") ?? 1;
+        const disc = Math.round((num(l, "descuento") ?? 0) * 10_000);
+        const pq = str(l, "producto");
+        if (pq) {
+          const p = pickOne(await backend.searchProducts(pq), pq, (x) => x.sku, "producto");
+          const price = Math.round(num(l, "precio_neto") ?? p.price_minor);
+          if (price !== p.price_minor) notes.push(`Línea ${i + 1} (${p.name}): precio ${pesos(price)} neto, distinto del de lista (${pesos(p.price_minor)}).`);
+          if (p.price_minor <= 0 && num(l, "precio_neto") === null) throw new Error(`«${p.name}» no tiene precio de lista: indica precio_neto o pídele el precio a la persona.`);
+          lines.push({ product_uid: p.uid, description: str(l, "descripcion") || p.name, qty_milli: Math.round(qty * 1000), unit_price_minor: price, discount_ppm: disc, taxable: typeof l.afecto_iva === "boolean" ? l.afecto_iva : p.taxable });
+        } else {
+          const desc = str(l, "descripcion");
+          const price = num(l, "precio_neto");
+          if (!desc || price === null) throw new Error(`La línea ${i + 1} necesita un producto, o una descripción con precio_neto.`);
+          notes.push(`Línea ${i + 1} («${desc}») no es un producto de NÚCLEO: precio escrito a mano.`);
+          lines.push({ product_uid: null, description: desc, qty_milli: Math.round(qty * 1000), unit_price_minor: Math.round(price), discount_ppm: disc, taxable: l.afecto_iva !== false });
+        }
+        if (disc) notes.push(`Línea ${i + 1}: descuento de ${disc / 10_000} %.`);
+      }
+      const issue = str(a, "fecha") || todayIso();
+      const q = await backend.saveQuote({ customer_uid, prospect_name: customer_uid ? undefined : prospect, issue_date: issue, valid_until: addDays(issue, Math.round(num(a, "validez_dias") ?? 15)), lines, notes: str(a, "observaciones") || undefined });
+      dataChanged();
+      return text([
+        "Cotización creada (borrador):", quoteText(q, (await backend.business()).tax_rate_ppm ?? null),
+        ...(notes.length ? ["Para revisar con la persona antes de emitir:", ...notes.map((n) => `- ${n}`)] : []),
+        "Siguiente paso: emitir_cotizacion para crear el PDF.",
+      ].join("\n"));
+    }
+    case "emitir_cotizacion": {
+      const q = await findQuote(backend, str(a, "cotizacion"));
+      if (q.status === "anulada") throw new Error(`La cotización ${q.number} está anulada.`);
+      const tpl = str(a, "plantilla");
+      if (tpl && !QUOTE_TEMPLATES.some((t) => t.id === tpl)) throw new Error(`Plantilla desconocida «${tpl}». Opciones: ${QUOTE_TEMPLATES.map((t) => t.id).join(", ")}.`);
+      const [biz, settings, saved] = await Promise.all([backend.business(), backend.quoteDocSettings(), backend.quoteTerms(q.uid)]);
+      const terms = { delivery: str(a, "plazo_entrega") || saved.delivery, warranty: str(a, "garantia") || saved.warranty, payment: str(a, "forma_pago") || saved.payment };
+      if (terms.delivery !== saved.delivery || terms.warranty !== saved.warranty || terms.payment !== saved.payment) await backend.saveQuoteTerms(q.uid, terms);
+      const customer = q.customer_uid ? await backend.customer(q.customer_uid) : null;
+      const pdf = buildQuotePdf({ quote: q, biz, customer, settings, terms, template: (tpl || undefined) as QuoteTemplate | undefined });
+      const out = await backend.saveQuotePdf(q.uid, quoteFileName(q), pdf);
+      const missing = [!biz.logo && "logo", !biz.rut && "RUT del negocio", !(settings.bank.show && settings.bank.account) && "datos de transferencia"].filter(Boolean);
+      return text([
+        `PDF de ${q.number} emitido: ${out.path}`,
+        `Plantilla ${tpl || settings.template} · entrega ${terms.delivery || "—"} · garantía ${terms.warranty || "—"} · pago ${terms.payment || "—"} · total ${pesos(q.total_minor)}.`,
+        ...(missing.length ? [`Aviso: el documento salió sin ${missing.join(", ")} (Configuración → Cotizaciones y Mi negocio).`] : []),
+        "No se envió al cliente. Para enviarla: enviar_correo con cotizaciones: [\"" + q.number + "\"].",
+      ].join("\n"));
+    }
+
     /* ───── Acceso completo ───── */
+    case "enviar_correo": {
+      const st = await backend.mailStatus();
+      if (!st.configured) throw new Error("El correo de la empresa no está configurado. La persona lo conecta en Configuración → Integraciones → Correo (servidor y clave de la casilla, que escribe ella).");
+      if (!st.agent_send) throw new Error("Claude no tiene permiso para enviar correos en este negocio. La persona lo activa en Configuración → Integraciones → Correo («Permitir que Claude envíe los correos que le pidas»). Mientras tanto, muéstrale el texto para que lo envíe ella.");
+      const refs = Array.isArray(a.cotizaciones) ? (a.cotizaciones as unknown[]).filter((x): x is string => typeof x === "string" && !!x.trim()) : [];
+      const quotes: QuoteDetail[] = [];
+      for (const r of refs) quotes.push(await findQuote(backend, r));
+      let customer_uid: string | null = quotes.find((q) => q.customer_uid)?.customer_uid ?? null;
+      const cq = str(a, "cliente");
+      if (cq) customer_uid = pickOne(await searchBoth((q) => backend.searchCustomers(q), cq), cq, (x) => x.rut ?? "", "cliente").uid;
+      const row = await backend.mailSend({ kind: "otro", to: str(a, "para"), subject: str(a, "asunto"), body: typeof a.texto === "string" ? a.texto : "", customer_uid, reference: null, quote_uids: quotes.map((q) => q.uid) });
+      if (row.status !== "enviado") throw new Error(`El correo no salió: ${row.error ?? "error desconocido"}.`);
+      const marked: string[] = [];
+      for (const q of quotes) if (q.status === "borrador") { await backend.setQuoteStatus(q.uid, "enviada"); marked.push(q.number); }
+      dataChanged();
+      return text([
+        `Correo enviado desde ${st.from_email} a ${row.to_addr}: «${row.subject}».`,
+        ...(quotes.length ? [`Adjuntos: ${quotes.map((q) => `${q.number}.pdf`).join(", ")}.`] : []),
+        ...(marked.length ? [`Marcadas como enviadas: ${marked.join(", ")}.`] : []),
+        `Quedó en el registro de correos (n.º ${row.id}).`,
+      ].join("\n"));
+    }
     case "confirmar_venta": {
       const s = await findSale(backend, str(a, "venta"), "borradores");
       const credito = str(a, "modo") === "credito";

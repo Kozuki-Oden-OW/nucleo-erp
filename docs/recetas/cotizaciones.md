@@ -30,17 +30,21 @@ corrigieron contra la lista de precios de Data Logger.
 - El envío es un servicio aparte: «Envio» $5.000 neto.
 - Un producto que no está en NÚCLEO no se inventa: se pide el precio al dueño y se crea con su neto.
 
-## Pasos
+## Pasos (todo con herramientas de NÚCLEO, extensión 0.8.7)
 
-1. Cliente: buscarlo por RUT o nombre; si no existe, crearlo con RUT, razón social, giro, dirección y
-   correo (pedir lo que falte: es lo mismo que se pide por WhatsApp o correo antes de cotizar).
-2. Vender → Cotizaciones → «Nueva cotización»: cliente, validez (15 días si no se dice otra cosa) y las
-   líneas con el producto de NÚCLEO (precio neto de lista; descuento solo si el dueño lo indicó).
-3. Guardar y revisar el total con la persona cuando el monto o el descuento se salgan de lo habitual.
-4. «Emitir documento (PDF)»: plantilla del negocio, condiciones (plazo de entrega, garantía, forma de
-   pago). El PDF queda en la carpeta con el nombre «COT-NNNN Cliente.pdf».
-5. Envío al cliente: el agente **no envía**; deja el borrador de respuesta (correo o WhatsApp) con el
-   PDF indicado y la persona lo manda.
+1. Cliente: `buscar_clientes` por RUT o nombre. Si no existe, `crear_cliente` con RUT, razón social,
+   giro, dirección y correo (pedir lo que falte); si solo está consultando, se cotiza como `prospecto`.
+2. `crear_cotizacion` con el cliente y las líneas (producto por SKU o nombre; sin `precio_neto` usa el
+   de lista; validez 15 días salvo que se diga otra cosa). La respuesta trae cada línea en neto y con
+   IVA y una lista «para revisar con la persona»: precios distintos de la lista, descuentos y líneas
+   escritas a mano. Si aparece algo en esa lista que el dueño no pidió, se detiene y pregunta.
+3. `emitir_cotizacion`: crea el PDF «COT-NNNN Cliente.pdf» en la carpeta, con la plantilla, el logo, los
+   colores, los datos de transferencia y el botón de pago. Se puede repetir.
+4. Envío: `enviar_correo` con `cotizaciones: ["COT-NNNN"]` adjunta el PDF y deja la cotización como
+   enviada. Solo cuando el dueño pidió enviar ese correo a ese destinatario; si el texto lo redactó el
+   agente, se lo muestra antes. Requiere el permiso «Permitir que Claude envíe los correos que le
+   pidas» (Configuración → Integraciones → Correo); sin él, el agente entrega el texto y el dueño envía.
+5. `correos_enviados` muestra el registro (qué salió, a quién y con qué cotización).
 
 ## Qué lleva el documento
 
@@ -51,6 +55,6 @@ corrigieron contra la lista de precios de Data Logger.
 
 ## Lo que no hace el agente
 
-- No envía la cotización ni responde al cliente sin el «sí» de la persona.
+- No envía la cotización ni responde al cliente sin que la persona lo haya pedido para ese destinatario.
 - No cambia precios de lista ni inventa descuentos.
 - No borra archivos de la carpeta.

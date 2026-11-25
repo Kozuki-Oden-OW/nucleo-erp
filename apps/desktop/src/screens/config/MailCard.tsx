@@ -32,7 +32,7 @@ export function MailCard() {
 
   const apply = useCallback((s: MailStatus) => {
     setSt(s);
-    setForm({ host: s.host, port: s.port || null, security: s.security || "tls", username: s.username, password: "", from_name: s.from_name, from_email: s.from_email, reply_to: s.reply_to, bcc_self: s.bcc_self });
+    setForm({ host: s.host, port: s.port || null, security: s.security || "tls", username: s.username, password: "", from_name: s.from_name, from_email: s.from_email, reply_to: s.reply_to, bcc_self: s.bcc_self, agent_send: s.agent_send });
   }, []);
   const load = useCallback(async () => {
     try {
@@ -95,6 +95,10 @@ export function MailCard() {
             placeholder={st.has_password ? "Guardada (escribe para cambiarla)" : ""} disabled={!editable} hint="Se guarda cifrada en la base de esta empresa." />
           <Field label="Responder a" type="email" value={form.reply_to} onChange={(e) => set({ reply_to: e.target.value })} optional disabled={!editable} />
           <div className="flex items-end pb-2"><Checkbox label="Guardar copia en mi casilla (CCO)" checked={form.bcc_self} onChange={(v) => set({ bcc_self: v })} /></div>
+        </div>
+        <div data-agent-human className="rounded-lg border border-line p-3">
+          <Checkbox label="Permitir que Claude envíe los correos que le pidas" checked={form.agent_send} onChange={(v) => { if (editable) set({ agent_send: v }); }}
+            hint="Apagado, Claude solo prepara el texto y tú lo envías. Encendido, puede enviarlo desde esta casilla cuando se lo pidas (por ejemplo, una cotización con su PDF). Cada correo queda en el registro con «(Claude)». Solo tú puedes cambiar esta casilla." />
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <Button icon={Save} onClick={save} disabled={!editable || !!busy}>{busy === "save" ? "Guardando…" : "Guardar"}</Button>
