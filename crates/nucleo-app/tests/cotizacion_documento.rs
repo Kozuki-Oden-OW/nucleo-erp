@@ -2,7 +2,7 @@
 //! transferencia), condiciones de cada cotización y guardado del PDF emitido en la carpeta elegida.
 
 use data_encoding::BASE64;
-use nucleo_app::quote_doc_ops::{QuoteBank, QuoteCard, QuoteDocSettings, QuoteTerms};
+use nucleo_app::quote_doc_ops::{QuoteBank, QuoteCard, QuoteColors, QuoteDocSettings, QuoteTerms};
 use nucleo_app::sales_ops::{LineInput, QuoteInput};
 use nucleo_app::{AppService, BusinessProfile, CompanySession, MemoryKeyStore};
 
@@ -273,5 +273,42 @@ fn el_enlace_de_pago_con_tarjeta_se_valida() {
             .unwrap()
             .card
             .show
+    );
+}
+
+#[test]
+fn los_colores_del_documento_se_validan() {
+    let (_data, _app, mut s) = session();
+    let with = |primary: &str, secondary: &str| QuoteDocSettings {
+        colors: QuoteColors {
+            primary: primary.into(),
+            secondary: secondary.into(),
+        },
+        ..Default::default()
+    };
+    // De fábrica: color del negocio y sin el nombre bajo el logo.
+    let d = s.quote_doc_settings().unwrap();
+    assert_eq!(d.colors, QuoteColors::default());
+    assert!(!d.show_name);
+
+    let ok = s
+        .save_quote_doc_settings(&with(" #0A51A4 ", "#fdc701"))
+        .unwrap();
+    assert_eq!(
+        (ok.colors.primary.as_str(), ok.colors.secondary.as_str()),
+        ("#0a51a4", "#fdc701")
+    );
+    for bad in ["azul", "#12345", "#12345g", "0a51a4", "#0a51a4ff"] {
+        let e = s
+            .save_quote_doc_settings(&with(bad, ""))
+            .unwrap_err()
+            .to_string();
+        assert!(e.contains("#rrggbb"), "{bad}: {e}");
+        assert!(s.save_quote_doc_settings(&with("", bad)).is_err(), "{bad}");
+    }
+    // Vacío vuelve al color del negocio.
+    assert_eq!(
+        s.save_quote_doc_settings(&with("", "")).unwrap().colors,
+        QuoteColors::default()
     );
 }

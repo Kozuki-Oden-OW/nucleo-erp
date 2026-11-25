@@ -62,6 +62,42 @@ describe("PDF de la cotización", () => {
     expect(bad).not.toContain("/URI");
   });
 
+  it("con logo, bajo él van los datos del negocio y no su nombre (salvo que se pida)", async () => {
+    const f = await fixture();
+    const biz = { ...f.biz, name: "Empresa Prueba", legal_name: null };
+    const own = (raw: string) => (raw.match(/\(Empresa Prueba\) Tj/g) ?? []).length;
+    for (const t of QUOTE_TEMPLATES) {
+      const hidden = new TextDecoder("latin1").decode(buildQuotePdf({ ...f, biz, settings: { ...f.settings, show_name: false }, template: t.id }));
+      expect(own(hidden), t.id).toBe(0);
+      expect(hidden, t.id).toContain("RUT: 76.123.456-0");
+      expect(hidden, t.id).toContain("Av. Siempre Viva 742, Santiago");
+      expect(hidden, t.id).toContain("+56 9 1234 5678");
+      const shown = new TextDecoder("latin1").decode(buildQuotePdf({ ...f, biz, settings: { ...f.settings, show_name: true }, template: t.id }));
+      expect(own(shown), t.id).toBe(1);
+      // Sin logo el nombre va siempre: es lo único que dice de quién es la cotización.
+      const noLogo = new TextDecoder("latin1").decode(buildQuotePdf({ ...f, biz: { ...biz, logo: null }, settings: { ...f.settings, show_name: false }, template: t.id }));
+      expect(own(noLogo), t.id).toBe(1);
+    }
+  });
+
+  it("los colores del documento: principal y secundario, y «Compacta» siempre en blanco y negro", async () => {
+    const f = await fixture();
+    const blue = "0.039 0.318 0.643 rg", yellow = "0.99 0.78 0. rg";
+    const two = { ...f.settings, colors: { primary: "#0a51a4", secondary: "#fdc701" } };
+    for (const t of ["clasica", "moderna", "elegante"] as const) {
+      const raw = new TextDecoder("latin1").decode(buildQuotePdf({ ...f, settings: two, template: t }));
+      expect(raw, t).toContain(blue);
+      expect(raw, t).toContain(yellow);
+      // Sin colores propios se usa el color del negocio (que se guarda por nombre) y no aparece el amarillo.
+      const plain = new TextDecoder("latin1").decode(buildQuotePdf({ ...f, biz: { ...f.biz, accent: "azul" }, template: t }));
+      expect(plain, t).toContain("0.114 0.373 0.82 rg");
+      expect(plain, t).not.toContain(yellow);
+    }
+    const bw = new TextDecoder("latin1").decode(buildQuotePdf({ ...f, settings: two, template: "compacta" }));
+    expect(bw).not.toContain(blue);
+    expect(bw).not.toContain(yellow);
+  });
+
   it("el nombre del archivo lleva número y cliente, sin caracteres que Windows rechaza", async () => {
     const f = await fixture();
     const name = quoteFileName({ ...f.quote, customer_name: 'Soc. de Inv. / Desarrollo: "I+D" <Chile>?' });

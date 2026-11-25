@@ -66,6 +66,15 @@ impl Default for QuoteCard {
     }
 }
 
+/// Colores del documento, como `#rrggbb`. Vacío = el color del negocio. El secundario se usa en
+/// líneas y en el botón de pago (por ejemplo, el amarillo de un logo azul y amarillo).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct QuoteColors {
+    pub primary: String,
+    pub secondary: String,
+}
+
 /// Cómo va la numeración de cotizaciones, contando los archivos de la carpeta.
 #[derive(Debug, Clone, Serialize)]
 pub struct QuoteNumbering {
@@ -96,6 +105,9 @@ pub struct QuoteDocSettings {
     pub footer: String,
     pub bank: QuoteBank,
     pub card: QuoteCard,
+    pub colors: QuoteColors,
+    /// Escribir el nombre del negocio bajo el logo. Sin logo, el nombre va siempre.
+    pub show_name: bool,
 }
 
 impl Default for QuoteDocSettings {
@@ -109,6 +121,8 @@ impl Default for QuoteDocSettings {
             footer: "Gracias por confiar en nosotros".into(),
             bank: QuoteBank::default(),
             card: QuoteCard::default(),
+            colors: QuoteColors::default(),
+            show_name: false,
         }
     }
 }
@@ -129,6 +143,19 @@ fn short(what: &str, v: &str, max: usize) -> AppResult<String> {
         )));
     }
     Ok(t.to_string())
+}
+
+/// Un color `#rrggbb` (se guarda en minúsculas) o vacío.
+fn color(what: &str, v: &str) -> AppResult<String> {
+    let t = v.trim().to_ascii_lowercase();
+    let ok = t.is_empty()
+        || (t.len() == 7 && t.starts_with('#') && t[1..].chars().all(|c| c.is_ascii_hexdigit()));
+    if !ok {
+        return Err(AppError::Validation(format!(
+            "{what} debe escribirse como #rrggbb, por ejemplo #0a51a4"
+        )));
+    }
+    Ok(t)
 }
 
 fn clean_terms(t: &QuoteTerms) -> AppResult<QuoteTerms> {
@@ -320,6 +347,11 @@ impl CompanySession {
                     card_label
                 },
             },
+            colors: QuoteColors {
+                primary: color("el color principal", &v.colors.primary)?,
+                secondary: color("el color secundario", &v.colors.secondary)?,
+            },
+            show_name: v.show_name,
         };
         let conn = self.db.conn();
         dbcore::set_setting(

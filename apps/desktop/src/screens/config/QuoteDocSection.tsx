@@ -2,8 +2,9 @@
 // condiciones habituales, los datos de transferencia y la carpeta donde se guardan los PDF emitidos.
 import { useEffect, useState } from "react";
 import { open as pickFolder } from "@tauri-apps/plugin-dialog";
-import { Check, FolderOpen, Save } from "lucide-react";
+import { Check, FolderOpen, Pipette, Save } from "lucide-react";
 import { errorMessage, useBackend, type BusinessSettings, type QuoteDocSettings, type QuoteNumbering, type QuoteTemplate } from "../../data";
+import { logoPalette } from "../../lib/logoColors";
 import { QUOTE_TEMPLATES } from "../../lib/quotePdf";
 import { useSession } from "../../lib/session";
 import { Button, Card, Checkbox, Field, Notice, Spinner, TextArea, cx } from "../../ui/kit";
@@ -54,6 +55,17 @@ export function QuoteDocSection({ onChanged }: { onChanged: () => void }) {
   const terms = (patch: Partial<QuoteDocSettings["terms"]>) => setS((v) => v && { ...v, terms: { ...v.terms, ...patch } });
   const bank = (patch: Partial<QuoteDocSettings["bank"]>) => setS((v) => v && { ...v, bank: { ...v.bank, ...patch } });
   const card = (patch: Partial<QuoteDocSettings["card"]>) => setS((v) => v && { ...v, card: { ...v.card, ...patch } });
+  const colors = (patch: Partial<QuoteDocSettings["colors"]>) => setS((v) => v && { ...v, colors: { ...v.colors, ...patch } });
+  const fromLogo = async () => {
+    if (!biz.logo) { toast("warning", "Primero sube el logo: los colores se toman de él."); return; }
+    try {
+      const p = await logoPalette(biz.logo);
+      if (!p) { toast("warning", "El logo no tiene colores (es blanco, negro o gris). Elige los colores a mano."); return; }
+      colors({ primary: p.primary, secondary: p.secondary ?? "" });
+      toast("success", p.secondary ? "Colores tomados del logo. Guarda los ajustes para usarlos." : "El logo tiene un solo color: quedó como principal. Guarda los ajustes para usarlo.");
+    } catch (e) { toast("danger", errorMessage(e)); }
+  };
+  const isHex = (c: string) => /^#[0-9a-f]{6}$/i.test(c.trim());
   const choose = async () => {
     try {
       const dir = await pickFolder({ directory: true, multiple: false, title: "Carpeta para guardar las cotizaciones" });
@@ -82,7 +94,24 @@ export function QuoteDocSection({ onChanged }: { onChanged: () => void }) {
             </button>
           ))}
         </div>
-        <p className="mt-3 text-xs text-muted">El color de las plantillas es el color del negocio (Configuración → Apariencia). «Compacta» va siempre en blanco y negro.</p>
+        <div className="mt-4 flex flex-col gap-3 border-t border-line pt-4">
+          <div>
+            <p className="text-sm font-semibold">Colores del documento</p>
+            <p className="text-xs text-muted">El principal va en títulos, encabezado de la tabla y total; el secundario, en líneas y en el botón de pago. Si los dejas vacíos se usa el color del negocio. «Compacta» va siempre en blanco y negro.</p>
+          </div>
+          <div className="flex flex-wrap items-end gap-3">
+            {([["primary", "Color principal", "#0a51a4"], ["secondary", "Color secundario", "#fdc701"]] as const).map(([key, label, sample]) => (
+              <div key={key} className="flex items-end gap-2">
+                <span aria-hidden className="mb-1 h-8 w-8 shrink-0 rounded-md border border-line-strong" style={{ background: isHex(s.colors[key]) ? s.colors[key] : "transparent" }} />
+                <div className="w-36"><Field label={label} value={s.colors[key]} onChange={(e) => colors({ [key]: e.target.value })} placeholder={sample} disabled={!editable} autoComplete="off" /></div>
+              </div>
+            ))}
+            {editable && <Button variant="secondary" icon={Pipette} onClick={fromLogo}>Tomar los colores del logo</Button>}
+            {editable && (s.colors.primary || s.colors.secondary) && <Button variant="ghost" onClick={() => colors({ primary: "", secondary: "" })}>Usar el color del negocio</Button>}
+          </div>
+          <Checkbox label="Escribir el nombre del negocio bajo el logo" checked={s.show_name} onChange={(v) => { if (editable) set({ show_name: v }); }}
+            hint="Desmarcado, bajo el logo van solo tus datos en letra chica: RUT, giro, dirección, teléfono y correo (los de Configuración → Mi negocio). Sin logo, el nombre va siempre." />
+        </div>
       </Card>
 
       <LogoCard biz={biz} editable={editable} onChange={(nb) => { setBiz({ ...biz, logo: nb.logo }); onChanged(); }} />

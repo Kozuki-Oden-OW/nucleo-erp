@@ -350,6 +350,8 @@ export interface QuoteTerms { delivery: string; warranty: string; payment: strin
 export interface QuoteBank { show: boolean; holder: string; rut: string; bank: string; account_type: string; account: string; email: string }
 /** Enlace para pagar con tarjeta (el «link de pago» de Webpay, por ejemplo): sale como botón en el PDF. */
 export interface QuoteCard { show: boolean; url: string; label: string }
+/** Colores del documento como `#rrggbb`; vacío = el color del negocio. */
+export interface QuoteColors { primary: string; secondary: string }
 /** Cómo va la numeración de cotizaciones, contando los archivos de la carpeta. */
 export interface QuoteNumbering { prefix: string; width: number; next_number: number; next_label: string; folder_last: number | null }
 export interface QuoteDocSettings {
@@ -364,6 +366,9 @@ export interface QuoteDocSettings {
   footer: string;
   bank: QuoteBank;
   card: QuoteCard;
+  colors: QuoteColors;
+  /** Escribir el nombre del negocio bajo el logo (sin logo va siempre). */
+  show_name: boolean;
 }
 export interface QuoteEmitted { path: string; file_name: string; folder: string }
 

@@ -2094,6 +2094,7 @@ export class DemoBackend implements Backend {
     contact_note: "Si tiene alguna pregunta acerca de esta cotización, escríbanos o llámenos.", footer: "Gracias por confiar en nosotros",
     bank: { show: true, holder: "Ferretería Los Andes SpA", rut: "76.123.456-0", bank: "Banco de ejemplo", account_type: "Cuenta corriente", account: "00-000-00000", email: "pagos@ejemplo.cl" },
     card: { show: true, url: "https://www.webpay.cl/company/000000", label: "Pagar con tarjeta (Webpay)" },
+    colors: { primary: "", secondary: "" }, show_name: false,
   };
   private quoteTermsByUid = new Map<string, QuoteTerms>();
 
@@ -2104,7 +2105,9 @@ export class DemoBackend implements Backend {
     const url = v.card.url.trim();
     if (url && (!url.startsWith("https://") || /\s/.test(url))) throw new AppError("validacion", "El enlace de pago con tarjeta debe ser una dirección completa que empiece con https://");
     if (v.card.show && !url) throw new AppError("validacion", "Pega el enlace de pago con tarjeta, o desmarca «Mostrar el botón de pago con tarjeta».");
-    this.quoteDoc = structuredClone({ ...v, folder: v.folder?.trim() || null, card: { show: v.card.show, url, label: v.card.label.trim() || "Pagar con tarjeta (Webpay)" } });
+    const hexColor = (c: string) => { const t = c.trim().toLowerCase(); if (t && !/^#[0-9a-f]{6}$/.test(t)) throw new AppError("validacion", "El color debe escribirse como #rrggbb, por ejemplo #0a51a4."); return t; };
+    const colors = { primary: hexColor(v.colors.primary), secondary: hexColor(v.colors.secondary) };
+    this.quoteDoc = structuredClone({ ...v, colors, folder: v.folder?.trim() || null, card: { show: v.card.show, url, label: v.card.label.trim() || "Pagar con tarjeta (Webpay)" } });
     this.log("cotizacion.ajustes", "cotizaciones", null);
     return this.quoteDocSettings();
   }

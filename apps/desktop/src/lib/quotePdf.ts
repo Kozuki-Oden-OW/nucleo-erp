@@ -4,7 +4,9 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { BusinessSettings, CustomerDetail, QuoteDetail, QuoteDocSettings, QuoteTemplate, QuoteTerms } from "../data/types";
+import { ACCENTS } from "./accent";
 import { formatDate, formatMoney, formatPpm, formatQty } from "./format";
+import { luminance } from "./logoColors";
 
 export const QUOTE_TEMPLATES: { id: QuoteTemplate; name: string; hint: string }[] = [
   { id: "clasica", name: "Clásica", hint: "Logo arriba, datos a la izquierda y tabla con bordes. La de siempre." },
@@ -14,7 +16,13 @@ export const QUOTE_TEMPLATES: { id: QuoteTemplate; name: string; hint: string }[
 ];
 
 type Rgb = [number, number, number];
-interface Look { accent: Rgb; soft: Rgb; ink: Rgb; muted: Rgb; body: number; table: "grid" | "striped" | "plain"; margin: number }
+interface Look {
+  accent: Rgb; soft: Rgb; ink: Rgb; muted: Rgb; body: number; table: "grid" | "striped" | "plain"; margin: number;
+  /** Segundo color (líneas y botón de pago); igual al principal si el negocio usa uno solo. */
+  second: Rgb;
+  /** Color de la letra sobre el principal y sobre el secundario. */
+  onAccent: Rgb; onSecond: Rgb;
+}
 
 function hex(color: string | null | undefined, fallback: Rgb): Rgb {
   const m = /^#?([0-9a-f]{6})$/i.exec(color ?? "");
@@ -24,13 +32,25 @@ function hex(color: string | null | undefined, fallback: Rgb): Rgb {
 }
 const mix = (c: Rgb, t: number): Rgb => [Math.round(c[0] + (255 - c[0]) * t), Math.round(c[1] + (255 - c[1]) * t), Math.round(c[2] + (255 - c[2]) * t)];
 
-function look(template: QuoteTemplate, accentHex: string | null): Look {
-  const accent = hex(accentHex, [14, 116, 144]);
-  const base = { ink: [24, 32, 44] as Rgb, muted: [100, 110, 124] as Rgb };
-  if (template === "compacta") return { ...base, accent: [30, 30, 30], soft: [240, 240, 240], body: 8, table: "grid", margin: 12 };
-  if (template === "moderna") return { ...base, accent, soft: mix(accent, 0.9), body: 9.5, table: "striped", margin: 16 };
-  if (template === "elegante") return { ...base, accent, soft: mix(accent, 0.92), body: 9.5, table: "plain", margin: 16 };
-  return { ...base, accent, soft: mix(accent, 0.88), body: 9.5, table: "grid", margin: 16 };
+const INK: Rgb = [24, 32, 44];
+const lum = (c: Rgb) => luminance(c[0], c[1], c[2]);
+
+/** Color del negocio (Configuración → Apariencia) como RGB: se guarda por nombre («azul», «verde»…). */
+function businessColor(accent: string | null | undefined): Rgb {
+  return hex(ACCENTS.find((a) => a.id === accent)?.light ?? accent, [14, 116, 144]);
+}
+
+function look(template: QuoteTemplate, biz: BusinessSettings, colors: QuoteDocSettings["colors"] | undefined): Look {
+  const base = { ink: INK, muted: [100, 110, 124] as Rgb };
+  if (template === "compacta") return { ...base, accent: [30, 30, 30], second: [30, 30, 30], onAccent: [255, 255, 255], onSecond: [255, 255, 255], soft: [240, 240, 240], body: 8, table: "grid", margin: 12 };
+  const accent = hex(colors?.primary, businessColor(biz.accent));
+  const second = hex(colors?.secondary, accent);
+  // Sobre un color claro (amarillo) la letra blanca no se lee: va en el principal si es oscuro, o en negro.
+  const on = (c: Rgb, dark: Rgb): Rgb => (lum(c) > 0.6 ? dark : [255, 255, 255]);
+  const tones = { accent, second, onAccent: on(accent, INK), onSecond: on(second, lum(accent) < 0.4 ? accent : INK) };
+  if (template === "moderna") return { ...base, ...tones, soft: mix(accent, 0.9), body: 9.5, table: "striped", margin: 16 };
+  if (template === "elegante") return { ...base, ...tones, soft: mix(accent, 0.92), body: 9.5, table: "plain", margin: 16 };
+  return { ...base, ...tones, soft: mix(accent, 0.88), body: 9.5, table: "grid", margin: 16 };
 }
 
 export interface QuotePdfInput {
@@ -61,7 +81,8 @@ function logoSize(doc: jsPDF, logo: string, maxW: number, maxH: number): { w: nu
 export function buildQuotePdf(input: QuotePdfInput): Uint8Array {
   const { quote: q, biz, customer, settings, terms } = input;
   const template = input.template ?? settings.template;
-  const L = look(template, biz.accent);
+  const L = look(template, biz, settings.colors);
+  const twoTone = L.second.join() !== L.accent.join();
   const doc = new jsPDF({ unit: "mm", format: "letter" });
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
@@ -91,42 +112,52 @@ export function buildQuotePdf(input: QuotePdfInput): Uint8Array {
   const meta: [string, string][] = [["Fecha", formatDate(q.issue_date)], ...(q.valid_until ? [["Válida hasta", formatDate(q.valid_until)] as [string, string]] : [])];
 
   let y = M;
-  if (template === "elegante") { doc.setFillColor(...L.accent); doc.rect(0, 0, 7, H, "F"); }
+  const sideBar = () => {
+    if (template !== "elegante") return;
+    doc.setFillColor(...L.accent); doc.rect(0, 0, 7, H, "F");
+    if (twoTone) { doc.setFillColor(...L.second); doc.rect(7, 0, 1.6, H, "F"); }
+  };
+  sideBar();
 
   /* ── Encabezado ── */
   const logo = biz.logo ? logoSize(doc, biz.logo, template === "compacta" ? 34 : 48, template === "compacta" ? 13 : 18) : null;
+  // Con logo, el nombre ya está en la imagen: bajo ella van solo los datos (RUT, dirección, teléfono),
+  // salvo que el negocio pida escribirlo también.
+  const showName = !logo || settings.show_name;
   if (template === "moderna") {
     doc.setFillColor(...L.accent);
     doc.rect(0, 0, W, 34, "F");
-    text("COTIZACIÓN", left, 15, { size: 20, bold: true, color: [255, 255, 255] });
-    text(q.number, left, 23, { size: 12, color: [255, 255, 255] });
-    meta.forEach(([k, v], i) => text(`${k}: ${v}`, right, 14 + i * 5.5, { size: 9.5, color: [255, 255, 255], align: "right" }));
+    if (twoTone) { doc.setFillColor(...L.second); doc.rect(0, 34, W, 2.2, "F"); }
+    text("COTIZACIÓN", left, 15, { size: 20, bold: true, color: L.onAccent });
+    text(q.number, left, 23, { size: 12, color: L.onAccent });
+    meta.forEach(([k, v], i) => text(`${k}: ${v}`, right, 14 + i * 5.5, { size: 9.5, color: L.onAccent, align: "right" }));
     y = 42;
     if (logo && biz.logo) { doc.addImage(biz.logo, logo.fmt, left, y, logo.w, logo.h); y += logo.h + 3; }
     const boxW = (width - 6) / 2;
     const boxH = 9 + Math.max(companyLines.length, clientLines.length, 1) * lineH(9) * 1.25 + 4;
-    ([["DE", company, companyLines, left], ["PARA", q.customer_name, clientLines, left + boxW + 6]] as [string, string, string[], number][]).forEach(([tag, name, lines, x]) => {
+    ([["DE", showName ? company : "", companyLines, left], ["PARA", q.customer_name, clientLines, left + boxW + 6]] as [string, string, string[], number][]).forEach(([tag, name, lines, x]) => {
       doc.setFillColor(...L.soft);
       doc.roundedRect(x, y, boxW, boxH, 2, 2, "F");
       text(tag, x + 4, y + 5.5, { size: 7.5, bold: true, color: L.accent });
-      text(name, x + 4, y + 10.5, { size: 10.5, bold: true, maxWidth: boxW - 8 });
-      lines.forEach((l, i) => text(l, x + 4, y + 15 + i * lineH(9) * 1.25, { size: 8.5, color: L.muted, maxWidth: boxW - 8 }));
+      if (name) text(name, x + 4, y + 10.5, { size: 10.5, bold: true, maxWidth: boxW - 8 });
+      const from = name ? 15 : 10.5;
+      lines.forEach((l, i) => text(l, x + 4, y + from + i * lineH(9) * 1.25, { size: 8.5, color: L.muted, maxWidth: boxW - 8 }));
     });
     y += boxH + 7;
   } else {
     const top = y;
     let hy = y;
     if (logo && biz.logo) { doc.addImage(biz.logo, logo.fmt, left, hy, logo.w, logo.h); hy += logo.h + 3.5; } else hy += 4;
-    text(company, left, hy + 1, { size: template === "compacta" ? 11 : 13, bold: true });
-    hy += template === "compacta" ? 4.5 : 5.5;
+    if (showName) { text(company, left, hy + 1, { size: template === "compacta" ? 11 : 13, bold: true }); hy += template === "compacta" ? 4.5 : 5.5; }
+    else hy += 0.5;
     companyLines.forEach((l) => { text(l, left, hy, { size: L.body - 1, color: L.muted, maxWidth: width * 0.58 }); hy += lineH(L.body - 1) * 1.3; });
     // Bloque derecho: título, número y fechas.
     text("COTIZACIÓN", right, top + 6, { size: template === "compacta" ? 13 : template === "elegante" ? 20 : 16, bold: true, color: L.accent, align: "right" });
     text(`N° ${q.number}`, right, top + 12.5, { size: 11, bold: true, align: "right" });
     meta.forEach(([k, v], i) => text(`${k}: ${v}`, right, top + 18 + i * 4.8, { size: L.body - 0.5, color: L.muted, align: "right" }));
     y = Math.max(hy, top + 18 + meta.length * 4.8) + 3;
-    doc.setDrawColor(...(template === "compacta" ? L.ink : L.accent));
-    doc.setLineWidth(template === "compacta" ? 0.2 : 0.5);
+    doc.setDrawColor(...(template === "compacta" ? L.ink : L.second));
+    doc.setLineWidth(template === "compacta" ? 0.2 : twoTone ? 0.9 : 0.5);
     doc.line(left, y, right, y);
     y += 6;
     text(template === "elegante" ? "Preparada para" : "PARA", left, y, { size: 7.5, bold: true, color: L.accent });
@@ -147,7 +178,7 @@ export function buildQuotePdf(input: QuotePdfInput): Uint8Array {
     styles: { font: "helvetica", fontSize: L.body, textColor: L.ink, cellPadding: template === "compacta" ? 1.4 : 2, lineColor: template === "compacta" ? [120, 120, 120] : mix(L.accent, 0.6), lineWidth: L.table === "grid" ? 0.15 : 0 },
     headStyles: L.table === "plain"
       ? { fillColor: [255, 255, 255], textColor: L.accent, fontStyle: "bold", lineWidth: { bottom: 0.5 }, lineColor: L.accent }
-      : { fillColor: template === "compacta" ? [235, 235, 235] : L.accent, textColor: template === "compacta" ? L.ink : [255, 255, 255], fontStyle: "bold" },
+      : { fillColor: template === "compacta" ? [235, 235, 235] : L.accent, textColor: template === "compacta" ? L.ink : L.onAccent, fontStyle: "bold" },
     alternateRowStyles: L.table === "striped" ? { fillColor: L.soft } : {},
     bodyStyles: L.table === "plain" ? { lineWidth: { bottom: 0.1 }, lineColor: [215, 220, 226] } : {},
     columnStyles: Object.fromEntries(numCols.map((c) => [c, { halign: "right" as const, cellWidth: c === 1 ? 20 : c === 3 && withDiscount ? 16 : 28 }])),
@@ -155,7 +186,7 @@ export function buildQuotePdf(input: QuotePdfInput): Uint8Array {
   });
   y = ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y) + 5;
 
-  const need = (h: number) => { if (y + h > H - 18) { doc.addPage(); if (template === "elegante") { doc.setFillColor(...L.accent); doc.rect(0, 0, 7, H, "F"); } y = M + 4; } };
+  const need = (h: number) => { if (y + h > H - 18) { doc.addPage(); sideBar(); y = M + 4; } };
 
   /* ── Totales ── */
   const rate = biz.tax_rate_ppm ?? biz.tax_rate_user_ppm;
@@ -170,10 +201,12 @@ export function buildQuotePdf(input: QuotePdfInput): Uint8Array {
   if (template === "compacta") { doc.setDrawColor(...L.ink); doc.setLineWidth(0.3); doc.line(tx, y + 0.5, right, y + 0.5); text("TOTAL", tx + 2, y + 6, { bold: true, size: 10.5 }); text(formatMoney(q.total_minor), right - 2, y + 6, { bold: true, size: 10.5, align: "right" }); y += 10; }
   else {
     doc.setFillColor(...L.accent);
-    doc.roundedRect(tx, y + 0.5, boxW, template === "elegante" ? 12 : 9.5, 1.5, 1.5, "F");
-    const ty = y + (template === "elegante" ? 8.2 : 6.8);
-    text("TOTAL", tx + 3, ty, { bold: true, size: 10.5, color: [255, 255, 255] });
-    text(formatMoney(q.total_minor), right - 3, ty, { bold: true, size: template === "elegante" ? 14 : 12, color: [255, 255, 255], align: "right" });
+    const th = template === "elegante" ? 12 : 9.5;
+    doc.roundedRect(tx, y + 0.5, boxW, th, 1.5, 1.5, "F");
+    if (twoTone) { doc.setFillColor(...L.second); doc.rect(tx, y + 0.5 + th - 1.1, boxW, 1.1, "F"); }
+    const ty = y + (template === "elegante" ? 8.2 : 6.8) - (twoTone ? 0.4 : 0);
+    text("TOTAL", tx + 3, ty, { bold: true, size: 10.5, color: L.onAccent });
+    text(formatMoney(q.total_minor), right - 3, ty, { bold: true, size: template === "elegante" ? 14 : 12, color: L.onAccent, align: "right" });
     y += template === "elegante" ? 17 : 14.5;
   }
 
@@ -243,9 +276,9 @@ export function buildQuotePdf(input: QuotePdfInput): Uint8Array {
     y += 4.5;
     doc.setFont("helvetica", "bold").setFontSize(template === "compacta" ? 9 : 10);
     const bw = Math.min(width * 0.5, doc.getTextWidth(label) + 14);
-    doc.setFillColor(...L.accent);
+    doc.setFillColor(...L.second);
     doc.roundedRect(left, y, bw, bh, 1.8, 1.8, "F");
-    text(label, left + bw / 2, y + bh / 2 + 1.25, { size: template === "compacta" ? 9 : 10, bold: true, color: [255, 255, 255], align: "center" });
+    text(label, left + bw / 2, y + bh / 2 + 1.25, { size: template === "compacta" ? 9 : 10, bold: true, color: L.onSecond, align: "center" });
     doc.link(left, y, bw, bh, { url: cardUrl });
     // Al lado, la dirección a la vista: sirve si la cotización se imprime o el lector no abre enlaces.
     const tx2 = left + bw + 5, tw = right - tx2;
