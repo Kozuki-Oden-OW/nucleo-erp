@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, ExternalLink, Landmark, Link2, RefreshCw, ShoppingBag, Truck, Unplug } from "lucide-react";
 import { MailCard } from "./MailCard";
+import { WhatsAppCard } from "./WhatsAppCard";
 import { WooCard } from "./WooCard";
 import { AccessCard } from "./AccessCard";
 import { errorMessage, useBackend, type MlOrderRow, type MlStatus, type MlSyncReport, type Product } from "../../data";
@@ -30,6 +31,7 @@ export function IntegrationsSection() {
   return (
     <div className="flex flex-col gap-5">
       <MailCard />
+      <WhatsAppCard />
       <MercadoLibreCard />
       <WooCard />
       <AccessCard />

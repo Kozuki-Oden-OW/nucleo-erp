@@ -7,7 +7,7 @@ import type {
   AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput,
-  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
+  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, WspBridgeState, WspChat, WspConversation, WspDraft, WspSent, WspSetup, WspStatus, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
@@ -188,6 +188,15 @@ export interface Backend {
   /** Compara stock y precios con la tienda; con `apply` envía los cambios. */
   wooPush(stock: boolean, prices: boolean, apply: boolean): Promise<WooPushReport>;
   /** Correo de la empresa (SMTP): la clave la escribe la persona y nunca vuelve a la interfaz. */
+  /* WhatsApp por el puente local */
+  wspStatus(): Promise<WspStatus>;
+  wspSave(setup: WspSetup): Promise<WspStatus>;
+  wspDisconnect(): Promise<WspStatus>;
+  /** Estado del puente (y el código QR si falta vincular el número). */
+  wspState(): Promise<WspBridgeState>;
+  wspChats(limit?: number, unread?: boolean): Promise<WspChat[]>;
+  wspConversation(chat: string, limit?: number): Promise<WspConversation>;
+  wspSend(draft: WspDraft): Promise<WspSent>;
   mailStatus(): Promise<MailStatus>;
   mailPresets(): Promise<MailPreset[]>;
   mailSave(setup: MailSetup): Promise<MailStatus>;

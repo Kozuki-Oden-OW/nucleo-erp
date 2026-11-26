@@ -397,3 +397,50 @@ describe("Cotizar y enviar por correo solo con NÚCLEO (demostración)", () => {
     expect((await runTool(b, "borradores", "crear_cotizacion", { lineas: [{ producto: p.name }] })).isError).toBe(true);
   });
 });
+
+describe("WhatsApp solo con NÚCLEO (demostración)", () => {
+  const setup = { url: "http://127.0.0.1:47620", key: "nwsp_llave-de-prueba-0123456789", agent_send: false, ignore: ["+56 9 7777 7777"] };
+
+  it("lee los chats sin los números excluidos y envía solo con el permiso del dueño", async () => {
+    const b = new DemoBackend();
+    expect(txt(await runTool(b, "ver", "whatsapp_chats", {}))).toMatch(/no está conectado/);
+    await b.wspSave(setup);
+
+    const chats = txt(await runTool(b, "ver", "whatsapp_chats", {}));
+    expect(chats).toContain("Laboratorio Alfa");
+    expect(chats).toContain("2 sin leer");
+    expect(chats).not.toContain("Mamá");
+    expect(chats).toMatch(/solo lee y propone/);
+    expect(txt(await runTool(b, "ver", "whatsapp_chats", { solo_no_leidos: true }))).not.toContain("Constructora Sur");
+
+    const conv = await runTool(b, "ver", "whatsapp_leer", { chat: "laboratorio" });
+    expect(conv.isError, txt(conv)).toBeFalsy();
+    expect(txt(conv)).toContain("taladro percutor");
+    // El número excluido no se puede abrir ni por teléfono ni por id.
+    expect((await runTool(b, "ver", "whatsapp_leer", { chat: "+56 9 7777 7777" })).isError).toBe(true);
+    expect((await runTool(b, "ver", "whatsapp_leer", { chat: "56977777777@c.us" })).isError).toBe(true);
+
+    const args = { chat: "Laboratorio Alfa", texto: "Buenas tardes. Sí, tenemos stock de 4 unidades. ¿Me indica RUT y razón social para la cotización?" };
+    expect((await runTool(b, "borradores", "whatsapp_enviar", args)).isError).toBe(true);
+    expect(txt(await runTool(b, "completo", "whatsapp_enviar", args))).toMatch(/no tiene permiso/);
+    await b.wspSave({ ...setup, key: "", agent_send: true });
+    const sent = await runTool(b, "completo", "whatsapp_enviar", args);
+    expect(sent.isError, txt(sent)).toBeFalsy();
+    expect(txt(await runTool(b, "ver", "whatsapp_leer", { chat: "56911111111" }))).toContain("Nosotros: Buenas tardes. Sí, tenemos stock");
+
+    // Con una cotización: debe estar emitida; queda marcada como enviada.
+    const p = (await b.searchProducts(""))[0]!;
+    const made = await runTool(b, "borradores", "crear_cotizacion", { prospecto: "Laboratorio Alfa", lineas: [{ producto: p.sku, cantidad: 4 }] });
+    const number = /COT-\d+/.exec(txt(made))![0];
+    const withPdf = { chat: "Laboratorio Alfa", texto: "Le adjunto la cotización.", cotizaciones: [number] };
+    expect(txt(await runTool(b, "completo", "whatsapp_enviar", withPdf))).toMatch(/emítela primero/);
+    await runTool(b, "borradores", "emitir_cotizacion", { cotizacion: number });
+    const ok = await runTool(b, "completo", "whatsapp_enviar", withPdf);
+    expect(ok.isError, txt(ok)).toBeFalsy();
+    expect(txt(ok)).toContain(`${number}.pdf`);
+    expect((await b.listQuotes(number)).find((q) => q.number === number)!.status).toBe("enviada");
+    // A un número excluido no se escribe.
+    expect((await runTool(b, "completo", "whatsapp_enviar", { telefono: "+56 9 7777 7777", texto: "hola" })).isError).toBe(true);
+    expect((await runTool(b, "completo", "whatsapp_enviar", { texto: "hola" })).isError).toBe(true);
+  });
+});

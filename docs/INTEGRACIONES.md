@@ -146,6 +146,7 @@ adelante se vende NÚCLEO como servicio (con la facturación SII), las extension
 | Avisos de pago por correo (bancos) | Propuesta (ver I4) |
 | Bluexpress / Starken / Chilexpress / Correos | Esperando credenciales |
 | WooCommerce | Lista (falta probar con la tienda real; plugin 0.1.0) |
+| WhatsApp (puente local) | Lista (falta probar con el número real; requiere Docker) |
 
 ## I4 · Bancos (solo lectura: saldos y movimientos)
 
@@ -397,6 +398,35 @@ de pedidos de alto rendimiento.
 | Envío a revisión del directorio de WordPress.org (lo hace el dueño con su cuenta) | ⏳ |
 | Enviar a la tienda el n.º de seguimiento cuando el envío se despacha | ⏳ |
 | Productos de la tienda sin SKU: enlazarlos a mano, como en Mercado Libre | ⏳ |
+
+## I9 · WhatsApp (puente local)
+
+Objetivo: que NÚCLEO (y Claude por la extensión de NÚCLEO) lea los chats del WhatsApp de la empresa y
+envíe las respuestas aprobadas, con la cotización en PDF, **sin abrir WhatsApp Web en un navegador**.
+Decisión D-WSP-01; código en `integraciones/whatsapp` y `crates/nucleo-app/src/wsp_ops.rs`.
+
+- **Cómo se conecta:** un servicio pequeño (Docker) se vincula al número como dispositivo vinculado,
+  con un código QR una sola vez. No es la API de Meta: no cuesta por mensaje ni pide verificar la
+  empresa; a cambio no tiene garantía oficial. Es para atención normal, no para envíos masivos.
+  WhatsApp permite hasta cuatro dispositivos vinculados por número.
+- **Privacidad:** el puente escucha solo en `127.0.0.1` y pide una llave; NÚCLEO solo acepta
+  direcciones de este computador. No se guardan conversaciones en NÚCLEO. Los grupos nunca se muestran
+  y el dueño puede excluir números (familia, personales): no aparecen ni se pueden abrir por su id.
+- **Activación:** `Iniciar-WhatsApp.ps1` (crea la llave y arranca el puente) → Configuración →
+  Integraciones → WhatsApp (dirección y llave) → escanear el QR que muestra NÚCLEO.
+- **Agente:** `whatsapp_chats`, `whatsapp_leer` (leer no marca como leído) y `whatsapp_enviar`
+  (texto y PDF de cotizaciones emitidas). Enviar exige «Acceso completo» y el permiso «Permitir que
+  Claude envíe los mensajes que apruebes»; la regla de trabajo sigue siendo proponer el texto y
+  enviar con el «sí» de la persona (receta `docs/recetas/whatsapp-consultas-y-respuestas.md`).
+
+| Paso | Estado |
+|---|---|
+| Puente con pruebas (WhatsApp simulado) y NÚCLEO contra el puente por HTTP | ✅ |
+| Conexión, QR y exclusiones en Configuración → Integraciones | ✅ |
+| Herramientas del agente | ✅ |
+| Prueba con el número real de Data Logger (vincular, leer, enviar un mensaje) | ⏳ |
+| Empaquetar el puente sin Docker para otras empresas | ⏳ |
+| Bandeja de WhatsApp dentro de NÚCLEO para la persona (hoy solo el agente lee) | ⏳ |
 
 ## I3 · NÚCLEO en línea (cifrado de extremo a extremo)
 

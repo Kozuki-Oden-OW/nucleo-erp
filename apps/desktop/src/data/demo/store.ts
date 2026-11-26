@@ -5,7 +5,7 @@ import { AppError, type Backend, type Feature, type FileSource, type ImportView,
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
   SiiDocument, SiiIssueInput, SiiIntercambioGuardado, SiiIntercambioInput, SiiIntercambioResumen, SiiLibro, SiiLibroInput, SiiPrintDoc, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
-  MlBilling, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, SyncNetReport, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncPeer, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
+  MlBilling, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, WspBridgeState, WspChat, WspConversation, WspDraft, WspSent, WspSetup, WspStatus, SyncNetReport, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncPeer, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput, StatementLineView, BankSuggestion,
   F22Inputs, F22View,
@@ -1846,6 +1846,67 @@ export class DemoBackend implements Backend {
       promocion: { subject: "Novedades de {empresa}", body: "Hola {cliente}:\n\n(escribe aquí la promoción)\n\nSaludos,\n{firma}\n\nSi no quieres recibir más promociones, responde este correo con la palabra BAJA." },
     } as MailTemplates,
   };
+  /* ───────── WhatsApp (demostración: un puente simulado con chats de ejemplo) ───────── */
+  private wsp = {
+    cfg: null as WspSetup | null,
+    chats: [
+      { id: "56911111111@c.us", nombre: "Laboratorio Alfa", telefono: "56911111111", no_leidos: 2, grupo: false, mensajes: [["c", "Hola, buenas tardes"], ["c", "¿Tienen stock del taladro percutor? Necesito 4, con factura."]] },
+      { id: "56922222222@c.us", nombre: "Constructora Sur", telefono: "56922222222", no_leidos: 0, grupo: false, mensajes: [["c", "¿Me puede enviar la cotización por acá?"], ["yo", "Claro, se la envío en unos minutos."]] },
+      { id: "56977777777@c.us", nombre: "Mamá", telefono: "56977777777", no_leidos: 1, grupo: false, mensajes: [["c", "¿Vienes a almorzar el domingo?"]] },
+    ] as { id: string; nombre: string; telefono: string; no_leidos: number; grupo: boolean; mensajes: [string, string][] }[],
+  };
+  private wspLink(): WspSetup {
+    if (!this.wsp.cfg) throw new AppError("validacion", "WhatsApp no está conectado: la persona lo conecta en Configuración → Integraciones → WhatsApp (dirección y llave del puente).");
+    return this.wsp.cfg;
+  }
+  private wspVisible() { const ig = this.wspLink().ignore; return this.wsp.chats.filter((c) => !c.grupo && !ig.includes(c.telefono)); }
+  private wspChatView(c: DemoBackend["wsp"]["chats"][number]): WspChat {
+    const u = c.mensajes[c.mensajes.length - 1];
+    return { id: c.id, nombre: c.nombre, telefono: c.telefono, no_leidos: c.no_leidos, grupo: c.grupo, ultimo: u ? { texto: u[1], de_mi: u[0] === "yo", fecha: new Date().toISOString() } : null };
+  }
+  async wspStatus(): Promise<WspStatus> {
+    const c = this.wsp.cfg;
+    return wait({ configured: !!c, url: c?.url ?? "", has_key: !!c?.key, agent_send: c?.agent_send ?? false, ignore: [...(c?.ignore ?? [])] });
+  }
+  async wspSave(setup: WspSetup): Promise<WspStatus> {
+    this.require("config.editar");
+    const url = setup.url.trim().replace(/\/+$/, "").toLowerCase();
+    if (!/^http:\/\/(127\.0\.0\.1|localhost):\d{2,5}$/.test(url)) throw new AppError("validacion", "La dirección del puente debe ser la de este computador, por ejemplo http://127.0.0.1:47620.");
+    const key = setup.key.trim() || this.wsp.cfg?.key || "";
+    if (key.length < 24) throw new AppError("validacion", "Falta la llave del puente (la muestra Iniciar-WhatsApp.ps1).");
+    const ignore = setup.ignore.map((n) => n.replace(/\D/g, "")).filter(Boolean);
+    if (ignore.some((n) => n.length < 8 || n.length > 15)) throw new AppError("validacion", "Un número excluido no parece un teléfono: escríbelo con código de país.");
+    this.wsp.cfg = { url, key, agent_send: setup.agent_send, ignore: [...new Set(ignore)] };
+    return this.wspStatus();
+  }
+  async wspDisconnect(): Promise<WspStatus> { this.require("config.editar"); this.wsp.cfg = null; return this.wspStatus(); }
+  async wspState(): Promise<WspBridgeState> { this.wspLink(); return wait({ estado: "listo", numero: "56912345678", nombre: "Ferretería Los Andes (demostración)", qr: null }); }
+  async wspChats(limit = 30, unread = false): Promise<WspChat[]> {
+    return wait(this.wspVisible().filter((c) => !unread || c.no_leidos > 0).slice(0, limit).map((c) => this.wspChatView(c)));
+  }
+  async wspConversation(chat: string, limit = 30): Promise<WspConversation> {
+    const c = this.wspVisible().find((x) => x.id === chat);
+    if (!c) throw new AppError("validacion", "Ese chat está fuera de lo que NÚCLEO puede ver (grupo o número excluido en Configuración → Integraciones → WhatsApp).");
+    return wait({ chat: this.wspChatView(c), mensajes: c.mensajes.slice(-limit).map(([who, texto], i) => ({ id: `m${i}`, de_mi: who === "yo", texto, tipo: texto.startsWith("[archivo]") ? "document" : "chat", fecha: new Date().toISOString(), adjunto: texto.startsWith("[archivo]") })) });
+  }
+  async wspSend(d: WspDraft): Promise<WspSent> {
+    const cfg = this.wspLink();
+    const phone = d.telefono.replace(/\D/g, "");
+    if (!d.chat.trim() && !phone) throw new AppError("validacion", "Indica el chat o el teléfono del destinatario.");
+    if (!d.texto.trim() && !d.quote_uids.length) throw new AppError("validacion", "Falta el texto del mensaje.");
+    const id = d.chat.trim() || `${phone}@c.us`;
+    if (cfg.ignore.includes(id.replace(/@.*$/, ""))) throw new AppError("validacion", "Ese número está excluido en Configuración → Integraciones → WhatsApp.");
+    const quotes = d.quote_uids.map((u) => this.findQuote(u));
+    const missing = quotes.find((q) => !this.quoteEmitted.has(q.uid));
+    if (missing) throw new AppError("validacion", `La cotización ${missing.number} aún no tiene su PDF en la carpeta: emítela primero («Emitir documento»).`);
+    let c = this.wsp.chats.find((x) => x.id === id);
+    if (!c) { c = { id, nombre: `+${phone}`, telefono: phone, no_leidos: 0, grupo: false, mensajes: [] }; this.wsp.chats.unshift(c); }
+    if (d.texto.trim()) c.mensajes.push(["yo", d.texto.trim()]);
+    for (const q of quotes) c.mensajes.push(["yo", `[archivo] ${q.number}.pdf`]);
+    this.log("whatsapp.enviar", "whatsapp", id);
+    return wait({ chat: id, mensajes: (d.texto.trim() ? 1 : 0) + quotes.length, reference: quotes.map((q) => q.number).join(", ") });
+  }
+
   async mailStatus(): Promise<MailStatus> {
     const c = this.mail.cfg;
     return wait({

@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "nucleo-erp",
   "display_name": "NÚCLEO ERP",
-  "version": "0.8.7",
+  "version": "0.8.8",
   "description": "Permite que Claude use NÚCLEO ERP en este computador: ve la pantalla, la recorre con su propio cursor y registra ventas, gastos, clientes y cobros.",
   "long_description": "Conecta Claude con NÚCLEO ERP, el sistema de gestión local y gratuito para pymes chilenas. NÚCLEO debe estar abierto con Configuración → Claude activado; ahí eliges si Claude solo mira, crea borradores o tiene acceso completo. La extensión solo se comunica con NÚCLEO dentro del mismo computador (127.0.0.1): los datos del negocio siguen guardados solo en tu equipo.",
   "author": {
@@ -127,6 +127,18 @@
     {
       "name": "correos_enviados",
       "description": "Registro de los correos enviados desde NÚCLEO: fecha, destinatario, asunto, documento relacionado, quién lo envió y si salió o falló. También dice si el correo de la empresa está configurado y si Clau"
+    },
+    {
+      "name": "whatsapp_chats",
+      "description": "Chats recientes del WhatsApp de la empresa, leídos por el puente de NÚCLEO: nombre, teléfono, cuántos mensajes sin leer y el último mensaje. No incluye grupos ni los números que la persona excluyó. Le"
+    },
+    {
+      "name": "whatsapp_leer",
+      "description": "Mensajes de un chat de WhatsApp de la empresa (quién escribió, cuándo y qué). Indica el chat por nombre, teléfono o el id que entrega whatsapp_chats. No marca el chat como leído."
+    },
+    {
+      "name": "whatsapp_enviar",
+      "description": "Envía un mensaje por el WhatsApp de la empresa a un chat existente o a un teléfono, con el texto tal como se indica; puede adjuntar el PDF de cotizaciones ya emitidas. Úsalo solo con el texto que la p"
     },
     {
       "name": "confirmar_venta",

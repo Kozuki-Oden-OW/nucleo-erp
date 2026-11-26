@@ -40,6 +40,7 @@ pub mod sii_venta;
 pub mod sync_net;
 pub mod sync_ops;
 pub mod woo_ops;
+pub mod wsp_ops;
 
 pub use company::{CompanySession, NewCustomer};
 pub use error::{AppError, AppResult};

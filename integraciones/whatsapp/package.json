@@ -1,0 +1,16 @@
+{
+  "name": "nucleo-whatsapp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-or-later",
+  "description": "Puente de WhatsApp para NÚCLEO ERP: se vincula al número de la empresa como dispositivo vinculado y ofrece a NÚCLEO, solo en este computador, leer los chats y enviar lo que la persona aprueba.",
+  "scripts": {
+    "start": "node puente.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4",
+    "whatsapp-web.js": "^1.34.8"
+  }
+}

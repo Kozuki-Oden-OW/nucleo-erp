@@ -1,0 +1,16 @@
+# Puente de WhatsApp para NÚCLEO ERP. Lo arranca Iniciar-WhatsApp.ps1 (crea la llave en .env).
+# El puerto se publica solo en este computador (127.0.0.1): nadie de la red puede llegar al puente.
+services:
+  nucleo-whatsapp:
+    build: .
+    image: nucleo-whatsapp:local
+    container_name: nucleo-whatsapp
+    restart: unless-stopped
+    environment:
+      NUCLEO_WSP_KEY: ${NUCLEO_WSP_KEY:?falta la llave: ejecuta Iniciar-WhatsApp.ps1}
+      NUCLEO_WSP_PORT: "47620"
+      WSP_SESSION_DIR: /session
+      WSP_WEB_VERSION: ${WSP_WEB_VERSION:-2.3000.1055167106-alpha}
+    ports: ["127.0.0.1:47620:47620"]
+    volumes: ["./sesion:/session"]
+    shm_size: "512m"

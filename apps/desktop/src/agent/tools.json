@@ -742,6 +742,83 @@
     }
   },
   {
+    "name": "whatsapp_chats",
+    "nivel": "ver",
+    "description": "Chats recientes del WhatsApp de la empresa, leídos por el puente de NÚCLEO: nombre, teléfono, cuántos mensajes sin leer y el último mensaje. No incluye grupos ni los números que la persona excluyó. Leer no marca nada como leído. Si WhatsApp no está conectado o vinculado, lo dice.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "solo_no_leidos": {
+          "type": "boolean",
+          "description": "true = solo los chats con mensajes sin leer"
+        },
+        "limite": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 30
+        }
+      }
+    }
+  },
+  {
+    "name": "whatsapp_leer",
+    "nivel": "ver",
+    "description": "Mensajes de un chat de WhatsApp de la empresa (quién escribió, cuándo y qué). Indica el chat por nombre, teléfono o el id que entrega whatsapp_chats. No marca el chat como leído.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "chat": {
+          "type": "string",
+          "description": "Nombre del contacto, teléfono o id del chat"
+        },
+        "limite": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 30
+        }
+      },
+      "required": [
+        "chat"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "whatsapp_enviar",
+    "nivel": "completo",
+    "description": "Envía un mensaje por el WhatsApp de la empresa a un chat existente o a un teléfono, con el texto tal como se indica; puede adjuntar el PDF de cotizaciones ya emitidas. Úsalo solo con el texto que la persona aprobó para ese destinatario: primero muéstrale la respuesta propuesta y espera su «sí». Requiere «Acceso completo» y que la persona haya activado «Permitir que Claude envíe los mensajes que apruebes» en Configuración → Integraciones → WhatsApp. No escribe en grupos ni a números excluidos.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "chat": {
+          "type": "string",
+          "description": "Nombre, teléfono o id de un chat existente"
+        },
+        "telefono": {
+          "type": "string",
+          "description": "Teléfono con código de país para escribir a alguien sin chat previo (ej. +56 9 1234 5678)"
+        },
+        "texto": {
+          "type": "string"
+        },
+        "cotizaciones": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 3,
+          "description": "Números de cotizaciones emitidas cuyo PDF se adjunta"
+        }
+      },
+      "required": [
+        "texto"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "confirmar_venta",
     "nivel": "completo",
     "description": "Confirma una venta en borrador: le asigna número, descuenta stock y registra el cobro (contado) o la deja por cobrar (crédito).",

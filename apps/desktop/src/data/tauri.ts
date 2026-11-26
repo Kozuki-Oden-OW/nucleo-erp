@@ -7,7 +7,7 @@ import type {
   AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput,
-  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
+  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, WspBridgeState, WspChat, WspConversation, WspDraft, WspSent, WspSetup, WspStatus, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
@@ -182,6 +182,13 @@ export class TauriBackend implements Backend {
   wooSync(from?: string | null) { return call<WooSyncReport>("woo_sync", { from: from ?? null }); }
   wooOrders(limit?: number) { return call<WooOrderRow[]>("woo_orders", { limit: limit ?? null }); }
   wooPush(stock: boolean, prices: boolean, apply: boolean) { return call<WooPushReport>("woo_push", { stock, prices, apply }); }
+  wspStatus() { return call<WspStatus>("wsp_status"); }
+  wspSave(setup: WspSetup) { return call<WspStatus>("wsp_save", { setup }); }
+  wspDisconnect() { return call<WspStatus>("wsp_disconnect"); }
+  wspState() { return call<WspBridgeState>("wsp_state"); }
+  wspChats(limit?: number, unread?: boolean) { return call<WspChat[]>("wsp_chats", { limit: limit ?? null, unread: unread ?? null }); }
+  wspConversation(chat: string, limit?: number) { return call<WspConversation>("wsp_conversation", { chat, limit: limit ?? null }); }
+  wspSend(draft: WspDraft) { return call<WspSent>("wsp_send", { draft }); }
   mailStatus() { return call<MailStatus>("mail_status"); }
   mailPresets() { return call<MailPreset[]>("mail_presets"); }
   mailSave(setup: MailSetup) { return call<MailStatus>("mail_save", { setup }); }

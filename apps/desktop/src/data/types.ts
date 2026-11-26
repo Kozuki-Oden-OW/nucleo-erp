@@ -1783,6 +1783,17 @@ export interface MlManualOrder {
   move_stock: boolean;
 }
 
+/* ───────── WhatsApp por el puente local (integraciones/whatsapp) ───────── */
+
+export interface WspStatus { configured: boolean; url: string; has_key: boolean; /** El dueño permite que Claude envíe los mensajes que él aprueba. */ agent_send: boolean; /** Teléfonos (dígitos) cuyos chats NÚCLEO no muestra. */ ignore: string[] }
+export interface WspSetup { url: string; /** Vacía = conserva la guardada. */ key: string; agent_send: boolean; ignore: string[] }
+export interface WspBridgeState { estado: "iniciando" | "qr" | "listo" | "desconectado" | string; numero: string | null; nombre: string | null; /** Imagen del código QR mientras falta vincular. */ qr: string | null }
+export interface WspChat { id: string; nombre: string | null; telefono: string | null; no_leidos: number; grupo: boolean; ultimo: { texto: string; de_mi: boolean; fecha: string | null } | null }
+export interface WspMessage { id: string; de_mi: boolean; texto: string; tipo: string; fecha: string | null; adjunto: boolean }
+export interface WspConversation { chat: WspChat; mensajes: WspMessage[] }
+export interface WspDraft { chat: string; telefono: string; texto: string; quote_uids: string[] }
+export interface WspSent { chat: string; mensajes: number; reference: string }
+
 /* ───────── Correo de la empresa (SMTP) ───────── */
 
 export interface MailStatus {

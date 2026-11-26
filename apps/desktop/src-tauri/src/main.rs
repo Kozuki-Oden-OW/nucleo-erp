@@ -12,6 +12,7 @@ mod quotedoc;
 mod sii;
 mod sync;
 mod woo;
+mod wsp;
 
 use nucleo_app::AppService;
 use nucleo_app::keys::OsKeyStore;
@@ -146,6 +147,13 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         mail::mail_send,
         mail::mail_test,
         mail::mail_log,
+        wsp::wsp_status,
+        wsp::wsp_save,
+        wsp::wsp_disconnect,
+        wsp::wsp_state,
+        wsp::wsp_chats,
+        wsp::wsp_conversation,
+        wsp::wsp_send,
         sii::sii_status,
         sii::sii_save_setup,
         sii::sii_load_certificate,
