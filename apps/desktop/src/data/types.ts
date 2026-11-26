@@ -2200,3 +2200,57 @@ export interface StartReport {
   sales_imported: number; sales_existing: number; sales_errors: number; customers_created: number; suppliers_created: number;
   credit_notes: number; credit_notes_minor: number; notes: string[];
 }
+
+/* ───────────── Navegador de NÚCLEO ───────────── */
+
+export interface BrowserSettings {
+  /** Carpeta de descargas; vacía = «Documentos\NUCLEO ERP Descargas». */
+  download_dir: string;
+  /** Sitios permitidos además de los de los accesos guardados (dominios). */
+  sites: string[];
+}
+
+export interface BrowserAccess {
+  uid: string;
+  name: string;
+  login_url: string;
+  username: string;
+  has_password: boolean;
+  /** La persona autorizó hoy que NÚCLEO inicie sesión con este acceso. */
+  granted_today: boolean;
+}
+
+export interface BrowserView {
+  settings: BrowserSettings;
+  accesses: BrowserAccess[];
+  /** Todos los sitios que el navegador abre (ajustes + accesos). */
+  allowed: string[];
+  today: string;
+  /** Carpeta de descargas ya resuelta. */
+  folder: string;
+  open: boolean;
+}
+
+export interface BrowserDownload { name: string; path: string; ok: boolean; note: string | null }
+
+export interface BrowserPageState {
+  open: boolean;
+  url: string;
+  loading: boolean;
+  /** Sitio al que la página quiso ir y no está permitido. */
+  blocked: string | null;
+  downloads: BrowserDownload[];
+  folder: string;
+}
+
+/** Un control de la página: `n` es su número (w12), `k` el tipo, `l` la etiqueta, `v` el valor. */
+export interface BrowserControl { n: number; k: string; l: string; v?: string; o?: string[]; d?: number }
+export interface BrowserFrame { path: string; href: string; title: string; type: string; text: string; controls: BrowserControl[] }
+export interface BrowserPage { url?: string; title?: string; frames?: BrowserFrame[]; navego?: boolean; error?: string }
+export interface BrowserRead { state: BrowserPageState; page: BrowserPage }
+export interface BrowserActResult {
+  state: BrowserPageState;
+  result: { ok?: string; error?: string; navego?: boolean; usuario?: boolean; clave?: boolean; enviado?: boolean };
+  access?: string;
+}
+export interface BrowserSavedFile { name: string; path: string; bytes: number; pdf: boolean; /** Texto leído del PDF, si se pudo. */ text: string | null }

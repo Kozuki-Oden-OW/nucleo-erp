@@ -9,6 +9,7 @@ pub mod auth;
 pub mod auto_ops;
 pub mod bank_ops;
 pub mod bank_rules;
+pub mod browser_ops;
 pub mod catalog_ops;
 pub mod collect_ops;
 pub mod comex_ops;

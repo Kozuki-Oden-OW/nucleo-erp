@@ -13,7 +13,7 @@ import { Dialog, useToast } from "../../ui/overlay";
 const EMPTY: AccessInput = { name: "", login_url: "", username: "", password: "", kind: "lectura", notes: "", no_payments: false };
 const PRESETS: { label: string; name: string; url: string }[] = [
   { label: "Mercado Libre (colaborador)", name: "Mercado Libre", url: "https://www.mercadolibre.cl/" },
-  { label: "BCI (operador de consulta)", name: "BCI", url: "https://www.bci.cl/empresas" },
+  { label: "BCI Pyme (operador de consulta)", name: "BCI Pyme", url: "https://www.bci.cl/corporativo/banco-en-linea/pyme" },
   { label: "Bluexpress", name: "Bluexpress", url: "https://www.blue.cl/" },
 ];
 
@@ -47,6 +47,7 @@ export function AccessCard() {
       const a = await backend.saveAccess(editing.uid, editing.form);
       setEditing(null);
       await load();
+      window.dispatchEvent(new Event("nucleo:datos"));
       toast("success", `Acceso a ${a.name} guardado. La clave quedó cifrada y no se vuelve a mostrar.`);
     } catch (e) { toast("danger", errorMessage(e)); } finally { setBusy(false); }
   };
@@ -55,6 +56,7 @@ export function AccessCard() {
     setBusy(true);
     try {
       setRows(await backend.deleteAccess(removing.uid));
+      window.dispatchEvent(new Event("nucleo:datos"));
       toast("success", `Se borró el acceso a ${removing.name} y su clave.`);
       setRemoving(null);
     } catch (e) { toast("danger", errorMessage(e)); } finally { setBusy(false); }
@@ -82,8 +84,8 @@ export function AccessCard() {
     >
       <div className="flex flex-col gap-4">
         <Notice tone="info" title="Cómo se usan">
-          La clave queda cifrada en tu computador y no se vuelve a mostrar: ni en esta pantalla ni a Claude. El ingreso automático con tu autorización
-          («Autorizo / No autorizo») llega con la extensión de NÚCLEO para el navegador; hasta entonces el acceso queda guardado y tú inicias sesión como siempre.
+          La clave queda cifrada en tu computador y no se vuelve a mostrar: ni en esta pantalla ni a Claude. Quien la usa es el <strong>Navegador de NÚCLEO</strong>{" "}
+          (más abajo), y solo los días en que tú pulsas «Autorizar por hoy» para ese acceso.
           Guarda solo cuentas que <strong>no puedan pagar ni transferir</strong>.
         </Notice>
         <DataTable label="Accesos guardados" columns={columns} rows={rows} rowKey={(a) => a.uid} empty="Aún no hay accesos guardados." />

@@ -33,6 +33,23 @@ Para el agente de NÚCLEO. Todo se hace con las herramientas de NÚCLEO; el dine
    repite («eso siempre es de tal cliente», «eso es combustible»), dejarlo en `guardar_regla_banco`.
 6. Cerrar con: saldo según el banco contra saldo según NÚCLEO, y lo que quedó pendiente.
 
+## BCI Pyme: cómo se lee (aprendido el 26-11-2026)
+
+- Entrada: `https://www.bci.cl/corporativo/banco-en-linea/pyme`. El dueño inicia sesión (clave y código
+  son suyos); el agente solo lee.
+- Inicio → «Mis Movimientos». Abajo, «Filas por página» → 100, para ver todo el rango de una vez.
+- El contenido vive en un marco de otro origen: no se puede leer como texto ni con JavaScript. Se lee
+  por capturas, bajando de a una pantalla, y se comprueba la cadena de saldos (saldo anterior ± monto
+  = saldo de la fila) antes de registrar: si no calza, falta una fila.
+- No tocar «Transferir», «Descargar» ni «Imprimir». La sesión avisa antes de caducar.
+- La cuenta en NÚCLEO parte con el saldo del banco al cierre del día anterior al primer movimiento
+  registrado (saldo inicial + fecha): así «según NÚCLEO» y «según el banco» difieren solo en lo
+  pendiente de conciliar.
+- Un abono mayor que la factura con devolución posterior (cliente que pagó de más): se cobra la factura
+  por su total y los dos movimientos del banco se dejan «ignorados» con una nota que explique el neto.
+- Un pago anterior a la fecha de inicio de la cuenta bancaria en NÚCLEO no se registra en esa cuenta
+  (descuadraría el banco).
+
 ## Cobros recurrentes, informe y meta
 
 - `cobros_recurrentes`: qué se cobra solo, a quién y cuándo toca. Si uno dice «TOCA GENERARLO»,

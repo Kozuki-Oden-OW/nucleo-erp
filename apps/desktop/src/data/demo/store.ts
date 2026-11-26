@@ -9,7 +9,7 @@ import type {
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
   SiiDocument, SiiIssueInput, SiiIntercambioGuardado, SiiIntercambioInput, SiiIntercambioResumen, SiiLibro, SiiLibroInput, SiiPrintDoc, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
-  MlBilling, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, WspBridgeState, WspChat, WspConversation, WspDraft, WspSent, WspSetup, WspStatus, SyncNetReport, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncPeer, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
+  MlBilling, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, BrowserActResult, BrowserPageState, BrowserRead, BrowserSavedFile, BrowserSettings, BrowserView, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, WspBridgeState, WspChat, WspConversation, WspDraft, WspSent, WspSetup, WspStatus, SyncNetReport, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncPeer, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput, StatementLineView, BankSuggestion,
   F22Inputs, F22View,
@@ -2584,6 +2584,119 @@ export class DemoBackend implements Backend {
     this.accessList = this.accessList.filter((a) => a.uid !== u);
     return this.accesses();
   }
+
+  /* ───────────── Navegador de NÚCLEO (simulado: un sitio de ejemplo, sin red) ───────────── */
+
+  private browser = {
+    settings: { download_dir: "", sites: ["sii.cl"] } as BrowserSettings,
+    grants: new Set<string>(),
+    open: false,
+    url: "",
+    inside: false,
+    typed: "",
+    files: [] as string[],
+  };
+
+  private browserSites(): string[] {
+    const site = (u: string) => { try { return new URL(u).hostname.split(".").slice(-2).join("."); } catch { return ""; } };
+    return [...new Set([...this.browser.settings.sites, ...this.accessList.map((a) => site(a.login_url))].filter(Boolean))].sort();
+  }
+  private browserHost(url: string): string {
+    let u: URL;
+    try { u = new URL(url); } catch { throw new AppError("validacion", "El navegador de NÚCLEO solo abre direcciones https://"); }
+    if (u.protocol !== "https:") throw new AppError("validacion", "El navegador de NÚCLEO solo abre direcciones https://");
+    const h = u.hostname.toLowerCase();
+    if (!this.browserSites().some((s) => h === s || h.endsWith(`.${s}`))) {
+      throw new AppError("validacion", `${h} no está entre los sitios permitidos del navegador de NÚCLEO. La persona lo agrega en Configuración → Integraciones → Navegador.`);
+    }
+    return h;
+  }
+  private browserPageState(): BrowserPageState {
+    return { open: this.browser.open, url: this.browser.url, loading: false, blocked: null, downloads: this.browser.files.map((n) => ({ name: n, path: `Descargas de demostración/${n}`, ok: true, note: null })), folder: this.browser.settings.download_dir || "Documentos/NUCLEO ERP Descargas" };
+  }
+  private browserNeedOpen(): void {
+    if (!this.browser.open) throw new AppError("validacion", "El navegador de NÚCLEO está cerrado: ábrelo primero con una dirección o un acceso.");
+  }
+
+  async browserInfo(): Promise<BrowserView> {
+    return wait({
+      settings: { ...this.browser.settings, sites: [...this.browser.settings.sites] },
+      accesses: this.accessList.map((a) => ({ uid: a.uid, name: a.name, login_url: a.login_url, username: a.username, has_password: a.has_password, granted_today: this.browser.grants.has(a.uid) })),
+      allowed: this.browserSites(),
+      today: now().slice(0, 10),
+      folder: this.browser.settings.download_dir || "Documentos/NUCLEO ERP Descargas",
+      open: this.browser.open,
+    });
+  }
+  async browserSaveSettings(input: BrowserSettings): Promise<BrowserView> {
+    this.require("config.editar");
+    const sites = [...new Set(input.sites.map((x) => x.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0] ?? "").filter(Boolean))].sort();
+    const bad = sites.find((x) => !/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(x));
+    if (bad) throw new AppError("validacion", `«${bad}» no es un sitio: escribe el dominio, por ejemplo banco.cl`);
+    this.browser.settings = { download_dir: input.download_dir.trim(), sites };
+    this.log("navegador.ajustes", "navegador", "ajustes");
+    return this.browserInfo();
+  }
+  async browserGrant(u: string, on: boolean): Promise<BrowserView> {
+    this.require("config.editar");
+    if (!this.accessList.some((a) => a.uid === u)) throw new AppError("no_encontrado", "No encontramos ese acceso.");
+    if (on) this.browser.grants.add(u); else this.browser.grants.delete(u);
+    this.log("navegador.permiso", "acceso", u);
+    return this.browserInfo();
+  }
+  async browserOpen(url: string | null, access: string | null): Promise<BrowserPageState> {
+    const target = url?.trim() || this.accessList.find((a) => a.name.toLowerCase().includes((access ?? "").trim().toLowerCase()) && !!access?.trim())?.login_url;
+    if (!target) throw new AppError("validacion", "Indica una dirección https:// o el nombre de un acceso guardado.");
+    this.browserHost(target);
+    this.browser = { ...this.browser, open: true, url: target, inside: false, typed: "" };
+    return wait(this.browserPageState());
+  }
+  async browserState(): Promise<BrowserPageState> { return wait(this.browserPageState()); }
+  async browserRead(): Promise<BrowserRead> {
+    this.browserNeedOpen();
+    const host = new URL(this.browser.url).hostname;
+    const frames = this.browser.inside
+      ? [
+          { path: "", href: this.browser.url, title: `Portal de ejemplo — ${host}`, type: "text/html", text: "Resumen de tu negocio\nCuenta corriente\nSaldo disponible $ 223.477", controls: [{ n: 1, k: "enlace", l: "Cartola PDF" }, { n: 2, k: "campo", l: "Busca nombre, rut, etc.", v: this.browser.typed }] },
+          { path: "0", href: `https://app.${host.split(".").slice(-2).join(".")}/movimientos`, title: "", type: "text/html", text: "26/11/26\tTransferencia enviada a Biotecnos Limitada\t- $ 296.989\t$ 223.477\n24/11/26\tTransferencia recibida de Bioup Investigacion Cientifica\t+ $ 126.200\t$ 577.466", controls: [{ n: 3, k: "botón", l: "Siguiente" }] },
+        ]
+      : [{ path: "", href: this.browser.url, title: `Ingreso — ${host}`, type: "text/html", text: "Ingresa a tu cuenta", controls: [{ n: 1, k: "campo", l: "RUT", v: "" }, { n: 2, k: "clave", l: "Clave", v: "" }, { n: 3, k: "botón", l: "Ingresar" }] }];
+    return wait({ state: this.browserPageState(), page: { url: this.browser.url, title: frames[0]?.title ?? "", frames } });
+  }
+  async browserAct(op: "clic" | "escribir" | "elegir" | "volver", target: number | null, text: string | null = null): Promise<BrowserActResult> {
+    this.browserNeedOpen();
+    const page = (await this.browserRead()).page;
+    const c = page.frames!.flatMap((f) => f.controls).find((x) => x.n === target);
+    let result: BrowserActResult["result"];
+    if (op === "volver") result = { ok: "volviendo a la página anterior" };
+    else if (!c) result = { error: `no conozco «w${target}»: vuelve a leer la página` };
+    else if (op === "escribir" && c.k === "clave") result = { error: "las claves no se escriben: las rellena NÚCLEO con el acceso guardado" };
+    else if (op === "escribir") { this.browser.typed = text ?? ""; result = { ok: `escrito en «${c.l}»` }; }
+    else result = { ok: `clic en «${c.l}»` };
+    return wait({ state: this.browserPageState(), result });
+  }
+  async browserSaveFile(_target: number | null, url: string | null, name: string): Promise<BrowserSavedFile> {
+    this.browserNeedOpen();
+    if (url) this.browserHost(url);
+    const clean = name.trim();
+    if (!/^[^\\/:*?"<>|]+\.(pdf|xml|csv|xlsx|xls|txt|json|png|jpg|jpeg)$/i.test(clean) || clean.startsWith(".")) {
+      throw new AppError("validacion", "Nombre de archivo: sin rutas y con extensión de documento (por ejemplo 536-DL.pdf).");
+    }
+    if (this.browser.files.includes(clean)) throw new AppError("validacion", `Ya existe ${clean} en la carpeta de descargas: no lo sobrescribo.`);
+    this.browser.files.push(clean);
+    return wait({ name: clean, path: `Descargas de demostración/${clean}`, bytes: 206888, pdf: /\.pdf$/i.test(clean), text: /\.pdf$/i.test(clean) ? "DATA LOGGER CHILE SPA\nFACTURA ELECTRONICA\nNº536\nTOTAL\n$ 104.720" : null });
+  }
+  async browserLogin(access: string, submit: boolean): Promise<BrowserActResult> {
+    const a = this.accessList.find((x) => x.uid === access || x.name.toLowerCase().includes(access.trim().toLowerCase()));
+    if (!a) throw new AppError("no_encontrado", `No encontramos un acceso llamado «${access}».`);
+    if (!this.browser.grants.has(a.uid)) {
+      throw new AppError("validacion", `Falta el permiso de hoy para entrar a ${a.name}: la persona lo da en Configuración → Integraciones → Navegador, «Autorizar por hoy». Vence solo al cambiar el día.`);
+    }
+    this.browser = { ...this.browser, open: true, url: a.login_url, inside: submit };
+    this.log("navegador.ingreso", "acceso", a.uid);
+    return wait({ state: this.browserPageState(), result: { usuario: true, clave: true, enviado: submit }, access: a.name });
+  }
+  async browserClose(): Promise<void> { this.browser.open = false; this.browser.inside = false; }
 
   /* ───────────── WooCommerce (simulado) ───────────── */
 

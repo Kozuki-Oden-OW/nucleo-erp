@@ -269,7 +269,12 @@ pub fn login(
 }
 
 #[tauri::command]
-pub fn logout(state: State<'_, AppState>) -> CmdResult<SessionInfo> {
+pub fn logout<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    state: State<'_, AppState>,
+) -> CmdResult<SessionInfo> {
+    // Al salir de la sesión se cierra el navegador de NÚCLEO (puede tener sitios con sesión abierta).
+    crate::browser::close(&app);
     with_session(&state, |s| {
         s.logout()?;
         session_info_of(s, String::new())

@@ -7,7 +7,7 @@ import type {
   AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput,
-  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, WspBridgeState, WspChat, WspConversation, WspDraft, WspSent, WspSetup, WspStatus, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
+  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, BrowserActResult, BrowserPageState, BrowserRead, BrowserSavedFile, BrowserSettings, BrowserView, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, WspBridgeState, WspChat, WspConversation, WspDraft, WspSent, WspSetup, WspStatus, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
@@ -178,6 +178,18 @@ export class TauriBackend implements Backend {
   accesses() { return call<AccessRow[]>("accesses"); }
   saveAccess(uid: string | null, input: AccessInput) { return call<AccessRow>("save_access", { uid, input }); }
   deleteAccess(uid: string) { return call<AccessRow[]>("delete_access", { uid }); }
+  browserInfo() { return call<BrowserView>("browser_info"); }
+  browserSaveSettings(input: BrowserSettings) { return call<BrowserView>("browser_save_settings", { input }); }
+  browserGrant(uid: string, on: boolean) { return call<BrowserView>("browser_grant", { uid, on }); }
+  browserOpen(url: string | null, access: string | null) { return call<BrowserPageState>("browser_open", { url, access }); }
+  browserState() { return call<BrowserPageState>("browser_state"); }
+  browserRead() { return call<BrowserRead>("browser_read"); }
+  browserAct(op: "clic" | "escribir" | "elegir" | "volver", target: number | null, text: string | null = null, enter = false, option: string | null = null) {
+    return call<BrowserActResult>("browser_act", { action: { op, target, text, enter, option } });
+  }
+  browserSaveFile(target: number | null, url: string | null, name: string) { return call<BrowserSavedFile>("browser_save_file", { target, url, name }); }
+  browserLogin(access: string, submit: boolean) { return call<BrowserActResult>("browser_login", { access, submit }); }
+  browserClose() { return call<void>("browser_close"); }
   wooStatus() { return call<WooStatus>("woo_status"); }
   wooConnect(input: WooConnectInput) { return call<WooStatus>("woo_connect", { input }); }
   wooDisconnect() { return call<WooStatus>("woo_disconnect"); }

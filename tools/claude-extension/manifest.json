@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "nucleo-erp",
   "display_name": "NÚCLEO ERP",
-  "version": "0.8.9",
+  "version": "0.9.0",
   "description": "Permite que Claude use NÚCLEO ERP en este computador: ve la pantalla, la recorre con su propio cursor y registra ventas, gastos, clientes y cobros.",
   "long_description": "Conecta Claude con NÚCLEO ERP, el sistema de gestión local y gratuito para pymes chilenas. NÚCLEO debe estar abierto con Configuración → Claude activado; ahí eliges si Claude solo mira, crea borradores o tiene acceso completo. La extensión solo se comunica con NÚCLEO dentro del mismo computador (127.0.0.1): los datos del negocio siguen guardados solo en tu equipo.",
   "author": {
@@ -231,6 +231,30 @@
     {
       "name": "listar_accesos",
       "description": "Lista los accesos de solo lectura a sitios web guardados en NÚCLEO (gestor de contraseñas): nombre del sitio, dirección de ingreso, usuario, tipo (lectura u operador sin pagos) y si tiene clave guarda"
+    },
+    {
+      "name": "web_abrir",
+      "description": "Abre una página en el Navegador de NÚCLEO y devuelve lo que se ve: texto (también el de marcos internos) y controles numerados como [w12]. Indica «direccion» (https://…) o «acceso» (nombre de un acces"
+    },
+    {
+      "name": "web_leer",
+      "description": "Lee la página abierta en el Navegador de NÚCLEO: texto de la página y de cada marco, y los controles con su número ([w12] enlace, botón, campo, lista…). Los números cambian después de cada lectura. Co"
+    },
+    {
+      "name": "web_clic",
+      "description": "Hace clic en un control de la última lectura del Navegador de NÚCLEO (por ejemplo «w12») y devuelve la página después. Con «volver» en true vuelve a la página anterior. Solo para navegar y consultar: "
+    },
+    {
+      "name": "web_escribir",
+      "description": "Escribe en un campo de la página abierta en el Navegador de NÚCLEO (reemplaza lo que tenía) o, si el control es una lista, elige la opción cuyo texto calza. Con enter=true presiona Enter al terminar. "
+    },
+    {
+      "name": "web_guardar",
+      "description": "Guarda en la carpeta de descargas de NÚCLEO (la que definió la persona, por ejemplo la de facturas) un archivo de la página abierta: sin más datos, el documento que la página muestra incrustado (el PD"
+    },
+    {
+      "name": "web_ingresar",
+      "description": "Pide a NÚCLEO que inicie sesión en un sitio con un acceso guardado: NÚCLEO abre la página de ingreso si hace falta y rellena usuario y clave. Claude no ve ni escribe la clave. Solo funciona si la pers"
     },
     {
       "name": "listar_envios",

@@ -28,6 +28,7 @@ impl Ipc {
             sync: Mutex::new(None),
             backups_dir: dir.path().join("respaldos"),
         });
+        app.manage(crate::browser::BrowserState::default());
         let webview = tauri::WebviewWindowBuilder::new(&app, "main", Default::default())
             .build()
             .unwrap();
@@ -1163,4 +1164,101 @@ fn lo_que_nucleo_hace_solo_por_ipc() {
         ),
         (json!(1), json!(1))
     );
+}
+
+/// El navegador de NÚCLEO por IPC: sitios permitidos, carpeta de descargas, permiso del día y lo que
+/// se rechaza antes de abrir una ventana.
+#[test]
+fn el_navegador_de_nucleo_por_ipc() {
+    let ipc = Ipc::new();
+    let created = ipc.ok(
+        "create_company",
+        json!({ "name": "Data Logger", "profile": "empresa" }),
+    );
+    ipc.ok("open_company", json!({ "uid": created["company"]["uid"] }));
+
+    let v = ipc.ok("browser_info", json!({}));
+    assert_eq!(v["allowed"], json!(["sii.cl"]));
+    assert_eq!(v["open"], false);
+    assert!(
+        v["folder"]
+            .as_str()
+            .unwrap()
+            .contains("NUCLEO ERP Descargas")
+    );
+
+    // La carpeta tiene que existir; los sitios quedan como dominios.
+    let bad = ipc
+        .call(
+            "browser_save_settings",
+            json!({ "input": { "download_dir": "Z:\\no\\existe\\nunca", "sites": [] } }),
+        )
+        .unwrap_err();
+    assert!(
+        bad["message"]
+            .as_str()
+            .unwrap()
+            .contains("No encuentro la carpeta")
+    );
+    let dir = tempfile::tempdir().unwrap();
+    let v = ipc.ok(
+        "browser_save_settings",
+        json!({ "input": { "download_dir": dir.path(), "sites": ["https://www.sii.cl/", "mercadolibre.cl"] } }),
+    );
+    assert_eq!(v["settings"]["sites"], json!(["mercadolibre.cl", "sii.cl"]));
+    assert_eq!(v["folder"], json!(dir.path()));
+
+    // Un acceso guardado agrega su sitio; el permiso es por acceso y por día.
+    let a = ipc.ok(
+        "save_access",
+        json!({ "uid": null, "input": { "name": "BCI Pyme", "login_url": "https://www.bci.cl/corporativo/banco-en-linea/pyme", "username": "11111111-1", "password": "clave-de-ejemplo", "kind": "lectura", "notes": null, "no_payments": true } }),
+    );
+    let v = ipc.ok("browser_info", json!({}));
+    assert_eq!(v["allowed"], json!(["bci.cl", "mercadolibre.cl", "sii.cl"]));
+    assert_eq!(v["accesses"][0]["granted_today"], false);
+    let sin = ipc
+        .call("browser_login", json!({ "access": "bci", "submit": true }))
+        .unwrap_err();
+    assert!(
+        sin["message"]
+            .as_str()
+            .unwrap()
+            .contains("Autorizar por hoy")
+    );
+    let v = ipc.ok("browser_grant", json!({ "uid": a["uid"], "on": true }));
+    assert_eq!(v["accesses"][0]["granted_today"], true);
+    assert!(!v.to_string().contains("clave-de-ejemplo"));
+    let v = ipc.ok("browser_grant", json!({ "uid": a["uid"], "on": false }));
+    assert_eq!(v["accesses"][0]["granted_today"], false);
+
+    // Lo que no abre ventana: sitio no permitido, http, y leer o guardar con el navegador cerrado.
+    for (url, msg) in [
+        (
+            "https://www.otrobanco.cl/",
+            "no está entre los sitios permitidos",
+        ),
+        ("http://www.sii.cl/", "solo abre direcciones https"),
+    ] {
+        let e = ipc
+            .call("browser_open", json!({ "url": url, "access": null }))
+            .unwrap_err();
+        assert!(e["message"].as_str().unwrap().contains(msg), "{e}");
+    }
+    let e = ipc.call("browser_read", json!({})).unwrap_err();
+    assert!(e["message"].as_str().unwrap().contains("está cerrado"));
+    let e = ipc
+        .call(
+            "browser_save_file",
+            json!({ "target": null, "url": null, "name": "..\\..\\x.exe" }),
+        )
+        .unwrap_err();
+    assert!(e["message"].as_str().unwrap().contains("archivo"));
+    let e = ipc
+        .call(
+            "browser_act",
+            json!({ "action": { "op": "pagar", "target": 1, "text": null, "enter": false, "option": null } }),
+        )
+        .unwrap_err();
+    assert!(e["message"].as_str().unwrap().contains("desconocida"));
+    assert_eq!(ipc.ok("browser_state", json!({}))["open"], false);
 }

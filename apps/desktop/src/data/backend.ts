@@ -7,7 +7,7 @@ import type {
   AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput,
-  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, WspBridgeState, WspChat, WspConversation, WspDraft, WspSent, WspSetup, WspStatus, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
+  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, BrowserActResult, BrowserPageState, BrowserRead, BrowserSavedFile, BrowserSettings, BrowserView, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, WspBridgeState, WspChat, WspConversation, WspDraft, WspSent, WspSetup, WspStatus, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
@@ -179,6 +179,21 @@ export interface Backend {
   accesses(): Promise<AccessRow[]>;
   saveAccess(uid: string | null, input: AccessInput): Promise<AccessRow>;
   deleteAccess(uid: string): Promise<AccessRow[]>;
+
+  /* Navegador de NÚCLEO: ventana propia para el SII, el banco y otros sitios permitidos. */
+  browserInfo(): Promise<BrowserView>;
+  /** Carpeta de descargas y sitios permitidos. Solo la persona. */
+  browserSaveSettings(input: BrowserSettings): Promise<BrowserView>;
+  /** «Autorizar por hoy» el ingreso con un acceso guardado (o quitar el permiso). Solo la persona. */
+  browserGrant(uid: string, on: boolean): Promise<BrowserView>;
+  browserOpen(url: string | null, access: string | null): Promise<BrowserPageState>;
+  browserState(): Promise<BrowserPageState>;
+  browserRead(): Promise<BrowserRead>;
+  browserAct(op: "clic" | "escribir" | "elegir" | "volver", target: number | null, text?: string | null, enter?: boolean, option?: string | null): Promise<BrowserActResult>;
+  browserSaveFile(target: number | null, url: string | null, name: string): Promise<BrowserSavedFile>;
+  /** NÚCLEO rellena el ingreso; la clave no pasa por la interfaz. Exige el permiso de hoy. */
+  browserLogin(access: string, submit: boolean): Promise<BrowserActResult>;
+  browserClose(): Promise<void>;
   // WooCommerce (Configuración → Integraciones)
   wooStatus(): Promise<WooStatus>;
   /** Prueba las llaves contra la tienda y, si responde bien, guarda la conexión. */

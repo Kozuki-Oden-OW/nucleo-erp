@@ -4,6 +4,7 @@
 mod access;
 mod agent;
 mod auto;
+mod browser;
 mod commands;
 #[cfg(test)]
 mod ipc_tests;
@@ -319,6 +320,16 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         commands::severance,
         commands::f22,
         commands::save_f22_inputs,
+        browser::browser_info,
+        browser::browser_save_settings,
+        browser::browser_grant,
+        browser::browser_open,
+        browser::browser_state,
+        browser::browser_read,
+        browser::browser_act,
+        browser::browser_save_file,
+        browser::browser_login,
+        browser::browser_close,
         agent::agent_settings,
         agent::agent_update,
         agent::agent_reply,
@@ -347,6 +358,7 @@ fn main() {
             let agent = std::sync::Arc::new(agent::AgentState::load(&data_dir));
             agent.apply(app.handle());
             app.manage(agent);
+            app.manage(browser::BrowserState::default());
             app.manage(commands::AppState {
                 service: Mutex::new(service),
                 session: std::sync::Arc::new(Mutex::new(None)),
@@ -357,12 +369,19 @@ fn main() {
         })
         .build(tauri::generate_context!())
         .expect("no se pudo iniciar NÚCLEO ERP")
-        .run(|app, event| {
+        .run(|app, event| match event {
             // Al cerrar: apaga el acceso para Claude y borra su archivo de conexión.
-            if let tauri::RunEvent::Exit = event
-                && let Some(agent) = app.try_state::<std::sync::Arc<agent::AgentState>>()
-            {
-                agent.shutdown();
+            tauri::RunEvent::Exit => {
+                if let Some(agent) = app.try_state::<std::sync::Arc<agent::AgentState>>() {
+                    agent.shutdown();
+                }
             }
+            // El navegador de NÚCLEO no queda abierto sin la ventana principal.
+            tauri::RunEvent::WindowEvent {
+                label,
+                event: tauri::WindowEvent::Destroyed,
+                ..
+            } if label == "main" => browser::close(app),
+            _ => {}
         });
 }

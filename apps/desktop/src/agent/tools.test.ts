@@ -527,3 +527,62 @@ describe("WhatsApp solo con NÚCLEO (demostración)", () => {
     expect(txt(await runTool(b, "ver", "buscar_series", { buscar: "no-existe" }))).toMatch(/No hay series/);
   });
 });
+
+describe("Navegador de NÚCLEO", () => {
+  const banco = { name: "BCI Pyme", login_url: "https://www.bci.cl/corporativo/banco-en-linea/pyme", username: "11111111-1", password: "clave-de-ejemplo", kind: "lectura" as const, no_payments: true };
+
+  it("solo abre sitios permitidos y lee la página con sus marcos", async () => {
+    const b = new DemoBackend();
+    expect(txt(await runTool(b, "ver", "web_abrir", { direccion: "https://www.bci.cl/" }))).toMatch(/no está entre los sitios permitidos/);
+    expect(txt(await runTool(b, "ver", "web_abrir", { direccion: "http://www.sii.cl/" }))).toMatch(/solo abre direcciones https/);
+    expect(txt(await runTool(b, "ver", "web_leer", {}))).toMatch(/está cerrado/);
+    await b.saveAccess(null, banco);
+    const page = txt(await runTool(b, "ver", "web_abrir", { acceso: "bci" }));
+    expect(page).toMatch(/Navegador de NÚCLEO — Ingreso/);
+    expect(page).toMatch(/https:\/\/www\.bci\.cl\/corporativo\/banco-en-linea\/pyme/);
+    expect(page).toMatch(/\[w2\] clave «Clave» \(la rellena NÚCLEO: web_ingresar\)/);
+    // Con «Solo ver» no se hace clic ni se guarda.
+    expect((await runTool(b, "ver", "web_clic", { elemento: "w3" })).isError).toBe(true);
+    expect((await runTool(b, "ver", "web_ingresar", { acceso: "bci" })).isError).toBe(true);
+  });
+
+  it("la clave la rellena NÚCLEO y solo con el permiso de hoy", async () => {
+    const b = new DemoBackend();
+    const a = await b.saveAccess(null, banco);
+    const sin = await runTool(b, "completo", "web_ingresar", { acceso: "BCI Pyme" });
+    expect(sin.isError).toBe(true);
+    expect(txt(sin)).toMatch(/Autorizar por hoy/);
+    // Claude no escribe claves aunque tenga acceso completo.
+    await runTool(b, "completo", "web_abrir", { acceso: "bci" });
+    const escribir = await runTool(b, "completo", "web_escribir", { elemento: "w2", texto: "x" });
+    expect(escribir.isError).toBe(true);
+    expect(txt(escribir)).toMatch(/las rellena NÚCLEO/);
+
+    await b.browserGrant(a.uid, true);
+    const dentro = txt(await runTool(b, "completo", "web_ingresar", { acceso: "BCI Pyme" }));
+    expect(dentro).toMatch(/BCI Pyme: NÚCLEO rellenó usuario y clave y envió el formulario/);
+    expect(dentro).not.toMatch(/clave-de-ejemplo/);
+    expect(dentro).toMatch(/── Marco 0 · https:\/\/app\.bci\.cl\/movimientos ──/);
+    expect(dentro).toMatch(/Transferencia enviada a Biotecnos Limitada/);
+
+    // Buscar acota el texto y los controles.
+    const solo = txt(await runTool(b, "ver", "web_leer", { buscar: "bioup" }));
+    expect(solo).toMatch(/Bioup Investigacion Cientifica/);
+    expect(solo).not.toMatch(/Biotecnos/);
+    const escrito = txt(await runTool(b, "completo", "web_escribir", { elemento: "w2", texto: "Winkler" }));
+    expect(escrito).toMatch(/\[w2\] campo «Busca nombre, rut, etc\.» = «Winkler»/);
+    expect(txt(await runTool(b, "completo", "web_clic", { elemento: "w3" }))).toMatch(/Hecho: clic en «Siguiente»/);
+    expect((await runTool(b, "completo", "web_clic", { elemento: "w99" })).isError).toBe(true);
+  });
+
+  it("guarda archivos en la carpeta con nombre sano y sin sobrescribir", async () => {
+    const b = new DemoBackend();
+    await runTool(b, "ver", "web_abrir", { direccion: "https://www1.sii.cl/cgi-bin/Portal001/mipeAdminDocsEmi.cgi" });
+    expect(txt(await runTool(b, "completo", "web_guardar", { nombre: "536-DL.pdf" }))).toMatch(/Guardado: .*536-DL\.pdf · \d+ KB · PDF/);
+    expect(txt(await runTool(b, "completo", "web_guardar", { nombre: "536-DL.pdf" }))).toMatch(/no lo sobrescribo/);
+    expect((await runTool(b, "completo", "web_guardar", { nombre: "..\\..\\x.pdf" })).isError).toBe(true);
+    expect((await runTool(b, "completo", "web_guardar", { nombre: "programa.exe" })).isError).toBe(true);
+    expect((await runTool(b, "completo", "web_guardar", { nombre: "a.pdf", direccion: "https://otro-sitio.com/a.pdf" })).isError).toBe(true);
+    expect(txt(await runTool(b, "ver", "web_leer", {}))).toMatch(/Descargas recientes .*536-DL\.pdf/);
+  });
+});

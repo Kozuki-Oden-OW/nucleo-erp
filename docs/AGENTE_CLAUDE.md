@@ -13,9 +13,9 @@ con las mismas reglas, permisos y auditoría del programa.
 
    | Nivel | Puede |
    |---|---|
-   | Solo ver | `ver_pantalla`, `ir_a`, `desplazar` y las consultas (`resumen_negocio`, `buscar*`, `listar_*`, `datos_de_apoyo`, `listar_documentos_sii`, `consultar_estado_sii`, `consultar_libro_sii`, `pedidos_woocommerce`, `comparar_woocommerce`, `listar_accesos`, `cuentas_dinero`, `conciliacion_banco`) |
+   | Solo ver | `ver_pantalla`, `ir_a`, `desplazar` y las consultas (`resumen_negocio`, `buscar*`, `listar_*`, `datos_de_apoyo`, `listar_documentos_sii`, `consultar_estado_sii`, `consultar_libro_sii`, `pedidos_woocommerce`, `comparar_woocommerce`, `listar_accesos`, `cuentas_dinero`, `conciliacion_banco`) y el navegador en modo lectura (`web_abrir`, `web_leer`) |
    | Crear borradores | Lo anterior + `crear_cliente`, `crear_proveedor`, `crear_producto`, `crear_venta_borrador`, `registrar_gasto` (queda por pagar), `registrar_envio` |
-   | Acceso completo | Lo anterior + `clic`, `escribir`, `elegir`, `tecla`, `confirmar_venta`, `registrar_cobro`, gastos pagados y la facturación SII (`cargar_folios_sii`, `emitir_documento_sii`, `enviar_documentos_sii`, `crear_libro_sii`, `enviar_libro_sii`, `responder_intercambio_sii`), `sincronizar_woocommerce`, `registrar_ventas_mercadolibre`, `registrar_movimientos_banco` y `conciliar_movimiento_banco`. Enviar stock o precios a la tienda WooCommerce no es una herramienta: lo confirma la persona en la pantalla. Enviar al SII es irreversible: Claude muestra el resumen y espera la confirmación de la persona en el chat |
+   | Acceso completo | Lo anterior + `clic`, `escribir`, `elegir`, `tecla`, `confirmar_venta`, `registrar_cobro`, gastos pagados y la facturación SII (`cargar_folios_sii`, `emitir_documento_sii`, `enviar_documentos_sii`, `crear_libro_sii`, `enviar_libro_sii`, `responder_intercambio_sii`), `sincronizar_woocommerce`, `registrar_ventas_mercadolibre`, `registrar_movimientos_banco`, `conciliar_movimiento_banco` y el Navegador de NÚCLEO (`web_clic`, `web_escribir`, `web_guardar`, `web_ingresar`). Enviar stock o precios a la tienda WooCommerce no es una herramienta: lo confirma la persona en la pantalla. Enviar al SII es irreversible: Claude muestra el resumen y espera la confirmación de la persona en el chat |
 
    Siempre valen además los permisos del usuario con que está abierta la sesión.
 3. «Instalar en Claude» abre en la app de Claude la extensión **NucleoERP.mcpb** (formato MCPB) y la
@@ -92,7 +92,7 @@ construyen después de la certificación del SII.
 
 | # | Tarea | Qué hace el agente | Estado |
 |---|---|---|---|
-| 1 | **Gestor de contraseñas de NÚCLEO** | Pide ingresos a sitios con usuarios de solo lectura, sin ver ni escribir la clave (funciones abajo) | Guardar accesos y `listar_accesos`: construido el 23-11-2026. Pedir y autorizar el ingreso: por construir (con la extensión) |
+| 1 | **Gestor de contraseñas de NÚCLEO** | Pide ingresos a sitios con usuarios de solo lectura, sin ver ni escribir la clave (funciones abajo) | Guardar accesos y `listar_accesos`: construido el 23-11-2026. Ingreso con el Navegador de NÚCLEO y permiso por el día (`web_ingresar`): construido el 26-11-2026 |
 | 2 | **Aviso de autorización** | Cada ingreso pedido por el agente avisa al dueño con «Autorizo / No autorizo»: en el PC, por correo, por WhatsApp y en la app del celular | Por construir (PC primero, luego correo, luego WhatsApp) |
 | 3 | **Extensión de Chrome para NÚCLEO** | Conecta Chrome con NÚCLEO para trabajar en sitios sin API con la sesión de la empresa | Por construir |
 | 4 | **Revisar cartolas del banco** | Con el usuario de solo lectura (BCI primero): saldo, ingresos, egresos y glosa; propone qué venta quedó pagada. Nunca transferencias ni pagos | Construido el 24-11-2026 con la sesión que abre el dueño: `registrar_movimientos_banco`, `conciliacion_banco` y `conciliar_movimiento_banco` (receta `docs/recetas/cierre-diario.md`). El ingreso sin el dueño espera el usuario de lectura y la extensión; la API de notificaciones de BCI queda como vía futura |
@@ -113,38 +113,48 @@ construyen después de la certificación del SII.
 | 18 | **Series y certificados** | Registra series con su certificado de calibración, las une a la venta y responde a quién se le vendió cada equipo y qué calibraciones vencen | Construido el 26-11-2026: `buscar_series`, `registrar_series` (D-SERIE-01) |
 | 19 | **Conector propio del banco** | Servicio local que entra al portal con el usuario de consulta (solo lectura) y deja los movimientos, con quién transfirió, en la conciliación | Por construir: requiere estudiar el portal de BCI con una sesión abierta por el dueño. Mientras tanto Claude los lee en esa sesión y los carga con `registrar_movimientos_banco` |
 
-### Funciones del gestor de contraseñas
+### Gestor de contraseñas y Navegador de NÚCLEO
 
-Lo que hace la persona (en Configuración → Integraciones → Accesos):
+Decisiones: `docs/DECISIONS.md`, D-NAV-01…04. Receta de uso: `docs/recetas/navegador-sii-y-banco.md`.
 
-- Guarda un acceso por sitio: nombre, dirección de ingreso, usuario, clave y tipo (**solo lectura** u
-  operador sin facultad de pago). La clave se escribe en NÚCLEO, se guarda en la base cifrada y nunca
-  se muestra de vuelta (solo «guardada»).
-- Elige por acceso quién puede pedirlo (el robot programado, el agente, ambos) y por dónde llega el
-  aviso (PC, correo, WhatsApp, app).
-- Cambia la clave, desactiva o borra el acceso, y ve el historial de ingresos.
+Lo que hace la persona (en Configuración → Integraciones):
 
-Lo que puede hacer el agente (herramientas nuevas):
+- **Accesos**: guarda un acceso por sitio (nombre, dirección de ingreso, usuario, clave y tipo: solo
+  lectura u operador sin facultad de pago). La clave se escribe en NÚCLEO, queda en la base cifrada y
+  nunca se muestra de vuelta.
+- **Navegador → «Autorizar por hoy»**: por cada acceso, permite que NÚCLEO inicie sesión con él hasta
+  que cambie el día. Lo puede quitar cuando quiera.
+- **Navegador → sitios permitidos y carpeta de descargas**.
+- En la ventana del navegador: elige su certificado digital para el SII y resuelve códigos, captchas o
+  segundas claves.
 
-| Herramienta | Qué hace |
-|---|---|
-| `listar_accesos` | Sitios con acceso guardado, usuario y tipo. Nunca la clave |
-| `pedir_ingreso {acceso, motivo}` | Crea una solicitud de un solo uso que vence en minutos y dispara el aviso al dueño |
-| `estado_ingreso {solicitud}` | Pendiente, autorizada (sesión abierta), rechazada o vencida |
-| `cerrar_sesion {acceso}` | Cierra la sesión del sitio al terminar la tarea |
+Lo que puede hacer el agente:
+
+| Herramienta | Nivel | Qué hace |
+|---|---|---|
+| `listar_accesos` | ver | Sitios con acceso guardado, usuario y tipo. Nunca la clave |
+| `web_abrir {direccion \| acceso}` | ver | Abre una página de un sitio permitido y la lee |
+| `web_leer {buscar, desde}` | ver | Texto de la página y de todos sus marcos, y controles numerados (`w12`) |
+| `web_clic {elemento \| volver}` | completo | Clic en un control o volver atrás; devuelve la página después |
+| `web_escribir {elemento, texto, enter}` | completo | Escribe en un campo o elige en una lista. Nunca en un campo de clave |
+| `web_guardar {nombre, elemento, direccion}` | completo | Guarda en la carpeta de descargas el documento incrustado, un enlace o una dirección |
+| `web_ingresar {acceso}` | completo | Pide a NÚCLEO que rellene el ingreso con un acceso autorizado hoy |
 
 Lo que hace NÚCLEO solo:
 
-- Con la autorización, completa usuario y clave en el navegador del robot o de la extensión, **solo si
-  la dirección de la página es la guardada en el acceso** (protege de páginas falsas).
-- Registra en la auditoría cada solicitud: quién la pidió, para qué, quién autorizó o rechazó y desde
-  qué canal.
-- Avisa cuando una clave dejó de funcionar o el sitio pide cambiarla.
+- Rellena usuario y clave **solo si la página es del mismo sitio que la dirección guardada** (protege
+  de páginas falsas) y solo con el permiso de hoy. La clave no vuelve en ninguna respuesta.
+- Registra en la auditoría cada permiso dado o quitado y cada lectura de la clave.
+- Bloquea la navegación a sitios que no están en la lista y lo informa.
+- Cierra el navegador al salir de la sesión o al cerrar NÚCLEO.
 
 Límites que no cambian:
 
-- No hay herramienta que entregue una clave al agente, ni un botón que el agente pueda pulsar para
-  completarla: la autorización es siempre de la persona.
+- No hay herramienta que entregue una clave al agente ni que le permita escribirla. El permiso del día
+  lo da siempre la persona: el agente no puede autorizarse, ni cambiar los sitios ni la carpeta.
 - Solo accesos de solo lectura u operador sin pago. No se guardan claves de apoderado del banco, de
   Google, de la Clave Tributaria ni datos de tarjetas.
-- Segundo factor, captchas, códigos de verificación y pagos los hace la persona.
+- Segundo factor, captchas, códigos de verificación, certificados y pagos los hace la persona.
+- En los sitios, el agente navega y consulta. No pulsa controles que paguen, transfieran, envíen,
+  emitan, anulen o acepten condiciones sin que la persona lo haya pedido para ese caso; en el banco,
+  solo lectura.

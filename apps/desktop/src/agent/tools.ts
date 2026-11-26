@@ -10,6 +10,7 @@ import { buildQuotePdf, QUOTE_TEMPLATES, quoteFileName } from "../lib/quotePdf";
 import { navigate } from "../lib/router";
 import { hitHref } from "../shell/CommandPalette";
 import { choose, click, key, resolveRoute, scroll, settle, snapshot, type } from "./dom";
+import { formatPage, refNumber, stateLines } from "./web";
 import TOOLS from "./tools.json";
 
 export type AgentLevel = "ver" | "borradores" | "completo";
@@ -227,6 +228,9 @@ export async function runTool(backend: Backend, level: AgentLevel, name: string,
   }
 }
 
+/** Tipo de cada control de la última lectura del navegador (para saber si es una lista). */
+let webControls = new Map<number, string>();
+
 async function exec(backend: Backend, level: AgentLevel, name: string, a: Args): Promise<ToolResult> {
   switch (name) {
     /* ───── Pantalla ───── */
@@ -385,6 +389,60 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
       return text(r.length
         ? `${r.length} ${r.length === 1 ? "acceso guardado" : "accesos guardados"} (la clave no se muestra):\n${r.map((x) => `- ${x.name} · ${x.login_url} · usuario ${x.username} · ${x.kind === "lectura" ? "solo lectura" : "operador sin pagos"}${x.has_password ? " · clave guardada" : " · sin clave"}${x.notes ? ` · ${x.notes}` : ""}`).join("\n")}`
         : "No hay accesos guardados. Se agregan en Configuración → Integraciones → Accesos (la clave la escribe la persona).");
+    }
+    /* ───── Navegador de NÚCLEO ───── */
+    case "web_abrir": {
+      const st = await backend.browserOpen(str(a, "direccion") || null, str(a, "acceso") || null);
+      if (!st.open) return text("No se pudo abrir el navegador de NÚCLEO.", true);
+      const r = await backend.browserRead();
+      webControls = new Map((r.page.frames ?? []).flatMap((f) => f.controls).map((c) => [c.n, c.k]));
+      return text(formatPage(r.page, r.state));
+    }
+    case "web_leer": {
+      const r = await backend.browserRead();
+      if (r.page.navego) return text("La página estaba cambiando: vuelve a leerla.", true);
+      webControls = new Map((r.page.frames ?? []).flatMap((f) => f.controls).map((c) => [c.n, c.k]));
+      return text(formatPage(r.page, r.state, str(a, "buscar"), num(a, "desde") ?? 0));
+    }
+    case "web_clic":
+    case "web_escribir": {
+      const back = name === "web_clic" && a.volver === true;
+      const n = back ? null : refNumber(str(a, "elemento"));
+      if (!back && n === null) return text("Indica el control con su número de la última lectura, por ejemplo w12.", true);
+      const kind = n === null ? undefined : webControls.get(n);
+      const op = back ? "volver" : name === "web_clic" ? "clic" : kind === "lista" ? "elegir" : "escribir";
+      const txt = typeof a.texto === "string" ? a.texto : "";
+      const r = await backend.browserAct(op, n, op === "escribir" ? txt : null, a.enter === true, op === "elegir" ? txt : null);
+      if (r.result.error) return text(`${r.result.error.charAt(0).toUpperCase()}${r.result.error.slice(1)}.`, true);
+      const after = await backend.browserRead();
+      webControls = new Map((after.page.frames ?? []).flatMap((f) => f.controls).map((c) => [c.n, c.k]));
+      const done = r.result.navego ? "Hecho: la página cambió." : `Hecho: ${r.result.ok ?? "listo"}.`;
+      return text(`${done}\n\n${formatPage(after.page, after.state)}`);
+    }
+    case "web_guardar": {
+      const el = str(a, "elemento");
+      const n = el ? refNumber(el) : null;
+      if (el && n === null) return text("El elemento se indica con su número de la última lectura, por ejemplo w4.", true);
+      const f = await backend.browserSaveFile(n, str(a, "direccion") || null, str(a, "nombre"));
+      const saved = `Guardado: ${f.path} · ${Math.max(1, Math.round(f.bytes / 1024))} KB${f.pdf ? " · PDF" : ""}.`;
+      if (!f.pdf) return text(saved);
+      return text(f.text
+        ? `${saved}\n\nTexto del documento (leído del PDF; el orden de las líneas puede variar):\n${f.text}`
+        : `${saved}\n\nNo pude leer el texto de este PDF: el archivo quedó guardado tal cual.`);
+    }
+    case "web_ingresar": {
+      const r = await backend.browserLogin(str(a, "acceso"), true);
+      if (r.result.error) return text(`NÚCLEO no rellenó el ingreso: ${r.result.error}.`, true);
+      const what = r.result.navego
+        ? "NÚCLEO rellenó el ingreso y la página cambió."
+        : r.result.clave
+          ? `NÚCLEO rellenó ${r.result.usuario ? "usuario y clave" : "la clave"}${r.result.enviado ? " y envió el formulario" : ""}.`
+          : r.result.usuario
+            ? `NÚCLEO rellenó el usuario${r.result.enviado ? " y continuó" : ""}: si ahora aparece el campo de la clave, llama de nuevo a web_ingresar.`
+            : "No hay un formulario de ingreso en la página: puede que la sesión ya esté abierta.";
+      const after = await backend.browserRead();
+      webControls = new Map((after.page.frames ?? []).flatMap((f) => f.controls).map((c) => [c.n, c.k]));
+      return text([`${r.access ?? "Acceso"}: ${what}`, ...stateLines(r.state).filter((l) => l.startsWith("Bloqueado")), "", formatPage(after.page, after.state)].join("\n"));
     }
     case "sincronizar_woocommerce": {
       const r = await backend.wooSync(str(a, "desde") || null);
