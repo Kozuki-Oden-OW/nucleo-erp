@@ -1004,7 +1004,7 @@ export interface Dashboard {
 
 export type AlertKind =
   | "caja_negativa" | "cobros_vencidos" | "pagos_vencidos" | "pagos_proximos" | "sin_stock" | "bajo_minimo" | "margen_bajo"
-  | "alza_precios" | "detenidos" | "clientes_riesgo" | "importaciones" | "presupuesto" | "documentar";
+  | "alza_precios" | "detenidos" | "clientes_riesgo" | "importaciones" | "presupuesto" | "documentar" | "calibraciones";
 export interface AlertLine { label: string; value: string; href: string | null }
 export interface AlertItem {
   kind: AlertKind; severity: "alta" | "media" | "info"; title: string; detail: string; count: number;
@@ -1034,13 +1034,36 @@ export interface CustomerInsights { costs_visible: boolean; total_net_12m_minor:
 
 /* ───── Conciliación bancaria ───── */
 
-export interface StatementLineInput { date: string; description: string; reference: string | null; amount_minor: number; balance_minor: number | null }
+export interface StatementLineInput {
+  date: string; description: string; reference: string | null; amount_minor: number; balance_minor: number | null;
+  /** Quién transfirió o a quién se le pagó, y el comentario de la transferencia, si el banco los entrega. */
+  counterparty_rut?: string | null; counterparty_name?: string | null; comment?: string | null;
+}
 export interface ImportStatementResult { statement_uid: string; added: number; duplicates: number; auto_matched: number }
 export type ReconcileKind = "vincular" | "vincular_traspaso" | "cobrar" | "pagar_compra" | "pagar_gasto" | "gasto" | "traspaso" | "ignorar" | "deshacer";
-export interface BankSuggestion { action: ReconcileKind; target_uid: string | null; label: string; detail: string; score: number; category_id: number | null; category: string | null }
+export interface BankSuggestion {
+  action: ReconcileKind; target_uid: string | null; label: string; detail: string; score: number; category_id: number | null; category: string | null;
+  /** Regla de conciliación que la propone o la refuerza. */
+  rule?: string | null; tax_included?: boolean | null; note?: string | null;
+}
 export interface StatementLineView {
   uid: string; date: string; description: string; reference: string | null; amount_minor: number; balance_minor: number | null;
   status: "pendiente" | "conciliado" | "ignorado"; matched: { kind: "pago" | "traspaso"; label: string; link: string | null } | null; note: string | null; suggestions: BankSuggestion[];
+  counterparty_rut?: string | null; counterparty_name?: string | null; comment?: string | null;
+}
+export type BankRuleAction = "cliente" | "proveedor" | "gasto" | "traspaso" | "ignorar";
+export type BankRuleDirection = "abono" | "cargo" | "ambos";
+/** «Cuando la glosa diga X (o el RUT sea Y), es tal cliente, proveedor, gasto, traspaso o se ignora». */
+export interface BankRule {
+  uid: string; name: string; pattern: string; rut: string | null; direction: BankRuleDirection; action: BankRuleAction;
+  customer_uid: string | null; supplier_uid: string | null; category_id: number | null; account_uid: string | null;
+  /** A qué lleva, en palabras. */
+  target: string; tax_included: boolean | null; note: string | null; origin: "manual" | "aprendida"; hits: number; last_hit_at: string | null; active: boolean;
+}
+export interface BankRuleInput {
+  name?: string; pattern: string; rut?: string | null; direction: BankRuleDirection; action: BankRuleAction;
+  customer_uid?: string | null; supplier_uid?: string | null; category_id?: number | null; account_uid?: string | null;
+  tax_included?: boolean | null; note?: string | null; active?: boolean | null;
 }
 export interface ReconciliationView {
   account: MoneyAccount;
@@ -1829,7 +1852,7 @@ export interface MailSetup {
 export interface MailPreset { name: string; host: string; port: number; security: string; note: string }
 export interface MailTemplate { subject: string; body: string }
 export interface MailTemplates { envio: MailTemplate; cobro: MailTemplate; promocion: MailTemplate }
-export type MailKind = "prueba" | "envio" | "cobro" | "promocion" | "otro";
+export type MailKind = "prueba" | "envio" | "cobro" | "promocion" | "otro" | "informe";
 
 export interface MailDraft {
   kind: MailKind;
@@ -2090,4 +2113,90 @@ export interface SiiDocument {
   track_id: string | null;
   glosa: string | null;
   created_at: string;
+}
+
+/* ───────── Lo que NÚCLEO hace solo: cobranza, informe y cobros recurrentes ───────── */
+
+export interface CollectSettings {
+  /** Ronda programada. */
+  enabled: boolean;
+  /** «avisar»: queda lista y NÚCLEO avisa. «enviar»: los recordatorios salen solos. */
+  mode: "avisar" | "enviar";
+  /** 1 = lunes … 7 = domingo. */
+  weekdays: number[];
+  hour: number;
+  /** Días de atraso desde los que se cobra. */
+  min_days: number;
+  /** Avisar también estos días antes del vencimiento (0 = solo lo vencido). */
+  before_days: number;
+  /** Días de espera antes de volver a escribirle al mismo cliente. */
+  repeat_days: number;
+  max_per_run: number;
+  /** Clientes a los que no se les envía recordatorio. */
+  excluded: string[];
+}
+export interface CollectState { last_run_date: string | null; last_run_at: string | null; last_sent: number; last_failed: number; last_kind: string }
+export interface CollectDoc { number: string; sale_uid: string; due_date: string; pending_minor: number; days_late: number }
+export interface CollectItem {
+  customer_uid: string; customer_name: string; email: string | null; docs: CollectDoc[]; total_minor: number; overdue_minor: number;
+  max_days_late: number; last_reminder_at: string | null; state: "listo" | "sin_correo" | "reciente" | "excluido";
+}
+export interface CollectRound {
+  today: string; mail_ready: boolean; agent_send: boolean; settings: CollectSettings; last: CollectState; items: CollectItem[];
+  ready: number; total_minor: number; overdue_minor: number; due_now: boolean;
+}
+export interface CollectResult { sent: number; failed: number; errors: string[] }
+
+export interface DigestSettings { enabled: boolean; weekdays: number[]; hour: number; to: string; /** Meta de ventas del mes (total con impuesto). 0 = sin meta. */ goal_minor: number }
+export interface GoalProgress { goal_minor: number; sold_minor: number; remaining_minor: number; progress_ppm: number; workdays_left: number; per_workday_minor: number }
+export interface DigestPreview {
+  settings: DigestSettings; last: { last_run_date: string | null; last_run_at: string | null; last_ok: boolean; last_error: string | null };
+  mail_ready: boolean; to: string; subject: string; body: string; goal: GoalProgress | null;
+}
+
+export type RecurringFrequency = "mensual" | "bimestral" | "trimestral" | "semestral" | "anual";
+export interface RecurringSaleInput {
+  name: string; customer_uid: string; lines: LineInput[]; notes: string | null; frequency: RecurringFrequency;
+  next_date: string; end_date: string | null; credit_days: number;
+  /** true: la venta queda por cobrar. false: queda en borrador. */
+  confirm: boolean; send_mail: boolean; active: boolean;
+}
+export interface RecurringSale extends RecurringSaleInput {
+  uid: string; customer_name: string; customer_email: string | null; last_run_date: string | null;
+  last_sale_uid: string | null; last_sale_number: string | null; runs: number; total_minor: number | null; due_now: boolean;
+}
+export interface RecurringNow { sales: string[]; mails_sent: number; notes: string[] }
+
+/** Aviso de una tarea programada que acaba de terminar. */
+export interface AutoDone { kind: string; tone: "success" | "info" | "warning"; title: string; detail: string; href: string; sent: number; failed: number }
+
+/* ───────── Números de serie y certificados de calibración ───────── */
+
+export type SerialStatus = "en_stock" | "vendido" | "baja";
+export interface Serial {
+  uid: string; serial: string; product_uid: string; product_name: string; product_sku: string; status: SerialStatus;
+  sale_uid: string | null; sale_number: string | null; customer_uid: string | null; customer_name: string | null; sold_at: string | null;
+  certificate_number: string | null; certificate_date: string | null;
+  /** Próxima calibración. */
+  certificate_due: string | null; certificate_lab: string | null;
+  /** Ruta del PDF del certificado en el computador. */
+  certificate_file: string | null; notes: string | null;
+  /** Días que faltan para la próxima calibración (negativo: vencida). */
+  due_in_days: number | null;
+}
+export interface SerialInput {
+  product_uid: string; serial: string; certificate_number?: string | null; certificate_date?: string | null; certificate_due?: string | null;
+  certificate_lab?: string | null; certificate_file?: string | null; notes?: string | null; status?: "en_stock" | "baja" | null;
+}
+export interface SerialFilter { query?: string | null; product_uid?: string | null; customer_uid?: string | null; sale_uid?: string | null; status?: SerialStatus | null; due_within_days?: number | null; limit?: number | null }
+export interface SerialBulkReport { added: number; duplicates: string[] }
+
+/* ───────── Inicio con los registros del SII ───────── */
+
+export interface StartFile { name: string; text: string }
+export interface StartFileReport { name: string; direction: "venta" | "compra" | null; period: string | null; documents: number; total_minor: number; status: "ok" | "error"; message: string | null }
+export interface StartReport {
+  files: StartFileReport[]; periods: string[]; sales_docs: number; sales_total_minor: number; purchases_docs: number; purchases_total_minor: number;
+  sales_imported: number; sales_existing: number; sales_errors: number; customers_created: number; suppliers_created: number;
+  credit_notes: number; credit_notes_minor: number; notes: string[];
 }

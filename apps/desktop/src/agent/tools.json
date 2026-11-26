@@ -742,6 +742,217 @@
     }
   },
   {
+    "name": "ronda_cobranza",
+    "nivel": "ver",
+    "description": "La ronda de cobranza de hoy: clientes con documentos vencidos (o por vencer, si así está configurado), primero lo más atrasado, con sus documentos, el total, el correo de su ficha, cuándo se les escribió por última vez y si el recordatorio saldría («listo», «reciente», «sin_correo», «excluido»). También dice cómo está programada la ronda y si Claude puede enviar correos.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "enviar_cobranza",
+    "nivel": "completo",
+    "description": "Envía los recordatorios de cobro por correo desde la casilla de la empresa: a cada cliente uno solo, con todos sus documentos pendientes, los datos de transferencia y el enlace de pago del negocio. Sin «clientes» envía a todos los que están «listos» en ronda_cobranza; con «clientes», solo a esos (sirve para insistirle a uno al que ya se le escribió). Úsalo solo cuando la persona pidió enviar la cobranza: muéstrale antes a quiénes y cuánto debe cada uno. Requiere «Acceso completo» y el permiso de correo («Permitir que Claude envíe los correos que le pidas»). Nunca envía a un cliente excluido ni cambia la programación.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "clientes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 50,
+          "description": "Nombres o RUT de los clientes; vacío = todos los listos"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "informe_negocio",
+    "nivel": "ver",
+    "description": "El informe del negocio tal como le llega al dueño por correo: ventas de hoy, de ayer, de los últimos 7 días y del mes; avance contra la meta de ventas del mes (cuánto falta y cuánto hay que vender por día hábil); resultado del mes; dinero disponible, por cobrar y por pagar; próximos vencimientos; lo que requiere atención y el poco stock. También dice si el informe está programado y a qué correo llega.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "cobros_recurrentes",
+    "nivel": "ver",
+    "description": "Cobros recurrentes programados (por ejemplo, el monitoreo mensual de un cliente): nombre, cliente, frecuencia, monto, fecha del próximo cobro, la última venta que generó y si está activo. Los crea y cambia la persona en Ventas → Cobros recurrentes; NÚCLEO genera la venta y avisa al cliente cuando toca.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "reglas_banco",
+    "nivel": "ver",
+    "description": "Reglas de conciliación bancaria: «cuando la glosa diga X (o el RUT sea Y), es tal cliente, tal proveedor, tal gasto, un traspaso o se ignora». Muestra las que escribió la persona y las que NÚCLEO aprendió al conciliar, con las veces que se usó cada una.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "guardar_regla_banco",
+    "nivel": "completo",
+    "description": "Crea una regla de conciliación bancaria. No mueve dinero ni concilia: hace que NÚCLEO proponga arriba el cliente, proveedor, gasto, traspaso o «ignorar» que corresponde cuando la glosa (o el RUT de quien transfiere) coincide. Úsala cuando la persona te explique un movimiento que se repite («las transferencias de Inversiones del Sur son de Frigorífico Austral», «LIPIGAS es combustible»).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "texto": {
+          "type": "string",
+          "description": "Texto que debe aparecer en la glosa (al menos 3 letras); puede ir vacío si se indica el RUT"
+        },
+        "rut": {
+          "type": "string",
+          "description": "RUT de quien transfiere o a quien se paga"
+        },
+        "aplica_a": {
+          "type": "string",
+          "enum": [
+            "abono",
+            "cargo",
+            "ambos"
+          ],
+          "description": "Por defecto: abono para cliente, cargo para proveedor y gasto"
+        },
+        "accion": {
+          "type": "string",
+          "enum": [
+            "cliente",
+            "proveedor",
+            "gasto",
+            "traspaso",
+            "ignorar"
+          ]
+        },
+        "cliente": {
+          "type": "string",
+          "description": "Para «cliente»: nombre o RUT en NÚCLEO"
+        },
+        "proveedor": {
+          "type": "string",
+          "description": "Para «proveedor»: nombre o RUT en NÚCLEO"
+        },
+        "categoria": {
+          "type": "string",
+          "description": "Para «gasto»: nombre de la categoría (ver datos_de_apoyo)"
+        },
+        "con_iva": {
+          "type": "boolean",
+          "description": "Para «gasto»: el monto incluye IVA"
+        },
+        "cuenta": {
+          "type": "string",
+          "description": "Para «traspaso»: la otra cuenta propia (ver cuentas_dinero)"
+        },
+        "nota": {
+          "type": "string",
+          "description": "Para «ignorar»: por qué se ignoran (queda en cada movimiento)"
+        }
+      },
+      "required": [
+        "accion"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "buscar_series",
+    "nivel": "ver",
+    "description": "Busca equipos por número de serie, producto, cliente o número de certificado: a quién se vendió cada serie y cuándo, y su certificado de calibración (número, laboratorio, fecha y próxima calibración). Con «vencen_en_dias» lista los equipos cuya calibración vence dentro de ese plazo o ya venció: sirve para ofrecer la recalibración.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "buscar": {
+          "type": "string",
+          "description": "Serie, producto, cliente o N° de certificado"
+        },
+        "cliente": {
+          "type": "string",
+          "description": "Nombre o RUT: solo los equipos de ese cliente"
+        },
+        "estado": {
+          "type": "string",
+          "enum": [
+            "en_stock",
+            "vendido",
+            "baja"
+          ]
+        },
+        "vencen_en_dias": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 730
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "registrar_series",
+    "nivel": "borradores",
+    "description": "Registra números de serie de un producto (uno o varios) y, si se indican, los datos del certificado de calibración (se aplican a todas las series de la llamada; para certificados distintos, una llamada por serie). Con «venta» además deja esas series anotadas en esa venta: quedan vendidas a su cliente. No cambia el stock: la serie identifica cuál unidad es. Copia la serie tal como viene en el equipo o en el certificado.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "producto": {
+          "type": "string",
+          "description": "Nombre o SKU del producto"
+        },
+        "series": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "maxItems": 200
+        },
+        "certificado": {
+          "type": "object",
+          "properties": {
+            "numero": {
+              "type": "string"
+            },
+            "laboratorio": {
+              "type": "string"
+            },
+            "fecha": {
+              "type": "string",
+              "description": "AAAA-MM-DD"
+            },
+            "proxima_calibracion": {
+              "type": "string",
+              "description": "AAAA-MM-DD"
+            },
+            "archivo": {
+              "type": "string",
+              "description": "Ruta del PDF en el computador de la persona"
+            }
+          },
+          "additionalProperties": false
+        },
+        "venta": {
+          "type": "string",
+          "description": "Número de la venta donde se entregaron (opcional)"
+        }
+      },
+      "required": [
+        "producto",
+        "series"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "whatsapp_chats",
     "nivel": "ver",
     "description": "Chats recientes del WhatsApp de la empresa, leídos por el puente de NÚCLEO: nombre, teléfono, cuántos mensajes sin leer y el último mensaje. No incluye grupos ni los números que la persona excluyó. Leer no marca nada como leído. Si WhatsApp no está conectado o vinculado, lo dice.",
@@ -1231,7 +1442,7 @@
   {
     "name": "registrar_movimientos_banco",
     "nivel": "completo",
-    "description": "Guarda en la conciliación bancaria de NÚCLEO los movimientos de una cuenta leídos en el portal del banco (con la sesión que abrió la persona, solo lectura) o en una cartola. No duplica los que ya estaban y concilia solo los evidentes (un único cobro o pago posible por el mismo monto). No mueve dinero ni crea cobros: para eso se usa conciliar_movimiento_banco. Copia cada movimiento tal como aparece en el banco: fecha, glosa completa, número de operación y monto.",
+    "description": "Guarda en la conciliación bancaria de NÚCLEO los movimientos de una cuenta leídos en el portal del banco (con la sesión que abrió la persona, solo lectura) o en una cartola. No duplica los que ya estaban y concilia solo los evidentes (un único cobro o pago posible por el mismo monto). No mueve dinero ni crea cobros: para eso se usa conciliar_movimiento_banco. Copia cada movimiento tal como aparece en el banco: fecha, glosa completa, número de operación y monto; si el detalle muestra quién transfirió (RUT, nombre) y su comentario, cópialos también: con eso NÚCLEO reconoce al cliente y aprende.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1268,6 +1479,18 @@
               "saldo": {
                 "type": "number",
                 "description": "Saldo después del movimiento, si el banco lo muestra"
+              },
+              "rut": {
+                "type": "string",
+                "description": "RUT de quien transfirió o de a quién se pagó, si el banco lo muestra"
+              },
+              "nombre": {
+                "type": "string",
+                "description": "Nombre de quien transfirió o de a quién se pagó, si el banco lo muestra"
+              },
+              "comentario": {
+                "type": "string",
+                "description": "Comentario o mensaje de la transferencia, si aparece"
               }
             },
             "required": [
@@ -1289,7 +1512,7 @@
   {
     "name": "conciliacion_banco",
     "nivel": "ver",
-    "description": "Muestra la conciliación de una cuenta bancaria: saldo según el banco y según NÚCLEO, y los movimientos del banco con su estado. Para cada movimiento pendiente entrega las sugerencias de NÚCLEO (qué venta por cobrar, compra o gasto podría ser, con su puntaje) y los identificadores que usa conciliar_movimiento_banco. También lista los cobros y pagos de NÚCLEO que no aparecen en el banco.",
+    "description": "Muestra la conciliación de una cuenta bancaria: saldo según el banco y según NÚCLEO, y los movimientos del banco con su estado. Para cada movimiento pendiente entrega las sugerencias de NÚCLEO (qué venta por cobrar, compra o gasto podría ser, con su puntaje) y los identificadores que usa conciliar_movimiento_banco; las que vienen «por regla» salen de una regla de conciliación escrita por la persona o aprendida de lo ya conciliado. También lista los cobros y pagos de NÚCLEO que no aparecen en el banco.",
     "inputSchema": {
       "type": "object",
       "properties": {

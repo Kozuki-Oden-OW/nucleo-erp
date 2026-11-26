@@ -63,6 +63,7 @@ pub const ALERT_KINDS: &[(&str, &str)] = &[
     ("importaciones", "Importaciones en camino"),
     ("presupuesto", "Gastos sobre el presupuesto del mes"),
     ("documentar", "Ventas pendientes de documentar"),
+    ("calibraciones", "Certificados de calibración por vencer"),
 ];
 
 #[derive(Debug, Clone, Serialize)]
@@ -908,6 +909,60 @@ impl CompanySession {
                     href: "/ventas?tab=pendientes_doc".into(),
                     action: "Revisar y marcar".into(),
                     lines: vec![],
+                });
+            }
+        }
+
+        if sales_ok && on("calibraciones") {
+            // Equipos vendidos cuyo certificado vence dentro de 30 días: una recalibración por ofrecer.
+            let due = self.serials_due(30)?;
+            if !due.is_empty() {
+                let overdue = due
+                    .iter()
+                    .filter(|s| s.due_in_days.is_some_and(|d| d < 0))
+                    .count();
+                out.push(AlertItem {
+                    kind: "calibraciones".into(),
+                    severity: "info".into(),
+                    title: format!(
+                        "{} {} por vencer",
+                        due.len(),
+                        if due.len() == 1 {
+                            "certificado de calibración"
+                        } else {
+                            "certificados de calibración"
+                        }
+                    ),
+                    detail: format!(
+                        "Equipos vendidos cuya calibración vence dentro de 30 días{}. Es buen momento para ofrecer la recalibración.",
+                        if overdue > 0 {
+                            format!(" ({overdue} ya vencieron)")
+                        } else {
+                            String::new()
+                        }
+                    ),
+                    count: due.len() as i64,
+                    amount_minor: None,
+                    href: "/inventario?tab=series&vence=30".into(),
+                    action: "Ver los equipos".into(),
+                    lines: due
+                        .iter()
+                        .take(5)
+                        .map(|s| AlertLine {
+                            label: format!(
+                                "{} · serie {} · {}",
+                                s.product_name,
+                                s.serial,
+                                s.customer_name.clone().unwrap_or_else(|| "sin cliente".into())
+                            ),
+                            value: s
+                                .certificate_due
+                                .as_deref()
+                                .map(fecha)
+                                .unwrap_or_default(),
+                            href: s.sale_uid.as_ref().map(|u| format!("/ventas/{u}")),
+                        })
+                        .collect(),
                 });
             }
         }

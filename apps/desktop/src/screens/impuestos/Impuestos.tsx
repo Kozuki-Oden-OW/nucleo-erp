@@ -2,11 +2,11 @@
 // configuración tributaria. NÚCLEO no declara: prepara el formulario código por código, explica
 // cada monto y guarda lo que la persona declaró en sii.cl.
 import { useCallback, useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, FolderInput } from "lucide-react";
 import { useBackend, errorMessage, type F29View } from "../../data";
 import { navigate, type Route } from "../../lib/router";
 import { addDays, todayIso } from "../../lib/format";
-import { IconButton, Notice, PageHeader, Spinner, Tabs } from "../../ui/kit";
+import { Button, IconButton, Notice, PageHeader, Spinner, Tabs } from "../../ui/kit";
 import { F29Tab } from "./F29Tab";
 import { RegistroTab } from "./Registro";
 import { ContabilidadTab } from "./Contabilidad";
@@ -41,7 +41,8 @@ export function Impuestos({ route }: { route: Route }) {
   return (
     <div className="anim-in">
       <PageHeader title="Impuestos y contabilidad"
-        subtitle="Prepara tu declaración mensual (F29) y tu renta anual (F22) con tus ventas, compras, importaciones y remuneraciones. NÚCLEO no declara: te deja cada código listo para copiar en sii.cl y te explica de dónde sale." />
+        subtitle="Prepara tu declaración mensual (F29) y tu renta anual (F22) con tus ventas, compras, importaciones y remuneraciones. NÚCLEO no declara: te deja cada código listo para copiar en sii.cl y te explica de dónde sale."
+        actions={<Button variant="secondary" icon={FolderInput} onClick={() => navigate("/contabilidad/inicio-sii")}>Traer mis datos del SII</Button>} />
       {tab !== "f22" && tab !== "contabilidad" && <div className="mb-4 flex flex-wrap items-center gap-2">
         <IconButton icon={ChevronLeft} label="Mes anterior" onClick={() => go(tab, shiftPeriod(period, -1))} />
         <label className="sr-only" htmlFor="periodo">Período</label>

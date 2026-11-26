@@ -23,6 +23,8 @@ import type {
   PurchaseOrderSummary, PurchaseSummary, ReceiveLine, NewSupplier, Supplier, SupplierDetail, QuoteDetail, QuoteInput, QuoteSummary, RateRow, RoleRow,
   SaleDetail, SaleInput, SaleSummary, SearchHit, SecuritySettings, SequenceRow, SessionInfo, UserPatch, UserRow,
   SiiDocument, SiiIssueInput, SiiIntercambioGuardado, SiiIntercambioInput, SiiIntercambioResumen, SiiLibro, SiiLibroInput, SiiPrintDoc, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
+  AutoDone, BankRule, BankRuleInput, CollectResult, CollectRound, CollectSettings, DigestPreview, DigestSettings, GoalProgress, RecurringNow, RecurringSale, RecurringSaleInput,
+  Serial, SerialBulkReport, SerialFilter, SerialInput, StartFile, StartReport,
 } from "./types";
 
 /** Archivo elegido para adjuntar: ruta en el escritorio o archivo del navegador en la demostración. */
@@ -209,6 +211,34 @@ export interface Backend {
   mailSend(draft: MailDraft): Promise<MailLogRow>;
   mailTest(to?: string | null): Promise<MailLogRow>;
   mailLog(customerUid?: string | null, limit?: number): Promise<MailLogRow[]>;
+
+  /** Tareas programadas: «¿toca algo?» (ronda de cobranza, informe, cobros recurrentes). */
+  autoRun(): Promise<AutoDone[]>;
+  collectRound(): Promise<CollectRound>;
+  /** Solo la persona programa la ronda o excluye clientes. */
+  collectSaveSettings(settings: CollectSettings): Promise<CollectSettings>;
+  /** Envía la ronda (todos los listos) o solo a los clientes indicados. */
+  collectSend(customerUids?: string[] | null): Promise<CollectResult>;
+  digestPreview(): Promise<DigestPreview>;
+  digestSaveSettings(settings: DigestSettings): Promise<DigestPreview>;
+  /** Envía el informe ahora; devuelve a quién llegó. */
+  digestSend(): Promise<string>;
+  salesGoal(): Promise<GoalProgress | null>;
+  recurringSales(): Promise<RecurringSale[]>;
+  saveRecurringSale(input: RecurringSaleInput, uid?: string | null): Promise<RecurringSale>;
+  deleteRecurringSale(uid: string): Promise<void>;
+  recurringRunNow(uid: string): Promise<RecurringNow>;
+  bankRules(): Promise<BankRule[]>;
+  saveBankRule(input: BankRuleInput, uid?: string | null): Promise<BankRule[]>;
+  deleteBankRule(uid: string): Promise<BankRule[]>;
+  serials(filter?: SerialFilter): Promise<Serial[]>;
+  saveSerial(input: SerialInput, uid?: string | null): Promise<Serial>;
+  addSerials(productUid: string, serials: string[]): Promise<SerialBulkReport>;
+  assignSerials(saleUid: string, serialUids: string[]): Promise<Serial[]>;
+  releaseSerial(uid: string): Promise<Serial>;
+  deleteSerial(uid: string): Promise<void>;
+  /** Carga de una vez los registros de compras y ventas descargados del SII. */
+  siiStartImport(files: StartFile[]): Promise<StartReport>;
   /** Facturación electrónica propia con el SII: estado, datos del emisor, certificado y folios. */
   siiStatus(): Promise<SiiStatus>;
   siiSaveSetup(setup: SiiSetup): Promise<SiiStatus>;

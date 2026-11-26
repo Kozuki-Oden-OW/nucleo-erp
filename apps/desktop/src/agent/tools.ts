@@ -3,7 +3,7 @@
 // valen las mismas reglas, permisos y auditoría.
 import type { Backend } from "../data";
 import { errorMessage } from "../data";
-import type { WspChat, QuoteDetail, QuoteSummary, QuoteTemplate, Customer, HistoricalSale, MoneyAccount, ReconcileKind, SiiDocument, SiiIntercambioResumen, SiiLibro, SiiLineaLibro, LineInput, Product, SaleSummary, SaleTerms, ShipmentInput, ShipmentSize, Supplier } from "../data/types";
+import type { BankRule, BankRuleAction, BankRuleDirection, BankRuleInput, Serial, SerialStatus, WspChat, QuoteDetail, QuoteSummary, QuoteTemplate, Customer, HistoricalSale, MoneyAccount, ReconcileKind, SiiDocument, SiiIntercambioResumen, SiiLibro, SiiLineaLibro, LineInput, Product, SaleSummary, SaleTerms, ShipmentInput, ShipmentSize, Supplier } from "../data/types";
 import { EMPTY_TERMS } from "../data/saleTerms";
 import { formatMoney, formatQty, todayIso } from "../lib/format";
 import { buildQuotePdf, QUOTE_TEMPLATES, quoteFileName } from "../lib/quotePdf";
@@ -192,6 +192,16 @@ async function findWspChat(backend: Backend, ref: string): Promise<WspChat> {
   throw new Error(`Varios chats coinciden con «${ref}»: ${loose.slice(0, 8).map((c) => `${c.nombre || "sin nombre"} (+${c.telefono ?? "?"})`).join("; ")}. Indica el teléfono o el id.`);
 }
 
+const DAY_NAMES = (days: number[]) => {
+  const n = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
+  const d = [...days].sort();
+  if (d.length === 7) return "todos los días";
+  if (d.join() === "1,2,3,4,5") return "de lunes a viernes";
+  return d.length ? `los ${d.map((x) => n[x - 1]).join(", ")}` : "ningún día";
+};
+const ruleLine = (r: BankRule) => `- ${r.pattern ? `glosa «${r.pattern}»` : `RUT ${r.rut}`}${r.pattern && r.rut ? ` o RUT ${r.rut}` : ""} (${r.direction}) → ${r.target}${r.action === "gasto" && r.tax_included ? " (con IVA incluido)" : ""} · ${r.origin === "manual" ? "escrita por la persona" : "aprendida"} · usada ${r.hits} ${r.hits === 1 ? "vez" : "veces"}${r.active ? "" : " · pausada"}${r.note ? ` · ${r.note}` : ""}`;
+const serialLine = (s: Serial) => `- ${s.serial} · ${s.product_name} (${s.product_sku}) · ${s.status === "vendido" ? `vendido en ${s.sale_number} a ${s.customer_name ?? "cliente ocasional"} el ${s.sold_at}` : s.status === "baja" ? "de baja" : "en stock"}${s.certificate_number ? ` · certificado ${s.certificate_number}${s.certificate_lab ? ` (${s.certificate_lab})` : ""}${s.certificate_date ? ` del ${s.certificate_date}` : ""}` : " · sin certificado anotado"}${s.certificate_due ? ` · próxima calibración ${s.certificate_due}${s.due_in_days !== null ? (s.due_in_days < 0 ? ` (VENCIDA hace ${-s.due_in_days} días)` : ` (en ${s.due_in_days} días)`) : ""}` : ""}${s.certificate_file ? ` · PDF: ${s.certificate_file}` : ""}`;
+
 function dataChanged() { if (typeof window !== "undefined") window.dispatchEvent(new Event("nucleo:datos")); }
 
 async function screenAfter(done: string): Promise<ToolResult> {
@@ -321,7 +331,7 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error(`Movimiento ${i + 1}: la fecha debe ser AAAA-MM-DD.`);
         if (amount === null || amount === 0) throw new Error(`Movimiento ${i + 1}: falta el monto (positivo si es abono, negativo si es cargo).`);
         const balance = num(m, "saldo");
-        return { date, description: str(m, "descripcion"), reference: str(m, "referencia") || null, amount_minor: Math.round(amount), balance_minor: balance === null ? null : Math.round(balance) };
+        return { date, description: str(m, "descripcion"), reference: str(m, "referencia") || null, amount_minor: Math.round(amount), balance_minor: balance === null ? null : Math.round(balance), counterparty_rut: str(m, "rut") || null, counterparty_name: str(m, "nombre") || null, comment: str(m, "comentario") || null };
       });
       const r = await backend.importBankStatement(account.uid, str(a, "origen") || "Leído en el portal del banco", lines);
       dataChanged();
@@ -338,8 +348,8 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
         v.statement_balance_minor !== null ? `Saldo según el banco al ${v.statement_date}: ${pesos(v.statement_balance_minor)} · según NÚCLEO: ${v.nucleo_balance_minor !== null ? pesos(v.nucleo_balance_minor) : "—"}${v.nucleo_balance_minor !== null && v.nucleo_balance_minor !== v.statement_balance_minor ? ` · diferencia ${pesos(v.statement_balance_minor - v.nucleo_balance_minor)}` : ""}.` : "Aún no hay saldo informado por el banco.",
       ];
       const body = rows.map((l) => [
-        `- ${l.date} · ${l.amount_minor > 0 ? "abono" : "cargo"} ${pesos(Math.abs(l.amount_minor))} · ${l.description}${l.reference ? ` · ref ${l.reference}` : ""} · ${l.status}${l.matched ? ` con ${l.matched.label}` : ""} · movimiento ${l.uid}`,
-        ...(l.status === "pendiente" ? l.suggestions.slice(0, 4).map((g) => `    · sugerencia ${g.score}%: ${g.action} → ${g.label} (${g.detail})${g.target_uid ? ` · destino ${g.target_uid}` : ""}${g.category_id !== null ? ` · categoría ${g.category_id} ${g.category ?? ""}` : ""}`) : []),
+        `- ${l.date} · ${l.amount_minor > 0 ? "abono" : "cargo"} ${pesos(Math.abs(l.amount_minor))} · ${l.description}${l.reference ? ` · ref ${l.reference}` : ""}${l.counterparty_name || l.counterparty_rut ? ` · de/para ${[l.counterparty_name, l.counterparty_rut].filter(Boolean).join(" ")}` : ""}${l.comment ? ` · comentario «${l.comment}»` : ""} · ${l.status}${l.matched ? ` con ${l.matched.label}` : ""} · movimiento ${l.uid}`,
+        ...(l.status === "pendiente" ? l.suggestions.slice(0, 4).map((g) => `    · sugerencia ${g.score}%: ${g.action} → ${g.label} (${g.detail})${g.target_uid ? ` · destino ${g.target_uid}` : ""}${g.category_id !== null ? ` · categoría ${g.category_id} ${g.category ?? ""}` : ""}${g.rule ? ` · por regla «${g.rule}»${g.tax_included ? " (con IVA)" : ""}${g.note ? ` · nota: ${g.note}` : ""}` : ""}`) : []),
       ].join("\n"));
       const missing = v.unmatched.slice(0, 30).map((u) => `- ${u.date} · ${u.document} · ${u.detail} · ${pesos(u.amount_minor)}`);
       return text([
@@ -603,6 +613,56 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
         : "El correo de la empresa no está configurado (Configuración → Integraciones → Correo): la persona escribe ahí el servidor y la clave de la casilla.";
       return text([head, rows.length ? `${rows.length} correos:` : "Sin correos enviados.", ...rows.map((r) => `- ${r.sent_at.slice(0, 16).replace("T", " ")} · ${r.to_addr} · «${r.subject}»${r.reference ? ` · ${r.reference}` : ""} · ${r.status}${r.error ? ` (${r.error})` : ""} · ${r.user_name}`)].join("\n"));
     }
+    case "ronda_cobranza": {
+      const r = await backend.collectRound();
+      const c = r.settings;
+      const STATE: Record<string, string> = { listo: "listo para enviar", reciente: "ya se le escribió hace poco", sin_correo: "SIN CORREO en su ficha", excluido: "excluido por la persona (no se le envía)" };
+      const lateTxt = (d: number) => (d > 0 ? `${d} días de atraso` : d === 0 ? "vence hoy" : `vence en ${-d} días`);
+      const head = [
+        `Ronda de cobranza del ${r.today}: ${r.items.length} ${r.items.length === 1 ? "cliente" : "clientes"} · ${r.ready} con el recordatorio listo · atrasado ${pesos(r.overdue_minor)} de ${pesos(r.total_minor)} que deben.`,
+        c.enabled
+          ? `Programada: ${DAY_NAMES(c.weekdays)} desde las ${String(c.hour).padStart(2, "0")}:00, modo «${c.mode === "enviar" ? "enviar sola" : "avisar a la persona"}»${r.due_now ? " · TOCA HOY y aún no se hace" : ""}.`
+          : "Sin programar: se envía cuando la persona lo pide.",
+        `Se cobra desde ${c.min_days} día(s) de atraso${c.before_days ? `, se avisa ${c.before_days} días antes de vencer` : ""}; no se repite al mismo cliente antes de ${c.repeat_days} días.`,
+        r.mail_ready ? (r.agent_send ? "Claude puede enviar los recordatorios si la persona lo pide (enviar_cobranza)." : "Claude NO tiene permiso para enviar correos: puede mostrar la ronda y la persona la envía en Dinero → Cobranza.") : "El correo de la empresa no está configurado (Configuración → Integraciones → Correo).",
+        r.last.last_run_at ? `Última ronda (${r.last.last_kind}): ${r.last.last_run_at.slice(0, 16).replace("T", " ")} · ${r.last.last_sent} enviados${r.last.last_failed ? `, ${r.last.last_failed} sin salir` : ""}.` : "",
+      ];
+      const body = r.items.map((i) => [
+        `- ${i.customer_name} · ${pesos(i.total_minor)}${i.overdue_minor && i.overdue_minor !== i.total_minor ? ` (atrasado ${pesos(i.overdue_minor)})` : ""} · ${lateTxt(i.max_days_late)} · ${i.email ?? "sin correo"} · ${STATE[i.state] ?? i.state}${i.last_reminder_at ? ` · último recordatorio ${i.last_reminder_at.slice(0, 10)}` : ""}`,
+        ...i.docs.map((d) => `    · ${d.number} · ${pesos(d.pending_minor)} · vence ${d.due_date} (${lateTxt(d.days_late)})`),
+      ].join("\n"));
+      return text([...head.filter(Boolean), r.items.length ? "" : "Nadie que cobrar hoy.", ...body].join("\n"));
+    }
+    case "informe_negocio": {
+      const p = await backend.digestPreview();
+      const s = p.settings;
+      return text([
+        p.body,
+        "",
+        s.enabled ? `Este informe sale solo por correo ${DAY_NAMES(s.weekdays)} desde las ${String(s.hour).padStart(2, "0")}:00 a ${p.to || "la casilla de la empresa"}.` : "El informe por correo no está programado (la persona lo activa en Configuración → Informe y meta).",
+        s.goal_minor ? "" : "No hay meta de ventas del mes (la persona la fija en Configuración → Informe y meta).",
+      ].filter((x, i) => x || i === 1).join("\n"));
+    }
+    case "cobros_recurrentes": {
+      const rows = await backend.recurringSales();
+      if (!rows.length) return text("No hay cobros recurrentes. La persona los crea en Ventas → Cobros recurrentes.");
+      return text([`${rows.length} cobros recurrentes:`, ...rows.map((r) =>
+        `- ${r.name} · ${r.customer_name} · ${r.frequency} · ${r.total_minor === null ? "monto por revisar" : pesos(r.total_minor)} · próximo ${r.next_date}${r.end_date ? ` (hasta ${r.end_date})` : ""}${r.due_now ? " · TOCA GENERARLO" : ""}${r.active ? "" : " · pausado"}${r.last_sale_number ? ` · último ${r.last_sale_number} el ${r.last_run_date}` : " · aún no se genera"} · ${r.confirm ? "queda por cobrar" : "queda en borrador"}${r.send_mail ? (r.customer_email ? ` · avisa a ${r.customer_email}` : " · el cliente no tiene correo") : ""}`)].join("\n"));
+    }
+    case "reglas_banco": {
+      const rules = await backend.bankRules();
+      if (!rules.length) return text("Aún no hay reglas de conciliación. NÚCLEO las anota al conciliar movimientos, y se pueden crear con guardar_regla_banco.");
+      return text([`${rules.length} reglas de conciliación:`, ...rules.map(ruleLine)].join("\n"));
+    }
+    case "buscar_series": {
+      let customer_uid: string | null = null;
+      const cq = str(a, "cliente");
+      if (cq) customer_uid = pickOne(await searchBoth((q) => backend.searchCustomers(q), cq), cq, (x) => x.rut ?? "", "cliente").uid;
+      const st = str(a, "estado");
+      const rows = await backend.serials({ query: str(a, "buscar") || null, customer_uid, status: (st as SerialStatus) || null, due_within_days: num(a, "vencen_en_dias"), limit: 100 });
+      if (!rows.length) return text("No hay series con ese criterio.");
+      return text([`${rows.length} ${rows.length === 1 ? "serie" : "series"}:`, ...rows.map(serialLine)].join("\n"));
+    }
     case "whatsapp_chats": {
       const st = await backend.wspStatus();
       if (!st.configured) return text("WhatsApp no está conectado a NÚCLEO. La persona lo activa en Configuración → Integraciones → WhatsApp: arranca el puente (Iniciar-WhatsApp.ps1), escribe la dirección y la llave, y escanea el código QR con el teléfono.");
@@ -706,6 +766,80 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
         ...(marked.length ? [`Marcadas como enviadas: ${marked.join(", ")}.`] : []),
         "Quedó en la auditoría de NÚCLEO.",
       ].join("\n"));
+    }
+    case "enviar_cobranza": {
+      const round = await backend.collectRound();
+      if (!round.mail_ready) throw new Error("El correo de la empresa no está configurado. La persona lo conecta en Configuración → Integraciones → Correo.");
+      if (!round.agent_send) throw new Error("Claude no tiene permiso para enviar correos en este negocio. La persona lo activa en Configuración → Integraciones → Correo («Permitir que Claude envíe los correos que le pidas»), o envía la ronda ella en Dinero → Cobranza.");
+      const names = Array.isArray(a.clientes) ? (a.clientes as unknown[]).filter((x): x is string => typeof x === "string" && !!x.trim()) : [];
+      const uids: string[] = [];
+      for (const n of names) {
+        const k = norm(n);
+        const hits = round.items.filter((i) => norm(i.customer_name) === k);
+        const loose = hits.length ? hits : round.items.filter((i) => norm(i.customer_name).includes(k));
+        if (loose.length !== 1) {
+          const c = pickOne(await searchBoth((q) => backend.searchCustomers(q), n), n, (x) => x.rut ?? "", "cliente");
+          if (!round.items.some((i) => i.customer_uid === c.uid)) throw new Error(`${c.name} no está en la ronda de cobranza de hoy (no tiene documentos vencidos).`);
+          uids.push(c.uid);
+        } else uids.push(loose[0]!.customer_uid);
+      }
+      if (!names.length && !round.ready) throw new Error("No hay recordatorios listos para enviar hoy (ver ronda_cobranza).");
+      const r = await backend.collectSend(uids.length ? uids : null);
+      dataChanged();
+      return text(`Cobranza: ${r.sent} ${r.sent === 1 ? "recordatorio enviado" : "recordatorios enviados"}${r.failed ? `; ${r.failed} no salieron: ${r.errors.join("; ")}` : ""}. Quedaron en el registro de correos y en la ficha de cada cliente.`);
+    }
+    case "guardar_regla_banco": {
+      const action = str(a, "accion") as BankRuleAction;
+      const input: BankRuleInput = { pattern: str(a, "texto"), rut: str(a, "rut") || null, action, direction: (str(a, "aplica_a") as BankRuleDirection) || (action === "cliente" ? "abono" : action === "proveedor" || action === "gasto" ? "cargo" : "ambos"), note: str(a, "nota") || null };
+      if (action === "cliente") input.customer_uid = pickOne(await searchBoth((q) => backend.searchCustomers(q), str(a, "cliente")), str(a, "cliente"), (x) => x.rut ?? "", "cliente").uid;
+      if (action === "proveedor") input.supplier_uid = pickOne(await searchBoth((q) => backend.searchSuppliers(q), str(a, "proveedor")), str(a, "proveedor"), (x) => x.rut ?? "", "proveedor").uid;
+      if (action === "gasto") {
+        const cats = (await backend.expenseCategories()).filter((c) => !c.archived);
+        const k = norm(str(a, "categoria"));
+        const cat = cats.find((c) => norm(c.name) === k) ?? (k ? cats.find((c) => norm(c.name).includes(k)) : undefined);
+        if (!cat) throw new Error(`No hay una categoría de gasto «${str(a, "categoria")}». Categorías: ${cats.map((c) => c.name).join(", ")}.`);
+        input.category_id = cat.id;
+        input.tax_included = a.con_iva === true;
+      }
+      if (action === "traspaso") input.account_uid = (await bankAccount(backend, str(a, "cuenta"))).uid;
+      const before = new Set((await backend.bankRules()).map((r) => r.uid));
+      const rules = await backend.saveBankRule(input, null);
+      const created = rules.find((r) => !before.has(r.uid));
+      dataChanged();
+      return text(`Regla guardada:\n${created ? ruleLine(created) : "(ver reglas_banco)"}\nDesde ahora los movimientos por revisar que coincidan traen esa sugerencia arriba; registrar cada uno sigue necesitando la confirmación de la persona.`);
+    }
+    case "registrar_series": {
+      const pq = str(a, "producto");
+      const product = pickOne(await backend.searchProducts(pq), pq, (x) => x.sku, "producto");
+      const list = Array.isArray(a.series) ? (a.series as unknown[]).filter((x): x is string => typeof x === "string" && !!x.trim()).map((x) => x.trim()) : [];
+      if (!list.length) throw new Error("Indica al menos un número de serie.");
+      const cert = (a.certificado && typeof a.certificado === "object" ? a.certificado : {}) as Args;
+      const hasCert = ["numero", "laboratorio", "fecha", "proxima_calibracion", "archivo"].some((k) => str(cert, k));
+      const saleRef = str(a, "venta");
+      const sale = saleRef ? (await backend.listSales({ query: saleRef })).find((x) => norm(x.number) === norm(saleRef)) : null;
+      if (saleRef && !sale) throw new Error(`No encontré la venta «${saleRef}».`);
+      const existing = await backend.serials({ product_uid: product.uid, limit: 2000 });
+      const keyOf = (t: string) => t.replace(/[^\p{L}\p{N}]/gu, "").toUpperCase();
+      const done: Serial[] = [];
+      const notes: string[] = [];
+      for (const serial of list) {
+        const prev = existing.find((x) => keyOf(x.serial) === keyOf(serial));
+        if (prev && !hasCert) { done.push(prev); notes.push(`${serial}: ya estaba registrada`); continue; }
+        done.push(await backend.saveSerial({
+          product_uid: product.uid, serial: prev?.serial ?? serial,
+          certificate_number: str(cert, "numero") || prev?.certificate_number || null, certificate_lab: str(cert, "laboratorio") || prev?.certificate_lab || null,
+          certificate_date: str(cert, "fecha") || prev?.certificate_date || null, certificate_due: str(cert, "proxima_calibracion") || prev?.certificate_due || null,
+          certificate_file: str(cert, "archivo") || prev?.certificate_file || null, notes: prev?.notes ?? null,
+        }, prev?.uid ?? null));
+      }
+      let assigned = "";
+      if (sale) {
+        const inSale = await backend.assignSerials(sale.uid, done.filter((x) => x.sale_uid !== sale.uid).map((x) => x.uid));
+        assigned = ` La venta ${sale.number} tiene ahora ${inSale.length} ${inSale.length === 1 ? "serie anotada" : "series anotadas"}.`;
+      }
+      dataChanged();
+      const fresh = await backend.serials({ product_uid: product.uid, limit: 2000 });
+      return text([`${product.name}: ${done.length} ${done.length === 1 ? "serie" : "series"}.${assigned}`, ...fresh.filter((x) => done.some((d) => d.uid === x.uid)).map(serialLine), ...(notes.length ? ["Notas:", ...notes.map((n) => `- ${n}`)] : [])].join("\n"));
     }
     case "enviar_correo": {
       const st = await backend.mailStatus();

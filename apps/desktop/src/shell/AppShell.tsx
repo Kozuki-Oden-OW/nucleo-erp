@@ -3,7 +3,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Bell, ChevronsLeft, ChevronsRight, FlaskConical, KeyRound, LogOut, Monitor, Moon, PanelLeft, Plus, Search, Sun,
 } from "lucide-react";
-import { useBackend, type AlertItem, type AppInfo, type CreatedCompany, type SessionInfo } from "../data";
+import { useBackend, type AlertItem, type AppInfo, type AutoDone, type CreatedCompany, type SessionInfo } from "../data";
+import { useToast } from "../ui/overlay";
 import { AlertList } from "./AlertList";
 import { applyAccent } from "../lib/accent";
 import { CompanySwitcher } from "./CompanySwitcher";
@@ -76,6 +77,27 @@ export function AppShell({
     if (!backend.features.has("dashboard")) return;
     backend.alerts().then(setAlerts).catch(() => setAlerts(null));
   }, [backend, route.raw]);
+
+  // Lo que NÚCLEO hace solo (ronda de cobranza, informe por correo, cobros recurrentes): mientras el
+  // programa está abierto pregunta cada pocos minutos «¿toca algo?». Lo que haga queda avisado aquí
+  // y en la campana hasta que se cierre el programa.
+  const toast = useToast();
+  const [autoDone, setAutoDone] = useState<AutoDone[]>([]);
+  useEffect(() => {
+    let alive = true;
+    const tick = async () => {
+      try {
+        const done = await backend.autoRun();
+        if (!alive || done.length === 0) return;
+        setAutoDone((prev) => [...done, ...prev].slice(0, 12));
+        for (const d of done) toast(d.tone, `${d.title}. ${d.detail}`);
+        window.dispatchEvent(new Event("nucleo:datos"));
+      } catch { /* se reintenta en la próxima vuelta */ }
+    };
+    const first = window.setTimeout(tick, 20_000);
+    const every = window.setInterval(tick, 5 * 60_000);
+    return () => { alive = false; window.clearTimeout(first); window.clearInterval(every); };
+  }, [backend, session.company.uid, toast]);
 
   // Logo del negocio en el menú (se refresca al navegar, por ejemplo después de cambiarlo).
   const [logo, setLogo] = useState<string | null>(null);
@@ -206,7 +228,7 @@ export function AppShell({
                 {alertCount > 0 && (
                   <span className="num pointer-events-none absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">{alertCount}</span>
                 )}
-                {bell && <AlertsPopover data={alerts} onClose={() => setBell(false)} />}
+                {bell && <AlertsPopover data={alerts} auto={autoDone} onClose={() => setBell(false)} />}
               </div>
               <UserMenu session={session} onLogout={async () => setSession(await backend.logout())} />
             </div>
@@ -261,7 +283,7 @@ function ThemeMenu({ theme, onChange }: { theme: Theme; onChange: (t: Theme) => 
   return <IconButton icon={icon} label={`${label} (clic para cambiar)`} onClick={() => onChange(order[(order.indexOf(theme) + 1) % 3]!)} />;
 }
 
-function AlertsPopover({ data, onClose }: { data: AlertItem[] | null; onClose: () => void }) {
+function AlertsPopover({ data, auto, onClose }: { data: AlertItem[] | null; auto: AutoDone[]; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
@@ -279,6 +301,21 @@ function AlertsPopover({ data, onClose }: { data: AlertItem[] | null; onClose: (
       {!data || data.length === 0
         ? <div className="px-2 py-6 text-center text-sm text-muted">Todo en orden.</div>
         : <div className="max-h-[420px] overflow-auto"><AlertList alerts={data} compact onNavigate={onClose} /></div>}
+      {auto.length > 0 && (
+        <div className="mt-1 border-t border-line pt-1">
+          <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted">NÚCLEO hizo solo, hoy</div>
+          <ul className="max-h-48 overflow-auto">
+            {auto.map((a, i) => (
+              <li key={i}>
+                <button onClick={() => { navigate(a.href); onClose(); }} className="flex w-full flex-col rounded-md px-2 py-1.5 text-left hover:bg-surface-2">
+                  <span className={cx("text-sm", a.tone === "warning" ? "text-warning" : "text-ink")}>{a.title}</span>
+                  <span className="text-xs text-muted">{a.detail}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

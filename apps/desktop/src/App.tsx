@@ -36,6 +36,7 @@ import { StockDocEditor } from "./screens/inventario/StockDocEditor";
 import { StockEntryEditor } from "./screens/inventario/StockEntryEditor";
 import { CountEditor } from "./screens/inventario/CountEditor";
 import { Config } from "./screens/config/Config";
+import { SiiStart } from "./screens/impuestos/SiiStart";
 import { Money } from "./screens/dinero/Money";
 import { ExpenseView } from "./screens/dinero/Expenses";
 import { Gastos } from "./screens/gastos/Gastos";
@@ -193,6 +194,7 @@ function Screen({ route, info, session, reload }: { route: Route; info: AppInfo;
       if (a === "importacion" && b) return <ImportView key={b} uid={b} />;
       return <Comex route={route} />;
     case "contabilidad":
+      if (has.has("impuestos") && a === "inicio-sii") return <SiiStart />;
       return has.has("impuestos") ? <Impuestos route={route} /> : <Proximamente id="contabilidad" />;
     case "remuneraciones":
       if (!has.has("remuneraciones")) return <Proximamente id="remuneraciones" />;

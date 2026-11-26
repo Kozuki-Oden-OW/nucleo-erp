@@ -5,7 +5,7 @@ import {
   Banknote, CalendarClock, FilePlus2, HandCoins, Landmark, Percent, Plus, Receipt, Settings2, ShoppingCart,
   TrendingDown, TrendingUp, UserPlus, Users, Wallet,
 } from "lucide-react";
-import { useBackend, errorMessage, type Dashboard as Data, type SessionInfo } from "../data";
+import { useBackend, errorMessage, type Dashboard as Data, type GoalProgress, type SessionInfo } from "../data";
 import { formatDate, formatMoney, formatMoneyShort, formatMonthShort } from "../lib/format";
 import { useTerm } from "../lib/glosario";
 import { navigate } from "../lib/router";
@@ -39,6 +39,8 @@ export function Dashboard({ session }: { session: SessionInfo }) {
   const [chart, setChart] = useState<"ventas" | "margen">("ventas");
 
   useEffect(() => { backend.dashboard().then(setD).catch((e) => setErr(errorMessage(e))); }, [backend]);
+  const [goal, setGoal] = useState<GoalProgress | null>(null);
+  useEffect(() => { backend.salesGoal().then(setGoal).catch(() => setGoal(null)); }, [backend]);
 
   if (err) return <Notice tone="danger">{err}</Notice>;
   if (!d) return <Spinner label="Calculando tu resumen…" />;
@@ -62,6 +64,30 @@ export function Dashboard({ session }: { session: SessionInfo }) {
           </>
         }
       />
+
+      {d.series.every((m) => m.sales_minor === 0) && backend.features.has("impuestos") && can("contabilidad.editar") && (
+        <div className="mb-5">
+          <Notice tone="info" title="¿Partiendo con NÚCLEO? Trae tus ventas y compras del SII"
+            actions={<Button size="sm" onClick={() => navigate("/contabilidad/inicio-sii")}>Traer mis datos</Button>}>
+            Descarga tu Registro de Compras y Ventas desde sii.cl y suéltalo aquí: en un par de minutos ves cuánto vendes, a quién y a quién le compras. No se pide ninguna clave.
+          </Notice>
+        </div>
+      )}
+      {goal && (
+        <button onClick={() => navigate("/config/informe")} className="mb-5 block w-full rounded-xl border border-line bg-surface px-5 py-3 text-left shadow-card hover:border-accent/50">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+            <span className="font-medium text-ink">Meta del mes: {formatMoney(goal.goal_minor)}</span>
+            <span className="text-muted">
+              {goal.remaining_minor > 0
+                ? <>Llevas <strong className="num text-ink">{Math.round(goal.progress_ppm / 10_000)} %</strong> · faltan <strong className="num text-ink">{formatMoney(goal.remaining_minor)}</strong> · {formatMoney(goal.per_workday_minor)} por día hábil ({goal.workdays_left} por delante)</>
+                : <strong className="text-success">Meta cumplida ({Math.round(goal.progress_ppm / 10_000)} %)</strong>}
+            </span>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, Math.round(goal.progress_ppm / 10_000))} aria-label="Avance de la meta del mes">
+            <div className={goal.remaining_minor > 0 ? "h-full bg-accent" : "h-full bg-success"} style={{ width: `${Math.min(100, goal.progress_ppm / 10_000)}%` }} />
+          </div>
+        </button>
+      )}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
         <div className="min-w-0">

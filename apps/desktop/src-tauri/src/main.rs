@@ -3,6 +3,7 @@
 
 mod access;
 mod agent;
+mod auto;
 mod commands;
 #[cfg(test)]
 mod ipc_tests;
@@ -154,6 +155,28 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         wsp::wsp_chats,
         wsp::wsp_conversation,
         wsp::wsp_send,
+        auto::auto_run,
+        auto::collect_round,
+        auto::collect_save_settings,
+        auto::collect_send,
+        auto::digest_preview,
+        auto::digest_save_settings,
+        auto::digest_send,
+        auto::sales_goal,
+        auto::recurring_sales,
+        auto::save_recurring_sale,
+        auto::delete_recurring_sale,
+        auto::recurring_run_now,
+        auto::bank_rules,
+        auto::save_bank_rule,
+        auto::delete_bank_rule,
+        auto::serials,
+        auto::save_serial,
+        auto::add_serials,
+        auto::assign_serials,
+        auto::release_serial,
+        auto::delete_serial,
+        auto::sii_start_import,
         sii::sii_status,
         sii::sii_save_setup,
         sii::sii_load_certificate,

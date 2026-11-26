@@ -24,6 +24,8 @@ import type {
   SaleSummary, SearchHit,
   SecuritySettings, SequenceRow, SessionInfo, UserPatch, UserRow,
   SiiDocument, SiiIssueInput, SiiIntercambioGuardado, SiiIntercambioInput, SiiIntercambioResumen, SiiLibro, SiiLibroInput, SiiPrintDoc, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
+  AutoDone, BankRule, BankRuleInput, CollectResult, CollectRound, CollectSettings, DigestPreview, DigestSettings, GoalProgress, RecurringNow, RecurringSale, RecurringSaleInput,
+  Serial, SerialBulkReport, SerialFilter, SerialInput, StartFile, StartReport,
 } from "./types";
 
 interface CommandError { code: string; message: string }
@@ -197,6 +199,28 @@ export class TauriBackend implements Backend {
   mailSaveTemplates(templates: MailTemplates) { return call<MailTemplates>("mail_save_templates", { templates }); }
   mailDraft(kind: "envio" | "cobro" | "promocion", reference: string) { return call<MailDraft>("mail_draft", { kind, reference }); }
   mailSend(draft: MailDraft) { return call<MailLogRow>("mail_send", { draft }); }
+  autoRun() { return call<AutoDone[]>("auto_run"); }
+  collectRound() { return call<CollectRound>("collect_round"); }
+  collectSaveSettings(settings: CollectSettings) { return call<CollectSettings>("collect_save_settings", { settings }); }
+  collectSend(customerUids?: string[] | null) { return call<CollectResult>("collect_send", { customerUids: customerUids ?? null }); }
+  digestPreview() { return call<DigestPreview>("digest_preview"); }
+  digestSaveSettings(settings: DigestSettings) { return call<DigestPreview>("digest_save_settings", { settings }); }
+  digestSend() { return call<string>("digest_send"); }
+  salesGoal() { return call<GoalProgress | null>("sales_goal"); }
+  recurringSales() { return call<RecurringSale[]>("recurring_sales"); }
+  saveRecurringSale(input: RecurringSaleInput, uid?: string | null) { return call<RecurringSale>("save_recurring_sale", { input, uid: uid ?? null }); }
+  deleteRecurringSale(uid: string) { return call<void>("delete_recurring_sale", { uid }); }
+  recurringRunNow(uid: string) { return call<RecurringNow>("recurring_run_now", { uid }); }
+  bankRules() { return call<BankRule[]>("bank_rules"); }
+  saveBankRule(input: BankRuleInput, uid?: string | null) { return call<BankRule[]>("save_bank_rule", { input, uid: uid ?? null }); }
+  deleteBankRule(uid: string) { return call<BankRule[]>("delete_bank_rule", { uid }); }
+  serials(filter?: SerialFilter) { return call<Serial[]>("serials", { filter: filter ?? {} }); }
+  saveSerial(input: SerialInput, uid?: string | null) { return call<Serial>("save_serial", { input, uid: uid ?? null }); }
+  addSerials(productUid: string, serials: string[]) { return call<SerialBulkReport>("add_serials", { productUid, serials }); }
+  assignSerials(saleUid: string, serialUids: string[]) { return call<Serial[]>("assign_serials", { saleUid, serialUids }); }
+  releaseSerial(uid: string) { return call<Serial>("release_serial", { uid }); }
+  deleteSerial(uid: string) { return call<void>("delete_serial", { uid }); }
+  siiStartImport(files: StartFile[]) { return call<StartReport>("sii_start_import", { files }); }
   mailTest(to?: string | null) { return call<MailLogRow>("mail_test", { to: to ?? null }); }
   mailLog(customerUid?: string | null, limit?: number) { return call<MailLogRow[]>("mail_log", { customerUid: customerUid ?? null, limit: limit ?? null }); }
   siiStatus() { return call<SiiStatus>("sii_status"); }

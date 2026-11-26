@@ -1059,3 +1059,108 @@ fn inteligencia_contabilidad_y_conciliacion_por_ipc() {
         json!({ "statementUid": r["statement_uid"] }),
     );
 }
+
+#[test]
+fn lo_que_nucleo_hace_solo_por_ipc() {
+    let ipc = Ipc::new();
+    let created = ipc.ok(
+        "create_company",
+        json!({ "name": "Data Logger", "profile": "empresa" }),
+    );
+    ipc.ok("open_company", json!({ "uid": created["company"]["uid"] }));
+    let cust = ipc.ok(
+        "add_customer",
+        json!({ "input": { "name": "Clínica Sur", "rut": "76.543.210-3", "email": "pagos@clinicasur.cl" } }),
+    )["uid"]
+        .clone();
+    let prod = ipc.ok("add_product", json!({ "input": { "name": "Tlog 10EH", "unit": "un", "kind": "servicio", "price_minor": 40000, "taxable": false } }))["uid"].clone();
+
+    // Sin nada programado, la vuelta de tareas no hace nada.
+    assert_eq!(ipc.ok("auto_run", json!({})), json!([]));
+
+    // Cobranza: ronda, programación y envío (sin casilla configurada no sale).
+    let round = ipc.ok("collect_round", json!({}));
+    assert_eq!(round["items"], json!([]));
+    assert_eq!(round["settings"]["mode"], "avisar");
+    let cfg = ipc.ok("collect_save_settings", json!({ "settings": { "enabled": true, "mode": "avisar", "weekdays": [5, 1], "hour": 9, "min_days": 3, "before_days": 0, "repeat_days": 10, "max_per_run": 15, "excluded": [] } }));
+    assert_eq!(cfg["weekdays"], json!([1, 5]));
+    assert!(
+        ipc.call("collect_send", json!({ "customerUids": null }))
+            .is_err()
+    );
+
+    // Informe y meta.
+    let p = ipc.ok("digest_save_settings", json!({ "settings": { "enabled": false, "weekdays": [1, 2, 3, 4, 5], "hour": 8, "to": "", "goal_minor": 5000000 } }));
+    assert!(p["body"].as_str().unwrap().contains("Meta del mes"));
+    assert_eq!(
+        ipc.ok("digest_preview", json!({}))["goal"]["goal_minor"],
+        5000000
+    );
+    assert_eq!(ipc.ok("sales_goal", json!({}))["remaining_minor"], 5000000);
+    assert!(ipc.call("digest_send", json!({})).is_err());
+
+    // Cobro recurrente: crear, generar ahora y eliminar.
+    let line = json!({ "product_uid": prod, "description": "Monitoreo", "qty_milli": 1000, "unit_price_minor": 40000, "discount_ppm": 0, "taxable": false });
+    let rec = ipc.ok("save_recurring_sale", json!({ "input": { "name": "Monitoreo mensual", "customer_uid": cust, "lines": [line], "notes": null, "frequency": "mensual", "next_date": "2030-01-31", "end_date": null, "credit_days": 10, "confirm": true, "send_mail": false, "active": true }, "uid": null }));
+    assert_eq!(rec["total_minor"], 40000);
+    let now = ipc.ok("recurring_run_now", json!({ "uid": rec["uid"] }));
+    assert_eq!(now["sales"].as_array().unwrap().len(), 1);
+    let list = ipc.ok("recurring_sales", json!({}));
+    assert_eq!(list[0]["next_date"], "2030-02-28");
+    assert_eq!(list[0]["runs"], 1);
+    ipc.ok("delete_recurring_sale", json!({ "uid": rec["uid"] }));
+
+    // Reglas del banco.
+    let cats = ipc.ok("expense_categories", json!({}));
+    let cat = cats[0]["id"].clone();
+    let rules = ipc.ok("save_bank_rule", json!({ "input": { "name": "", "pattern": "LIPIGAS", "rut": null, "direction": "cargo", "action": "gasto", "category_id": cat, "tax_included": true }, "uid": null }));
+    assert_eq!(rules[0]["pattern"], "lipigas");
+    assert_eq!(ipc.ok("bank_rules", json!({})).as_array().unwrap().len(), 1);
+    assert_eq!(
+        ipc.ok("delete_bank_rule", json!({ "uid": rules[0]["uid"] })),
+        json!([])
+    );
+
+    // Series: registrar, asignar a la venta generada y devolver.
+    let r = ipc.ok(
+        "add_serials",
+        json!({ "productUid": prod, "serials": ["EF-1", "EF-2", "ef 1"] }),
+    );
+    assert_eq!(
+        (
+            r["added"].clone(),
+            r["duplicates"].as_array().unwrap().len()
+        ),
+        (json!(2), 1)
+    );
+    let s = ipc.ok("save_serial", json!({ "input": { "product_uid": prod, "serial": "EF-3", "certificate_number": "CAL-9", "certificate_due": "2031-01-01" }, "uid": null }));
+    assert_eq!(s["status"], "en_stock");
+    let all = ipc.ok("serials", json!({ "filter": {} }));
+    assert_eq!(all.as_array().unwrap().len(), 3);
+    let sale_uid = ipc.ok("list_sales", json!({ "filter": {} }))[0]["uid"].clone();
+    let in_sale = ipc.ok(
+        "assign_serials",
+        json!({ "saleUid": sale_uid, "serialUids": [s["uid"]] }),
+    );
+    assert_eq!(in_sale[0]["customer_name"], "Clínica Sur");
+    assert_eq!(
+        ipc.ok("release_serial", json!({ "uid": s["uid"] }))["status"],
+        "en_stock"
+    );
+    ipc.ok("delete_serial", json!({ "uid": s["uid"] }));
+
+    // Inicio con los registros del SII.
+    let ventas = "Nro;Tipo Doc;Tipo Venta;Rut cliente;Razon Social;Folio;Fecha Docto;Monto Exento;Monto Neto;Monto IVA;Monto total\n1;34;Del Giro;76123456-0;Frigorífico Norte SpA;7;05/09/2026;50000;0;0;50000\n";
+    let rep = ipc.ok(
+        "sii_start_import",
+        json!({ "files": [{ "name": "RCV_VENTA_77334963-0_202609.csv", "text": ventas }] }),
+    );
+    assert_eq!(rep["files"][0]["period"], "2026-09");
+    assert_eq!(
+        (
+            rep["sales_imported"].clone(),
+            rep["customers_created"].clone()
+        ),
+        (json!(1), json!(1))
+    );
+}

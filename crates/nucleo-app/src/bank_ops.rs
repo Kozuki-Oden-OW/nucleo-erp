@@ -5,6 +5,7 @@
 //! por la descripción (COPEC → Combustible, ENTEL → Internet y telefonía…), o un traspaso entre
 //! cuentas propias. Lo que no corresponde se ignora con una nota.
 
+use crate::bank_rules::{self, Facts, Outcome, Rule};
 use crate::company::CompanySession;
 use crate::finance_ops::{ExpenseInput, MoneyTransferInput};
 use crate::inventory_ops::{date_ord, date_str};
@@ -22,7 +23,7 @@ const MAX_LINES: usize = 5_000;
 
 /* ───────────────────────────── Tipos ───────────────────────────── */
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct StatementLineInput {
     pub date: String,
     pub description: String,
@@ -30,6 +31,14 @@ pub struct StatementLineInput {
     /// Positivo: abono (entra dinero). Negativo: cargo (sale dinero).
     pub amount_minor: i64,
     pub balance_minor: Option<i64>,
+    /// Quién transfirió o a quién se le pagó, si el banco lo entrega.
+    #[serde(default)]
+    pub counterparty_rut: Option<String>,
+    #[serde(default)]
+    pub counterparty_name: Option<String>,
+    /// Comentario o mensaje de la transferencia.
+    #[serde(default)]
+    pub comment: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -58,6 +67,12 @@ pub struct Suggestion {
     pub score: i64,
     pub category_id: Option<i64>,
     pub category: Option<String>,
+    /// Regla de conciliación que la propone o la refuerza.
+    pub rule: Option<String>,
+    /// Para «gasto» por regla: si el monto incluye IVA.
+    pub tax_included: Option<bool>,
+    /// Para «ignorar» por regla: la nota que queda en el movimiento.
+    pub note: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -80,6 +95,9 @@ pub struct StatementLineView {
     pub status: String,
     pub matched: Option<MatchedRef>,
     pub note: Option<String>,
+    pub counterparty_rut: Option<String>,
+    pub counterparty_name: Option<String>,
+    pub comment: Option<String>,
     pub suggestions: Vec<Suggestion>,
 }
 
@@ -352,6 +370,13 @@ fn fingerprint(l: &StatementLineInput, n: usize) -> String {
     )
 }
 
+fn short(v: &Option<String>, max: usize) -> Option<String> {
+    v.as_deref()
+        .map(str::trim)
+        .filter(|x| !x.is_empty())
+        .map(|x| x.chars().take(max).collect())
+}
+
 /// Palabras de 4+ letras de un nombre (para reconocer al cliente o proveedor en la descripción).
 fn name_hit(description: &str, name: &str) -> bool {
     let d = fold(description);
@@ -422,6 +447,12 @@ impl CompanySession {
                     .map(|r| r.chars().take(80).collect()),
                 amount_minor: l.amount_minor,
                 balance_minor: l.balance_minor,
+                counterparty_rut: l
+                    .counterparty_rut
+                    .as_deref()
+                    .and_then(crate::bank_rules::rut_key),
+                counterparty_name: short(&l.counterparty_name, 120),
+                comment: short(&l.comment, 200),
             });
         }
         let from = clean.iter().map(|l| l.date.clone()).min();
@@ -445,14 +476,21 @@ impl CompanySession {
             let fp = fingerprint(l, *n);
             *n += 1;
             let ok = tx.execute(
-                "INSERT OR IGNORE INTO bank_statement_lines (uid, statement_id, money_account_id, line_date, description, reference, amount_minor, balance_minor, fingerprint)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                rusqlite::params![uuid::Uuid::now_v7().to_string(), sid, account.id, l.date, l.description, l.reference, l.amount_minor, l.balance_minor, fp],
+                "INSERT OR IGNORE INTO bank_statement_lines (uid, statement_id, money_account_id, line_date, description, reference, amount_minor, balance_minor, fingerprint, counterparty_rut, counterparty_name, comment)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                rusqlite::params![uuid::Uuid::now_v7().to_string(), sid, account.id, l.date, l.description, l.reference, l.amount_minor, l.balance_minor, fp, l.counterparty_rut, l.counterparty_name, l.comment],
             )?;
             if ok == 1 {
                 added += 1;
             } else {
                 dup += 1;
+                // El mismo movimiento leído otra vez con más datos (quién transfirió) completa el guardado.
+                tx.execute(
+                    "UPDATE bank_statement_lines SET counterparty_rut = coalesce(counterparty_rut, ?3),
+                        counterparty_name = coalesce(counterparty_name, ?4), comment = coalesce(comment, ?5)
+                     WHERE money_account_id = ?1 AND fingerprint = ?2",
+                    rusqlite::params![account.id, fp, l.counterparty_rut, l.counterparty_name, l.comment],
+                )?;
             }
         }
         tx.execute(
@@ -517,10 +555,14 @@ impl CompanySession {
             Option<i64>,
             Option<i64>,
             Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
         );
         let raw: Vec<Raw> = {
             let mut stmt = conn.prepare(
-                "SELECT id, uid, line_date, description, reference, amount_minor, balance_minor, status, payment_id, transfer_id, note
+                "SELECT id, uid, line_date, description, reference, amount_minor, balance_minor, status, payment_id, transfer_id, note,
+                    counterparty_rut, counterparty_name, comment
                  FROM bank_statement_lines WHERE money_account_id = ?1 AND line_date >= ?2 ORDER BY line_date DESC, id DESC",
             )?;
             stmt.query_map(rusqlite::params![account.id, since], |r| {
@@ -536,6 +578,9 @@ impl CompanySession {
                     r.get(8)?,
                     r.get(9)?,
                     r.get(10)?,
+                    r.get(11)?,
+                    r.get(12)?,
+                    r.get(13)?,
                 ))
             })?
             .collect::<Result<_, _>>()?
@@ -543,7 +588,23 @@ impl CompanySession {
         let ctx = SuggestCtx::load(conn, account.id)?;
         let mut lines = Vec::with_capacity(raw.len());
         let (mut pending, mut reconciled, mut ignored) = (0, 0, 0);
-        for (_, uid, date, desc, reference, amount, balance, status, pid, tid, note) in raw {
+        for (
+            _,
+            uid,
+            date,
+            desc,
+            reference,
+            amount,
+            balance,
+            status,
+            pid,
+            tid,
+            note,
+            c_rut,
+            c_name,
+            comment,
+        ) in raw
+        {
             match status.as_str() {
                 "pendiente" => pending += 1,
                 "conciliado" => reconciled += 1,
@@ -555,7 +616,17 @@ impl CompanySession {
                 _ => None,
             };
             let suggestions = if status == "pendiente" {
-                ctx.suggest(&date, &desc, reference.as_deref(), amount)
+                ctx.suggest(
+                    &date,
+                    reference.as_deref(),
+                    &Facts {
+                        description: &desc,
+                        name: c_name.as_deref(),
+                        comment: comment.as_deref(),
+                        rut: c_rut.as_deref(),
+                        amount,
+                    },
+                )
             } else {
                 Vec::new()
             };
@@ -569,6 +640,9 @@ impl CompanySession {
                 status,
                 matched,
                 note,
+                counterparty_rut: c_rut,
+                counterparty_name: c_name,
+                comment,
                 suggestions,
             });
         }
@@ -660,6 +734,14 @@ impl CompanySession {
             )
             .optional()?
             .ok_or_else(|| AppError::NotFound("el movimiento".into()))?;
+        let (c_rut, c_name, c_comment): (Option<String>, Option<String>, Option<String>) =
+            self.db.conn().query_row(
+                "SELECT counterparty_rut, counterparty_name, comment FROM bank_statement_lines WHERE id = ?1",
+                [id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )?;
+        // Lo que esta conciliación enseña para la próxima vez (si enseña algo).
+        let mut learned: Option<Outcome> = None;
         let account = fdb::accounts(self.db.conn())?
             .into_iter()
             .find(|a| a.id == acc_id)
@@ -748,6 +830,15 @@ impl CompanySession {
                 let t = target()?.to_string();
                 let before = last_payment(self.db.conn())?;
                 self.register_payment(&t, abs, "Transferencia", &date, Some(&account.uid))?;
+                learned = self
+                    .db
+                    .conn()
+                    .query_row("SELECT customer_id FROM sales WHERE uid = ?1", [&t], |r| {
+                        r.get::<_, Option<i64>>(0)
+                    })
+                    .optional()?
+                    .flatten()
+                    .map(Outcome::Customer);
                 (Some(new_payment(self.db.conn(), before)?), None, None)
             }
             "pagar_compra" | "pagar_gasto" => {
@@ -763,6 +854,21 @@ impl CompanySession {
                 } else {
                     self.pay_expense(&t, abs, "Transferencia", &date, Some(&account.uid))?;
                 }
+                learned = self
+                    .db
+                    .conn()
+                    .query_row(
+                        if action.kind == "pagar_compra" {
+                            "SELECT supplier_id FROM purchases WHERE uid = ?1"
+                        } else {
+                            "SELECT supplier_id FROM expenses WHERE uid = ?1"
+                        },
+                        [&t],
+                        |r| r.get::<_, Option<i64>>(0),
+                    )
+                    .optional()?
+                    .flatten()
+                    .map(Outcome::Supplier);
                 (Some(new_payment(self.db.conn(), before)?), None, None)
             }
             "gasto" => {
@@ -797,6 +903,10 @@ impl CompanySession {
                     quantity_milli: None,
                     unit_minor: None,
                 })?;
+                learned = Some(Outcome::Expense {
+                    category_id,
+                    tax_included: action.tax_included.unwrap_or(false),
+                });
                 (Some(new_payment(self.db.conn(), before)?), None, None)
             }
             "traspaso" => {
@@ -828,6 +938,7 @@ impl CompanySession {
                     [before],
                     |r| r.get(0),
                 )?;
+                learned = Some(Outcome::Transfer(other.id));
                 (None, Some(tid), None)
             }
             "ignorar" => {
@@ -885,6 +996,19 @@ impl CompanySession {
             &text,
             action.note.as_deref(),
         )?;
+        if let Some(outcome) = learned {
+            bank_rules::learn(
+                &tx,
+                &Facts {
+                    description: &desc,
+                    name: c_name.as_deref(),
+                    comment: c_comment.as_deref(),
+                    rut: c_rut.as_deref(),
+                    amount,
+                },
+                outcome,
+            )?;
+        }
         tx.commit()?;
         self.bank_reconciliation(&account.uid)
     }
@@ -1093,13 +1217,30 @@ fn matched_transfer(conn: &Connection, id: i64, account_id: i64) -> AppResult<Op
         .optional()?)
 }
 
+/// Documento por pagar candidato: (acción, uid, documento, proveedor, vencimiento, saldo, id del proveedor).
+type PayableCand = (
+    &'static str,
+    String,
+    String,
+    String,
+    String,
+    i64,
+    Option<i64>,
+);
+
 /// Datos para sugerir con qué conciliar cada movimiento pendiente.
 struct SuggestCtx {
     cands: Vec<Candidate>,
-    receivables: Vec<(String, String, String, String, i64)>,
-    payables: Vec<(&'static str, String, String, String, String, i64)>,
+    /// (uid de la venta, número, cliente, vencimiento, saldo, id del cliente)
+    receivables: Vec<(String, String, String, String, i64, Option<i64>)>,
+    /// (acción, uid, documento, proveedor, vencimiento, saldo, id del proveedor)
+    payables: Vec<PayableCand>,
     categories: HashMap<String, (i64, String)>,
-    others: Vec<(String, String)>,
+    /// Categorías por id (para las reglas de gasto).
+    category_names: HashMap<i64, String>,
+    /// (uid, nombre, id) de las otras cuentas propias.
+    others: Vec<(String, String, i64)>,
+    rules: Vec<Rule>,
 }
 
 impl SuggestCtx {
@@ -1107,12 +1248,19 @@ impl SuggestCtx {
         let cands = open_candidates(conn, account_id)?;
         let receivables = {
             let mut stmt = conn.prepare(
-                "SELECT s.uid, s.number, coalesce(c.name, 'Cliente ocasional'), r.due_date, sum(r.amount_minor - r.paid_minor)
+                "SELECT s.uid, s.number, coalesce(c.name, 'Cliente ocasional'), r.due_date, sum(r.amount_minor - r.paid_minor), s.customer_id
                  FROM receivables r JOIN sales s ON s.id = r.sale_id LEFT JOIN customers c ON c.id = s.customer_id
                  WHERE r.status = 'abierta' AND s.commercial_state = 'efectuada' GROUP BY s.id",
             )?;
             stmt.query_map([], |r| {
-                Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+                Ok((
+                    r.get(0)?,
+                    r.get(1)?,
+                    r.get(2)?,
+                    r.get(3)?,
+                    r.get(4)?,
+                    r.get(5)?,
+                ))
             })?
             .collect::<Result<Vec<_>, _>>()?
         };
@@ -1122,7 +1270,7 @@ impl SuggestCtx {
                     CASE b.source_type WHEN 'COM' THEN (SELECT uid FROM purchases WHERE id = b.source_id) ELSE (SELECT uid FROM expenses WHERE id = b.source_id) END,
                     CASE b.source_type WHEN 'COM' THEN (SELECT coalesce(supplier_doc_kind || ' ' || supplier_doc_number, number) FROM purchases WHERE id = b.source_id)
                                         ELSE (SELECT number || ' · ' || description FROM expenses WHERE id = b.source_id) END,
-                    coalesce(v.name, ''), b.due_date, sum(b.amount_minor - b.paid_minor)
+                    coalesce(v.name, ''), b.due_date, sum(b.amount_minor - b.paid_minor), b.supplier_id
                  FROM payables b LEFT JOIN suppliers v ON v.id = b.supplier_id
                  WHERE b.status = 'abierta' AND b.source_type IN ('COM', 'GAS') GROUP BY b.source_type, b.source_id",
             )?;
@@ -1139,6 +1287,7 @@ impl SuggestCtx {
                     r.get(3)?,
                     r.get(4)?,
                     r.get(5)?,
+                    r.get(6)?,
                 ))
             })?
             .collect::<Result<Vec<_>, _>>()?
@@ -1153,26 +1302,32 @@ impl SuggestCtx {
             .collect::<Result<HashMap<_, _>, _>>()?
         };
         let others = {
-            let mut stmt = conn.prepare("SELECT uid, name FROM money_accounts WHERE id <> ?1 AND archived_at IS NULL ORDER BY name")?;
-            stmt.query_map([account_id], |r| Ok((r.get(0)?, r.get(1)?)))?
+            let mut stmt = conn.prepare("SELECT uid, name, id FROM money_accounts WHERE id <> ?1 AND archived_at IS NULL ORDER BY name")?;
+            stmt.query_map([account_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
                 .collect::<Result<Vec<_>, _>>()?
         };
+        let category_names = categories.values().cloned().collect();
         Ok(SuggestCtx {
             cands,
             receivables,
             payables,
             categories,
+            category_names,
             others,
+            rules: bank_rules::load(conn, true)?,
         })
     }
 
-    fn suggest(
-        &self,
-        date: &str,
-        desc: &str,
-        reference: Option<&str>,
-        amount: i64,
-    ) -> Vec<Suggestion> {
+    fn suggest(&self, date: &str, reference: Option<&str>, facts: &Facts<'_>) -> Vec<Suggestion> {
+        let amount = facts.amount;
+        // Para reconocer nombres se mira la glosa junto con quién transfirió y su comentario.
+        let seen = format!(
+            "{} {} {}",
+            facts.description,
+            facts.name.unwrap_or(""),
+            facts.comment.unwrap_or("")
+        );
+        let desc = seen.as_str();
         let d = date_ord(date).unwrap_or(0);
         let mut out = Vec::new();
         for c in self.cands.iter().filter(|c| c.4 == amount) {
@@ -1199,10 +1354,13 @@ impl SuggestCtx {
                 score: score.clamp(30, 100),
                 category_id: None,
                 category: None,
+                rule: None,
+                tax_included: None,
+                note: None,
             });
         }
         if amount > 0 {
-            for (uid, number, party, due, pending) in
+            for (uid, number, party, due, pending, _) in
                 self.receivables.iter().filter(|r| r.4 == amount)
             {
                 let hit = name_hit(desc, party);
@@ -1223,10 +1381,13 @@ impl SuggestCtx {
                     score: if hit { 85 } else { 60 },
                     category_id: None,
                     category: None,
+                    rule: None,
+                    tax_included: None,
+                    note: None,
                 });
             }
         } else {
-            for (kind, uid, doc, party, due, pending) in
+            for (kind, uid, doc, party, due, pending, _) in
                 self.payables.iter().filter(|p| p.5 == -amount)
             {
                 let hit = !party.is_empty() && name_hit(desc, party);
@@ -1254,6 +1415,9 @@ impl SuggestCtx {
                     score: if hit { 85 } else { 60 },
                     category_id: None,
                     category: None,
+                    rule: None,
+                    tax_included: None,
+                    note: None,
                 });
             }
             let guess = guess_category(desc).and_then(|g| self.categories.get(&fold(g)).cloned());
@@ -1272,6 +1436,9 @@ impl SuggestCtx {
                 score: if guess.is_some() { 55 } else { 25 },
                 category_id: guess.as_ref().map(|g| g.0),
                 category: guess.map(|g| g.1),
+                rule: None,
+                tax_included: None,
+                note: None,
             });
         }
         let lower = fold(desc);
@@ -1286,7 +1453,7 @@ impl SuggestCtx {
         ]
         .iter()
         .any(|k| lower.contains(k));
-        for (uid, name) in &self.others {
+        for (uid, name, _) in &self.others {
             out.push(Suggestion {
                 action: "traspaso".into(),
                 target_uid: Some(uid.clone()),
@@ -1295,11 +1462,154 @@ impl SuggestCtx {
                 score: if transfer_like { 70 } else { 15 },
                 category_id: None,
                 category: None,
+                rule: None,
+                tax_included: None,
+                note: None,
             });
         }
+        self.apply_rules(facts, &mut out);
         out.sort_by_key(|x| std::cmp::Reverse(x.score));
         out.truncate(6);
         out
+    }
+}
+
+impl SuggestCtx {
+    /// Las reglas (manuales y aprendidas) suben la sugerencia que corresponde o agregan la que falta.
+    fn apply_rules(&self, facts: &Facts<'_>, out: &mut Vec<Suggestion>) {
+        let amount = facts.amount;
+        // Solo la mejor regla de cada tipo: dos reglas de cliente distintas no se suman.
+        let mut done: HashSet<&str> = HashSet::new();
+        for r in bank_rules::matching(&self.rules, facts) {
+            if !done.insert(r.action.as_str()) {
+                continue;
+            }
+            let base = if r.origin == "manual" { 92 } else { 88 };
+            let tag = Some(r.name.clone());
+            match r.action.as_str() {
+                "cliente" if amount > 0 => {
+                    for (uid, number, party, due, pending, cid) in &self.receivables {
+                        if *cid != r.customer_id || *pending < amount {
+                            continue;
+                        }
+                        let exact = *pending == amount;
+                        match out
+                            .iter_mut()
+                            .find(|s| s.action == "cobrar" && s.target_uid.as_deref() == Some(uid))
+                        {
+                            Some(s) => {
+                                s.score = 96;
+                                s.rule = tag.clone();
+                            }
+                            None => out.push(Suggestion {
+                                action: "cobrar".into(),
+                                target_uid: Some(uid.clone()),
+                                label: format!("Cobro de {number} · {party}"),
+                                detail: format!(
+                                    "Por cobrar {} · vence el {}{}",
+                                    crate::insight_ops::money(*pending),
+                                    fecha(due),
+                                    if exact {
+                                        ""
+                                    } else {
+                                        " · sería un abono parcial"
+                                    }
+                                ),
+                                score: if exact { 96 } else { 72 },
+                                category_id: None,
+                                category: None,
+                                rule: tag.clone(),
+                                tax_included: None,
+                                note: None,
+                            }),
+                        }
+                    }
+                }
+                "proveedor" if amount < 0 => {
+                    for (kind, uid, doc, party, due, pending, sid) in &self.payables {
+                        if *sid != r.supplier_id || *pending < -amount {
+                            continue;
+                        }
+                        let exact = *pending == -amount;
+                        match out
+                            .iter_mut()
+                            .find(|s| s.action == *kind && s.target_uid.as_deref() == Some(uid))
+                        {
+                            Some(s) => {
+                                s.score = 96;
+                                s.rule = tag.clone();
+                            }
+                            None => out.push(Suggestion {
+                                action: (*kind).into(),
+                                target_uid: Some(uid.clone()),
+                                label: format!("Pago de {doc} · {party}"),
+                                detail: format!(
+                                    "Por pagar {} · vence el {}{}",
+                                    crate::insight_ops::money(*pending),
+                                    fecha(due),
+                                    if exact {
+                                        ""
+                                    } else {
+                                        " · sería un pago parcial"
+                                    }
+                                ),
+                                score: if exact { 96 } else { 72 },
+                                category_id: None,
+                                category: None,
+                                rule: tag.clone(),
+                                tax_included: None,
+                                note: None,
+                            }),
+                        }
+                    }
+                }
+                "gasto" if amount < 0 => {
+                    let Some(cat) = r.category_id else { continue };
+                    let Some(name) = self.category_names.get(&cat) else {
+                        continue;
+                    };
+                    out.retain(|s| s.action != "gasto");
+                    out.push(Suggestion {
+                        action: "gasto".into(),
+                        target_uid: None,
+                        label: format!("Registrar gasto: {name}"),
+                        detail: "Así lo indica una regla de conciliación".into(),
+                        score: base,
+                        category_id: Some(cat),
+                        category: Some(name.clone()),
+                        rule: tag,
+                        tax_included: r.tax_included,
+                        note: None,
+                    });
+                }
+                "traspaso" => {
+                    let Some((uid, _, _)) = self.others.iter().find(|o| Some(o.2) == r.account_id)
+                    else {
+                        continue;
+                    };
+                    if let Some(s) = out
+                        .iter_mut()
+                        .find(|s| s.action == "traspaso" && s.target_uid.as_deref() == Some(uid))
+                    {
+                        s.score = base;
+                        s.rule = tag;
+                    }
+                }
+                "ignorar" => out.push(Suggestion {
+                    action: "ignorar".into(),
+                    target_uid: None,
+                    label: "Ignorar este movimiento".into(),
+                    detail: r.note.clone().unwrap_or_default(),
+                    score: base,
+                    category_id: None,
+                    category: None,
+                    rule: tag,
+                    tax_included: None,
+                    note: r.note.clone(),
+                }),
+                _ => {}
+            }
+        }
     }
 }
 
@@ -1349,6 +1659,7 @@ mod tests {
             reference: None,
             amount_minor: -9990,
             balance_minor: None,
+            ..Default::default()
         };
         assert_eq!(fingerprint(&l, 0), "2026-10-01|-9990|pago entel||0");
     }

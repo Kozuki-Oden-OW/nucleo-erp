@@ -9,6 +9,7 @@ import { Badge, Button, Card, Checkbox, EmptyState, Field, Kpi, Notice, PageHead
 import { Dialog, useToast } from "../../ui/overlay";
 import { DataTable, type Column } from "../../ui/table";
 import { Dispatches } from "./Dispatches";
+import { SerialsTab } from "./Serials";
 
 export const STOCK_STATUS: Record<StockStatus, [Tone, string]> = {
   sin_stock: ["danger", "Sin stock"],
@@ -24,7 +25,7 @@ export function StockStatusBadge({ status }: { status: StockStatus }) {
   return <Badge tone={tone}>{label}</Badge>;
 }
 
-type Tab = "existencias" | "despachar" | "movimientos" | "bodegas";
+type Tab = "existencias" | "despachar" | "movimientos" | "bodegas" | "series";
 type Filter = "todos" | StockStatus;
 
 export function Inventory({ route }: { route: Route }) {
@@ -47,12 +48,13 @@ export function Inventory({ route }: { route: Route }) {
           </>
         )}
       />
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: "existencias", label: "Existencias" }, { value: "despachar", label: "Por despachar", count: pending }, { value: "movimientos", label: "Movimientos" }, { value: "bodegas", label: "Bodegas" }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: "existencias", label: "Existencias" }, { value: "despachar", label: "Por despachar", count: pending }, { value: "movimientos", label: "Movimientos" }, { value: "series", label: "Series y certificados" }, { value: "bodegas", label: "Bodegas" }]} />
       <div className="mt-4">
         {tab === "existencias" && <Stock route={route} />}
         {tab === "despachar" && <Dispatches onCount={setPending} />}
         {tab === "movimientos" && <Docs />}
         {tab === "bodegas" && <Warehouses />}
+        {tab === "series" && <SerialsTab route={route} />}
       </div>
     </div>
   );

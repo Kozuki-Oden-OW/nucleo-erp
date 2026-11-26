@@ -6,10 +6,11 @@ import { navigate, type Route } from "../../lib/router";
 import { QuoteStatusBadge, SaleStatus } from "../../ui/doc";
 import { Button, EmptyState, Field, Notice, PageHeader, Tabs } from "../../ui/kit";
 import { DataTable, type Column } from "../../ui/table";
+import { RecurringSalesTab } from "./RecurringSales";
 
-type Tab = "ventas" | "cotizaciones" | "pendientes_doc" | "por_cobrar" | "borradores";
+type Tab = "ventas" | "cotizaciones" | "pendientes_doc" | "por_cobrar" | "borradores" | "recurrentes";
 
-const VIEW: Record<Exclude<Tab, "cotizaciones">, SaleFilter["view"]> = {
+const VIEW: Record<Exclude<Tab, "cotizaciones" | "recurrentes">, SaleFilter["view"]> = {
   ventas: "todas", pendientes_doc: "pendientes_doc", por_cobrar: "por_cobrar", borradores: "borradores",
 };
 
@@ -25,6 +26,7 @@ export function SalesList({ route }: { route: Route }) {
   useEffect(() => {
     let alive = true;
     const t = setTimeout(() => {
+      if (tab === "recurrentes") return;
       if (tab === "cotizaciones") backend.listQuotes(query).then((r) => alive && setQuotes(r)).catch((e) => setErr(errorMessage(e)));
       else backend.listSales({ query, view: VIEW[tab] }).then((r) => alive && setSales(r)).catch((e) => setErr(errorMessage(e)));
     }, 100);
@@ -81,8 +83,10 @@ export function SalesList({ route }: { route: Route }) {
           { value: "por_cobrar", label: "Por cobrar", count: counts.cobrar },
           { value: "pendientes_doc", label: "Pendientes de documentación", count: counts.pend },
           { value: "borradores", label: "Borradores" },
+          { value: "recurrentes", label: "Cobros recurrentes" },
         ]}
       />
+      {tab === "recurrentes" ? <RecurringSalesTab /> : <>
       <div className="my-4 flex items-center gap-3">
         <Field
           aria-label="Buscar"
@@ -121,6 +125,7 @@ export function SalesList({ route }: { route: Route }) {
           empty={<EmptyState icon={ShoppingBag} title={tab === "pendientes_doc" ? "Nada pendiente de documentación" : "Sin ventas en esta vista"} />}
         />
       )}
+      </>}
     </div>
   );
 }

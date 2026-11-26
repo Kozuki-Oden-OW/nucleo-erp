@@ -235,6 +235,26 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "cotizacion_documento",
         sql: include_str!("../migrations/0045_cotizacion_documento.sql"),
     },
+    Migration {
+        version: 46,
+        name: "correo_informes",
+        sql: include_str!("../migrations/0046_correo_informes.sql"),
+    },
+    Migration {
+        version: 47,
+        name: "cobros_recurrentes",
+        sql: include_str!("../migrations/0047_cobros_recurrentes.sql"),
+    },
+    Migration {
+        version: 48,
+        name: "reglas_conciliacion",
+        sql: include_str!("../migrations/0048_reglas_conciliacion.sql"),
+    },
+    Migration {
+        version: 49,
+        name: "series",
+        sql: include_str!("../migrations/0049_series.sql"),
+    },
 ];
 
 pub fn latest_version() -> i64 {

@@ -9,6 +9,7 @@ import { useTerm } from "../../lib/glosario";
 import { usePrefs } from "../../lib/prefs";
 import { goBack, navigate } from "../../lib/router";
 import { DocChain, SaleStatus } from "../../ui/doc";
+import { SaleSerialsCard } from "../inventario/Serials";
 import { Badge, Button, Card, DefinitionList, Notice, PageHeader, Spinner } from "../../ui/kit";
 import { useToast } from "../../ui/overlay";
 import { DocumentDialog, EffectDialog, PaymentDialog, VoidDialog } from "./dialogs";
@@ -218,6 +219,7 @@ export function SaleView({ uid }: { uid: string }) {
             </Card>
           )}
 
+          <SaleSerialsCard sale={s} />
           <Card title="Historial">
             <ol className="relative ml-2 border-l border-line">
               {s.timeline.map((e, i) => (

@@ -11,7 +11,7 @@ import { useToast } from "../../ui/overlay";
 const KIND_LABEL: Record<string, string> = { prueba: "Prueba", envio: "Despacho", cobro: "Cobro", promocion: "Promoción", otro: "Otro" };
 const FIELDS = {
   envio: "{cliente} {empresa} {venta} {courier} {seguimiento} {destino} {firma}",
-  cobro: "{cliente} {empresa} {detalle} {total} {vencido} {firma}",
+  cobro: "{cliente} {empresa} {detalle} {total} {vencido} {pago} {firma}",
   promocion: "{cliente} {empresa} {firma}",
 } as const;
 

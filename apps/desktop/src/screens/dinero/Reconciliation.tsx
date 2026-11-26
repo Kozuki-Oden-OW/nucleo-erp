@@ -2,16 +2,17 @@
 // cargo: lo que ya está registrado se concilia solo; para el resto sugiere el cobro de una venta, el
 // pago de una compra o de un gasto, un gasto nuevo con su categoría o un traspaso entre tus cuentas.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CheckCheck, CircleCheck, CircleDashed, EyeOff, FileUp, Landmark, Scale, Sparkles, Trash2, Undo2, Upload } from "lucide-react";
+import { BrainCircuit, CheckCheck, CircleCheck, CircleDashed, EyeOff, FileUp, Landmark, Scale, Sparkles, Trash2, Undo2, Upload } from "lucide-react";
 import {
   useBackend, errorMessage, type BankSuggestion, type ExpenseCategory, type MoneyAccount, type ReconcileAction, type ReconciliationView, type StatementLineView,
 } from "../../data";
 import { readStatementFile, type ParsedStatement } from "../../lib/cartola";
-import { formatDate, formatMoney, todayIso } from "../../lib/format";
+import { formatDate, formatMoney, formatRut, todayIso } from "../../lib/format";
 import { navigate } from "../../lib/router";
 import { useSession } from "../../lib/session";
 import { Badge, Button, Card, Checkbox, EmptyState, Field, Kpi, Notice, Select, Spinner, TextArea, cx } from "../../ui/kit";
 import { Dialog, Drawer, useToast } from "../../ui/overlay";
+import { BankRulesDialog } from "./BankRules";
 
 type Filter = "pendiente" | "conciliado" | "ignorado" | "todos";
 
@@ -29,6 +30,7 @@ export function ReconciliationTab({ onChanged }: { onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<StatementLineView | null>(null);
   const [cats, setCats] = useState<ExpenseCategory[]>([]);
+  const [rules, setRules] = useState<{ pattern: string; direction: "abono" | "cargo" } | "lista" | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -64,7 +66,7 @@ export function ReconciliationTab({ onChanged }: { onChanged: () => void }) {
   };
   const apply = (line: StatementLineView, s: BankSuggestion) => {
     if (s.action === "gasto" && !s.category_id) { setOpen(line); return; }
-    void act(line, { kind: s.action, target_uid: s.target_uid, category_id: s.category_id }, "Movimiento conciliado.");
+    void act(line, { kind: s.action, target_uid: s.target_uid, category_id: s.category_id, tax_included: s.tax_included ?? null, note: s.note ?? null }, s.action === "ignorar" ? "Movimiento ignorado." : "Movimiento conciliado.");
   };
 
   const rows = useMemo(() => (view?.lines ?? []).filter((l) => filter === "todos" || l.status === filter), [view, filter]);
@@ -84,6 +86,7 @@ export function ReconciliationTab({ onChanged }: { onChanged: () => void }) {
             {view && view.pending > 0 && <Button variant="secondary" icon={Sparkles} onClick={async () => { try { const v = await backend.autoReconcileBank(acc); const n = (view?.pending ?? 0) - v.pending; setView(v); toast(n ? "success" : "info", n ? `${n} movimientos conciliados.` : "No hay coincidencias seguras: revisa las sugerencias de cada movimiento."); } catch (e) { toast("danger", errorMessage(e)); } }}>Conciliar automáticamente</Button>}
           </>
         )}
+        <Button variant="ghost" icon={BrainCircuit} onClick={() => setRules("lista")}>Reglas</Button>
         <span className="text-xs text-muted">Descarga la cartola desde tu banco en Excel o CSV. Se reconocen las columnas Fecha, Descripción, Cargos, Abonos (o Monto) y Saldo.</span>
       </div>
 
@@ -120,10 +123,15 @@ export function ReconciliationTab({ onChanged }: { onChanged: () => void }) {
                       <span className="num w-24 shrink-0 text-sm text-muted">{formatDate(l.date)}</span>
                       <div className="min-w-[14rem] flex-1">
                         <div className="truncate text-sm font-medium text-ink" title={l.description}>{l.description}{l.reference && <span className="ml-2 font-mono text-xs font-normal text-muted">{l.reference}</span>}</div>
+                        {(l.counterparty_name || l.counterparty_rut || l.comment) && (
+                          <div className="mt-0.5 truncate text-xs text-ink">
+                            {[l.counterparty_name, l.counterparty_rut && formatRut(l.counterparty_rut), l.comment && `«${l.comment}»`].filter(Boolean).join(" · ")}
+                          </div>
+                        )}
                         <div className="mt-0.5 text-xs text-muted">
                           {l.status === "conciliado" && l.matched && (l.matched.link ? <button className="text-accent hover:underline" onClick={() => navigate(l.matched!.link!)}>{l.matched.label}</button> : l.matched.label)}
                           {l.status === "ignorado" && `Ignorado: ${l.note ?? ""}`}
-                          {l.status === "pendiente" && top && <>Sugerencia: <span className="text-ink">{top.label}</span> · {top.detail}</>}
+                          {l.status === "pendiente" && top && <>Sugerencia: <span className="text-ink">{top.label}</span> · {top.detail}{top.rule && <span className="ml-1.5 inline-flex items-center gap-1 text-accent"><BrainCircuit size={12} aria-hidden />por regla</span>}</>}
                           {l.status === "pendiente" && !top && "Sin sugerencias: elige qué es"}
                         </div>
                       </div>
@@ -207,7 +215,9 @@ export function ReconciliationTab({ onChanged }: { onChanged: () => void }) {
         })()}
       </Dialog>
 
-      <LineDrawer line={open} cats={cats} accounts={accounts.filter((a) => a.uid !== acc)} onClose={() => setOpen(null)} onAct={(a, ok) => open && void act(open, a, ok)} />
+      <LineDrawer line={open} cats={cats} accounts={accounts.filter((a) => a.uid !== acc)} onClose={() => setOpen(null)} onAct={(a, ok) => open && void act(open, a, ok)}
+        onRule={(l) => { setOpen(null); setRules({ pattern: (l.counterparty_name || l.description).replace(/\d{4,}/g, " ").replace(/\s+/g, " ").trim().slice(0, 60), direction: l.amount_minor > 0 ? "abono" : "cargo" }); }} />
+      <BankRulesDialog open={rules !== null} onClose={() => { setRules(null); load(); }} cats={cats} accounts={accounts.filter((a) => a.uid !== acc)} seed={rules && rules !== "lista" ? rules : null} />
     </div>
   );
 }
@@ -219,11 +229,12 @@ function short(s: BankSuggestion): string {
     case "pagar_compra": case "pagar_gasto": return "Registrar pago";
     case "gasto": return s.category ? `Gasto: ${s.category}` : "Registrar gasto";
     case "traspaso": return "Registrar traspaso";
+    case "ignorar": return "Ignorar";
     default: return "Aplicar";
   }
 }
 
-function LineDrawer({ line, cats, accounts, onClose, onAct }: { line: StatementLineView | null; cats: ExpenseCategory[]; accounts: MoneyAccount[]; onClose: () => void; onAct: (a: ReconcileAction, ok: string) => void }) {
+function LineDrawer({ line, cats, accounts, onClose, onAct, onRule }: { line: StatementLineView | null; cats: ExpenseCategory[]; accounts: MoneyAccount[]; onClose: () => void; onAct: (a: ReconcileAction, ok: string) => void; onRule: (l: StatementLineView) => void }) {
   const [cat, setCat] = useState("");
   const [desc, setDesc] = useState("");
   const [taxIncl, setTaxIncl] = useState(false);
@@ -232,7 +243,7 @@ function LineDrawer({ line, cats, accounts, onClose, onAct }: { line: StatementL
   useEffect(() => {
     if (!line) return;
     const g = line.suggestions.find((s) => s.action === "gasto");
-    setCat(g?.category_id ? String(g.category_id) : ""); setDesc(line.description.slice(0, 120)); setTaxIncl(false); setNote(""); setOther(line.suggestions.find((s) => s.action === "traspaso")?.target_uid ?? accounts[0]?.uid ?? "");
+    setCat(g?.category_id ? String(g.category_id) : ""); setDesc(line.description.slice(0, 120)); setTaxIncl(g?.tax_included ?? false); setNote(""); setOther(line.suggestions.find((s) => s.action === "traspaso")?.target_uid ?? accounts[0]?.uid ?? "");
   }, [line, accounts]);
   if (!line) return <Drawer open={false} onClose={onClose} title="">{null}</Drawer>;
   const out = line.amount_minor < 0;
@@ -246,8 +257,8 @@ function LineDrawer({ line, cats, accounts, onClose, onAct }: { line: StatementL
             <ul className="flex flex-col gap-2">
               {line.suggestions.filter((s) => s.action !== "gasto" && s.action !== "traspaso").map((s, i) => (
                 <li key={i} className="flex items-center gap-3 rounded-lg border border-line px-3 py-2.5">
-                  <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium text-ink">{s.label}</div><div className="text-xs text-muted">{s.detail}</div></div>
-                  <Button size="sm" onClick={() => onAct({ kind: s.action, target_uid: s.target_uid }, s.action.startsWith("vincular") ? "Movimiento conciliado." : "Registrado y conciliado.")}>{short(s)}</Button>
+                  <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium text-ink">{s.label}</div><div className="text-xs text-muted">{s.detail}{s.rule && <span className="ml-1.5 text-accent">· regla «{s.rule}»</span>}</div></div>
+                  <Button size="sm" onClick={() => onAct({ kind: s.action, target_uid: s.target_uid, note: s.note ?? null }, s.action === "ignorar" ? "Movimiento ignorado." : s.action.startsWith("vincular") ? "Movimiento conciliado." : "Registrado y conciliado.")}>{short(s)}</Button>
                 </li>
               ))}
             </ul>
@@ -284,6 +295,10 @@ function LineDrawer({ line, cats, accounts, onClose, onAct }: { line: StatementL
           <TextArea label="Nota" value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Ej. retiro del dueño" />
           <div className="mt-3"><Button variant="ghost" icon={EyeOff} disabled={!note.trim()} onClick={() => onAct({ kind: "ignorar", note }, "Movimiento ignorado.")}>Ignorar con esta nota</Button></div>
         </section>
+        <p className="text-xs text-muted">
+          NÚCLEO recuerda lo que elijas aquí y la próxima vez lo propone arriba. Si prefieres dejarlo escrito desde ya,{" "}
+          <button className="text-accent hover:underline" onClick={() => onRule(line)}>crea una regla con este movimiento</button>.
+        </p>
       </div>
     </Drawer>
   );

@@ -72,6 +72,10 @@ Todo es entero: las sumas y los reportes se hacen en SQL sin perder exactitud y 
 | 43 | `0043_accesos.sql` | `site_accesses`: accesos de solo lectura a sitios web (gestor de contraseñas) — nombre, dirección de ingreso, usuario, clave (en la base cifrada; nunca vuelve a la interfaz) y tipo (lectura u operador sin pagos) |
 | 44 | `0044_sync_transporte.sql` | `sync_peers.secret` (llave de 32 bytes de cada dispositivo emparejado; se borra al quitarlo) y `sync_peers.address` (en el celular, dirección del computador en la red local) |
 | 45 | `0045_cotizacion_documento.sql` | `quotes.terms_json`: condiciones de cada cotización (plazo de entrega, garantía y forma de pago); si es nulo se usan las habituales del negocio (ajuste «cotizaciones») |
+| 46 | `0046_correo_informes.sql` | `email_log.kind` acepta «informe» (el informe periódico al dueño). La tabla se reconstruye para cambiar la restricción |
+| 47 | `0047_cobros_recurrentes.sql` | `recurring_sales`: venta que se repite (cliente, líneas en JSON, frecuencia, día de cobro, próxima fecha, término, días de plazo, si queda por cobrar, si avisa por correo, última venta generada) |
+| 48 | `0048_reglas_conciliacion.sql` | `bank_statement_lines.counterparty_rut`, `counterparty_name` y `comment`; tabla `bank_rules` (texto o RUT → cliente, proveedor, gasto, traspaso o ignorar; origen manual o aprendida; aciertos) |
+| 49 | `0049_series.sql` | `product_serials`: serie por unidad (única por producto), estado, venta y cliente, y certificado de calibración (número, fecha, próxima calibración, laboratorio, ruta del PDF) |
 
 Las migraciones son transaccionales y versionadas con `PRAGMA user_version`. **Pre-1.0:** se pueden
 reescribir (en la Fase 2 se reemplazó la tabla mínima de clientes de la Fase 1); desde la primera beta

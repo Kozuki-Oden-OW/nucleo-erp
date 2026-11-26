@@ -213,6 +213,48 @@ fn settings_of(conn: &Connection) -> AppResult<QuoteDocSettings> {
         .unwrap_or_default())
 }
 
+/// Texto «cómo pagar» para los correos de cobro: los datos de transferencia y el enlace de tarjeta
+/// del negocio, si el dueño los tiene activados para sus cotizaciones. Vacío si no hay ninguno.
+pub(crate) fn payment_block(conn: &Connection) -> AppResult<String> {
+    let s = settings_of(conn)?;
+    let mut out = String::new();
+    let b = &s.bank;
+    if b.show && !b.holder.trim().is_empty() && !b.account.trim().is_empty() {
+        out.push_str("Puedes pagar por transferencia:\n");
+        out.push_str(b.holder.trim());
+        if !b.rut.trim().is_empty() {
+            out.push_str(&format!("\nRUT {}", b.rut.trim()));
+        }
+        let cuenta = [b.bank.trim(), b.account_type.trim()]
+            .into_iter()
+            .filter(|x| !x.is_empty())
+            .collect::<Vec<_>>()
+            .join(" · ");
+        out.push_str(&format!(
+            "\n{}{}N° {}",
+            cuenta,
+            if cuenta.is_empty() { "" } else { " " },
+            b.account.trim()
+        ));
+        if !b.email.trim().is_empty() {
+            out.push_str(&format!("\nComprobante a: {}", b.email.trim()));
+        }
+        out.push_str("\n\n");
+    }
+    if s.card.show && !s.card.url.trim().is_empty() {
+        out.push_str(&format!(
+            "{} con tarjeta aquí: {}\n\n",
+            if out.is_empty() {
+                "Puedes pagar"
+            } else {
+                "También puedes pagar"
+            },
+            s.card.url.trim()
+        ));
+    }
+    Ok(out)
+}
+
 fn cot_sequence(conn: &Connection) -> AppResult<dbcore::SequenceRow> {
     dbcore::sequences(conn)?
         .into_iter()

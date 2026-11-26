@@ -2,6 +2,10 @@
 // Sirve para el navegador (prueba de usabilidad de la Fase 3) y para desarrollar pantallas antes de
 // que exista su comando Rust. No persiste nada: al recargar la página vuelve al estado inicial.
 import { AppError, type Backend, type Feature, type FileSource, type ImportView, type PurchaseFilter, type SaleFilter } from "../backend";
+import type {
+  AutoDone, BankRule, BankRuleInput, CollectDoc, CollectItem, CollectResult, CollectRound, CollectSettings, CollectState, DigestPreview, DigestSettings, GoalProgress,
+  RecurringNow, RecurringSale, RecurringSaleInput, Serial, SerialBulkReport, SerialFilter, SerialInput, StartFile, StartReport,
+} from "../types";
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
   SiiDocument, SiiIssueInput, SiiIntercambioGuardado, SiiIntercambioInput, SiiIntercambioResumen, SiiLibro, SiiLibroInput, SiiPrintDoc, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
@@ -1986,6 +1990,282 @@ export class DemoBackend implements Backend {
   async mailLog(customerUid?: string | null): Promise<MailLogRow[]> {
     const name = customerUid ? this.customers.find((c) => c.uid === customerUid)?.name : null;
     return wait(customerUid ? this.mail.log.filter((r) => r.customer_name === name) : [...this.mail.log]);
+  }
+  /* ───────── Lo que NÚCLEO hace solo (demostración: nada sale de verdad) ───────── */
+  private collectCfg: CollectSettings = { enabled: false, mode: "avisar", weekdays: [1, 4], hour: 10, min_days: 1, before_days: 0, repeat_days: 7, max_per_run: 20, excluded: [] };
+  private collectLast: CollectState = { last_run_date: null, last_run_at: null, last_sent: 0, last_failed: 0, last_kind: "" };
+  private digestCfg: DigestSettings = { enabled: false, weekdays: [1, 2, 3, 4, 5], hour: 8, to: "", goal_minor: 0 };
+  private recurringSalesList: RecurringSale[] = [];
+  private bankRuleList: BankRule[] = [];
+  private serialList: Serial[] = [];
+  private notAgentSetting(what: string) { this.require("config.editar"); void what; }
+  async autoRun(): Promise<AutoDone[]> { return wait([]); }
+  async collectRound(): Promise<CollectRound> {
+    this.require("dinero.ver");
+    const t = this.today, cfg = this.collectCfg;
+    const by = new Map<string, CollectItem>();
+    for (const s of this.sales) {
+      if (!s.customer_uid || !(s.commercial_state === "efectuada" || s.commercial_state === "cerrada")) continue;
+      const pending = s.totals.total_minor - this.paid(s);
+      if (pending <= 0) continue;
+      const c = this.customers.find((x) => x.uid === s.customer_uid);
+      if (!c) continue;
+      const due = s.due_date ?? s.issue_date;
+      const late = daysBetween(due, t);
+      const it = by.get(c.uid) ?? { customer_uid: c.uid, customer_name: c.name, email: c.email?.trim() || null, docs: [], total_minor: 0, overdue_minor: 0, max_days_late: -Infinity, last_reminder_at: null, state: "listo" as const };
+      it.docs.push({ number: s.number, sale_uid: s.uid, due_date: due, pending_minor: pending, days_late: late });
+      it.total_minor += pending;
+      if (late > 0) it.overdue_minor += pending;
+      it.max_days_late = Math.max(it.max_days_late, late);
+      by.set(c.uid, it);
+    }
+    const qualifies = (d: CollectDoc) => d.days_late >= Math.max(cfg.min_days, 1) || (cfg.before_days > 0 && d.days_late <= 0 && -d.days_late <= cfg.before_days);
+    const items = [...by.values()].filter((i) => i.docs.some(qualifies)).map((i) => {
+      const last = this.mail.log.find((r) => r.kind === "cobro" && r.status === "enviado" && r.customer_name === i.customer_name)?.sent_at ?? null;
+      const recent = !!last && daysBetween(last.slice(0, 10), t) < cfg.repeat_days;
+      return { ...i, last_reminder_at: last, state: (cfg.excluded.includes(i.customer_uid) ? "excluido" : !i.email ? "sin_correo" : recent ? "reciente" : "listo") as CollectItem["state"] };
+    }).sort((a, b) => b.max_days_late - a.max_days_late || b.overdue_minor - a.overdue_minor || a.customer_name.localeCompare(b.customer_name));
+    return wait({
+      today: t, mail_ready: !!this.mail.cfg, agent_send: !!this.mail.cfg?.agent_send, settings: structuredClone(cfg), last: { ...this.collectLast }, items,
+      ready: items.filter((i) => i.state === "listo").length, total_minor: items.reduce((a, i) => a + i.total_minor, 0), overdue_minor: items.reduce((a, i) => a + i.overdue_minor, 0), due_now: false,
+    });
+  }
+  async collectSaveSettings(v: CollectSettings): Promise<CollectSettings> {
+    this.notAgentSetting("cobranza");
+    if (!["avisar", "enviar"].includes(v.mode)) throw new AppError("validacion", "Modo: avisar o enviar.");
+    if (v.enabled && !v.weekdays.length) throw new AppError("validacion", "Elige al menos un día para la ronda programada.");
+    if (v.weekdays.some((d) => d < 1 || d > 7) || v.hour < 0 || v.hour > 23 || v.max_per_run < 1 || v.max_per_run > 200) throw new AppError("validacion", "Revisa los días, la hora y el tope de la ronda.");
+    this.collectCfg = { ...structuredClone(v), weekdays: [...new Set(v.weekdays)].sort(), excluded: v.excluded.filter((u) => this.customers.some((c) => c.uid === u)) };
+    return wait(structuredClone(this.collectCfg));
+  }
+  async collectSend(customerUids?: string[] | null): Promise<CollectResult> {
+    const round = await this.collectRound();
+    if (!round.mail_ready) throw new AppError("validacion", "Configura primero el correo de la empresa (Configuración → Integraciones → Correo).");
+    const chosen = customerUids?.length
+      ? customerUids.map((u) => {
+        const it = round.items.find((i) => i.customer_uid === u);
+        if (!it) throw new AppError("validacion", "Ese cliente no está en la ronda de cobranza de hoy.");
+        if (it.state === "excluido") throw new AppError("validacion", `${it.customer_name} está marcado como «no enviar recordatorios».`);
+        if (it.state === "sin_correo") throw new AppError("validacion", `${it.customer_name} no tiene correo en su ficha.`);
+        return it;
+      })
+      : round.items.filter((i) => i.state === "listo").slice(0, round.settings.max_per_run);
+    for (const it of chosen) await this.mailSend({ ...(await this.mailDraft("cobro", it.customer_uid)), reference: it.docs.map((d) => d.number).slice(0, 6).join(", ") });
+    this.collectLast = { ...this.collectLast, last_run_at: new Date().toISOString(), last_sent: chosen.length, last_failed: 0, last_kind: "manual" };
+    return wait({ sent: chosen.length, failed: 0, errors: [] });
+  }
+  async salesGoal(): Promise<GoalProgress | null> {
+    const goal = this.digestCfg.goal_minor;
+    if (goal <= 0) return wait(null);
+    const ym = this.today.slice(0, 7);
+    const sold = this.sales.filter((s) => (s.commercial_state === "efectuada" || s.commercial_state === "cerrada") && s.issue_date.startsWith(ym)).reduce((a, s) => a + s.totals.total_minor, 0);
+    let left = 0;
+    for (let d = this.today; d.startsWith(ym); d = addDays(d, 1)) { const w = new Date(`${d}T12:00:00`).getDay(); if (w >= 1 && w <= 5) left++; }
+    const remaining = Math.max(goal - sold, 0);
+    return wait({ goal_minor: goal, sold_minor: sold, remaining_minor: remaining, progress_ppm: Math.floor((sold * 1_000_000) / goal), workdays_left: left, per_workday_minor: left ? Math.floor(remaining / left) : remaining });
+  }
+  async digestPreview(): Promise<DigestPreview> {
+    this.require("dinero.ver");
+    const d = await this.dashboard();
+    const b = await this.business();
+    const goal = await this.salesGoal();
+    const dmy = (x: string) => x.split("-").reverse().join("-");
+    const body = [
+      `Informe de ${b.name} — ${dmy(this.today)}`, "", "VENTAS",
+      `Hoy, hasta ahora: ${formatCLP(d.today_sales_minor)} en ${d.today_sales_count} ${d.today_sales_count === 1 ? "venta" : "ventas"}`,
+      `Este mes: ${formatCLP(d.month_sales_minor)} (el mes anterior, a la misma fecha: ${formatCLP(d.month_prev_same_minor)})`,
+      ...(goal ? [goal.remaining_minor === 0
+        ? `Meta del mes: ${formatCLP(goal.goal_minor)} · cumplida (${Math.round(goal.progress_ppm / 10_000)} %)`
+        : `Meta del mes: ${formatCLP(goal.goal_minor)} · llevas ${Math.round(goal.progress_ppm / 10_000)} % · faltan ${formatCLP(goal.remaining_minor)} (${formatCLP(goal.per_workday_minor)} por día hábil; quedan ${goal.workdays_left})`] : []),
+      "", "RESULTADO DEL MES", `Compras: ${formatCLP(d.month_purchases_minor)} · Gastos: ${formatCLP(d.month_expenses_minor)}`, `Utilidad estimada: ${formatCLP(d.month_profit_minor)}`,
+      "", "DINERO", `Disponible: ${formatCLP(d.cash_minor)}`, `Te deben: ${formatCLP(d.receivable_minor)}${d.receivable_overdue_minor > 0 ? ` (atrasado: ${formatCLP(d.receivable_overdue_minor)})` : ""}`, `Debes: ${formatCLP(d.payable_minor)}`,
+      ...(d.tax_estimate_minor !== null ? [`IVA estimado del mes: ${formatCLP(d.tax_estimate_minor)}`] : []),
+      ...(d.alerts.length ? ["", "REQUIERE TU ATENCIÓN", ...d.alerts.map((a) => `- ${a.title}: ${a.detail}`)] : []),
+      ...(d.low_stock.length ? ["", "POCO STOCK", ...d.low_stock.slice(0, 12).map((p) => `- ${p.name}: quedan ${p.on_hand_milli / 1000} (mínimo ${p.min_milli / 1000})`)] : []),
+    ].join("\n");
+    return wait({
+      settings: structuredClone(this.digestCfg), last: { last_run_date: null, last_run_at: null, last_ok: false, last_error: null }, mail_ready: !!this.mail.cfg,
+      to: this.digestCfg.to || this.mail.cfg?.from_email || "", subject: `Informe de ${b.name} — ${dmy(this.today)} · ventas del mes ${formatCLP(d.month_sales_minor)}`, body, goal,
+    });
+  }
+  async digestSaveSettings(v: DigestSettings): Promise<DigestPreview> {
+    this.notAgentSetting("informe");
+    if (v.enabled && !v.weekdays.length) throw new AppError("validacion", "Elige al menos un día para el informe.");
+    if (v.to.trim() && v.to.split(/[,;]/).some((a) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(a.trim()))) throw new AppError("validacion", "El destinatario del informe no es una dirección válida.");
+    if (v.goal_minor < 0) throw new AppError("validacion", "La meta no es válida.");
+    this.digestCfg = { ...structuredClone(v), to: v.to.trim().toLowerCase() };
+    return this.digestPreview();
+  }
+  async digestSend(): Promise<string> {
+    const p = await this.digestPreview();
+    await this.mailSend({ kind: "informe", to: p.to, subject: p.subject, body: p.body, customer_uid: null, reference: null, quote_uids: [] });
+    return p.to;
+  }
+  private recurringView(r: RecurringSale): RecurringSale {
+    const c = this.customers.find((x) => x.uid === r.customer_uid);
+    return { ...structuredClone(r), customer_name: c?.name ?? "", customer_email: c?.email?.trim() || null, total_minor: computeTotals(r.lines, this.taxPpm()).total_minor, due_now: r.active && r.next_date <= this.today };
+  }
+  async recurringSales(): Promise<RecurringSale[]> { this.require("ventas.ver"); return wait(this.recurringSalesList.map((r) => this.recurringView(r))); }
+  async saveRecurringSale(input: RecurringSaleInput, uid?: string | null): Promise<RecurringSale> {
+    this.require("ventas.crear");
+    if (!input.name.trim()) throw new AppError("validacion", "Ponle un nombre al cobro, por ejemplo «Monitoreo mensual».");
+    if (!this.customers.some((c) => c.uid === input.customer_uid)) throw new AppError("validacion", "Elige el cliente al que se le cobra.");
+    if (!["mensual", "bimestral", "trimestral", "semestral", "anual"].includes(input.frequency)) throw new AppError("validacion", "Frecuencia: mensual, bimestral, trimestral, semestral o anual.");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.next_date)) throw new AppError("validacion", "La fecha del próximo cobro no es una fecha válida.");
+    if (input.end_date && input.end_date < input.next_date) throw new AppError("validacion", "La fecha de término es anterior al próximo cobro.");
+    this.validateLines(input.lines);
+    const prev = uid ? this.recurringSalesList.find((r) => r.uid === uid) : null;
+    if (uid && !prev) throw new AppError("no_encontrado", "No encontramos ese cobro recurrente.");
+    const rec: RecurringSale = { ...(prev ?? { uid: `rec-${this.recurringSalesList.length + 1}-${Date.now()}`, last_run_date: null, last_sale_uid: null, last_sale_number: null, runs: 0 }), ...structuredClone(input), name: input.name.trim(), customer_name: "", customer_email: null, total_minor: null, due_now: false };
+    if (prev) Object.assign(prev, rec); else this.recurringSalesList.push(rec);
+    return wait(this.recurringView(rec));
+  }
+  async deleteRecurringSale(uid: string): Promise<void> { this.require("ventas.crear"); this.recurringSalesList = this.recurringSalesList.filter((r) => r.uid !== uid); return wait(undefined); }
+  async recurringRunNow(uid: string): Promise<RecurringNow> {
+    const r = this.recurringSalesList.find((x) => x.uid === uid);
+    if (!r) throw new AppError("no_encontrado", "No encontramos ese cobro recurrente.");
+    const month = new Date(`${r.next_date}T12:00:00`).toLocaleDateString("es-CL", { month: "long", year: "numeric" });
+    const sale = await this.saveSale({ doc_type: "VEN", customer_uid: r.customer_uid, issue_date: this.today, lines: structuredClone(r.lines), notes: `${r.name} · ${month}`, terms: null });
+    let number = sale.number;
+    if (r.confirm) number = (await this.effectSale(sale.uid, { mode: "credito", method: "", due_date: addDays(this.today, r.credit_days) })).number;
+    const months = { mensual: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 }[r.frequency];
+    const d = new Date(`${r.next_date}T12:00:00`); d.setMonth(d.getMonth() + months);
+    Object.assign(r, { next_date: d.toISOString().slice(0, 10), last_run_date: this.today, last_sale_uid: sale.uid, last_sale_number: number, runs: r.runs + 1 });
+    if (r.end_date && r.next_date > r.end_date) r.active = false;
+    return wait({ sales: [number], mails_sent: 0, notes: r.send_mail ? ["Demostración: el aviso al cliente no se envía."] : [] });
+  }
+  async bankRules(): Promise<BankRule[]> { this.require("dinero.ver"); return wait(structuredClone(this.bankRuleList)); }
+  async saveBankRule(input: BankRuleInput, uid?: string | null): Promise<BankRule[]> {
+    this.require("dinero.registrar");
+    const fold = (t: string) => t.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const pattern = fold(input.pattern ?? "");
+    const rut = input.rut?.trim() ? input.rut.replace(/[^0-9kK]/g, "").toUpperCase() : null;
+    if (!rut && pattern.length < 3) throw new AppError("validacion", "Escribe el texto que debe aparecer en la glosa (al menos 3 letras) o el RUT.");
+    let target = "se ignora";
+    if (input.action === "cliente") { const c = this.customers.find((x) => x.uid === input.customer_uid); if (!c) throw new AppError("validacion", "Elige el cliente."); target = c.name; }
+    else if (input.action === "proveedor") { const v = this.suppliers.find((x) => x.uid === input.supplier_uid); if (!v) throw new AppError("validacion", "Elige el proveedor."); target = v.name; }
+    else if (input.action === "gasto") { const k = (await this.expenseCategories()).find((x) => x.id === input.category_id); if (!k) throw new AppError("validacion", "Elige la categoría del gasto."); target = `gasto de ${k.name}`; }
+    else if (input.action === "traspaso") { const a = (await this.moneyAccounts()).find((x) => x.uid === input.account_uid); if (!a) throw new AppError("validacion", "Elige la otra cuenta."); target = `traspaso con ${a.name}`; }
+    else if (!input.note?.trim()) throw new AppError("validacion", "Escribe por qué se ignoran esos movimientos.");
+    const prev = uid ? this.bankRuleList.find((r) => r.uid === uid) : null;
+    if (uid && !prev) throw new AppError("no_encontrado", "No encontramos esa regla.");
+    const rule: BankRule = {
+      uid: prev?.uid ?? `regla-${this.bankRuleList.length + 1}-${Date.now()}`, name: input.name?.trim() || `${pattern ? pattern.toUpperCase() : `RUT ${rut}`} → ${target}`, pattern, rut, direction: input.direction, action: input.action,
+      customer_uid: input.action === "cliente" ? input.customer_uid ?? null : null, supplier_uid: input.action === "proveedor" ? input.supplier_uid ?? null : null,
+      category_id: input.action === "gasto" ? input.category_id ?? null : null, account_uid: input.action === "traspaso" ? input.account_uid ?? null : null, target,
+      tax_included: input.action === "gasto" ? !!input.tax_included : null, note: input.note?.trim() || null, origin: "manual", hits: prev?.hits ?? 0, last_hit_at: prev?.last_hit_at ?? null, active: input.active ?? true,
+    };
+    if (prev) Object.assign(prev, rule); else this.bankRuleList.push(rule);
+    return this.bankRules();
+  }
+  async deleteBankRule(uid: string): Promise<BankRule[]> { this.require("dinero.registrar"); this.bankRuleList = this.bankRuleList.filter((r) => r.uid !== uid); return this.bankRules(); }
+  private serialKey(t: string) { return t.replace(/[^\p{L}\p{N}]/gu, "").toUpperCase(); }
+  private serialView(x: Serial): Serial {
+    return { ...x, due_in_days: x.certificate_due ? daysBetween(this.today, x.certificate_due) : null };
+  }
+  async serials(f: SerialFilter = {}): Promise<Serial[]> {
+    this.require("productos.ver");
+    const q = f.query?.trim().toLowerCase() ?? "";
+    const key = this.serialKey(q);
+    const limit = f.due_within_days != null ? addDays(this.today, f.due_within_days) : null;
+    return wait(this.serialList.filter((x) =>
+      (!q || (key && this.serialKey(x.serial).includes(key)) || [x.product_name, x.product_sku, x.customer_name ?? "", x.certificate_number ?? ""].some((t) => t.toLowerCase().includes(q)))
+      && (!f.product_uid || x.product_uid === f.product_uid) && (!f.customer_uid || x.customer_uid === f.customer_uid) && (!f.sale_uid || x.sale_uid === f.sale_uid)
+      && (!f.status || x.status === f.status) && (!limit || (!!x.certificate_due && x.certificate_due <= limit && x.status !== "baja")),
+    ).map((x) => this.serialView(x)));
+  }
+  async saveSerial(input: SerialInput, uid?: string | null): Promise<Serial> {
+    this.require("productos.editar");
+    const p = this.products.find((x) => x.uid === input.product_uid);
+    if (!p) throw new AppError("validacion", "Elige el producto de esa serie.");
+    const serial = input.serial.trim();
+    if (!this.serialKey(serial)) throw new AppError("validacion", "Escribe el número de serie.");
+    if (this.serialList.some((x) => x.uid !== uid && x.product_uid === p.uid && this.serialKey(x.serial) === this.serialKey(serial))) throw new AppError("validacion", `La serie ${serial} ya está registrada para ${p.name}.`);
+    if (input.certificate_date && input.certificate_due && input.certificate_due < input.certificate_date) throw new AppError("validacion", "La próxima calibración es anterior a la fecha del certificado.");
+    const prev = uid ? this.serialList.find((x) => x.uid === uid) : null;
+    if (uid && !prev) throw new AppError("no_encontrado", "No encontramos esa serie.");
+    if (prev?.status === "vendido" && input.status) throw new AppError("validacion", "Una serie vendida cambia de estado al quitarla de la venta.");
+    const row: Serial = {
+      ...(prev ?? { uid: `serie-${this.serialList.length + 1}-${Date.now()}`, sale_uid: null, sale_number: null, customer_uid: null, customer_name: null, sold_at: null }),
+      serial, product_uid: p.uid, product_name: p.name, product_sku: p.sku, status: prev?.status === "vendido" ? "vendido" : input.status ?? prev?.status ?? "en_stock",
+      certificate_number: input.certificate_number?.trim() || null, certificate_date: input.certificate_date || null, certificate_due: input.certificate_due || null,
+      certificate_lab: input.certificate_lab?.trim() || null, certificate_file: input.certificate_file?.trim() || null, notes: input.notes?.trim() || null, due_in_days: null,
+    };
+    if (prev) Object.assign(prev, row); else this.serialList.unshift(row);
+    return wait(this.serialView(row));
+  }
+  async addSerials(productUid: string, serials: string[]): Promise<SerialBulkReport> {
+    const rep: SerialBulkReport = { added: 0, duplicates: [] };
+    for (const raw of serials) {
+      if (!this.serialKey(raw)) continue;
+      try { await this.saveSerial({ product_uid: productUid, serial: raw }); rep.added++; } catch (e) { if (e instanceof AppError && e.message.includes("ya está registrada")) rep.duplicates.push(raw.trim()); else throw e; }
+    }
+    return rep;
+  }
+  async assignSerials(saleUid: string, serialUids: string[]): Promise<Serial[]> {
+    this.require("ventas.crear");
+    const s = this.findSale(saleUid);
+    // Todo o nada: si una serie no corresponde, ninguna queda asignada.
+    const before = structuredClone(this.serialList);
+    try { this.assignEach(s, serialUids); } catch (e) { this.serialList = before; throw e; }
+    return this.serials({ sale_uid: saleUid });
+  }
+  private assignEach(s: SaleRec, serialUids: string[]): void {
+    const saleUid = s.uid;
+    for (const u of serialUids) {
+      const x = this.serialList.find((y) => y.uid === u);
+      if (!x) throw new AppError("no_encontrado", "No encontramos esa serie.");
+      if (x.status === "baja") throw new AppError("validacion", `La serie ${x.serial} está dada de baja.`);
+      if (x.status === "vendido" && x.sale_uid !== saleUid) throw new AppError("validacion", `La serie ${x.serial} ya está en la venta ${x.sale_number}.`);
+      const sold = s.lines.filter((l) => l.product_uid === x.product_uid).reduce((a, l) => a + l.qty_milli, 0);
+      if (sold <= 0) throw new AppError("validacion", `La venta ${s.number} no incluye ${x.product_name} (serie ${x.serial}).`);
+      const already = this.serialList.filter((y) => y.sale_uid === saleUid && y.product_uid === x.product_uid && y.uid !== u).length;
+      if ((already + 1) * 1000 > sold) throw new AppError("validacion", `La venta ${s.number} tiene ${sold / 1000} unidad(es) de ${x.product_name} y ya tiene ${already} serie(s) asignadas.`);
+      Object.assign(x, { status: "vendido", sale_uid: s.uid, sale_number: s.number, customer_uid: s.customer_uid, customer_name: s.customer_uid ? this.customerName(s.customer_uid) : null, sold_at: s.issue_date });
+    }
+  }
+  async releaseSerial(uid: string): Promise<Serial> {
+    const x = this.serialList.find((y) => y.uid === uid);
+    if (!x || x.status !== "vendido") throw new AppError("validacion", "Esa serie no está asignada a una venta.");
+    Object.assign(x, { status: "en_stock", sale_uid: null, sale_number: null, customer_uid: null, customer_name: null, sold_at: null });
+    return wait(this.serialView(x));
+  }
+  async deleteSerial(uid: string): Promise<void> {
+    const x = this.serialList.find((y) => y.uid === uid);
+    if (x?.status === "vendido") throw new AppError("validacion", "Esa serie está en una venta: quítala de la venta primero.");
+    this.serialList = this.serialList.filter((y) => y.uid !== uid);
+    return wait(undefined);
+  }
+  async siiStartImport(files: StartFile[]): Promise<StartReport> {
+    if (!files.length) throw new AppError("validacion", "Elige los archivos del Registro de Compras y Ventas que descargaste del SII.");
+    const rep: StartReport = { files: [], periods: [], sales_docs: 0, sales_total_minor: 0, purchases_docs: 0, purchases_total_minor: 0, sales_imported: 0, sales_existing: 0, sales_errors: 0, customers_created: 0, suppliers_created: 0, credit_notes: 0, credit_notes_minor: 0, notes: [] };
+    const seen = new Set<string>();
+    for (const f of files) {
+      const fail = (message: string) => rep.files.push({ name: f.name, direction: null, period: null, documents: 0, total_minor: 0, status: "error", message });
+      const lower = f.name.toLowerCase();
+      const header = (f.text.split(/\r?\n/).find((l) => l.trim()) ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const direction = lower.includes("venta") ? "venta" : lower.includes("compra") ? "compra" : header.includes("rutcliente") ? "venta" : header.includes("rutproveedor") ? "compra" : null;
+      if (!direction) { fail("No se reconoce si es el registro de compras o el de ventas."); continue; }
+      let rows;
+      try { rows = parseRcv(f.text).rows; } catch (e) { fail((e as Error).message); continue; }
+      const m = (f.name.match(/\d+/g) ?? []).find((r) => r.length === 6 && Number(r.slice(4)) >= 1 && Number(r.slice(4)) <= 12 && Number(r.slice(0, 4)) >= 2000);
+      const period = m ? `${m.slice(0, 4)}-${m.slice(4)}` : rows.find((r) => r.issue_date)?.issue_date?.slice(0, 7) ?? null;
+      if (!period) { fail("No se pudo saber de qué mes es el archivo."); continue; }
+      if (seen.has(`${period}|${direction}`)) { fail(`Ya venía otro archivo de ${direction === "venta" ? "ventas" : "compras"} de ${period}: se usó el primero.`); continue; }
+      seen.add(`${period}|${direction}`);
+      try { await this.importRcv(period, direction, f.name, f.text); } catch (e) { fail((e as Error).message); continue; }
+      const total = rows.reduce((a, r) => a + (r.sii_type === 61 ? -r.total : r.total), 0);
+      if (direction === "venta") {
+        rep.sales_docs += rows.length; rep.sales_total_minor += total;
+        const nc = rows.filter((r) => r.sii_type === 61);
+        rep.credit_notes += nc.length; rep.credit_notes_minor += nc.reduce((a, r) => a + r.total, 0);
+      } else { rep.purchases_docs += rows.length; rep.purchases_total_minor += total; }
+      if (!rep.periods.includes(period)) rep.periods.push(period);
+      rep.files.push({ name: f.name, direction, period, documents: rows.length, total_minor: total, status: "ok", message: null });
+    }
+    rep.periods.sort();
+    rep.notes.push("Demostración: los registros quedan cargados en Impuestos; las ventas históricas y los proveedores se crean en la aplicación de escritorio.");
+    return wait(rep, 300);
   }
   /* Facturación electrónica propia (simulada: no hay SII en la demostración). */
   private sii = {

@@ -8,12 +8,13 @@ import { navigate, type Route } from "../../lib/router";
 import { useSession } from "../../lib/session";
 import { Badge, Button, Card, EmptyState, Kpi, Notice, Segmented, Spinner, Tabs } from "../../ui/kit";
 import { AccountsTab } from "./Accounts";
+import { CollectionTab } from "./Collection";
 import { DueTable, accountLabel } from "./common";
 import { FlowChart } from "./FlowChart";
 import { RecurringTab } from "./Recurring";
 import { ReconciliationTab } from "./Reconciliation";
 
-type Tab = "resumen" | "cuentas" | "conciliacion" | "gastos" | "por_cobrar" | "por_pagar" | "calendario" | "recurrentes";
+type Tab = "resumen" | "cuentas" | "conciliacion" | "gastos" | "por_cobrar" | "cobranza" | "por_pagar" | "calendario" | "recurrentes";
 
 export function Money({ route }: { route: Route }) {
   const backend = useBackend();
@@ -43,6 +44,7 @@ export function Money({ route }: { route: Route }) {
           { value: "cuentas", label: "Cuentas" },
           { value: "conciliacion", label: "Conciliación bancaria" },
           { value: "por_cobrar", label: t("por_cobrar"), count: ov?.receivables.length },
+          { value: "cobranza", label: "Cobranza" },
           { value: "por_pagar", label: t("por_pagar"), count: ov?.payables.length },
           { value: "calendario", label: "Calendario" },
           { value: "recurrentes", label: "Recurrentes" },
@@ -59,6 +61,7 @@ export function Money({ route }: { route: Route }) {
             <DueTable rows={ov.receivables} kind="cobro" empty={<EmptyState icon={HandCoins} title="Nadie te debe dinero">Las ventas a crédito aparecen aquí hasta que se pagan.</EmptyState>} />
           </DueBlock>
         )}
+        {tab === "cobranza" && <CollectionTab onChanged={reload} />}
         {tab === "por_pagar" && ov && (
           <DueBlock total={ov.payable_minor} overdue={ov.payable_overdue_minor} aging={ov.payable_aging} kind="pago">
             <DueTable rows={ov.payables} kind="pago" empty={<EmptyState icon={Banknote} title="No debes nada">Las compras y gastos sin pagar aparecen aquí.</EmptyState>} />

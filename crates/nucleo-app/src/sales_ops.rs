@@ -82,7 +82,7 @@ pub struct ProductPatch {
     pub stock_policy: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LineInput {
     pub product_uid: Option<String>,
     pub description: String,
@@ -423,6 +423,11 @@ impl CompanySession {
                     .id,
             )),
         }
+    }
+
+    /// Totales que tendrían estas líneas (valida productos, cantidades y precios).
+    pub(crate) fn lines_totals(&self, input: &[LineInput]) -> AppResult<Totals> {
+        Ok(self.prepare_lines(input)?.totals)
     }
 
     fn prepare_lines(&self, input: &[LineInput]) -> AppResult<Prepared> {

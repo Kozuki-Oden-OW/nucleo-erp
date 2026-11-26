@@ -20,6 +20,7 @@ export const ALERT_LABELS: { kind: AlertKind; label: string; hint: string }[] = 
   { kind: "importaciones", label: "Importaciones en camino", hint: "Carpetas en curso y su próxima fecha de llegada." },
   { kind: "presupuesto", label: "Gastos sobre el presupuesto", hint: "Categorías de gastos que superan su presupuesto del mes." },
   { kind: "documentar", label: "Ventas pendientes de documentar", hint: "Sin el número de boleta o factura anotado." },
+  { kind: "calibraciones", label: "Certificados de calibración por vencer", hint: "Equipos vendidos con serie cuya calibración vence dentro de 30 días." },
 ];
 
 export function AlertsSection() {

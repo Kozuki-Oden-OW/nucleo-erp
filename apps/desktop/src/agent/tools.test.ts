@@ -443,4 +443,87 @@ describe("WhatsApp solo con NÚCLEO (demostración)", () => {
     expect((await runTool(b, "completo", "whatsapp_enviar", { telefono: "+56 9 7777 7777", texto: "hola" })).isError).toBe(true);
     expect((await runTool(b, "completo", "whatsapp_enviar", { texto: "hola" })).isError).toBe(true);
   });
+  it("cobranza: muestra la ronda y envía solo con el permiso de correo", async () => {
+    const b = new DemoBackend();
+    await runTool(b, "borradores", "crear_cliente", { nombre: "Clínica Sur", rut: "76.123.456-0", correo: "pagos@clinicasur.cl" });
+    const v = await runTool(b, "borradores", "crear_venta_borrador", { cliente: "76.123.456-0", lineas: [{ descripcion: "Mapeo térmico", precio_neto: 100000, cantidad: 1 }] });
+    const uid = txt(v).match(/Identificador: (\S+)/)![1]!;
+    const past = new Date(Date.now() - 20 * 86_400_000).toISOString().slice(0, 10);
+    await runTool(b, "completo", "confirmar_venta", { venta: uid, modo: "credito", vencimiento: past });
+
+    const ronda = txt(await runTool(b, "ver", "ronda_cobranza", {}));
+    expect(ronda).toMatch(/Clínica Sur · \$119\.000/);
+    expect(ronda).toMatch(/pagos@clinicasur\.cl · listo para enviar/);
+    expect(ronda).toMatch(/no está configurado/);
+
+    expect((await runTool(b, "borradores", "enviar_cobranza", {})).isError).toBe(true);
+    expect(txt(await runTool(b, "completo", "enviar_cobranza", {}))).toMatch(/no está configurado/);
+    const mail = { host: "smtp.titan.email", port: 465, security: "tls", username: "ventas@datalogger.cl", password: "x", from_name: "Data Logger", from_email: "ventas@datalogger.cl", reply_to: "", bcc_self: false };
+    await b.mailSave({ ...mail, agent_send: false });
+    expect(txt(await runTool(b, "completo", "enviar_cobranza", {}))).toMatch(/no tiene permiso/);
+    expect(await b.mailLog()).toHaveLength(0);
+    await b.mailSave({ ...mail, agent_send: true });
+    expect(txt(await runTool(b, "completo", "enviar_cobranza", { clientes: ["Nadie SpA"] }))).toMatch(/No encontré/);
+    const sent = await runTool(b, "completo", "enviar_cobranza", {});
+    expect(sent.isError).toBeUndefined();
+    expect(txt(sent)).toMatch(/\d+ recordatorios? enviados?/);
+    const log = await b.mailLog();
+    expect(log.every((r) => r.kind === "cobro")).toBe(true);
+    expect(log.filter((r) => r.to_addr === "pagos@clinicasur.cl")).toHaveLength(1);
+    // Ya se le escribió: la ronda no lo repite, salvo que se pida por nombre.
+    expect(txt(await runTool(b, "ver", "ronda_cobranza", {}))).toMatch(/ya se le escribió hace poco/);
+    expect(txt(await runTool(b, "completo", "enviar_cobranza", {}))).toMatch(/No hay recordatorios listos/);
+    expect(txt(await runTool(b, "completo", "enviar_cobranza", { clientes: ["clinica sur"] }))).toMatch(/1 recordatorio enviado/);
+  });
+
+  it("informe con meta, cobros recurrentes y reglas del banco", async () => {
+    const b = new DemoBackend();
+    expect(txt(await runTool(b, "ver", "informe_negocio", {}))).toMatch(/VENTAS[\s\S]*DINERO[\s\S]*No hay meta de ventas/);
+    await b.digestSaveSettings({ enabled: true, weekdays: [1, 2, 3, 4, 5], hour: 8, to: "dueno@datalogger.cl", goal_minor: 900_000_000 });
+    const informe = txt(await runTool(b, "ver", "informe_negocio", {}));
+    expect(informe).toMatch(/Meta del mes: \$900\.000\.000 · llevas \d+ % · faltan/);
+    expect(informe).toMatch(/de lunes a viernes desde las 08:00 a dueno@datalogger\.cl/);
+
+    expect(txt(await runTool(b, "ver", "cobros_recurrentes", {}))).toMatch(/No hay cobros recurrentes/);
+    const c = (await b.searchCustomers(""))[0]!;
+    await b.saveRecurringSale({ name: "Monitoreo mensual", customer_uid: c.uid, lines: [{ product_uid: null, description: "Plataforma, 4 equipos", qty_milli: 1000, unit_price_minor: 40000, discount_ppm: 0, taxable: true }], notes: null, frequency: "mensual", next_date: "2020-01-05", end_date: null, credit_days: 10, confirm: true, send_mail: true, active: true });
+    expect(txt(await runTool(b, "ver", "cobros_recurrentes", {}))).toMatch(/Monitoreo mensual · .* · mensual · \$47\.600 · próximo 2020-01-05 · TOCA GENERARLO/);
+
+    expect(txt(await runTool(b, "ver", "reglas_banco", {}))).toMatch(/Aún no hay reglas/);
+    expect((await runTool(b, "borradores", "guardar_regla_banco", { accion: "gasto", texto: "LIPIGAS", categoria: "combustible" })).isError).toBe(true);
+    expect(txt(await runTool(b, "completo", "guardar_regla_banco", { accion: "gasto", texto: "LIPIGAS", categoria: "no existe" }))).toMatch(/No hay una categoría/);
+    const regla = await runTool(b, "completo", "guardar_regla_banco", { accion: "gasto", texto: "Lipigas", categoria: "combustible", con_iva: true });
+    expect(regla.isError).toBeUndefined();
+    expect(txt(regla)).toMatch(/glosa «lipigas» \(cargo\) → gasto de Combustible \(con IVA incluido\)/);
+    expect(txt(await runTool(b, "completo", "guardar_regla_banco", { accion: "ignorar", texto: "comision" }))).toMatch(/por qué se ignoran/);
+    expect(txt(await runTool(b, "ver", "reglas_banco", {}))).toMatch(/1 reglas/);
+  });
+
+  it("series: registra con certificado, las une a la venta y las encuentra", async () => {
+    const b = new DemoBackend();
+    const p = (await b.searchProducts("")).find((x) => x.kind === "producto")!;
+    const c = (await b.searchCustomers(""))[0]!;
+    expect((await runTool(b, "ver", "registrar_series", { producto: p.sku, series: ["EF-1"] })).isError).toBe(true);
+    const r = await runTool(b, "borradores", "registrar_series", {
+      producto: p.sku, series: ["EF-724A-0011", "EF-724A-0012"],
+      certificado: { numero: "CAL-2026-0456", laboratorio: "Lab acreditado", fecha: "2026-01-10", proxima_calibracion: "2027-01-10" },
+    });
+    expect(r.isError).toBeUndefined();
+    expect(txt(r)).toMatch(/2 series/);
+    expect(txt(r)).toMatch(/EF-724A-0011 · .* · en stock · certificado CAL-2026-0456 \(Lab acreditado\) del 2026-01-10 · próxima calibración 2027-01-10/);
+    // Repetir no duplica.
+    expect(txt(await runTool(b, "borradores", "registrar_series", { producto: p.sku, series: ["ef 724a 0011"] }))).toMatch(/ya estaba registrada/);
+    expect(await b.serials({ product_uid: p.uid })).toHaveLength(2);
+
+    const sale = await b.saveSale({ doc_type: "VEN", customer_uid: c.uid, issue_date: new Date().toISOString().slice(0, 10), lines: [{ product_uid: p.uid, description: p.name, qty_milli: 1000, unit_price_minor: p.price_minor, discount_ppm: 0, taxable: true }], terms: null });
+    const two = await runTool(b, "borradores", "registrar_series", { producto: p.sku, series: ["EF-724A-0011", "EF-724A-0012"], venta: sale.number });
+    expect(txt(two)).toMatch(/tiene 1 unidad\(es\)/);
+    const one = await runTool(b, "borradores", "registrar_series", { producto: p.sku, series: ["EF-724A-0012"], venta: sale.number });
+    expect(txt(one)).toMatch(new RegExp(`La venta ${sale.number} tiene ahora 1 serie anotada`));
+    const found = txt(await runTool(b, "ver", "buscar_series", { cliente: c.name }));
+    expect(found).toMatch(new RegExp(`EF-724A-0012 · .* · vendido en ${sale.number} a `));
+    expect(txt(await runTool(b, "ver", "buscar_series", { buscar: "cal-2026", estado: "en_stock" }))).toMatch(/1 serie:/);
+    expect(txt(await runTool(b, "ver", "buscar_series", { vencen_en_dias: 5000 }))).toMatch(/2 series/);
+    expect(txt(await runTool(b, "ver", "buscar_series", { buscar: "no-existe" }))).toMatch(/No hay series/);
+  });
 });

@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "nucleo-erp",
   "display_name": "NÚCLEO ERP",
-  "version": "0.8.8",
+  "version": "0.8.9",
   "description": "Permite que Claude use NÚCLEO ERP en este computador: ve la pantalla, la recorre con su propio cursor y registra ventas, gastos, clientes y cobros.",
   "long_description": "Conecta Claude con NÚCLEO ERP, el sistema de gestión local y gratuito para pymes chilenas. NÚCLEO debe estar abierto con Configuración → Claude activado; ahí eliges si Claude solo mira, crea borradores o tiene acceso completo. La extensión solo se comunica con NÚCLEO dentro del mismo computador (127.0.0.1): los datos del negocio siguen guardados solo en tu equipo.",
   "author": {
@@ -127,6 +127,38 @@
     {
       "name": "correos_enviados",
       "description": "Registro de los correos enviados desde NÚCLEO: fecha, destinatario, asunto, documento relacionado, quién lo envió y si salió o falló. También dice si el correo de la empresa está configurado y si Clau"
+    },
+    {
+      "name": "ronda_cobranza",
+      "description": "La ronda de cobranza de hoy: clientes con documentos vencidos (o por vencer, si así está configurado), primero lo más atrasado, con sus documentos, el total, el correo de su ficha, cuándo se les escri"
+    },
+    {
+      "name": "enviar_cobranza",
+      "description": "Envía los recordatorios de cobro por correo desde la casilla de la empresa: a cada cliente uno solo, con todos sus documentos pendientes, los datos de transferencia y el enlace de pago del negocio. Si"
+    },
+    {
+      "name": "informe_negocio",
+      "description": "El informe del negocio tal como le llega al dueño por correo: ventas de hoy, de ayer, de los últimos 7 días y del mes; avance contra la meta de ventas del mes (cuánto falta y cuánto hay que vender por"
+    },
+    {
+      "name": "cobros_recurrentes",
+      "description": "Cobros recurrentes programados (por ejemplo, el monitoreo mensual de un cliente): nombre, cliente, frecuencia, monto, fecha del próximo cobro, la última venta que generó y si está activo. Los crea y c"
+    },
+    {
+      "name": "reglas_banco",
+      "description": "Reglas de conciliación bancaria: «cuando la glosa diga X (o el RUT sea Y), es tal cliente, tal proveedor, tal gasto, un traspaso o se ignora». Muestra las que escribió la persona y las que NÚCLEO apre"
+    },
+    {
+      "name": "guardar_regla_banco",
+      "description": "Crea una regla de conciliación bancaria. No mueve dinero ni concilia: hace que NÚCLEO proponga arriba el cliente, proveedor, gasto, traspaso o «ignorar» que corresponde cuando la glosa (o el RUT de qu"
+    },
+    {
+      "name": "buscar_series",
+      "description": "Busca equipos por número de serie, producto, cliente o número de certificado: a quién se vendió cada serie y cuándo, y su certificado de calibración (número, laboratorio, fecha y próxima calibración)."
+    },
+    {
+      "name": "registrar_series",
+      "description": "Registra números de serie de un producto (uno o varios) y, si se indican, los datos del certificado de calibración (se aplican a todas las series de la llamada; para certificados distintos, una llamad"
     },
     {
       "name": "whatsapp_chats",

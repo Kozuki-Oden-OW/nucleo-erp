@@ -147,7 +147,7 @@ impl Default for MailTemplates {
             },
             cobro: MailTemplate {
                 subject: "Documentos pendientes de pago — {empresa}".into(),
-                body: "Hola {cliente}:\n\nTe escribimos para recordarte los documentos pendientes de pago:\n\n{detalle}\n\nTotal pendiente: {total}{vencido}\n\nSi ya pagaste, por favor responde este correo con el comprobante y lo registramos. ¡Gracias!\n\nSaludos,\n{firma}".into(),
+                body: "Hola {cliente}:\n\nTe escribimos para recordarte los documentos pendientes de pago:\n\n{detalle}\n\nTotal pendiente: {total}{vencido}\n\n{pago}Si ya pagaste, por favor responde este correo con el comprobante y lo registramos. ¡Gracias!\n\nSaludos,\n{firma}".into(),
             },
             promocion: MailTemplate {
                 subject: "Novedades de {empresa}".into(),
@@ -322,7 +322,7 @@ fn valid_email(s: &str) -> bool {
     s.parse::<lettre::Address>().is_ok()
 }
 
-const KINDS: &[&str] = &["prueba", "envio", "cobro", "promocion", "otro"];
+const KINDS: &[&str] = &["prueba", "envio", "cobro", "promocion", "otro", "informe"];
 const MAX_ATTACHMENTS: usize = 5;
 const MAX_ATTACHMENT_BYTES: usize = 15 * 1024 * 1024;
 
@@ -339,6 +339,17 @@ impl CompanySession {
 
     fn mail_config(&self) -> AppResult<MailConfig> {
         Ok(serde_json::from_str(&self.mail_row()?.config_json).unwrap_or_default())
+    }
+
+    /// (¿hay casilla configurada?, ¿Claude puede enviar?) para quien solo necesita saber eso.
+    pub(crate) fn mail_config_public(&self) -> AppResult<(bool, bool)> {
+        let c = self.mail_config()?;
+        Ok((c.configured(), c.agent_send))
+    }
+
+    /// Dirección de la casilla de la empresa (vacía si no está configurada).
+    pub(crate) fn mail_from(&self) -> AppResult<String> {
+        Ok(self.mail_config()?.from_email)
     }
 
     pub fn mail_status(&self) -> AppResult<MailStatus> {
@@ -635,10 +646,17 @@ impl CompanySession {
             ));
         }
         let (empresa, firma) = self.mail_firma()?;
-        let t = self.mail_templates()?.cobro;
+        let mut t = self.mail_templates()?.cobro;
+        // Cómo pagar: los datos de transferencia y el enlace de tarjeta que el negocio muestra en sus
+        // cotizaciones. Una plantilla antigua sin «{pago}» los recibe al final.
+        let pago = crate::quote_doc_ops::payment_block(self.db.conn())?;
+        if !t.body.contains("{pago}") && !pago.is_empty() {
+            t.body.push_str("\n\n{pago}");
+        }
         let vars = [
             ("cliente", c.name.clone()),
             ("empresa", empresa),
+            ("pago", pago),
             ("detalle", lines.join("\n")),
             ("total", clp(total)),
             (
@@ -655,9 +673,15 @@ impl CompanySession {
             kind: "cobro".into(),
             to: c.email.clone().unwrap_or_default(),
             subject: render(&t.subject, &vars),
-            body: render(&t.body, &vars),
+            body: render(&t.body, &vars).trim_end().to_string(),
             customer_uid: Some(c.uid.clone()),
-            reference: None,
+            reference: Some(
+                rows.iter()
+                    .map(|r| r.0.as_str())
+                    .take(6)
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            ),
             quote_uids: Vec::new(),
         })
     }
@@ -802,6 +826,18 @@ impl CompanySession {
         result: &Result<(), String>,
     ) -> AppResult<MailLogRow> {
         let user = self.actor_name()?;
+        self.mail_record_as(m, result, &user)
+    }
+
+    /// Igual que [`Self::mail_record`], con el nombre que queda en el registro (los envíos
+    /// programados quedan como «usuario (programado)»).
+    pub(crate) fn mail_record_as(
+        &mut self,
+        m: &OutgoingMail,
+        result: &Result<(), String>,
+        user: &str,
+    ) -> AppResult<MailLogRow> {
+        let user = user.to_string();
         let now = now_utc();
         let (status, error) = match result {
             Ok(()) => ("enviado", None),
