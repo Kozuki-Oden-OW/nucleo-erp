@@ -87,8 +87,7 @@ Orden exacto, sin preguntar entre pasos:
 
 1. **Entrar al SII con el certificado digital** (§0): página de ingreso → «Ingresar con Certificado
    Digital». El certificado es el de Nicolás Mariangel (RUT 17.256.184-5). Si Windows pide elegirlo o
-   pide su clave, eso lo resuelve NÚCLEO con la **clave del certificado digital** guardada (ver
-   abajo); mientras no esté construido, lo hace la persona.
+   pide su clave, eso lo hace la persona en la ventana: avisar en una línea y volver a leer.
 2. **Elegir la empresa**: DATA LOGGER CHILE SPA 77334963-0 → «Enviar».
 3. **Llenar la factura** (§0.1): RUT y dígito del receptor, «Ciudad» si quedó vacía, líneas (nombre,
    cantidad, precio neto; «Agrega línea de Detalle»), forma de pago. Comprobar neto, IVA y total
