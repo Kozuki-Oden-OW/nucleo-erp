@@ -573,6 +573,64 @@
     return { usuario: !!f.user, clave: !!f.pw, enviado: sent };
   }
 
+  /* ───────────── Firma de un documento (SII) ───────────── */
+
+  // La página de firma tiene un solo campo de clave y un botón «Firmar». NÚCLEO escribe ahí la
+  // clave de firma solo después de que la persona aprobó ese documento en la aplicación.
+  var SIGN_HINT = /^\s*firmar?\b/i;
+
+  function signFields() {
+    var pws = document.querySelectorAll("input[type=password]");
+    var live = [];
+    for (var i = 0; i < pws.length; i++) if (visible(pws[i]) && !pws[i].disabled) live.push(pws[i]);
+    var pw = live.length === 1 ? live[0] : null;
+    var go = null;
+    var roots = pw && pw.form ? [pw.form, document] : [document];
+    for (var r = 0; r < roots.length && !go; r++) {
+      var c = roots[r].querySelectorAll("button, input[type=submit], input[type=button], [role=button]");
+      for (var j = 0; j < c.length; j++) {
+        if (!visible(c[j]) || c[j].disabled) continue;
+        if (SIGN_HINT.test(labelOf(c[j]))) {
+          go = c[j];
+          break;
+        }
+      }
+    }
+    return { pw: pw, go: go, claves: live.length };
+  }
+
+  function probeSign() {
+    var f = signFields();
+    var body = "";
+    try {
+      body = document.body ? document.body.innerText : "";
+    } catch (e) {}
+    return {
+      host: location.host,
+      clave: !!f.pw,
+      claves: f.claves,
+      boton: f.go ? clean(labelOf(f.go), 60) : "",
+      titulo: clean(document.title, 120),
+      texto: clean(body, 500),
+    };
+  }
+
+  function fillSign(a) {
+    var site = String(a.site || "");
+    var host = location.hostname.toLowerCase();
+    if (!site || !(host === site || host.slice(-(site.length + 1)) === "." + site))
+      return { error: "esta página no es del SII" };
+    if (location.protocol !== "https:") return { error: "la página no es https" };
+    var f = signFields();
+    if (!f.pw || !f.go) return { error: "la página de firma cambió: no hay un campo de clave y un botón «Firmar»" };
+    setValue(f.pw, a.clave);
+    var go = f.go;
+    setTimeout(function () {
+      press(go);
+    }, 150);
+    return { clave: true, enviado: true, boton: clean(labelOf(go), 60) };
+  }
+
   /* ───────────── Mensajes entre marcos ───────────── */
 
   function handle(op, a) {
@@ -581,6 +639,8 @@
     if (op === "guardar") return grab(a);
     if (op === "sondear") return Promise.resolve(probeLogin());
     if (op === "rellenar") return Promise.resolve(fillLogin(a));
+    if (op === "sondear_firma") return Promise.resolve(probeSign());
+    if (op === "firmar") return Promise.resolve(fillSign(a));
     return Promise.resolve({ error: "orden desconocida" });
   }
 
@@ -769,6 +829,50 @@
     });
   }
 
+  // Busca la página de firma (en el documento principal o en un marco del mismo sitio).
+  function signTarget(id, site) {
+    function sameSite(h) {
+      h = String(h || "").toLowerCase().split(":")[0];
+      return !!site && (h === site || h.slice(-(site.length + 1)) === "." + site);
+    }
+    var own = { path: "", origin: location.origin, data: probeSign() };
+    return ask(id + "s", frameList(), "sondear_firma", {}, 1200).then(function (got) {
+      var all = [own].concat(got);
+      var claves = 0;
+      for (var i = 0; i < all.length; i++) {
+        var d = all[i].data || {};
+        // El origen lo informa el navegador (ev.origin), no el marco.
+        var o = all[i].origin || "";
+        if (!/^https:\/\//.test(o) || !sameSite(o.slice(8))) continue;
+        claves += d.claves || 0;
+        if (d.clave && d.boton) return { pick: all[i], claves: claves };
+      }
+      return { pick: null, claves: claves };
+    });
+  }
+
+  function signProbe(id, a) {
+    return signTarget(id, String(a.site || "")).then(function (t) {
+      if (!t.pick) return { firma: false, claves: t.claves, titulo: clean(document.title, 120) };
+      var d = t.pick.data;
+      return { firma: true, boton: d.boton, titulo: d.titulo || clean(document.title, 120), texto: d.texto };
+    });
+  }
+
+  function sign(id, a) {
+    var site = String(a.site || "");
+    return signTarget(id, site).then(function (t) {
+      if (!t.pick) return { error: "la página de firma ya no está a la vista" };
+      if (t.pick.path === "") return fillSign(a);
+      var win = winAt(t.pick.path);
+      if (!win) return { error: "la página de firma ya no está a la vista" };
+      // Con el origen exacto como destino: si el marco cambió de sitio, el mensaje no se entrega.
+      return ask(id + "f", [{ path: t.pick.path, win: win }], "firmar", a, 4000, t.pick.origin).then(function (r) {
+        return r.length ? r[0].data : { error: "la página de firma no respondió" };
+      });
+    });
+  }
+
   /* ───────────── Respuesta a NÚCLEO ───────────── */
 
   // NÚCLEO lanza la orden y después pregunta por el resultado (evaluación con respuesta, que no
@@ -809,6 +913,8 @@
         else if (cmd.op === "guardar")
           p = cmd.ref ? onRef(id, cmd.ref, "guardar", {}, 60000) : grab({ url: cmd.url });
         else if (cmd.op === "rellenar") p = login(id, cmd);
+        else if (cmd.op === "sondear_firma") p = signProbe(id, cmd);
+        else if (cmd.op === "firmar") p = sign(id, cmd);
         else if (cmd.op === "volver") {
           setTimeout(function () {
             history.back();

@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "nucleo-erp",
   "display_name": "NÚCLEO ERP",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Permite que Claude use NÚCLEO ERP en este computador: ve la pantalla, la recorre con su propio cursor y registra ventas, gastos, clientes y cobros.",
   "long_description": "Conecta Claude con NÚCLEO ERP, el sistema de gestión local y gratuito para pymes chilenas. NÚCLEO debe estar abierto con Configuración → Claude activado; ahí eliges si Claude solo mira, crea borradores o tiene acceso completo. La extensión solo se comunica con NÚCLEO dentro del mismo computador (127.0.0.1): los datos del negocio siguen guardados solo en tu equipo.",
   "author": {
@@ -275,6 +275,10 @@
     {
       "name": "web_ingresar",
       "description": "Pide a NÚCLEO que inicie sesión en un sitio con un acceso guardado: NÚCLEO abre la página de ingreso si hace falta y rellena usuario y clave. Claude no ve ni escribe la clave. Solo funciona si la pers"
+    },
+    {
+      "name": "web_firmar",
+      "description": "Firma el documento que está en la página «Firma de documento tributario electrónico» del SII (a la que se llega con «Validar y visualizar» y «Firmar» en la vista previa). NÚCLEO muestra a la persona u"
     },
     {
       "name": "listar_envios",

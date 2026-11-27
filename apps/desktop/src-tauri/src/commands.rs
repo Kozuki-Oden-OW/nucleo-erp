@@ -94,6 +94,13 @@ impl From<AppError> for CommandError {
     }
 }
 
+impl CommandError {
+    /// El mensaje para la persona (para pasarlo como texto dentro de otra operación).
+    pub fn text(&self) -> &str {
+        &self.message
+    }
+}
+
 fn internal(msg: &str) -> CommandError {
     CommandError {
         code: "interno",

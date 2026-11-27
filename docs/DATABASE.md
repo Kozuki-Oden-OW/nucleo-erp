@@ -76,6 +76,9 @@ Todo es entero: las sumas y los reportes se hacen en SQL sin perder exactitud y 
 | 47 | `0047_cobros_recurrentes.sql` | `recurring_sales`: venta que se repite (cliente, líneas en JSON, frecuencia, día de cobro, próxima fecha, término, días de plazo, si queda por cobrar, si avisa por correo, última venta generada) |
 | 48 | `0048_reglas_conciliacion.sql` | `bank_statement_lines.counterparty_rut`, `counterparty_name` y `comment`; tabla `bank_rules` (texto o RUT → cliente, proveedor, gasto, traspaso o ignorar; origen manual o aprendida; aciertos) |
 | 49 | `0049_series.sql` | `product_serials`: serie por unidad (única por producto), estado, venta y cliente, y certificado de calibración (número, fecha, próxima calibración, laboratorio, ruta del PDF) |
+| 50 | `0050_documento_venta.sql` | `sale_items.detail` y `quote_items.detail` (descripción extendida por línea, como la casilla «Descrip.» del SII) y `customers.requires_po` (el cliente trabaja con orden de compra) |
+| 51 | `0051_woo_equivalencias.sql` | `woo_product_map`: equivalencias entre un producto o variación de la tienda WooCommerce y uno o varios productos de NÚCLEO con su cantidad (tiendas sin SKU, combos y packs) |
+| 52 | `0052_clave_firma.sql` | `sii_signing_key`: una sola fila con la clave de firma de documentos del SII (en la base cifrada; no se sincroniza, no vuelve a la interfaz ni al asistente; NÚCLEO la usa solo en la página de firma, con la aprobación de la persona por documento) |
 
 Las migraciones son transaccionales y versionadas con `PRAGMA user_version`. **Pre-1.0:** se pueden
 reescribir (en la Fase 2 se reemplazó la tabla mínima de clientes de la Fase 1); desde la primera beta

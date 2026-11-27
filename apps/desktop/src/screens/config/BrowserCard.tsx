@@ -19,12 +19,14 @@ export function BrowserCard() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [dir, setDir] = useState("");
+  const [labels, setLabels] = useState("");
   const [sites, setSites] = useState("");
   const [url, setUrl] = useState("https://www.sii.cl/");
 
   const apply = useCallback((v: BrowserView) => {
     setView(v);
     setDir(v.settings.download_dir);
+    setLabels(v.settings.shipping_dir);
     setSites(v.settings.sites.join("\n"));
   }, []);
   const load = useCallback(async () => {
@@ -55,14 +57,14 @@ export function BrowserCard() {
     on ? `NÚCLEO puede iniciar sesión en ${a.name} hasta que termine el día.` : `Se quitó el permiso de hoy para ${a.name}.`,
   );
   const save = () => run(
-    () => backend.browserSaveSettings({ download_dir: dir, sites: sites.split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean) }),
+    () => backend.browserSaveSettings({ download_dir: dir, shipping_dir: labels, sites: sites.split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean) }),
     "Ajustes del navegador guardados.",
   );
   const open = async () => {
     setBusy(true);
     try { await backend.browserOpen(url.trim(), null); await refresh(); } catch (e) { toast("danger", errorMessage(e)); } finally { setBusy(false); }
   };
-  const dirty = dir !== view.settings.download_dir || sites.split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean).join("\n") !== view.settings.sites.join("\n");
+  const dirty = dir !== view.settings.download_dir || labels !== view.settings.shipping_dir || sites.split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean).join("\n") !== view.settings.sites.join("\n");
 
   const columns: Column<BrowserAccess>[] = [
     { key: "name", header: "Acceso", width: "minmax(8rem,1fr)", render: (a) => <span className="flex min-w-0 flex-col"><strong className="truncate">{a.name}</strong><span className="truncate text-xs text-muted">{a.username}</span></span> },
@@ -102,7 +104,10 @@ export function BrowserCard() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Carpeta de descargas" optional value={dir} onChange={(e) => setDir(e.target.value)} placeholder="D:\Facturas" hint={`Hoy se guarda en: ${view.folder}`} disabled={!editable} />
+          <div className="flex flex-col gap-4">
+            <Field label="Carpeta de descargas" optional value={dir} onChange={(e) => setDir(e.target.value)} placeholder="D:\Facturas" hint={`Hoy se guarda en: ${view.folder}`} disabled={!editable} />
+            <Field label="Carpeta de etiquetas de envío" optional value={labels} onChange={(e) => setLabels(e.target.value)} placeholder="D:\Envios" hint={`Las etiquetas del courier quedan en: ${view.shipping_folder}`} disabled={!editable} />
+          </div>
           <TextArea label="Sitios permitidos" value={sites} onChange={(e) => setSites(e.target.value)} rows={3} hint={`Uno por línea, solo el dominio (bci.cl). Los sitios de los accesos guardados ya están incluidos. Abre: ${view.allowed.join(", ") || "ninguno"}.`} disabled={!editable} />
         </div>
         {editable && (

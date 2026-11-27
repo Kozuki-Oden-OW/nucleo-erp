@@ -1207,6 +1207,27 @@ fn el_navegador_de_nucleo_por_ipc() {
     );
     assert_eq!(v["settings"]["sites"], json!(["mercadolibre.cl", "sii.cl"]));
     assert_eq!(v["folder"], json!(dir.path()));
+    // Sin carpeta de etiquetas, van a la de descargas; si se define, tiene que existir.
+    assert_eq!(v["shipping_folder"], json!(dir.path()));
+    let bad = ipc
+        .call(
+            "browser_save_settings",
+            json!({ "input": { "download_dir": dir.path(), "shipping_dir": "Z:\\no\\existe", "sites": ["sii.cl", "mercadolibre.cl"] } }),
+        )
+        .unwrap_err();
+    assert!(
+        bad["message"]
+            .as_str()
+            .unwrap()
+            .contains("No encuentro la carpeta")
+    );
+    let labels = tempfile::tempdir().unwrap();
+    let v = ipc.ok(
+        "browser_save_settings",
+        json!({ "input": { "download_dir": dir.path(), "shipping_dir": labels.path(), "sites": ["sii.cl", "mercadolibre.cl"] } }),
+    );
+    assert_eq!(v["shipping_folder"], json!(labels.path()));
+    assert_eq!(v["folder"], json!(dir.path()));
 
     // Un acceso guardado agrega su sitio; el permiso es por acceso y por día.
     let a = ipc.ok(
@@ -1253,6 +1274,73 @@ fn el_navegador_de_nucleo_por_ipc() {
         )
         .unwrap_err();
     assert!(e["message"].as_str().unwrap().contains("archivo"));
+    // La etiqueta del courier: carpeta «envios» y una descarga reciente de la página.
+    let e = ipc
+        .call(
+            "browser_save_file",
+            json!({ "target": null, "url": null, "name": "blue.2486244670.pdf", "folder": "otra", "download": null }),
+        )
+        .unwrap_err();
+    assert!(
+        e["message"]
+            .as_str()
+            .unwrap()
+            .contains("No conozco la carpeta")
+    );
+    let e = ipc
+        .call(
+            "browser_save_file",
+            json!({ "target": null, "url": null, "name": "blue.2486244670.pdf", "folder": "envios", "download": "NOEXISTE.pdf" }),
+        )
+        .unwrap_err();
+    assert!(
+        e["message"]
+            .as_str()
+            .unwrap()
+            .contains("No hay una descarga reciente")
+    );
+
+    // Clave de firma del SII: la guarda la persona, nunca vuelve, y sin página de firma no se usa.
+    assert_eq!(ipc.ok("signing_key_status", json!({}))["saved"], false);
+    let e = ipc
+        .call("browser_sign", json!({ "sale": null, "note": null }))
+        .unwrap_err();
+    assert!(
+        e["message"]
+            .as_str()
+            .unwrap()
+            .contains("Aún no hay clave de firma")
+    );
+    let e = ipc
+        .call(
+            "save_signing_key",
+            json!({ "key": "clave-de-ejemplo", "declared": false }),
+        )
+        .unwrap_err();
+    assert!(e["message"].as_str().unwrap().contains("Confirma"));
+    let v = ipc.ok(
+        "save_signing_key",
+        json!({ "key": "clave-de-ejemplo", "declared": true }),
+    );
+    assert_eq!(v["saved"], true);
+    assert!(!v.to_string().contains("clave-de-ejemplo"));
+    let e = ipc
+        .call("browser_sign", json!({ "sale": "FV-999999", "note": null }))
+        .unwrap_err();
+    assert!(e["message"].as_str().unwrap().contains("FV-999999"));
+    let e = ipc
+        .call(
+            "browser_sign",
+            json!({ "sale": null, "note": "Factura a Cliente" }),
+        )
+        .unwrap_err();
+    assert!(e["message"].as_str().unwrap().contains("está cerrado"));
+    // Un intento fallido no deja la firma «en curso».
+    let e = ipc
+        .call("browser_sign", json!({ "sale": null, "note": null }))
+        .unwrap_err();
+    assert!(e["message"].as_str().unwrap().contains("está cerrado"));
+    assert_eq!(ipc.ok("delete_signing_key", json!({}))["saved"], false);
     let e = ipc
         .call(
             "browser_act",

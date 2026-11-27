@@ -265,6 +265,11 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "woo_equivalencias",
         sql: include_str!("../migrations/0051_woo_equivalencias.sql"),
     },
+    Migration {
+        version: 52,
+        name: "clave_firma",
+        sql: include_str!("../migrations/0052_clave_firma.sql"),
+    },
 ];
 
 pub fn latest_version() -> i64 {

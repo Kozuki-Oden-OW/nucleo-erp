@@ -7,7 +7,7 @@ import type {
   AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput,
-  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, BrowserActResult, BrowserPageState, BrowserRead, BrowserSavedFile, BrowserSettings, BrowserView, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, WspBridgeState, WspChat, WspConversation, WspDraft, WspSent, WspSetup, WspStatus, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncView, WooCatalogItem, WooConnectInput, WooEquivalenceInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
+  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, BrowserActResult, BrowserPageState, BrowserRead, BrowserSavedFile, BrowserSettings, BrowserSignOutcome, BrowserView, SigningKeyStatus, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, WspBridgeState, WspChat, WspConversation, WspDraft, WspSent, WspSetup, WspStatus, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncView, WooCatalogItem, WooConnectInput, WooEquivalenceInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
@@ -190,9 +190,17 @@ export interface Backend {
   browserState(): Promise<BrowserPageState>;
   browserRead(): Promise<BrowserRead>;
   browserAct(op: "clic" | "escribir" | "elegir" | "volver", target: number | null, text?: string | null, enter?: boolean, option?: string | null): Promise<BrowserActResult>;
-  browserSaveFile(target: number | null, url: string | null, name: string): Promise<BrowserSavedFile>;
+  /** `folder`: "envios" guarda en la carpeta de etiquetas de envío. `download`: en vez de traer el
+   *  archivo, mueve ahí una descarga reciente de la página (por su nombre). */
+  browserSaveFile(target: number | null, url: string | null, name: string, folder?: string | null, download?: string | null): Promise<BrowserSavedFile>;
   /** NÚCLEO rellena el ingreso; la clave no pasa por la interfaz. Exige el permiso de hoy. */
   browserLogin(access: string, submit: boolean): Promise<BrowserActResult>;
+  /** Firma en la página de firma del SII con la clave guardada, si la persona aprueba el aviso. */
+  browserSign(sale: string | null, note: string | null): Promise<BrowserSignOutcome>;
+  signingKeyStatus(): Promise<SigningKeyStatus>;
+  /** Solo la persona: el asistente recibe un rechazo. */
+  saveSigningKey(key: string, declared: boolean): Promise<SigningKeyStatus>;
+  deleteSigningKey(): Promise<SigningKeyStatus>;
   browserClose(): Promise<void>;
   // WooCommerce (Configuración → Integraciones)
   wooStatus(): Promise<WooStatus>;

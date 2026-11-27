@@ -718,5 +718,24 @@ describe("Navegador de NÚCLEO", () => {
     expect((await runTool(b, "completo", "web_guardar", { nombre: "programa.exe" })).isError).toBe(true);
     expect((await runTool(b, "completo", "web_guardar", { nombre: "a.pdf", direccion: "https://otro-sitio.com/a.pdf" })).isError).toBe(true);
     expect(txt(await runTool(b, "ver", "web_leer", {}))).toMatch(/Descargas recientes .*536-DL\.pdf/);
+    // La etiqueta del courier: una descarga de la página pasa a la carpeta de envíos con su nombre final.
+    const etiqueta = txt(await runTool(b, "completo", "web_guardar", { descarga: "536-DL.pdf", carpeta: "envios", nombre: "blue.2486244670.pdf" }));
+    expect(etiqueta).toMatch(/Guardado: Etiquetas de demostración\/blue\.2486244670\.pdf/);
+    expect(etiqueta).not.toMatch(/Texto del documento/);
+    expect(txt(await runTool(b, "completo", "web_guardar", { descarga: "no-existe.pdf", carpeta: "envios", nombre: "blue.1.pdf" }))).toMatch(/No hay una descarga reciente/);
+    expect(txt(await runTool(b, "completo", "web_guardar", { nombre: "x.pdf", carpeta: "escritorio" }))).toMatch(/No conozco la carpeta/);
+  });
+
+  it("la firma en el SII pide la clave guardada por la persona y no se puede con «solo ver»", async () => {
+    const b = new DemoBackend();
+    expect((await runTool(b, "borradores", "web_firmar", { venta: "FV-000001" })).isError).toBe(true);
+    expect(txt(await runTool(b, "completo", "web_firmar", { venta: "FV-000001" }))).toMatch(/Aún no hay clave de firma guardada/);
+    expect(txt(await runTool(b, "ver", "listar_accesos", {}))).toMatch(/Clave de firma de documentos \(SII\): sin guardar/);
+    await b.saveSigningKey("clave-de-ejemplo", true);
+    const lista = txt(await runTool(b, "ver", "listar_accesos", {}));
+    expect(lista).toMatch(/Clave de firma de documentos \(SII\): guardada/);
+    expect(lista).not.toMatch(/clave-de-ejemplo/);
+    await runTool(b, "ver", "web_abrir", { direccion: "https://www1.sii.cl/cgi-bin/Portal001/mipeAdminDocsEmi.cgi" });
+    expect(txt(await runTool(b, "completo", "web_firmar", { venta: "FV-000001" }))).toMatch(/no es la de firma del SII/);
   });
 });

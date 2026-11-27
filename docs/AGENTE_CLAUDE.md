@@ -15,7 +15,7 @@ con las mismas reglas, permisos y auditoría del programa.
    |---|---|
    | Solo ver | `ver_pantalla`, `ir_a`, `desplazar` y las consultas (`resumen_negocio`, `buscar*`, `listar_*`, `datos_de_apoyo`, `listar_documentos_sii`, `consultar_estado_sii`, `consultar_libro_sii`, `pedidos_woocommerce`, `comparar_woocommerce`, `listar_accesos`, `cuentas_dinero`, `conciliacion_banco`) y el navegador en modo lectura (`web_abrir`, `web_leer`) |
    | Crear borradores | Lo anterior + `crear_cliente`, `crear_proveedor`, `crear_producto`, `crear_venta_borrador`, `registrar_gasto` (queda por pagar), `registrar_envio` |
-   | Acceso completo | Lo anterior + `clic`, `escribir`, `elegir`, `tecla`, `confirmar_venta`, `registrar_cobro`, gastos pagados y la facturación SII (`cargar_folios_sii`, `emitir_documento_sii`, `enviar_documentos_sii`, `crear_libro_sii`, `enviar_libro_sii`, `responder_intercambio_sii`), `sincronizar_woocommerce`, `registrar_ventas_mercadolibre`, `registrar_movimientos_banco`, `conciliar_movimiento_banco` y el Navegador de NÚCLEO (`web_clic`, `web_escribir`, `web_guardar`, `web_ingresar`). Enviar stock o precios a la tienda WooCommerce no es una herramienta: lo confirma la persona en la pantalla. Enviar al SII es irreversible: Claude muestra el resumen y espera la confirmación de la persona en el chat |
+   | Acceso completo | Lo anterior + `clic`, `escribir`, `elegir`, `tecla`, `confirmar_venta`, `registrar_cobro`, gastos pagados y la facturación SII (`cargar_folios_sii`, `emitir_documento_sii`, `enviar_documentos_sii`, `crear_libro_sii`, `enviar_libro_sii`, `responder_intercambio_sii`), `sincronizar_woocommerce`, `registrar_ventas_mercadolibre`, `registrar_movimientos_banco`, `conciliar_movimiento_banco` y el Navegador de NÚCLEO (`web_clic`, `web_escribir`, `web_guardar`, `web_ingresar`, `web_firmar`). Enviar stock o precios a la tienda WooCommerce no es una herramienta: lo confirma la persona en la pantalla. Enviar al SII es irreversible: Claude muestra el resumen y espera la confirmación de la persona en el chat |
 
    Siempre valen además los permisos del usuario con que está abierta la sesión.
 3. «Instalar en Claude» abre en la app de Claude la extensión **NucleoERP.mcpb** (formato MCPB) y la
@@ -163,8 +163,9 @@ Lo que puede hacer el agente:
 | `web_leer {buscar, desde}` | ver | Texto de la página y de todos sus marcos, controles numerados (`w12`, el número se conserva mientras la página sea la misma) y los avisos (`alert`) que mostró la página |
 | `web_clic {elemento \| volver}` | completo | Clic en un control o volver atrás; devuelve solo lo que cambió (la página completa si es otra) |
 | `web_escribir {elemento, texto, enter}` | completo | Escribe en un campo o elige en una lista; devuelve solo lo que cambió. Nunca en un campo de clave |
-| `web_guardar {nombre, elemento, direccion}` | completo | Guarda en la carpeta de descargas el documento incrustado, un enlace o una dirección |
+| `web_guardar {nombre, elemento, direccion, carpeta, descarga}` | completo | Guarda en la carpeta de descargas el documento incrustado, un enlace o una dirección. Con `carpeta: "envios"` va a la carpeta de etiquetas de envío; con `descarga` mueve ahí, con su nombre final, un archivo que la página ya bajó (la etiqueta del courier: `blue.<seguimiento>.pdf`) |
 | `web_ingresar {acceso}` | completo | Pide a NÚCLEO que rellene el ingreso con un acceso autorizado hoy |
+| `web_firmar {venta, resumen}` | completo | En la página de firma del SII: NÚCLEO muestra a la persona un aviso con la venta y el total; si ella lo aprueba, NÚCLEO escribe la clave de firma guardada y pulsa «Firmar». Una aprobación por documento |
 
 Lo que hace NÚCLEO solo:
 
@@ -173,6 +174,12 @@ Lo que hace NÚCLEO solo:
 - Registra en la auditoría cada permiso dado o quitado y cada lectura de la clave.
 - Bloquea la navegación a sitios que no están en la lista y lo informa.
 - Cierra el navegador al salir de la sesión o al cerrar NÚCLEO.
+
+Firma de documentos en el SII (D-NAV-08): la clave de firma se guarda aparte de los accesos, la
+escribe y la borra solo la persona, y NÚCLEO la usa solo en la página de firma del SII después de que
+la persona aprueba ese documento en un aviso de la aplicación. El agente pide la firma con
+`web_firmar`; no puede aprobar el aviso. Si la respuesta es «rechazado», no insiste; si es
+«esperando», no vuelve a llamar: lee la página cuando la persona avise.
 
 Límites que no cambian:
 

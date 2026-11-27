@@ -460,9 +460,13 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
     }
     case "listar_accesos": {
       const r = await backend.accesses();
-      return text(r.length
+      const key = await backend.signingKeyStatus().catch(() => null);
+      const sign = key
+        ? `\n\nClave de firma de documentos (SII): ${key.saved ? "guardada; con web_firmar la persona aprueba cada documento y NÚCLEO firma" : "sin guardar; la persona la escribe en Configuración → Integraciones → Accesos (o firma ella en la página del SII)"}.`
+        : "";
+      return text((r.length
         ? `${r.length} ${r.length === 1 ? "acceso guardado" : "accesos guardados"} (la clave no se muestra):\n${r.map((x) => `- ${x.name} · ${x.login_url} · usuario ${x.username} · ${x.kind === "lectura" ? "solo lectura" : "operador sin pagos"}${x.has_password ? " · clave guardada" : " · sin clave"}${x.notes ? ` · ${x.notes}` : ""}`).join("\n")}`
-        : "No hay accesos guardados. Se agregan en Configuración → Integraciones → Accesos (la clave la escribe la persona).");
+        : "No hay accesos guardados. Se agregan en Configuración → Integraciones → Accesos (la clave la escribe la persona).") + sign);
     }
     /* ───── Navegador de NÚCLEO ───── */
     case "web_abrir": {
@@ -502,9 +506,10 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
       const el = str(a, "elemento");
       const n = el ? refNumber(el) : null;
       if (el && n === null) return text("El elemento se indica con su número de la última lectura, por ejemplo w4.", true);
-      const f = await backend.browserSaveFile(n, str(a, "direccion") || null, str(a, "nombre"));
+      const moved = str(a, "descarga");
+      const f = await backend.browserSaveFile(n, str(a, "direccion") || null, str(a, "nombre"), str(a, "carpeta") || null, moved || null);
       const saved = `Guardado: ${f.path} · ${Math.max(1, Math.round(f.bytes / 1024))} KB${f.pdf ? " · PDF" : ""}.`;
-      if (!f.pdf) return text(saved);
+      if (!f.pdf || moved) return text(saved);
       return text(f.text
         ? `${saved}\n\nTexto del documento (leído del PDF; el orden de las líneas puede variar):\n${f.text}`
         : `${saved}\n\nNo pude leer el texto de este PDF: el archivo quedó guardado tal cual.`);
@@ -523,6 +528,15 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
       webControls = new Map((after.page.frames ?? []).flatMap((f) => f.controls).map((c) => [c.n, c.k]));
       webPage = after.page;
       return text([`${r.access ?? "Acceso"}: ${what}`, ...stateLines(r.state).filter((l) => l.startsWith("Bloqueado")), "", formatPage(after.page, after.state)].join("\n"));
+    }
+    case "web_firmar": {
+      const out = await backend.browserSign(str(a, "venta") || null, str(a, "resumen") || null);
+      if (out.status === "rechazado") return text(`${out.detail} No insistas: pregunta a la persona qué quiere corregir.`);
+      if (out.status === "esperando") return text(`${out.detail} No llames de nuevo a web_firmar: lee la página con web_leer cuando la persona te avise.`);
+      const after = await backend.browserRead();
+      webControls = new Map((after.page.frames ?? []).flatMap((f) => f.controls).map((c) => [c.n, c.k]));
+      webPage = after.page;
+      return text([out.detail, "Comprueba abajo que el SII emitió el documento (folio) antes de registrarlo en NÚCLEO.", "", formatPage(after.page, after.state)].join("\n"));
     }
     case "equivalencias_woocommerce": {
       const all = await backend.wooCatalog();

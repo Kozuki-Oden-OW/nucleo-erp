@@ -16,6 +16,7 @@ use crate::commands::{AppState, CommandError};
 use nucleo_app::browser_ops::{
     BrowserInfo, BrowserSettings, host_allowed, host_of, safe_file_name, site_of,
 };
+use nucleo_app::signing_ops::{SIGNING_SITE, is_signing_host};
 use nucleo_app::{AppError, CompanySession};
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -27,6 +28,7 @@ use tauri::webview::{DownloadEvent, NewWindowResponse, PageLoadEvent};
 use tauri::{
     AppHandle, Manager, Runtime, State, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 };
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
 const LABEL: &str = "navegador";
 const SCRIPT: &str = include_str!("browser.js");
@@ -52,6 +54,9 @@ pub struct BrowserShared {
     loading: AtomicBool,
     allowed: Mutex<Vec<String>>,
     download_dir: Mutex<PathBuf>,
+    shipping_dir: Mutex<PathBuf>,
+    /// Hay una firma esperando la aprobación de la persona (una a la vez).
+    signing: AtomicBool,
     blocked: Mutex<Option<String>>,
     downloads: Mutex<Vec<Download>>,
 }
@@ -72,6 +77,25 @@ impl BrowserShared {
             .map(|d| d.clone())
             .unwrap_or_default()
     }
+    /// Carpeta de las etiquetas de envío: la que definió la persona o, si no, la de descargas.
+    fn shipping(&self) -> PathBuf {
+        self.shipping_dir
+            .lock()
+            .map(|d| d.clone())
+            .ok()
+            .filter(|d| !d.as_os_str().is_empty())
+            .unwrap_or_else(|| self.dir())
+    }
+    /// Carpeta de destino de un archivo guardado: «descargas» (por defecto) o «envios».
+    fn folder_for(&self, which: Option<&str>) -> Result<PathBuf, String> {
+        match which.map(str::trim).filter(|w| !w.is_empty()) {
+            None | Some("descargas") => Ok(self.dir()),
+            Some("envios") => Ok(self.shipping()),
+            Some(other) => Err(format!(
+                "No conozco la carpeta «{other}»: usa «descargas» o «envios»."
+            )),
+        }
+    }
 }
 
 /// Lo que ve la pantalla de configuración.
@@ -81,6 +105,8 @@ pub struct BrowserView {
     pub info: BrowserInfo,
     /// Carpeta donde caen las descargas, ya resuelta.
     pub folder: String,
+    /// Carpeta de las etiquetas de envío, ya resuelta.
+    pub shipping_folder: String,
     pub open: bool,
 }
 
@@ -128,6 +154,9 @@ fn refresh<R: Runtime>(
     if let Ok(mut d) = shared.download_dir.lock() {
         *d = dir;
     }
+    if let Ok(mut d) = shared.shipping_dir.lock() {
+        *d = PathBuf::from(info.settings.shipping_dir.trim());
+    }
     Ok(info)
 }
 
@@ -135,6 +164,7 @@ fn view<R: Runtime>(app: &AppHandle<R>, shared: &BrowserShared, info: BrowserInf
     BrowserView {
         info,
         folder: shared.dir().to_string_lossy().into_owned(),
+        shipping_folder: shared.shipping().to_string_lossy().into_owned(),
         open: app.get_webview_window(LABEL).is_some(),
     }
 }
@@ -432,6 +462,12 @@ pub fn browser_save_settings<R: Runtime>(
             "No encuentro la carpeta «{dir}»: escribe una carpeta que exista, por ejemplo D:\\Facturas"
         )));
     }
+    let labels = input.shipping_dir.trim();
+    if !labels.is_empty() && !Path::new(labels).is_dir() {
+        return Err(err(format!(
+            "No encuentro la carpeta «{labels}»: escribe una carpeta que exista, por ejemplo D:\\Envios"
+        )));
+    }
     with(&state, |s| s.browser_save_settings(&input))?;
     let info = refresh(&app, &state, &shared)?;
     Ok(view(&app, &shared, info))
@@ -575,9 +611,79 @@ pub struct SavedFile {
     pub text: Option<String>,
 }
 
+/// Lleva a su carpeta final, con su nombre final, un archivo que la página descargó en esta sesión
+/// (por ejemplo la etiqueta del courier, que baja con el nombre que le pone el sitio). Solo mueve
+/// archivos de la lista de descargas de esta ventana y no sobrescribe.
+fn move_download(
+    shared: &BrowserShared,
+    source: &str,
+    dir: &Path,
+    name: &str,
+) -> Result<SavedFile, String> {
+    let wanted = source.trim();
+    let found = shared
+        .downloads
+        .lock()
+        .ok()
+        .and_then(|l| {
+            l.iter()
+                .rev()
+                .find(|d| d.ok && !d.path.is_empty() && d.name.eq_ignore_ascii_case(wanted))
+                .cloned()
+        })
+        .ok_or_else(|| {
+            format!(
+                "No hay una descarga reciente llamada «{wanted}»: su nombre sale en «Descargas \
+                 recientes» al leer la página."
+            )
+        })?;
+    let from = PathBuf::from(&found.path);
+    if !from.is_file() {
+        return Err(format!("{} ya no está donde se descargó.", found.name));
+    }
+    std::fs::create_dir_all(dir)
+        .map_err(|e| format!("No se pudo usar la carpeta {}: {e}", dir.display()))?;
+    let to = dir.join(name);
+    if to.exists() {
+        return Err(format!(
+            "Ya existe {name} en {}: no lo sobrescribo.",
+            dir.display()
+        ));
+    }
+    // De un disco a otro no se puede renombrar: se copia y se quita el original.
+    if std::fs::rename(&from, &to).is_err() {
+        std::fs::copy(&from, &to).map_err(|e| format!("No se pudo guardar {name}: {e}"))?;
+        let _ = std::fs::remove_file(&from);
+    }
+    let mut head = [0u8; 5];
+    let pdf = std::fs::File::open(&to)
+        .and_then(|mut f| std::io::Read::read_exact(&mut f, &mut head))
+        .is_ok()
+        && &head == b"%PDF-";
+    let saved = SavedFile {
+        name: name.to_string(),
+        path: to.to_string_lossy().into_owned(),
+        bytes: std::fs::metadata(&to)
+            .map(|m| m.len() as usize)
+            .unwrap_or(0),
+        pdf,
+        text: None,
+    };
+    if let Ok(mut l) = shared.downloads.lock() {
+        for d in l.iter_mut().filter(|d| d.path == found.path) {
+            d.name = saved.name.clone();
+            d.path = saved.path.clone();
+        }
+    }
+    Ok(saved)
+}
+
 /// Trae un archivo con la sesión de la página (el documento incrustado, un enlace o una dirección)
-/// y lo guarda en la carpeta de descargas con el nombre indicado. No sobrescribe.
+/// y lo guarda con el nombre indicado en la carpeta de descargas o, con `folder: "envios"`, en la
+/// de etiquetas de envío. Con `download`, en vez de traerlo, mueve ahí un archivo que la página
+/// ya descargó. No sobrescribe.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn browser_save_file<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, AppState>,
@@ -585,6 +691,8 @@ pub async fn browser_save_file<R: Runtime>(
     target: Option<u32>,
     url: Option<String>,
     name: String,
+    folder: Option<String>,
+    download: Option<String>,
 ) -> CmdResult<SavedFile> {
     refresh(&app, &state, &shared)?;
     let name = safe_file_name(&name).map_err(CommandError::from)?;
@@ -592,7 +700,19 @@ pub async fn browser_save_file<R: Runtime>(
     if let Some(u) = &url {
         with(&state, |s| s.browser_check_url(u))?;
     }
+    let dir = shared.folder_for(folder.as_deref()).map_err(err)?;
+    let download = download
+        .map(|d| d.trim().to_string())
+        .filter(|d| !d.is_empty());
     let shared = shared.inner().clone();
+    if let Some(source) = download {
+        if target.is_some() || url.is_some() {
+            return Err(err(
+                "Indica una sola cosa: la descarga reciente, un elemento o una dirección.",
+            ));
+        }
+        return blocking(move || move_download(&shared, &source, &dir, &name)).await;
+    }
     blocking(move || {
         let w = window(&app)?;
         let cmd = json!({ "op": "guardar", "ref": target, "url": url });
@@ -618,7 +738,6 @@ pub async fn browser_save_file<R: Runtime>(
         if bytes.is_empty() {
             return Err("el archivo llegó vacío".into());
         }
-        let dir = shared.dir();
         std::fs::create_dir_all(&dir)
             .map_err(|e| format!("No se pudo usar la carpeta {}: {e}", dir.display()))?;
         let path = dir.join(&name);
@@ -652,6 +771,178 @@ pub async fn browser_save_file<R: Runtime>(
             note: None,
         });
         Ok(saved)
+    })
+    .await
+}
+
+/// Lo que pasó al pedir la firma de un documento.
+#[derive(Debug, Serialize)]
+pub struct SignOutcome {
+    /// «firmado» (clave escrita y «Firmar» pulsado), «rechazado» (la persona dijo que no) o
+    /// «esperando» (el aviso sigue abierto).
+    pub status: String,
+    pub detail: String,
+    pub state: PageState,
+}
+
+/// Libera la marca de «firma en curso» pase lo que pase.
+struct SigningGuard(BrowserState);
+impl Drop for SigningGuard {
+    fn drop(&mut self) {
+        self.0.signing.store(false, Ordering::SeqCst);
+    }
+}
+
+/// Firma el documento que está en la página de firma del SII: NÚCLEO muestra a la persona un aviso
+/// propio de la aplicación con lo que se va a firmar y, solo si ella lo aprueba, escribe la clave de
+/// firma guardada y pulsa «Firmar». Una aprobación por documento. La clave va de la base a la página
+/// del SII y no vuelve en ninguna respuesta; quien pide la firma (el asistente) no puede aprobarla.
+#[tauri::command]
+pub async fn browser_sign<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+    shared: State<'_, BrowserState>,
+    sale: Option<String>,
+    note: Option<String>,
+) -> CmdResult<SignOutcome> {
+    refresh(&app, &state, &shared)?;
+    if !with(&state, |s| s.signing_key_status())?.saved {
+        return Err(err(
+            "Aún no hay clave de firma guardada: la persona la escribe en Configuración → \
+             Integraciones → Accesos, «Clave de firma de documentos (SII)».",
+        ));
+    }
+    let brief = match sale.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        Some(n) => Some(with(&state, |s| s.signing_sale_brief(n))?),
+        None => None,
+    };
+    let note = note
+        .map(|n| n.split_whitespace().collect::<Vec<_>>().join(" "))
+        .filter(|n| !n.is_empty())
+        .map(|n| n.chars().take(300).collect::<String>());
+    let shared = shared.inner().clone();
+    if shared.signing.swap(true, Ordering::SeqCst) {
+        return Err(err(
+            "Ya hay una firma esperando la aprobación de la persona en NÚCLEO.",
+        ));
+    }
+    let guard = SigningGuard(shared.clone());
+    blocking(move || {
+        let w = window(&app)?;
+        let host = w
+            .url()
+            .ok()
+            .and_then(|u| host_of(u.as_str()))
+            .ok_or("el navegador no está en una página https")?;
+        if !is_signing_host(&host) {
+            return Err(format!(
+                "La página abierta es de {host}: la clave de firma solo se escribe en el SII."
+            ));
+        }
+        let probe = run_op(
+            &w,
+            &shared,
+            json!({ "op": "sondear_firma", "site": SIGNING_SITE }),
+            Duration::from_secs(8),
+        )?;
+        if probe.get("firma").and_then(Value::as_bool) != Some(true) {
+            return Err(
+                "La página abierta no es la de firma del SII (un campo de clave y el botón \
+                 «Firmar»): se llega con «Validar y visualizar» y luego «Firmar» en la vista previa."
+                    .into(),
+            );
+        }
+        let text_of = |k: &str| {
+            probe
+                .get(k)
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string()
+        };
+        let mut lines = vec![
+            "NÚCLEO va a escribir tu clave de firma y pulsar «Firmar» en el SII.".to_string(),
+            "Emitir un documento no se puede deshacer.".to_string(),
+            String::new(),
+        ];
+        if let Some(b) = &brief {
+            lines.push(format!("Venta en NÚCLEO: {b}"));
+        }
+        if let Some(n) = &note {
+            lines.push(format!("Lo que indica Claude: {n}"));
+        }
+        lines.push(format!("Página: {}", text_of("titulo")));
+        let excerpt: String = text_of("texto").chars().take(320).collect();
+        if !excerpt.is_empty() {
+            lines.push(excerpt);
+        }
+        lines.push(String::new());
+        lines.push("¿Firmar este documento?".into());
+        let what = brief
+            .clone()
+            .or(note.clone())
+            .unwrap_or_else(|| text_of("titulo"));
+
+        let (tx, rx) = mpsc::channel::<Result<(String, String), String>>();
+        let (app2, shared2, w2) = (app.clone(), shared.clone(), w.clone());
+        std::thread::spawn(move || {
+            let _guard = guard;
+            let approved = app2
+                .dialog()
+                .message(lines.join("\n"))
+                .title("Firmar documento en el SII")
+                .kind(MessageDialogKind::Warning)
+                .buttons(MessageDialogButtons::OkCancelCustom(
+                    "Firmar".into(),
+                    "No firmar".into(),
+                ))
+                .parent(&w2)
+                .blocking_show();
+            let out = if !approved {
+                Ok((
+                    "rechazado".to_string(),
+                    "La persona no aprobó la firma: no se escribió la clave.".to_string(),
+                ))
+            } else {
+                (|| {
+                    // La página pudo cambiar mientras el aviso estaba abierto: se vuelve a comprobar.
+                    let host = w2
+                        .url()
+                        .ok()
+                        .and_then(|u| host_of(u.as_str()))
+                        .ok_or("el navegador ya no está en una página https")?;
+                    let st = app2.state::<AppState>();
+                    let secret = with(&st, |s| s.signing_secret(&host, &what))
+                        .map_err(|e| e.text().to_string())?;
+                    let cmd = json!({ "op": "firmar", "site": SIGNING_SITE, "clave": secret });
+                    drop(secret);
+                    let r = run_op(&w2, &shared2, cmd, Duration::from_secs(12))?;
+                    if let Some(e) = r.get("error").and_then(Value::as_str) {
+                        return Err(format!("No se firmó: {e}."));
+                    }
+                    wait_load(&shared2, Duration::from_millis(900), Duration::from_secs(30));
+                    Ok((
+                        "firmado".to_string(),
+                        "La persona aprobó: NÚCLEO escribió la clave y pulsó «Firmar».".to_string(),
+                    ))
+                })()
+            };
+            let _ = tx.send(out);
+        });
+        // El aviso puede quedar abierto más de lo que espera quien llamó: se responde igual.
+        let (status, detail) = match rx.recv_timeout(Duration::from_secs(95)) {
+            Ok(r) => r?,
+            Err(_) => (
+                "esperando".to_string(),
+                "El aviso de aprobación sigue abierto en NÚCLEO: cuando la persona responda, \
+                 NÚCLEO firmará (o no) y la página lo mostrará."
+                    .to_string(),
+            ),
+        };
+        Ok(SignOutcome {
+            status,
+            detail,
+            state: page_state(&app, &shared),
+        })
     })
     .await
 }
@@ -733,4 +1024,65 @@ pub fn close<R: Runtime>(app: &AppHandle<R>) {
 pub async fn browser_close<R: Runtime>(app: AppHandle<R>) -> CmdResult<()> {
     close(&app);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn una_descarga_reciente_se_mueve_con_su_nombre_final_sin_sobrescribir() {
+        let downloads = tempfile::tempdir().unwrap();
+        let labels = tempfile::tempdir().unwrap();
+        let from = downloads.path().join("MWYELI825E6A4C162X0.pdf");
+        std::fs::write(&from, b"%PDF-1.4 etiqueta").unwrap();
+        let shared = BrowserShared::default();
+        shared.note_download(Download {
+            name: "MWYELI825E6A4C162X0.pdf".into(),
+            path: from.to_string_lossy().into_owned(),
+            ok: true,
+            note: None,
+        });
+        // Solo lo que bajó esta ventana.
+        let e = move_download(&shared, "otro.pdf", labels.path(), "blue.1.pdf").unwrap_err();
+        assert!(e.contains("No hay una descarga reciente"), "{e}");
+
+        let saved = move_download(
+            &shared,
+            "mwyeli825e6a4c162x0.pdf",
+            labels.path(),
+            "blue.2486244670.pdf",
+        )
+        .unwrap();
+        assert!(saved.pdf);
+        assert_eq!(saved.bytes, 17);
+        assert!(!from.exists());
+        assert!(labels.path().join("blue.2486244670.pdf").is_file());
+        // La lista de descargas apunta al archivo donde quedó.
+        let list = shared.downloads.lock().unwrap().clone();
+        assert_eq!(list[0].name, "blue.2486244670.pdf");
+        assert_eq!(list[0].path, saved.path);
+
+        // No sobrescribe una etiqueta que ya existe.
+        let again = downloads.path().join("OTRA.pdf");
+        std::fs::write(&again, b"%PDF-1.4 otra").unwrap();
+        shared.note_download(Download {
+            name: "OTRA.pdf".into(),
+            path: again.to_string_lossy().into_owned(),
+            ok: true,
+            note: None,
+        });
+        let e =
+            move_download(&shared, "OTRA.pdf", labels.path(), "blue.2486244670.pdf").unwrap_err();
+        assert!(e.contains("no lo sobrescribo"), "{e}");
+        assert!(again.exists());
+
+        // Las carpetas: «envios» cae en la de descargas mientras no se defina otra.
+        *shared.download_dir.lock().unwrap() = downloads.path().to_path_buf();
+        assert_eq!(shared.folder_for(Some("envios")).unwrap(), downloads.path());
+        *shared.shipping_dir.lock().unwrap() = labels.path().to_path_buf();
+        assert_eq!(shared.folder_for(Some("envios")).unwrap(), labels.path());
+        assert_eq!(shared.folder_for(None).unwrap(), downloads.path());
+        assert!(shared.folder_for(Some("escritorio")).is_err());
+    }
 }

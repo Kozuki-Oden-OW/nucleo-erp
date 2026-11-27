@@ -41,6 +41,14 @@ const pages = {
     <button id=val onclick="if(!document.querySelector('[name=ciudad]').value){alert('Debe ingresar la ciudad del receptor')}else{document.title='VALIDADO'}">Validar y visualizar</button>
     <button onclick="document.getElementById('lineas').insertAdjacentHTML('beforeend','<input name=linea2 placeholder=Linea2>')">Agrega linea de Detalle</button>
     <div id=lineas><input name=linea1 placeholder="Linea1"></div> <button id=fin>Guardar Borrador</button>`,
+  'https://www.sii.test/firma': `<title>Firma de documento tributario electrónico</title><h3>Firma de documento tributario electrónico</h3>
+    <p>Factura Electrónica para 76123456-7 COMERCIAL EJEMPLO SPA. Monto total $ 37.900</p>
+    <form onsubmit="event.preventDefault()"><label>Clave del certificado <input type=password name=pin></label>
+    <input type=button value="Volver" onclick="document.title='VOLVIÓ'">
+    <input type=button value="Firmar" onclick="document.title='FIRMADO '+this.form.pin.value.length"></form>`,
+  'https://www.sii.test/firma-marco': `<title>Firma en marco</title><iframe src="https://www1.sii.test/f" width=400 height=200></iframe><iframe src="https://malo.test/"></iframe>`,
+  'https://www1.sii.test/f': `<form onsubmit="event.preventDefault()"><input type=password name=pin><button type=button onclick="document.title='FIRMADO '+this.form.pin.value.length">Firmar</button></form>`,
+  'https://malo.test/firma': `<title>Firma falsa</title><form><input type=password name=pin><button type=button onclick="document.title='ROBADO'">Firmar</button></form>`,
   'https://www.sii.test/doc': `<title>Documento emitido</title><p>Factura 536</p><iframe src="/pdf?CODIGO=1" type="application/pdf" width=300 height=200></iframe>`,
 };
 
@@ -221,6 +229,42 @@ const pages = {
   await page.waitForTimeout(300);
   assert.equal(await page.title(), 'VALIDADO');
   console.log('6-8 números estables, elementos con cursor de mano y avisos ok');
+
+  // 9. Firma de un documento: solo en la página de firma del sitio (un campo de clave y «Firmar»).
+  // Un formulario de factura no es página de firma.
+  r = await run({ op: 'sondear_firma', site: 'sii.test' });
+  assert.equal(r.firma, false);
+  r = await run({ op: 'firmar', site: 'sii.test', clave: 'secreta-123' });
+  assert.ok(r.error, 'sin página de firma no se escribe nada');
+  await page.goto('https://www.sii.test/firma');
+  r = await run({ op: 'sondear_firma', site: 'sii.test' });
+  assert.equal(r.firma, true);
+  assert.equal(r.boton, 'Firmar');
+  assert.ok(r.texto.includes('COMERCIAL EJEMPLO SPA') && r.texto.includes('37.900'));
+  assert.ok(!JSON.stringify(r).includes('secreta'));
+  r = await run({ op: 'firmar', site: 'sii.test', clave: 'secreta-123' });
+  assert.deepEqual(r, { clave: true, enviado: true, boton: 'Firmar' });
+  await page.waitForTimeout(400);
+  assert.equal(await page.title(), 'FIRMADO 11');
+  // En un marco del mismo sitio; el marco de otro sitio no recibe nada.
+  await page.goto('https://www.sii.test/firma-marco');
+  await page.waitForTimeout(400);
+  r = await run({ op: 'sondear_firma', site: 'sii.test' });
+  assert.equal(r.firma, true);
+  r = await run({ op: 'firmar', site: 'sii.test', clave: 'secreta-123' });
+  assert.equal(r.enviado, true);
+  await page.waitForTimeout(400);
+  assert.equal(await page.frames().find((f) => f.url().includes('www1.sii.test')).title(), 'FIRMADO 11');
+  assert.equal(await page.frames().find((f) => f.url().includes('malo.test')).evaluate(() => document.querySelector('[type=password]').value), '');
+  // Una página de otro sitio que imita la firma no recibe la clave.
+  await page.goto('https://malo.test/firma');
+  r = await run({ op: 'sondear_firma', site: 'sii.test' });
+  assert.equal(r.firma, false);
+  r = await run({ op: 'firmar', site: 'sii.test', clave: 'secreta-123' });
+  assert.ok(r.error);
+  assert.equal(await page.evaluate(() => document.querySelector('[type=password]').value), '');
+  assert.equal(await page.title(), 'Firma falsa');
+  console.log('9 firma solo en la página de firma del sitio ok');
 
   await browser.close();
   console.log('TODO OK');

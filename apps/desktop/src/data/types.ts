@@ -2232,6 +2232,8 @@ export interface StartReport {
 export interface BrowserSettings {
   /** Carpeta de descargas; vacía = «Documentos\NUCLEO ERP Descargas». */
   download_dir: string;
+  /** Carpeta de las etiquetas de envío; vacía = la misma de descargas. */
+  shipping_dir: string;
   /** Sitios permitidos además de los de los accesos guardados (dominios). */
   sites: string[];
 }
@@ -2254,6 +2256,8 @@ export interface BrowserView {
   today: string;
   /** Carpeta de descargas ya resuelta. */
   folder: string;
+  /** Carpeta de las etiquetas de envío ya resuelta. */
+  shipping_folder: string;
   open: boolean;
 }
 
@@ -2283,4 +2287,8 @@ export interface BrowserActResult {
   result: { ok?: string; error?: string; navego?: boolean; usuario?: boolean; clave?: boolean; enviado?: boolean };
   access?: string;
 }
+/** Clave de firma de documentos del SII: solo si está guardada, nunca la clave. */
+export interface SigningKeyStatus { saved: boolean; updated_at: string | null; updated_by: string | null }
+/** Resultado de pedir la firma: la persona aprueba cada documento en un aviso de NÚCLEO. */
+export interface BrowserSignOutcome { status: "firmado" | "rechazado" | "esperando"; detail: string; state: BrowserPageState }
 export interface BrowserSavedFile { name: string; path: string; bytes: number; pdf: boolean; /** Texto leído del PDF, si se pudo. */ text: string | null }

@@ -40,6 +40,7 @@ pub mod sale_terms;
 pub mod sales_ops;
 pub mod serial_ops;
 pub mod ship_ops;
+pub mod signing_ops;
 pub mod sii_intercambio;
 pub mod sii_ops;
 pub mod sii_print;

@@ -38,6 +38,8 @@ pub const FILE_EXTENSIONS: [&str; 10] = [
 pub struct BrowserSettings {
     /// Carpeta donde se guardan las descargas. Vacía: «Documentos\NUCLEO ERP Descargas».
     pub download_dir: String,
+    /// Carpeta de las etiquetas de envío (las del courier). Vacía: la misma de las descargas.
+    pub shipping_dir: String,
     /// Sitios permitidos además de los de los accesos guardados (dominios, sin «https://»).
     pub sites: Vec<String>,
 }
@@ -46,6 +48,7 @@ impl Default for BrowserSettings {
     fn default() -> Self {
         Self {
             download_dir: String::new(),
+            shipping_dir: String::new(),
             sites: DEFAULT_SITES.iter().map(|s| s.to_string()).collect(),
         }
     }
@@ -269,6 +272,12 @@ impl CompanySession {
                 "la carpeta de descargas no es válida".into(),
             ));
         }
+        let labels = v.shipping_dir.trim();
+        if labels.chars().count() > 240 || labels.chars().any(|c| c.is_control()) {
+            return Err(AppError::Validation(
+                "la carpeta de etiquetas de envío no es válida".into(),
+            ));
+        }
         let mut sites = Vec::new();
         for s in &v.sites {
             if !s.trim().is_empty() {
@@ -282,6 +291,7 @@ impl CompanySession {
         }
         let clean = BrowserSettings {
             download_dir: dir.to_string(),
+            shipping_dir: labels.to_string(),
             sites,
         };
         dbcore::set_setting(
@@ -296,7 +306,7 @@ impl CompanySession {
             "navegador",
             "ajustes",
             &format!(
-                "Ajustes del navegador de NÚCLEO: sitios {} · descargas en {}",
+                "Ajustes del navegador de NÚCLEO: sitios {} · descargas en {} · etiquetas de envío en {}",
                 if clean.sites.is_empty() {
                     "(solo los de los accesos)".to_string()
                 } else {
@@ -306,6 +316,11 @@ impl CompanySession {
                     "la carpeta por defecto"
                 } else {
                     &clean.download_dir
+                },
+                if clean.shipping_dir.is_empty() {
+                    "la misma carpeta"
+                } else {
+                    &clean.shipping_dir
                 }
             ),
             None,

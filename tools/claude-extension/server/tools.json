@@ -2036,13 +2036,25 @@
   {
     "name": "web_guardar",
     "nivel": "completo",
-    "description": "Guarda en la carpeta de descargas de NÚCLEO (la que definió la persona, por ejemplo la de facturas) un archivo de la página abierta: sin más datos, el documento que la página muestra incrustado (el PDF de una factura del SII); con «elemento», el archivo de ese enlace; con «direccion», esa dirección del mismo sitio. «nombre» es el nombre final con extensión (por ejemplo 536-DL.pdf): no se aceptan rutas ni programas y no sobrescribe un archivo existente. Si es un PDF con texto (como los del SII), devuelve además su texto para anotarlo en NÚCLEO. Requiere «Acceso completo».",
+    "description": "Guarda en la carpeta de descargas de NÚCLEO (la que definió la persona, por ejemplo la de facturas) un archivo de la página abierta: sin más datos, el documento que la página muestra incrustado (el PDF de una factura del SII); con «elemento», el archivo de ese enlace; con «direccion», esa dirección del mismo sitio. «nombre» es el nombre final con extensión (por ejemplo 536-DL.pdf): no se aceptan rutas ni programas y no sobrescribe un archivo existente. Si es un PDF con texto (como los del SII), devuelve además su texto para anotarlo en NÚCLEO. Con «carpeta: envios» queda en la carpeta de etiquetas de envío que definió la persona. Con «descarga» no se trae nada: se mueve a la carpeta, con el nombre final, un archivo que la página ya bajó (su nombre sale en «Descargas recientes»); así se guarda la etiqueta de Bluexpress después de pulsar «Descargar etiqueta»: web_guardar {descarga: \"<nombre que bajó>\", carpeta: \"envios\", nombre: \"blue.<n.o de seguimiento>.pdf\"}. Requiere «Acceso completo».",
     "inputSchema": {
       "type": "object",
       "properties": {
         "nombre": {
           "type": "string",
-          "description": "Nombre del archivo con extensión, como 536-DL.pdf"
+          "description": "Nombre del archivo con extensión, como 536-DL.pdf o blue.2486244670.pdf"
+        },
+        "carpeta": {
+          "type": "string",
+          "enum": [
+            "descargas",
+            "envios"
+          ],
+          "description": "Dónde queda: descargas (por defecto) o envios (etiquetas del courier)"
+        },
+        "descarga": {
+          "type": "string",
+          "description": "Nombre de una descarga reciente de la página, para moverla y renombrarla (opcional)"
         },
         "elemento": {
           "type": "string",
@@ -2074,6 +2086,25 @@
       "required": [
         "acceso"
       ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "web_firmar",
+    "nivel": "completo",
+    "description": "Firma el documento que está en la página «Firma de documento tributario electrónico» del SII (a la que se llega con «Validar y visualizar» y «Firmar» en la vista previa). NÚCLEO muestra a la persona un aviso propio con la venta, el cliente y el total; solo si ella pulsa «Firmar» en ese aviso, NÚCLEO escribe la clave de firma guardada y pulsa «Firmar» en la página. Una aprobación por documento: emitir no se puede deshacer. Claude no ve ni escribe la clave y no puede aprobar el aviso. Antes de llamarla, comprueba que receptor, líneas y total de la vista previa calzan con la venta y muestra el resumen en el chat. Si la clave no está guardada, la persona la escribe en Configuración → Integraciones → Accesos o firma ella en la página. Si responde «esperando», no la llames otra vez. Requiere «Acceso completo».",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "venta": {
+          "type": "string",
+          "description": "Número de la venta de NÚCLEO que se está facturando (ej. FV-000026): el aviso muestra su cliente y total"
+        },
+        "resumen": {
+          "type": "string",
+          "description": "Una línea con el documento, el receptor y el total, para el aviso (opcional si se indica la venta)"
+        }
+      },
       "additionalProperties": false
     }
   },

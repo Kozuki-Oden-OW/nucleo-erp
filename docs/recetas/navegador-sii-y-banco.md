@@ -70,8 +70,11 @@ Cuando el cliente es nuevo o `ver_venta` / `crear_venta_borrador` avisan que al 
    no se factura sin ella: pedirla a la persona.
 5. «Validar y visualizar» → vista previa («Revisión de documento») → «Firmar» → pantalla «Firma de
    documento tributario electrónico» (pide la clave del certificado; todavía no se emite nada).
-6. **La clave del certificado la pone la persona** (o NÚCLEO con su aprobación para ese documento,
-   cuando esté construido). El agente no la escribe ni pulsa «Firmar» por su cuenta.
+6. **Firma**: con la clave de firma guardada en NÚCLEO (Configuración → Integraciones → Accesos),
+   `web_firmar {venta: "FV-…"}`: NÚCLEO muestra a la persona un aviso con la venta, el cliente y el
+   total; con su clic en «Firmar», NÚCLEO escribe la clave y firma. Sin clave guardada, la escribe
+   la persona en la página y pulsa «Firmar». El agente no la escribe ni pulsa «Firmar» por su
+   cuenta.
 7. Emitida: abrir el PDF, `web_guardar {nombre: "factura-nueva.pdf"}` (devuelve el texto con el
    folio), renombrar a `NNN-DL.pdf` en la carpeta y registrar la venta en NÚCLEO
    (`crear_venta_borrador` con `documento: "factura"`, la forma de pago, las referencias y el
@@ -91,9 +94,12 @@ Orden exacto, sin preguntar entre pasos:
    cantidad, precio neto; «Agrega línea de Detalle»), forma de pago. Comprobar neto, IVA y total
    contra la cotización o el pedido.
 4. «Validar y visualizar» → «Firmar» (en la vista previa) → pantalla de firma.
-5. **Firma**: la **clave de firma de documentos** la escribe el gestor de contraseñas de NÚCLEO, con
-   la aprobación de la persona para ese documento (un clic sobre el resumen: receptor y total).
-   Mientras no esté construido, la escribe la persona y pulsa «Firmar». El agente nunca la escribe.
+5. **Firma**: `web_firmar {venta: "FV-…"}` (extensión 0.12.0). NÚCLEO abre un aviso de la aplicación
+   con la venta, el cliente y el total; la persona pulsa «Firmar» ahí y NÚCLEO escribe la **clave de
+   firma de documentos** y pulsa «Firmar» en la página. Un clic por documento. Respuestas: «firmado»
+   (leer la página y comprobar el folio), «rechazado» (no insistir: preguntar qué corregir) o
+   «esperando» (el aviso sigue abierto: no llamar otra vez). Si la clave no está guardada, la
+   escribe la persona en la página. El agente nunca la escribe.
 6. **Guardar el PDF**: con el documento a la vista, `web_guardar {nombre: "factura-nueva.pdf"}`; leer
    el folio en el texto devuelto y renombrar a `NNN-DL.pdf` en la carpeta de facturas.
 7. **Registrar en NÚCLEO de inmediato y descontar stock** (regla del dueño, 26-11-2026: apenas se
@@ -124,17 +130,16 @@ efectuada aparece en `listar_ventas {vista: "pendientes_doc"}` y él confirma qu
 En los dos sentidos la regla es la misma: una factura del SII y una venta de NÚCLEO, enlazadas por el
 folio, sin duplicar ninguna.
 
-### Claves que guarda NÚCLEO para este flujo (por construir)
+### La clave que guarda NÚCLEO para este flujo (construido el 27-11-2026, D-NAV-08)
 
-Dos claves **separadas**, aunque a veces sean iguales, para no confundirlas:
-
-- **Clave del certificado digital**: la que protege el certificado con que se entra al SII.
+- **Entrar al SII** no usa ninguna clave guardada: se pulsa «Ingresar con Certificado Digital» y el
+  certificado instalado en el computador hace el resto.
 - **Clave de firma de documentos**: la del certificado centralizado que el SII pide en «Firma de
-  documento tributario electrónico».
-
-Las dos se escriben una vez en NÚCLEO (Configuración → Integraciones → Accesos), quedan cifradas y no
-se muestran. La primera se usa al entrar; la segunda solo en la página de firma del SII y con la
-aprobación de la persona para cada documento, porque emitir no se puede deshacer.
+  documento tributario electrónico». La persona la escribe una vez en Configuración → Integraciones
+  → Accesos, bloque «Clave de firma de documentos (SII)»; queda cifrada y no se muestra. NÚCLEO la
+  usa solo en la página de firma del SII y con la aprobación de la persona para cada documento (un
+  aviso de la aplicación con la venta y el total), porque emitir no se puede deshacer. Nunca se
+  envía por chat y el agente no la ve.
 
 ## 1. Documentos emitidos en el SII
 

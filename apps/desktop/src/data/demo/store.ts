@@ -9,7 +9,7 @@ import type {
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
   SiiDocument, SiiIssueInput, SiiIntercambioGuardado, SiiIntercambioInput, SiiIntercambioResumen, SiiLibro, SiiLibroInput, SiiPrintDoc, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
-  MlBilling, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, BrowserActResult, BrowserPageState, BrowserRead, BrowserSavedFile, BrowserSettings, BrowserView, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, WspBridgeState, WspChat, WspConversation, WspDraft, WspSent, WspSetup, WspStatus, SyncNetReport, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncPeer, SyncView, WooCatalogItem, WooComponent, WooEquivalenceInput, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
+  MlBilling, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, BrowserActResult, BrowserPageState, BrowserRead, BrowserSavedFile, BrowserSignOutcome, SigningKeyStatus, BrowserSettings, BrowserView, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, WspBridgeState, WspChat, WspConversation, WspDraft, WspSent, WspSetup, WspStatus, SyncNetReport, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncPeer, SyncView, WooCatalogItem, WooComponent, WooEquivalenceInput, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput, StatementLineView, BankSuggestion,
   F22Inputs, F22View,
@@ -2592,7 +2592,7 @@ export class DemoBackend implements Backend {
   /* ───────────── Navegador de NÚCLEO (simulado: un sitio de ejemplo, sin red) ───────────── */
 
   private browser = {
-    settings: { download_dir: "", sites: ["sii.cl"] } as BrowserSettings,
+    settings: { download_dir: "", shipping_dir: "", sites: ["sii.cl"] } as BrowserSettings,
     grants: new Set<string>(),
     open: false,
     url: "",
@@ -2629,6 +2629,7 @@ export class DemoBackend implements Backend {
       allowed: this.browserSites(),
       today: now().slice(0, 10),
       folder: this.browser.settings.download_dir || "Documentos/NUCLEO ERP Descargas",
+      shipping_folder: this.browser.settings.shipping_dir || this.browser.settings.download_dir || "Documentos/NUCLEO ERP Descargas",
       open: this.browser.open,
     });
   }
@@ -2637,7 +2638,7 @@ export class DemoBackend implements Backend {
     const sites = [...new Set(input.sites.map((x) => x.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0] ?? "").filter(Boolean))].sort();
     const bad = sites.find((x) => !/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(x));
     if (bad) throw new AppError("validacion", `«${bad}» no es un sitio: escribe el dominio, por ejemplo banco.cl`);
-    this.browser.settings = { download_dir: input.download_dir.trim(), sites };
+    this.browser.settings = { download_dir: input.download_dir.trim(), shipping_dir: (input.shipping_dir ?? "").trim(), sites };
     this.log("navegador.ajustes", "navegador", "ajustes");
     return this.browserInfo();
   }
@@ -2679,16 +2680,25 @@ export class DemoBackend implements Backend {
     else result = { ok: `clic en «${c.l}»` };
     return wait({ state: this.browserPageState(), result });
   }
-  async browserSaveFile(_target: number | null, url: string | null, name: string): Promise<BrowserSavedFile> {
+  async browserSaveFile(_target: number | null, url: string | null, name: string, folder: string | null = null, download: string | null = null): Promise<BrowserSavedFile> {
     this.browserNeedOpen();
     if (url) this.browserHost(url);
     const clean = name.trim();
+    if (folder && folder !== "descargas" && folder !== "envios") throw new AppError("validacion", `No conozco la carpeta «${folder}»: usa «descargas» o «envios».`);
+    const where = folder === "envios" ? "Etiquetas de demostración" : "Descargas de demostración";
+    if (download) {
+      const i = this.browser.files.indexOf(download.trim());
+      if (i < 0) throw new AppError("validacion", `No hay una descarga reciente llamada «${download.trim()}»: su nombre sale en «Descargas recientes» al leer la página.`);
+      if (this.browser.files.includes(clean)) throw new AppError("validacion", `Ya existe ${clean}: no lo sobrescribo.`);
+      this.browser.files[i] = clean;
+      return wait({ name: clean, path: `${where}/${clean}`, bytes: 3741, pdf: /\.pdf$/i.test(clean), text: null });
+    }
     if (!/^[^\\/:*?"<>|]+\.(pdf|xml|csv|xlsx|xls|txt|json|png|jpg|jpeg)$/i.test(clean) || clean.startsWith(".")) {
       throw new AppError("validacion", "Nombre de archivo: sin rutas y con extensión de documento (por ejemplo 536-DL.pdf).");
     }
     if (this.browser.files.includes(clean)) throw new AppError("validacion", `Ya existe ${clean} en la carpeta de descargas: no lo sobrescribo.`);
     this.browser.files.push(clean);
-    return wait({ name: clean, path: `Descargas de demostración/${clean}`, bytes: 206888, pdf: /\.pdf$/i.test(clean), text: /\.pdf$/i.test(clean) ? "DATA LOGGER CHILE SPA\nFACTURA ELECTRONICA\nNº536\nTOTAL\n$ 104.720" : null });
+    return wait({ name: clean, path: `${where}/${clean}`, bytes: 206888, pdf: /\.pdf$/i.test(clean), text: /\.pdf$/i.test(clean) ? "DATA LOGGER CHILE SPA\nFACTURA ELECTRONICA\nNº536\nTOTAL\n$ 104.720" : null });
   }
   async browserLogin(access: string, submit: boolean): Promise<BrowserActResult> {
     const a = this.accessList.find((x) => x.uid === access || x.name.toLowerCase().includes(access.trim().toLowerCase()));
@@ -2701,6 +2711,28 @@ export class DemoBackend implements Backend {
     return wait({ state: this.browserPageState(), result: { usuario: true, clave: true, enviado: submit }, access: a.name });
   }
   async browserClose(): Promise<void> { this.browser.open = false; this.browser.inside = false; }
+
+  /* Clave de firma del SII (simulada: en la demostración no hay aviso ni página de firma real). */
+  private signingKey: SigningKeyStatus = { saved: false, updated_at: null, updated_by: null };
+  async signingKeyStatus(): Promise<SigningKeyStatus> { return wait({ ...this.signingKey }); }
+  async saveSigningKey(key: string, declared: boolean): Promise<SigningKeyStatus> {
+    this.require("config.editar");
+    if (!key) throw new AppError("validacion", "Escribe la clave de firma.");
+    if (!declared) throw new AppError("validacion", "Confirma que es la clave con que firmas documentos en el SII y que NÚCLEO la usará solo en la página de firma, con tu aprobación por cada documento.");
+    this.signingKey = { saved: true, updated_at: now(), updated_by: this.users.find((x) => x.uid === this.current)?.username ?? "demo" };
+    this.log("clave_firma.guardar", "clave_firma", "sii");
+    return this.signingKeyStatus();
+  }
+  async deleteSigningKey(): Promise<SigningKeyStatus> {
+    this.require("config.editar");
+    this.signingKey = { saved: false, updated_at: null, updated_by: null };
+    return this.signingKeyStatus();
+  }
+  async browserSign(_sale: string | null, _note: string | null): Promise<BrowserSignOutcome> {
+    if (!this.signingKey.saved) throw new AppError("validacion", "Aún no hay clave de firma guardada: la persona la escribe en Configuración → Integraciones → Accesos, «Clave de firma de documentos (SII)».");
+    this.browserNeedOpen();
+    throw new AppError("validacion", "La página abierta no es la de firma del SII (un campo de clave y el botón «Firmar»): se llega con «Validar y visualizar» y luego «Firmar» en la vista previa.");
+  }
 
   /* ───────────── WooCommerce (simulado) ───────────── */
 

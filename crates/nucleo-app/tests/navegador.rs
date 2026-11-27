@@ -50,6 +50,7 @@ fn sitios_permitidos_y_ajustes_solo_de_la_persona() {
     // La persona agrega sitios y la carpeta; el asistente no.
     let v = BrowserSettings {
         download_dir: " D:\\Facturas ".into(),
+        shipping_dir: " D:\\Datalogger spa\\Envios ".into(),
         sites: vec![
             "https://www.MercadoLibre.cl/ventas".into(),
             "sii.cl".into(),
@@ -61,12 +62,19 @@ fn sitios_permitidos_y_ajustes_solo_de_la_persona() {
     s.set_via_agent(false);
     let info = s.browser_save_settings(&v).unwrap();
     assert_eq!(info.settings.download_dir, "D:\\Facturas");
+    // La carpeta de las etiquetas de envío es aparte; el nombre «blue.<seguimiento>.pdf» es válido.
+    assert_eq!(info.settings.shipping_dir, "D:\\Datalogger spa\\Envios");
+    assert_eq!(
+        nucleo_app::browser_ops::safe_file_name("blue.2486244670.pdf").unwrap(),
+        "blue.2486244670.pdf"
+    );
+    assert!(nucleo_app::browser_ops::safe_file_name("..\\blue.2486244670.pdf").is_err());
     assert_eq!(info.settings.sites, vec!["mercadolibre.cl", "sii.cl"]);
     assert_eq!(info.allowed, vec!["bci.cl", "mercadolibre.cl", "sii.cl"]);
     assert!(
         s.browser_save_settings(&BrowserSettings {
-            download_dir: String::new(),
             sites: vec!["mi banco".into()],
+            ..BrowserSettings::default()
         })
         .is_err()
     );
@@ -172,4 +180,47 @@ fn del_sii_solo_se_guarda_e_boleta_y_su_clave_vale_solo_en_ese_servidor() {
             "no debe entregar la clave a {otro}"
         );
     }
+}
+
+#[test]
+fn la_clave_de_firma_la_guarda_la_persona_y_solo_sale_para_el_sii() {
+    let (_d, _a, mut s) = session();
+    assert!(!s.signing_key_status().unwrap().saved);
+    // Sin clave guardada no hay nada que entregar.
+    let e = s
+        .signing_secret("www1.sii.cl", "FV-000001")
+        .unwrap_err()
+        .to_string();
+    assert!(e.contains("Aún no hay clave de firma"), "{e}");
+
+    // El asistente no la guarda ni la borra.
+    s.set_via_agent(true);
+    assert!(s.save_signing_key("clave-de-ejemplo", true).is_err());
+    assert!(s.delete_signing_key().is_err());
+    s.set_via_agent(false);
+    // La persona, declarando que entiende para qué es.
+    assert!(s.save_signing_key("clave-de-ejemplo", false).is_err());
+    assert!(s.save_signing_key("", true).is_err());
+    let st = s.save_signing_key("clave-de-ejemplo", true).unwrap();
+    assert!(st.saved && st.updated_at.is_some());
+    // Lo que ve la interfaz no trae la clave, y no aparece entre los accesos.
+    let json = serde_json::to_string(&s.signing_key_status().unwrap()).unwrap();
+    assert!(!json.contains("clave-de-ejemplo"), "{json}");
+    assert!(s.accesses().unwrap().is_empty());
+    assert!(s.browser_info().unwrap().accesses.is_empty());
+
+    // Solo para una página del SII.
+    assert!(s.signing_secret("www.bci.cl", "x").is_err());
+    assert!(s.signing_secret("sii.cl.entrar.com", "x").is_err());
+    assert_eq!(
+        s.signing_secret("www1.sii.cl", "FV-000001 · Cliente · total $ 37.900")
+            .unwrap(),
+        "clave-de-ejemplo"
+    );
+    // Se reemplaza y se borra.
+    s.save_signing_key("otra-clave", true).unwrap();
+    assert_eq!(s.signing_secret("www1.sii.cl", "x").unwrap(), "otra-clave");
+    assert!(!s.delete_signing_key().unwrap().saved);
+    assert!(s.signing_secret("www1.sii.cl", "x").is_err());
+    assert!(s.signing_sale_brief("FV-999999").is_err());
 }

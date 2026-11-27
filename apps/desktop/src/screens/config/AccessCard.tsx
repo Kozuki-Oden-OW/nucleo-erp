@@ -9,6 +9,7 @@ import { useSession } from "../../lib/session";
 import { Badge, Button, Card, Checkbox, Field, IconButton, Notice, Select, Spinner, TextArea } from "../../ui/kit";
 import { DataTable, type Column } from "../../ui/table";
 import { Dialog, useToast } from "../../ui/overlay";
+import { SigningKeyBox } from "./SigningKey";
 
 const EMPTY: AccessInput = { name: "", login_url: "", username: "", password: "", kind: "lectura", notes: "", no_payments: false };
 /** El único acceso del SII que se guarda: e-Boleta, que solo admite RUT y Clave Tributaria. */
@@ -93,6 +94,7 @@ export function AccessCard() {
           Guarda solo cuentas que <strong>no puedan pagar ni transferir</strong>. Única excepción: el acceso a e-Boleta del SII, que se usa solo en ese sitio.
         </Notice>
         <DataTable label="Accesos guardados" columns={columns} rows={rows} rowKey={(a) => a.uid} empty="Aún no hay accesos guardados." />
+        <SigningKeyBox editable={editable} />
       </div>
 
       <Dialog

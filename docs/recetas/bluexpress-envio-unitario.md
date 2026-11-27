@@ -52,9 +52,16 @@ cuenta corriente empresa (sin paso de pago).
   casilla, antes la tenía que pulsar la persona), marcar los términos y «Pagar». Con la tarjeta
   inscrita (OneClick) no hay página de Transbank: el envío queda confirmado de inmediato y la página
   muestra el número de seguimiento, el monto y el n.º de transacción.
-- Después: `registrar_envio` sobre el envío de la venta (seguimiento, costo, transacción, talla). El
-  botón «Descargar etiqueta» tarda en activarse; la etiqueta se baja solo con permiso del dueño o se
-  imprime en el Punto con el número de seguimiento.
+- **Después de pagar, siempre y de inmediato** (regla del dueño, 27-11-2026; son dos pasos y no se
+  pregunta):
+  1. **Etiqueta**: `web_clic` en «Descargar etiqueta» (tarda unos segundos en activarse; si la
+     respuesta se corta, `web_leer` muestra el archivo en «Descargas recientes», con el n.º de
+     transacción como nombre). Luego `web_guardar {descarga: "<ese nombre>.pdf", carpeta: "envios",
+     nombre: "blue.<n.º de seguimiento>.pdf"}`: queda en la carpeta de etiquetas de envío
+     (`D:\Datalogger spa\Envios`), por ejemplo `blue.2486244670.pdf`. La carpeta la define el dueño
+     en Configuración → Integraciones → Navegador, «Carpeta de etiquetas de envío».
+  2. **Envío en NÚCLEO**: `registrar_envio` sobre el envío de la venta con el n.º de seguimiento, el
+     costo pagado, el n.º de transacción, la talla, el destinatario y la dirección.
 - Todo en el Navegador de NÚCLEO: no se usa otro navegador para ningún paso.
 
 ## Observaciones
@@ -87,5 +94,5 @@ confirmación en el chat antes de pagar.
   clic en el logo (el botón de radio está oculto).
 - **Origen:** viene precargado; en la lista hay que elegir «Punto Blue Express Market Plaza Ñuñoa».
 - **Después de pagar:** leer número de seguimiento, monto y n.º de transacción y registrarlos con
-  `registrar_envio`. La etiqueta se descarga solo con permiso del dueño; hay 5 días para dejar el
-  paquete en el Punto.
+  `registrar_envio`. La etiqueta se descarga y se guarda como `blue.<seguimiento>.pdf` en la carpeta
+  de etiquetas (ver arriba); hay 5 días para dejar el paquete en el Punto.

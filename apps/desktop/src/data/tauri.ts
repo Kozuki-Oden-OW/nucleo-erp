@@ -7,7 +7,7 @@ import type {
   AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput,
-  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, BrowserActResult, BrowserPageState, BrowserRead, BrowserSavedFile, BrowserSettings, BrowserView, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, WspBridgeState, WspChat, WspConversation, WspDraft, WspSent, WspSetup, WspStatus, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncView, WooCatalogItem, WooConnectInput, WooEquivalenceInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
+  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, BrowserActResult, BrowserPageState, BrowserRead, BrowserSavedFile, BrowserSettings, BrowserSignOutcome, BrowserView, SigningKeyStatus, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, WspBridgeState, WspChat, WspConversation, WspDraft, WspSent, WspSetup, WspStatus, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncView, WooCatalogItem, WooConnectInput, WooEquivalenceInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
@@ -187,8 +187,12 @@ export class TauriBackend implements Backend {
   browserAct(op: "clic" | "escribir" | "elegir" | "volver", target: number | null, text: string | null = null, enter = false, option: string | null = null) {
     return call<BrowserActResult>("browser_act", { action: { op, target, text, enter, option } });
   }
-  browserSaveFile(target: number | null, url: string | null, name: string) { return call<BrowserSavedFile>("browser_save_file", { target, url, name }); }
+  browserSaveFile(target: number | null, url: string | null, name: string, folder: string | null = null, download: string | null = null) { return call<BrowserSavedFile>("browser_save_file", { target, url, name, folder, download }); }
   browserLogin(access: string, submit: boolean) { return call<BrowserActResult>("browser_login", { access, submit }); }
+  browserSign(sale: string | null, note: string | null) { return call<BrowserSignOutcome>("browser_sign", { sale, note }); }
+  signingKeyStatus() { return call<SigningKeyStatus>("signing_key_status"); }
+  saveSigningKey(key: string, declared: boolean) { return call<SigningKeyStatus>("save_signing_key", { key, declared }); }
+  deleteSigningKey() { return call<SigningKeyStatus>("delete_signing_key"); }
   browserClose() { return call<void>("browser_close"); }
   wooStatus() { return call<WooStatus>("woo_status"); }
   wooConnect(input: WooConnectInput) { return call<WooStatus>("woo_connect", { input }); }
