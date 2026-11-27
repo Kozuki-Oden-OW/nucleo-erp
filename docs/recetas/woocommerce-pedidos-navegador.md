@@ -43,8 +43,8 @@ guarda (mostrar antes la lista a la persona). Para dejar códigos iguales en los
    equipos y M desde 17; «no contiene mercancías peligrosas»; cupón `VAMOSMIPYME`, que se aplica en el
    paso de pago y descuenta 30 %). **Antes de «Pagar»** mostrar destinatario, dirección, talla y total
    y esperar el «sí» del dueño para ese envío; con el «sí» se elige el medio de pago (OnePay, con la
-   tarjeta inscrita), se marcan los términos y se paga. `transbank.cl` debe estar entre los sitios
-   permitidos del navegador. Retiro en tienda: no lleva envío.
+   tarjeta inscrita), se marcan los términos y se paga: queda confirmado de inmediato, sin pasar por
+   la página de Transbank. Retiro en tienda: no lleva envío.
 6. **Documento**: boleta por e-Boleta (`boleta-electronica-sii.md`) o factura
    (`navegador-sii-y-banco.md` §0.1), y `documentar_venta`.
 7. Informar: pedidos ingresados, ventas creadas, envíos listos para pagar y lo que quedó pendiente.

@@ -47,8 +47,14 @@ cuenta corriente empresa (sin paso de pago).
 - **Paquete**: casilla de mercancías peligrosas, descripción, valor del contenido y talla → la página
   muestra el valor del envío → «Siguiente».
 - **Pago**: escribir `VAMOSMIPYME` en «Ingresa el código de descuento» → «Aplicar» (30 %: de $4.200 a
-  $2.940 en talla S a Peñaflor). Mostrar el resumen al dueño; con su «sí», elegir el medio de pago,
-  marcar los términos y «Pagar». La página de Webpay es de `transbank.cl`: debe estar permitida.
+  $2.940 en talla S a Peñaflor). Mostrar el resumen al dueño; con su «sí», elegir el medio de pago
+  (el logo de OnePay: es una opción oculta bajo una imagen; desde la extensión 0.11.0 aparece como
+  casilla, antes la tenía que pulsar la persona), marcar los términos y «Pagar». Con la tarjeta
+  inscrita (OneClick) no hay página de Transbank: el envío queda confirmado de inmediato y la página
+  muestra el número de seguimiento, el monto y el n.º de transacción.
+- Después: `registrar_envio` sobre el envío de la venta (seguimiento, costo, transacción, talla). El
+  botón «Descargar etiqueta» tarda en activarse; la etiqueta se baja solo con permiso del dueño o se
+  imprime en el Punto con el número de seguimiento.
 - Todo en el Navegador de NÚCLEO: no se usa otro navegador para ningún paso.
 
 ## Observaciones
