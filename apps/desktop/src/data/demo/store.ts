@@ -9,7 +9,7 @@ import type {
 import { computeLines, computeTotals, lineIsValid } from "../calc";
 import type {
   SiiDocument, SiiIssueInput, SiiIntercambioGuardado, SiiIntercambioInput, SiiIntercambioResumen, SiiLibro, SiiLibroInput, SiiPrintDoc, SiiSetup, SiiStatus, MailDraft, MailLogRow, MailPreset, MailSetup, MailStatus, MailTemplates,
-  MlBilling, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, BrowserActResult, BrowserPageState, BrowserRead, BrowserSavedFile, BrowserSettings, BrowserView, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, WspBridgeState, WspChat, WspConversation, WspDraft, WspSent, WspSetup, WspStatus, SyncNetReport, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncPeer, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
+  MlBilling, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, BrowserActResult, BrowserPageState, BrowserRead, BrowserSavedFile, BrowserSettings, BrowserView, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, WspBridgeState, WspChat, WspConversation, WspDraft, WspSent, WspSetup, WspStatus, SyncNetReport, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncPeer, SyncView, WooCatalogItem, WooComponent, WooEquivalenceInput, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput, StatementLineView, BankSuggestion,
   F22Inputs, F22View,
@@ -2707,7 +2707,64 @@ export class DemoBackend implements Backend {
   private woo = {
     url: "", key: "", connected: false, connectedAt: null as string | null, lastSync: null as string | null, writeBack: true,
     orders: [] as WooOrderRow[], store: new Map<string, { stock: number | null; price: number }>(),
+    map: new Map<string, WooComponent[]>(),
   };
+  /** Catálogo de la tienda de ejemplo: los productos de NÚCLEO con su SKU y dos que la tienda vende sin código. */
+  private wooStoreItems(): { product_id: string; variation_id: string; name: string; sku: string | null; price_minor: number }[] {
+    const tax = this.taxPpm() ?? 0;
+    const gross = (n: number) => n + Math.round((n * tax) / 1_000_000);
+    const goods = this.products.filter((p) => p.kind === "producto");
+    return [
+      ...goods.slice(0, Math.max(1, goods.length - 2)).map((p, i) => ({ product_id: String(100 + i), variation_id: "", name: p.name, sku: p.sku || null, price_minor: gross(p.price_minor) })),
+      { product_id: "902", variation_id: "", name: "Producto solo de la tienda", sku: null, price_minor: 12_990 },
+      { product_id: "903", variation_id: "", name: `${goods[0]?.name ?? "Producto"} + ${goods[1]?.name ?? "accesorio"} (combo)`, sku: null, price_minor: 39_990 },
+    ];
+  }
+  private wooParts(sku: string | null, productId: string): { p: Product; qty_milli: number }[] {
+    const bySku = sku ? this.products.find((p) => p.sku && p.sku.toLowerCase() === sku.toLowerCase()) : undefined;
+    if (bySku) return [{ p: bySku, qty_milli: 1000 }];
+    const parts = (this.woo.map.get(`${productId}:`) ?? []).map((c) => ({ p: this.products.find((x) => x.uid === c.product_uid), qty_milli: c.qty_milli }));
+    return parts.every((x) => x.p) ? (parts as { p: Product; qty_milli: number }[]) : [];
+  }
+  async wooCatalog(): Promise<WooCatalogItem[]> {
+    if (!this.woo.connected) throw new AppError("validacion", "La tienda WooCommerce no está conectada: Configuración → Integraciones.");
+    const tokens = (s: string) => new Set(s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().split(/[^a-z0-9+]+/).filter((t) => t && !["con", "de", "y", "a", "x", "+"].includes(t)));
+    return wait(this.wooStoreItems().map((s) => {
+      const parts = this.wooParts(s.sku, s.product_id);
+      const bySku = !!s.sku && parts.length === 1 && parts[0]!.p.sku.toLowerCase() === s.sku.toLowerCase();
+      const view = (x: { p: Product; qty_milli: number }) => ({ product_uid: x.p.uid, sku: x.p.sku, name: x.p.name, qty_milli: x.qty_milli });
+      let suggestion: WooCatalogItem["suggestion"] = null;
+      if (!parts.length) {
+        const want = tokens(s.name);
+        let best = 0;
+        for (const p of this.products) {
+          const have = tokens(p.name);
+          const common = [...want].filter((t) => have.has(t)).length;
+          const score = common / (want.size + have.size - common || 1);
+          if (score >= 0.5 && score > best) { best = score; suggestion = view({ p, qty_milli: 1000 }); }
+        }
+      }
+      return { ...s, matched_by: bySku ? "sku" as const : parts.length ? "equivalencia" as const : "" as const, components: parts.map(view), suggestion };
+    }).sort((a, b) => a.name.localeCompare(b.name, "es")), 60);
+  }
+  async wooSaveEquivalence(input: WooEquivalenceInput): Promise<void> {
+    this.require("config.editar");
+    if (!/^\d{1,20}$/.test(input.product_id.trim())) throw new AppError("validacion", "Indica el número del producto de la tienda (y el de la variación, si corresponde).");
+    const key = `${input.product_id.trim()}:${(input.variation_id ?? "").trim()}`;
+    if (!input.items.length) { this.woo.map.delete(key); return wait(undefined); }
+    if (input.items.length > 12) throw new AppError("validacion", "Una equivalencia admite hasta 12 productos.");
+    const seen = new Set<string>();
+    for (const c of input.items) {
+      if (!(c.qty_milli > 0)) throw new AppError("validacion", "La cantidad de cada producto debe ser mayor que cero.");
+      const p = this.products.find((x) => x.uid === c.product_uid);
+      if (!p) throw new AppError("no_encontrado", "No encontramos un producto de la equivalencia.");
+      if (seen.has(p.uid)) throw new AppError("validacion", `«${p.name}» está repetido: súmalo en una sola línea.`);
+      seen.add(p.uid);
+    }
+    this.woo.map.set(key, input.items.map((c) => ({ product_uid: c.product_uid, qty_milli: c.qty_milli })));
+    this.log("integracion.editar", "integracion", "woocommerce");
+    return wait(undefined);
+  }
 
   async wooStatus(): Promise<WooStatus> {
     const w = this.woo;
@@ -2750,18 +2807,24 @@ export class DemoBackend implements Backend {
     const tax = this.taxPpm() ?? 0;
     const net = (g: number) => Math.round((g * 1_000_000) / (1_000_000 + tax));
     const incoming = [
-      { id: "1301", title: goods[0]?.name ?? "Producto", sku: goods[0]?.sku ?? null, qty: 2, price: 23_990, ship: 3_920, method: "Blue Express a domicilio", buyer: ["Camila", "Rojas"], email: "camila@correo.cl" },
-      { id: "1302", title: "Producto solo de la tienda", sku: "WEB-SIN-NUCLEO", qty: 1, price: 12_990, ship: 0, method: "Retiro en tienda", buyer: ["Diego", "Muñoz"], email: "diego@correo.cl" },
+      { id: "1301", title: goods[0]?.name ?? "Producto", sku: goods[0]?.sku ?? null, pid: "100", qty: 2, price: 23_990, ship: 3_920, method: "Blue Express a domicilio", buyer: ["Camila", "Rojas"], email: "camila@correo.cl" },
+      { id: "1302", title: "Producto solo de la tienda", sku: null as string | null, pid: "902", qty: 1, price: 12_990, ship: 0, method: "Retiro en tienda", buyer: ["Diego", "Muñoz"], email: "diego@correo.cl" },
     ];
     const r: WooSyncReport = { imported: 0, to_review: 0, completed: 0, cancelled: 0, unchanged: 0, waiting_payment: 0, to_invoice: 0, shipments: 0, messages: [] };
     for (const o of incoming) {
       const known = this.woo.orders.find((x) => x.order_id === o.id);
       if (known?.status === "importada") { r.unchanged++; continue; }
-      const product = this.products.find((p) => o.sku && p.sku.toLowerCase() === o.sku.toLowerCase())?.uid ?? null;
+      // Por SKU o por la equivalencia guardada (que puede ser un combo: una línea por parte).
+      const parts = this.wooParts(o.sku, o.pid);
+      const product = parts[0]?.p.uid ?? null;
       const name = o.buyer.join(" ");
       const customers = await this.searchCustomers(name);
       const customer = customers.find((c) => c.name.toLowerCase() === name.toLowerCase()) ?? await this.addCustomer({ name, email: o.email, kind: "persona" } as NewCustomer);
-      const lines = [{ product_uid: product, description: o.title, qty_milli: o.qty * 1000, unit_price_minor: net(o.price), discount_ppm: 0, taxable: true }];
+      const weight = parts.reduce((t, x) => t + Math.max(1, x.p.price_minor) * x.qty_milli, 0);
+      const lines: LineInput[] = parts.length > 1 || (parts[0] && parts[0].qty_milli !== 1000)
+        ? parts.map((x) => ({ product_uid: x.p.uid, description: x.p.name, qty_milli: (o.qty * x.qty_milli), unit_price_minor: Math.round((net(o.price) * Math.max(1, x.p.price_minor)) / weight * 1000),
+            discount_ppm: 0, taxable: true, detail: `De «${o.title}» en la tienda` }))
+        : [{ product_uid: product, description: o.title, qty_milli: o.qty * 1000, unit_price_minor: net(o.price), discount_ppm: 0, taxable: true }];
       if (o.ship) lines.push({ product_uid: null, description: `Envío ${o.method}`, qty_milli: 1000, unit_price_minor: net(o.ship), discount_ppm: 0, taxable: true });
       const total = o.price * o.qty + o.ship;
       const input: SaleInput = {
@@ -2771,7 +2834,7 @@ export class DemoBackend implements Backend {
       };
       const sale = known?.sale_uid ? await this.saveSale(input, known.sale_uid) : await this.saveSale(input);
       let status: WooOrderRow["status"] = "por_revisar";
-      let issue: string | null = `No hay un producto de NÚCLEO con el mismo código: «${o.title}» (SKU ${o.sku}). Pon el mismo SKU en la tienda y en NÚCLEO y vuelve a sincronizar`;
+      let issue: string | null = `NÚCLEO no reconoce «${o.title}» (${o.sku ? `SKU ${o.sku}` : "sin SKU ni equivalencia"}). Enlázalo en «Equivalencias de productos» y vuelve a sincronizar`;
       let shipment: { uid: string; number: string } | null = null;
       if (product) {
         try {

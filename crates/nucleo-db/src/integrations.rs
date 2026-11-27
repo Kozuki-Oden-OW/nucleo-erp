@@ -342,6 +342,60 @@ pub struct WooPushProduct {
     pub reserved_milli: i64,
 }
 
+/// Equivalencia guardada: producto de la tienda, variación («» = todas), nombre y componentes (JSON).
+pub type WooMapRow = (String, String, String, String);
+
+pub fn woo_map_all(conn: &Connection) -> DbResult<Vec<WooMapRow>> {
+    let mut st = conn.prepare(
+        "SELECT store_product_id, store_variation_id, store_name, items_json FROM woo_product_map
+         ORDER BY store_name COLLATE NOCASE, store_variation_id",
+    )?;
+    let rows = st.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?;
+    Ok(rows.collect::<Result<_, _>>()?)
+}
+
+/// Componentes de un producto de la tienda: los de su variación o, si no hay, los del producto.
+pub fn woo_map_get(
+    conn: &Connection,
+    product_id: &str,
+    variation_id: &str,
+) -> DbResult<Option<String>> {
+    Ok(conn
+        .query_row(
+            "SELECT items_json FROM woo_product_map
+             WHERE store_product_id = ?1 AND store_variation_id IN (?2, '')
+             ORDER BY store_variation_id = '' LIMIT 1",
+            [product_id, variation_id],
+            |r| r.get(0),
+        )
+        .optional()?)
+}
+
+pub fn woo_map_set(
+    conn: &Connection,
+    product_id: &str,
+    variation_id: &str,
+    name: &str,
+    items_json: &str,
+    now: &str,
+) -> DbResult<()> {
+    conn.execute(
+        "INSERT INTO woo_product_map (store_product_id, store_variation_id, store_name, items_json, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5)
+         ON CONFLICT (store_product_id, store_variation_id) DO UPDATE SET
+            store_name = excluded.store_name, items_json = excluded.items_json, updated_at = excluded.updated_at",
+        [product_id, variation_id, name, items_json, now],
+    )?;
+    Ok(())
+}
+
+pub fn woo_map_delete(conn: &Connection, product_id: &str, variation_id: &str) -> DbResult<bool> {
+    Ok(conn.execute(
+        "DELETE FROM woo_product_map WHERE store_product_id = ?1 AND store_variation_id = ?2",
+        [product_id, variation_id],
+    )? > 0)
+}
+
 pub fn woo_push_products(conn: &Connection) -> DbResult<Vec<WooPushProduct>> {
     let mut st = conn.prepare(
         "SELECT p.sku, p.name, p.price_minor, p.taxable, p.track_stock,

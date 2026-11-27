@@ -524,6 +524,45 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
       webPage = after.page;
       return text([`${r.access ?? "Acceso"}: ${what}`, ...stateLines(r.state).filter((l) => l.startsWith("Bloqueado")), "", formatPage(after.page, after.state)].join("\n"));
     }
+    case "equivalencias_woocommerce": {
+      const all = await backend.wooCatalog();
+      const rows = str(a, "ver") === "todas" ? all : all.filter((r) => !r.matched_by);
+      const parts = (r: (typeof all)[number]) => r.components.map((c) => `${c.qty_milli / 1000} × ${c.sku || "sin SKU"} ${c.name}`).join(" + ");
+      const n = (k: string) => all.filter((r) => r.matched_by === k).length;
+      return text([
+        `Tienda WooCommerce: ${all.length} productos · ${n("sku")} por SKU · ${n("equivalencia")} por equivalencia · ${n("")} sin reconocer.`,
+        ...rows.slice(0, 150).map((r) => `- tienda ${r.product_id}${r.variation_id ? `/${r.variation_id}` : ""} · ${r.name}${r.price_minor !== null ? ` · ${pesos(r.price_minor)}` : ""} → ${
+          r.matched_by === "sku" ? `SKU ${r.sku}` : r.matched_by ? `equivalencia: ${parts(r)}` : `sin reconocer${r.suggestion ? ` · se parece a ${r.suggestion.sku || "sin SKU"} ${r.suggestion.name}` : ""}`}`),
+        ...(rows.length > 150 ? [`… ${rows.length - 150} más`] : []),
+        ...(n("") ? ["Para enlazarlos: guardar_equivalencias_woocommerce (muestra antes la lista a la persona)."] : []),
+      ].join("\n"));
+    }
+    case "guardar_equivalencias_woocommerce": {
+      const list = Array.isArray(a.equivalencias) ? (a.equivalencias as Args[]) : [];
+      if (!list.length) throw new Error("Indica al menos una equivalencia.");
+      const done: string[] = [];
+      const errors: string[] = [];
+      for (const e of list) {
+        const pid = str(e, "producto_tienda");
+        const label = str(e, "nombre") || `producto ${pid}`;
+        try {
+          const items = [];
+          const names: string[] = [];
+          for (const c of (Array.isArray(e.productos) ? (e.productos as Args[]) : [])) {
+            const q = str(c, "producto");
+            const p = pickOne(await backend.searchProducts(q), q, (x) => x.sku, "producto");
+            const qty = num(c, "cantidad") ?? 1;
+            items.push({ product_uid: p.uid, qty_milli: Math.round(qty * 1000) });
+            names.push(`${qty} × ${p.sku || p.name}`);
+          }
+          await backend.wooSaveEquivalence({ product_id: pid, variation_id: str(e, "variacion"), name: str(e, "nombre"), items });
+          done.push(items.length ? `- ${label} = ${names.join(" + ")}` : `- ${label}: equivalencia quitada`);
+        } catch (x) { errors.push(`- ${label}: ${errorMessage(x)}`); }
+      }
+      if (done.length) dataChanged();
+      return text([`Equivalencias guardadas: ${done.length} · con error: ${errors.length}.`, ...done, ...errors,
+        ...(done.length ? ["Los pedidos que estaban por revisar se confirman al sincronizar de nuevo (sincronizar_woocommerce)."] : [])].join("\n"), done.length === 0);
+    }
     case "sincronizar_woocommerce": {
       const r = await backend.wooSync(str(a, "desde") || null);
       return text([
@@ -703,6 +742,27 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
       });
       dataChanged();
       return text(`Producto creado: ${productLine(p).slice(2)}`);
+    }
+    case "actualizar_productos": {
+      const list = Array.isArray(a.productos) ? (a.productos as Args[]) : [];
+      if (!list.length) throw new Error("Indica al menos un producto.");
+      const done: string[] = [];
+      const errors: string[] = [];
+      for (const e of list) {
+        const q = str(e, "producto");
+        try {
+          const p = pickOne(await backend.searchProducts(q), q, (x) => x.sku, "producto");
+          const sku = str(e, "sku") || p.sku;
+          const name = str(e, "nombre") || p.name;
+          const price = num(e, "precio_neto") !== null ? Math.round(num(e, "precio_neto")!) : p.price_minor;
+          const changes = [sku !== p.sku && `SKU ${p.sku || "vacío"} → ${sku}`, name !== p.name && `nombre «${p.name}» → «${name}»`, price !== p.price_minor && `precio ${pesos(p.price_minor)} → ${pesos(price)}`].filter(Boolean);
+          if (!changes.length) { done.push(`- ${p.name}: sin cambios`); continue; }
+          await backend.updateProduct(p.uid, { name, sku, unit: p.unit, price_minor: price, taxable: p.taxable, min_milli: p.min_milli, category_uid: p.category_uid, stock_policy: p.stock_policy });
+          done.push(`- ${name}: ${changes.join(" · ")}`);
+        } catch (x) { errors.push(`- ${q}: ${errorMessage(x)}`); }
+      }
+      if (done.length) dataChanged();
+      return text([`Productos actualizados: ${done.length} · con error: ${errors.length}.`, ...done, ...errors].join("\n"), done.length === 0);
     }
     case "crear_venta_borrador": {
       let customer_uid: string | null = null;

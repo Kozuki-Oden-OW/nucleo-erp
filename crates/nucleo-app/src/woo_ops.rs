@@ -704,6 +704,165 @@ pub struct WooPushReport {
     pub messages: Vec<String>,
 }
 
+/* ───────────────────── Equivalencias de productos ───────────────────── */
+
+/// Producto de NÚCLEO que forma parte de un producto de la tienda, con su cantidad por unidad vendida.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WooComponent {
+    pub product_uid: String,
+    pub qty_milli: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct WooComponentView {
+    pub product_uid: String,
+    pub sku: String,
+    pub name: String,
+    pub qty_milli: i64,
+}
+
+/// Producto de NÚCLEO ya resuelto para una línea de pedido.
+#[derive(Debug, Clone)]
+struct WooPart {
+    uid: String,
+    sku: String,
+    name: String,
+    price_minor: i64,
+    qty_milli: i64,
+}
+
+/// Producto (o variación) de la tienda, como lo entrega su catálogo.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WooStoreItem {
+    pub product_id: String,
+    /// Vacío en un producto simple.
+    pub variation_id: String,
+    pub name: String,
+    pub sku: Option<String>,
+    pub price_minor: Option<i64>,
+}
+
+/// Un producto de la tienda y lo que NÚCLEO le reconoce.
+#[derive(Debug, Clone, Serialize)]
+pub struct WooCatalogItem {
+    pub product_id: String,
+    pub variation_id: String,
+    pub name: String,
+    pub sku: Option<String>,
+    pub price_minor: Option<i64>,
+    /// "sku", "equivalencia" o "" (NÚCLEO no lo reconoce).
+    pub matched_by: String,
+    pub components: Vec<WooComponentView>,
+    /// Producto de NÚCLEO de nombre más parecido, cuando no hay calce.
+    pub suggestion: Option<WooComponentView>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct WooEquivalenceInput {
+    pub product_id: String,
+    pub variation_id: String,
+    pub name: String,
+    pub items: Vec<WooComponent>,
+}
+
+/// Palabras de un nombre de producto para compararlo: sin tildes, sin el rango de medición y sin
+/// palabras de relleno («RC-5+ con sonda, rango de -40C° a 85C°» → rc, 5+, sonda).
+fn name_tokens(name: &str) -> Vec<String> {
+    let lower = name.to_lowercase();
+    let cut = lower.find("rango").unwrap_or(lower.len());
+    let clean: String = lower[..cut]
+        .chars()
+        .map(|c| match c {
+            'á' => 'a',
+            'é' => 'e',
+            'í' => 'i',
+            'ó' => 'o',
+            'ú' | 'ü' => 'u',
+            c if c.is_alphanumeric() || c == '+' => c,
+            _ => ' ',
+        })
+        .collect();
+    let mut out: Vec<String> = clean
+        .split_whitespace()
+        .filter(|t| !matches!(*t, "con" | "de" | "y" | "a" | "el" | "la" | "x" | "+"))
+        .map(String::from)
+        .collect();
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// Parecido entre dos nombres, de 0 a 100: palabras en común sobre palabras en total.
+fn similarity(a: &[String], b: &[String]) -> u32 {
+    if a.is_empty() || b.is_empty() {
+        return 0;
+    }
+    let common = a.iter().filter(|t| b.contains(t)).count();
+    (common * 100 / (a.len() + b.len() - common)) as u32
+}
+
+/// Catálogo de la tienda (productos y variaciones) para armar las equivalencias. Sin la sesión.
+pub fn fetch_catalog(http: &dyn WooHttp, cfg: &WooConfig) -> Result<Vec<WooStoreItem>, WooError> {
+    let price = |v: &Value| {
+        text(v.get("price"))
+            .or_else(|| text(v.get("regular_price")))
+            .and_then(|p| p.parse::<f64>().ok())
+            .map(|f| f.round() as i64)
+    };
+    let mut out = Vec::new();
+    for p in pages(
+        http,
+        cfg,
+        "products?status=any&_fields=id,type,status,sku,name,price,regular_price",
+    )? {
+        let Some(id) = text(p.get("id")) else {
+            continue;
+        };
+        if p.get("status").and_then(Value::as_str) == Some("trash") {
+            continue;
+        }
+        let name = text(p.get("name")).unwrap_or_else(|| format!("Producto {id}"));
+        if p.get("type").and_then(Value::as_str) == Some("variable") {
+            for v in pages(
+                http,
+                cfg,
+                &format!("products/{id}/variations?_fields=id,sku,price,regular_price,attributes"),
+            )? {
+                let Some(vid) = text(v.get("id")) else {
+                    continue;
+                };
+                let options: Vec<String> = v
+                    .get("attributes")
+                    .and_then(Value::as_array)
+                    .map(|a| a.iter().filter_map(|x| text(x.get("option"))).collect())
+                    .unwrap_or_default();
+                out.push(WooStoreItem {
+                    product_id: id.clone(),
+                    variation_id: vid,
+                    name: if options.is_empty() {
+                        name.clone()
+                    } else {
+                        format!("{name} — {}", options.join(", "))
+                    },
+                    sku: text(v.get("sku")),
+                    price_minor: price(&v),
+                });
+            }
+        } else {
+            out.push(WooStoreItem {
+                product_id: id,
+                variation_id: String::new(),
+                name,
+                sku: text(p.get("sku")),
+                price_minor: price(&p),
+            });
+        }
+    }
+    out.sort_by_key(|a| a.name.to_lowercase());
+    Ok(out)
+}
+
 struct StoreProduct {
     id: String,
     parent_id: Option<String>,
@@ -1167,31 +1326,69 @@ impl CompanySession {
         let mut lines = Vec::new();
         let mut missing = Vec::new();
         for it in &o.items {
-            let product = self.woo_product_for(it)?;
-            if product.is_none() {
+            // Por SKU o, si la tienda no lo usa, por la equivalencia guardada (que puede ser un combo).
+            let parts = self.woo_parts_for(it)?;
+            if parts.is_empty() {
                 missing.push(match &it.sku {
                     Some(s) => format!("«{}» (SKU {s})", it.name),
-                    None => format!("«{}» (sin SKU en la tienda)", it.name),
+                    None => format!("«{}» (sin SKU ni equivalencia)", it.name),
                 });
             }
             let base = it.subtotal_minor.max(it.total_minor);
-            let unit =
-                ((base as i128 * 1000 + it.qty_milli as i128 / 2) / it.qty_milli as i128) as i64;
             let discount_ppm = if base > 0 && it.total_minor < base {
                 (((base - it.total_minor) as i128 * 1_000_000 + base as i128 / 2) / base as i128)
                     as i64
             } else {
                 0
             };
-            lines.push(LineInput {
-                product_uid: product,
-                description: it.name.chars().take(200).collect(),
-                qty_milli: it.qty_milli,
-                unit_price_minor: net(unit),
-                discount_ppm,
-                taxable: true,
-                detail: None,
-            });
+            let unit_of = |amount: i64, qty: i64| {
+                ((amount as i128 * 1000 + qty as i128 / 2) / qty as i128) as i64
+            };
+            let simple = parts.len() == 1 && parts[0].qty_milli == 1000;
+            if parts.is_empty() || simple {
+                lines.push(LineInput {
+                    product_uid: parts.first().map(|p| p.uid.clone()),
+                    description: it.name.chars().take(200).collect(),
+                    qty_milli: it.qty_milli,
+                    unit_price_minor: net(unit_of(base, it.qty_milli)),
+                    discount_ppm,
+                    taxable: true,
+                    detail: None,
+                });
+                continue;
+            }
+            // Combo o pack: una línea por producto de NÚCLEO. El neto de la línea de la tienda se
+            // reparte según el precio de lista de cada parte; cada parte descuenta lo que de verdad
+            // suma (precio × cantidad) y la última se lleva el resto, para que el total calce.
+            let weight = |p: &WooPart| p.price_minor.max(1) as i128 * p.qty_milli as i128;
+            let total_w: i128 = parts.iter().map(weight).sum();
+            let target = net(base);
+            let mut left = target;
+            for (i, p) in parts.iter().enumerate() {
+                let qty =
+                    (((it.qty_milli as i128 * p.qty_milli as i128 + 500) / 1000) as i64).max(1);
+                let share = if i + 1 == parts.len() {
+                    left.max(0)
+                } else {
+                    ((target as i128 * weight(p) + total_w / 2) / total_w) as i64
+                };
+                let unit = unit_of(share, qty);
+                left -= ((unit as i128 * qty as i128 + 500) / 1000) as i64;
+                lines.push(LineInput {
+                    product_uid: Some(p.uid.clone()),
+                    description: p.name.chars().take(200).collect(),
+                    qty_milli: qty,
+                    unit_price_minor: unit,
+                    discount_ppm,
+                    taxable: true,
+                    detail: Some(
+                        format!("De «{}» en la tienda", it.name)
+                            .chars()
+                            .take(300)
+                            .collect(),
+                    ),
+                });
+            }
         }
         if o.shipping_minor > 0 {
             lines.push(LineInput {
@@ -1414,21 +1611,203 @@ impl CompanySession {
             .flatten())
     }
 
-    /// Producto de NÚCLEO de una línea: el que tiene el mismo SKU.
-    fn woo_product_for(&self, it: &WooItem) -> AppResult<Option<String>> {
+    /// Producto activo de NÚCLEO por una condición sobre `products`.
+    fn woo_part(&self, where_sql: &str, value: &str, qty_milli: i64) -> AppResult<Option<WooPart>> {
         use rusqlite::OptionalExtension;
-        let Some(sku) = it.sku.as_deref() else {
-            return Ok(None);
-        };
         Ok(self
             .db
             .conn()
             .query_row(
-                "SELECT uid FROM products WHERE lower(sku) = lower(?1) AND archived_at IS NULL",
-                [sku],
-                |r| r.get(0),
+                &format!(
+                    "SELECT uid, coalesce(sku, ''), name, price_minor FROM products
+                     WHERE {where_sql} AND archived_at IS NULL"
+                ),
+                [value],
+                |r| {
+                    Ok(WooPart {
+                        uid: r.get(0)?,
+                        sku: r.get(1)?,
+                        name: r.get(2)?,
+                        price_minor: r.get(3)?,
+                        qty_milli,
+                    })
+                },
             )
             .optional()?)
+    }
+
+    /// Productos de NÚCLEO de una equivalencia guardada. Si alguno ya no existe, la equivalencia no
+    /// vale (el pedido queda por revisar en vez de registrar la mitad de un combo).
+    fn woo_map_parts(&self, product_id: &str, variation_id: &str) -> AppResult<Vec<WooPart>> {
+        let Some(json) = db::woo_map_get(self.db.conn(), product_id, variation_id)? else {
+            return Ok(vec![]);
+        };
+        let items: Vec<WooComponent> = serde_json::from_str(&json).unwrap_or_default();
+        let mut out = Vec::with_capacity(items.len());
+        for c in &items {
+            match self.woo_part("uid = ?1", &c.product_uid, c.qty_milli)? {
+                Some(p) => out.push(p),
+                None => return Ok(vec![]),
+            }
+        }
+        Ok(out)
+    }
+
+    /// Productos de NÚCLEO de una línea del pedido: el del mismo SKU o, si no, los de la
+    /// equivalencia guardada para ese producto de la tienda. Vacío = no se reconoce.
+    fn woo_parts_for(&self, it: &WooItem) -> AppResult<Vec<WooPart>> {
+        if let Some(sku) = it.sku.as_deref()
+            && let Some(p) = self.woo_part("lower(sku) = lower(?1)", sku, 1000)?
+        {
+            return Ok(vec![p]);
+        }
+        self.woo_map_parts(&it.product_id, &it.variation_id)
+    }
+
+    /// Conexión lista para leer el catálogo de la tienda.
+    pub fn woo_catalog_plan(&self) -> AppResult<WooConfig> {
+        self.require("ventas.ver")?;
+        self.woo_ready()
+    }
+
+    /// Cada producto de la tienda con lo que NÚCLEO le reconoce: por SKU, por equivalencia o nada
+    /// (y, en ese caso, el producto de NÚCLEO de nombre más parecido como sugerencia).
+    pub fn woo_catalog(&self, store: &[WooStoreItem]) -> AppResult<Vec<WooCatalogItem>> {
+        self.require("ventas.ver")?;
+        let mut st = self.db.conn().prepare(
+            "SELECT uid, coalesce(sku, ''), name, price_minor FROM products WHERE archived_at IS NULL",
+        )?;
+        let all: Vec<WooPart> = st
+            .query_map([], |r| {
+                Ok(WooPart {
+                    uid: r.get(0)?,
+                    sku: r.get(1)?,
+                    name: r.get(2)?,
+                    price_minor: r.get(3)?,
+                    qty_milli: 1000,
+                })
+            })?
+            .collect::<Result<_, _>>()?;
+        let view = |p: &WooPart| WooComponentView {
+            product_uid: p.uid.clone(),
+            sku: p.sku.clone(),
+            name: p.name.clone(),
+            qty_milli: p.qty_milli,
+        };
+        let mut out = Vec::with_capacity(store.len());
+        for s in store {
+            let by_sku = s.sku.as_deref().and_then(|k| {
+                all.iter()
+                    .find(|p| !p.sku.is_empty() && p.sku.eq_ignore_ascii_case(k))
+            });
+            let (matched_by, parts) = match by_sku {
+                Some(p) => ("sku", vec![p.clone()]),
+                None => {
+                    let m = self.woo_map_parts(&s.product_id, &s.variation_id)?;
+                    (if m.is_empty() { "" } else { "equivalencia" }, m)
+                }
+            };
+            let suggestion = if parts.is_empty() {
+                let want = name_tokens(&s.name);
+                all.iter()
+                    .map(|p| (similarity(&want, &name_tokens(&p.name)), p))
+                    .filter(|(score, _)| *score >= 50)
+                    .max_by(|a, b| a.0.cmp(&b.0).then(b.1.name.len().cmp(&a.1.name.len())))
+                    .map(|(_, p)| view(p))
+            } else {
+                None
+            };
+            out.push(WooCatalogItem {
+                product_id: s.product_id.clone(),
+                variation_id: s.variation_id.clone(),
+                name: s.name.clone(),
+                sku: s.sku.clone(),
+                price_minor: s.price_minor,
+                matched_by: matched_by.into(),
+                components: parts.iter().map(view).collect(),
+                suggestion,
+            });
+        }
+        Ok(out)
+    }
+
+    /// Guarda a qué productos de NÚCLEO equivale un producto de la tienda (sin productos = se quita).
+    pub fn woo_save_equivalence(&mut self, input: &WooEquivalenceInput) -> AppResult<()> {
+        self.require("config.editar")?;
+        let pid = input.product_id.trim();
+        let vid = input.variation_id.trim();
+        let digits =
+            |s: &str| !s.is_empty() && s.len() <= 20 && s.chars().all(|c| c.is_ascii_digit());
+        if !digits(pid) || !(vid.is_empty() || digits(vid)) {
+            return Err(AppError::Validation(
+                "indica el número del producto de la tienda (y el de la variación, si corresponde)"
+                    .into(),
+            ));
+        }
+        let user = self.actor_name()?;
+        if input.items.is_empty() {
+            db::woo_map_delete(self.db.conn(), pid, vid)?;
+            log(
+                self.db.conn(),
+                &user,
+                "integracion.editar",
+                "integracion",
+                "woocommerce",
+                &format!("Quitó la equivalencia del producto {pid} de la tienda"),
+                None,
+            )?;
+            return Ok(());
+        }
+        if input.items.len() > 12 {
+            return Err(AppError::Validation(
+                "una equivalencia admite hasta 12 productos".into(),
+            ));
+        }
+        let mut names = Vec::new();
+        let mut items: Vec<WooComponent> = Vec::new();
+        for c in &input.items {
+            if !(1..=1_000_000_000).contains(&c.qty_milli) {
+                return Err(AppError::Validation(
+                    "la cantidad de cada producto debe ser mayor que cero".into(),
+                ));
+            }
+            let p = self
+                .woo_part("uid = ?1", &c.product_uid, c.qty_milli)?
+                .ok_or_else(|| AppError::NotFound("un producto de la equivalencia".into()))?;
+            if items.iter().any(|x| x.product_uid == p.uid) {
+                return Err(AppError::Validation(format!(
+                    "«{}» está repetido: súmalo en una sola línea",
+                    p.name
+                )));
+            }
+            names.push(format!("{} × {}", c.qty_milli as f64 / 1000.0, p.name));
+            items.push(WooComponent {
+                product_uid: p.uid,
+                qty_milli: c.qty_milli,
+            });
+        }
+        let name: String = input.name.trim().chars().take(200).collect();
+        let name = if name.is_empty() {
+            format!("Producto {pid}")
+        } else {
+            name
+        };
+        let json =
+            serde_json::to_string(&items).map_err(|e| AppError::Validation(e.to_string()))?;
+        db::woo_map_set(self.db.conn(), pid, vid, &name, &json, &now_utc())?;
+        log(
+            self.db.conn(),
+            &user,
+            "integracion.editar",
+            "integracion",
+            "woocommerce",
+            &format!(
+                "Equivalencia de la tienda: «{name}» = {}",
+                names.join(" + ")
+            ),
+            None,
+        )?;
+        Ok(())
     }
 
     /// Cliente de NÚCLEO del pedido (por RUT si lo dejó; si no, por nombre).

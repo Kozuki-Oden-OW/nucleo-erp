@@ -531,6 +531,51 @@
     }
   },
   {
+    "name": "actualizar_productos",
+    "nivel": "completo",
+    "description": "Cambia el código (SKU), el nombre o el precio neto de productos existentes, varios a la vez. Sirve para dejar los códigos de NÚCLEO iguales a los de la tienda (o a los modelos del fabricante). Solo cambia los datos que se envían; no toca stock, costo ni categorías, y los documentos ya emitidos no cambian. Responde con lo que había antes en cada uno.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "productos": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "properties": {
+              "producto": {
+                "type": "string",
+                "description": "SKU actual o nombre del producto"
+              },
+              "sku": {
+                "type": "string",
+                "description": "Código nuevo"
+              },
+              "nombre": {
+                "type": "string",
+                "description": "Nombre nuevo"
+              },
+              "precio_neto": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Precio de lista nuevo, sin IVA"
+              }
+            },
+            "required": [
+              "producto"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "productos"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "crear_venta_borrador",
     "nivel": "borradores",
     "description": "Crea una venta en borrador (no mueve stock ni dinero hasta confirmarla), con los mismos datos que pide el SII. «documento» es lo primero: boleta, factura o guia (guía de despacho); con factura o guía el receptor se completa desde la ficha del cliente y la respuesta avisa si falta algún dato que el SII exige (ciudad, giro, dirección). Cada línea indica un producto por SKU o nombre, o un nombre libre con precio; «detalle» es la descripción extendida de la línea (la casilla «Descrip.» del SII). precio_neto es por unidad, sin IVA; si se omite se usa el precio del producto. descuento en %. Si el cliente trabaja con orden de compra, anótala en «referencias». forma_pago: contado o credito (si se omite, la habitual del cliente).",
@@ -1768,7 +1813,7 @@
   {
     "name": "sincronizar_woocommerce",
     "nivel": "completo",
-    "description": "Trae de la tienda WooCommerce los pedidos pagados desde una fecha (por defecto los últimos 30 días) y los pasa a NÚCLEO: cliente con sus datos (por RUT si lo dejó; si no, por nombre), venta al contado que descuenta stock (producto con el mismo SKU; referencia «Pedido de internet» con el n.º del pedido) y, si lleva despacho, un envío «no despachado» con destinatario, dirección, contenido y valor declarado, listo para crear la orden de transporte. Los que piden factura quedan como factura con RUT, razón social y giro. Un producto sin el mismo SKU deja la venta en borrador por revisar. No duplica; los pedidos sin pagar no se registran y una cancelación posterior solo se avisa. Si está activado, anota en el pedido de la tienda el número de la venta. Requiere la tienda conectada en Configuración → Integraciones.",
+    "description": "Trae de la tienda WooCommerce los pedidos pagados desde una fecha (por defecto los últimos 30 días) y los pasa a NÚCLEO: cliente con sus datos (por RUT si lo dejó; si no, por nombre), venta al contado que descuenta stock (producto con el mismo SKU o, si la tienda no usa SKU, el de su equivalencia guardada: ver equivalencias_woocommerce; referencia «Pedido de internet» con el n.º del pedido) y, si lleva despacho, un envío «no despachado» con destinatario, dirección, contenido y valor declarado, listo para crear la orden de transporte. Los que piden factura quedan como factura con RUT, razón social y giro. Un producto sin SKU ni equivalencia deja la venta en borrador por revisar. No duplica; los pedidos sin pagar no se registran y una cancelación posterior solo se avisa. Si está activado, anota en el pedido de la tienda el número de la venta. Requiere la tienda conectada en Configuración → Integraciones.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1813,6 +1858,89 @@
     }
   },
   {
+    "name": "equivalencias_woocommerce",
+    "nivel": "ver",
+    "description": "Lista los productos de la tienda WooCommerce (y sus variaciones) con lo que NÚCLEO les reconoce: por SKU, por una equivalencia guardada o nada. Para los que faltan propone el producto de NÚCLEO de nombre más parecido. Sin equivalencia, un pedido de ese producto queda en borrador por revisar y no descuenta stock. Solo lee: no cambia nada en la tienda.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "ver": {
+          "type": "string",
+          "enum": [
+            "pendientes",
+            "todas"
+          ],
+          "default": "pendientes",
+          "description": "pendientes = solo los que NÚCLEO no reconoce"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "guardar_equivalencias_woocommerce",
+    "nivel": "completo",
+    "description": "Guarda a qué productos de NÚCLEO equivale cada producto de la tienda WooCommerce, para tiendas sin SKU, combos y packs. «productos» lleva uno o varios productos de NÚCLEO con la cantidad que se descuenta por cada unidad vendida en la tienda (un combo «equipo + soporte» = dos productos; un pack «5 x …» = cantidad 5). Con «productos» vacío se quita la equivalencia. Solo cambia NÚCLEO, nunca la tienda. Muestra antes a la persona la lista que vas a guardar: de esto depende qué stock descuenta cada pedido.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "equivalencias": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 120,
+          "items": {
+            "type": "object",
+            "properties": {
+              "producto_tienda": {
+                "type": "string",
+                "description": "Número del producto en la tienda (de equivalencias_woocommerce)"
+              },
+              "variacion": {
+                "type": "string",
+                "description": "Número de la variación; vacío = vale para todas"
+              },
+              "nombre": {
+                "type": "string",
+                "description": "Nombre del producto en la tienda"
+              },
+              "productos": {
+                "type": "array",
+                "maxItems": 12,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "producto": {
+                      "type": "string",
+                      "description": "SKU o nombre del producto de NÚCLEO"
+                    },
+                    "cantidad": {
+                      "type": "number",
+                      "exclusiveMinimum": 0,
+                      "default": 1
+                    }
+                  },
+                  "required": [
+                    "producto"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "producto_tienda",
+              "productos"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "equivalencias"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "listar_accesos",
     "nivel": "ver",
     "description": "Lista los accesos de solo lectura a sitios web guardados en NÚCLEO (gestor de contraseñas): nombre del sitio, dirección de ingreso, usuario, tipo (lectura u operador sin pagos) y si tiene clave guardada. Nunca entrega la clave: Claude no la ve ni la escribe. El inicio de sesión con esos accesos lo hace NÚCLEO con la autorización de la persona.",
@@ -1824,7 +1952,7 @@
   {
     "name": "web_abrir",
     "nivel": "ver",
-    "description": "Abre una página en el Navegador de NÚCLEO y devuelve lo que se ve: texto (también el de marcos internos) y controles numerados como [w12]. Indica «direccion» (https://…) o «acceso» (nombre de un acceso guardado: abre su página de ingreso). Es el navegador propio de NÚCLEO (ventana aparte, con su perfil): solo abre los sitios permitidos por la persona. Al SII se entra con el certificado digital: abre la página de ingreso y pulsa «Ingresar con Certificado Digital»; si Windows pide elegir el certificado, eso lo hace la persona. Si la página pide iniciar sesión con usuario y clave, usa web_ingresar; nunca escribas una clave.",
+    "description": "Abre una página en el Navegador de NÚCLEO y devuelve lo que se ve: texto (también el de marcos internos) y controles numerados como [w12]. Indica «direccion» (https://…) o «acceso» (nombre de un acceso guardado: abre su página de ingreso). Es el navegador propio de NÚCLEO (ventana aparte, con su perfil): solo abre los sitios permitidos por la persona. Regla del negocio: las tareas en sitios web (SII, banco, courier, tienda) se hacen solo en este navegador, nunca en Chrome ni en otro; si algo no se puede hacer aquí, se le dice a la persona en vez de cambiar de navegador. Al SII se entra con el certificado digital: abre la página de ingreso y pulsa «Ingresar con Certificado Digital»; si Windows pide elegir el certificado, eso lo hace la persona. Si la página pide iniciar sesión con usuario y clave, usa web_ingresar; nunca escribas una clave.",
     "inputSchema": {
       "type": "object",
       "properties": {

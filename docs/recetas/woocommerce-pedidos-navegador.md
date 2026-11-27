@@ -5,6 +5,11 @@ buscar los pedidos, ingresarlos a NÚCLEO y preparar el envío de Bluexpress si 
 (Si la tienda está conectada por API en Configuración → Integraciones → WooCommerce, lo mismo se hace
 con `sincronizar_woocommerce` y `pedidos_woocommerce`; el navegador es el camino cuando no lo está.)
 
+Si la tienda no usa SKU (o vende combos y packs), antes de sincronizar se enlazan sus productos con los
+de NÚCLEO: `equivalencias_woocommerce` muestra los que faltan y `guardar_equivalencias_woocommerce` los
+guarda (mostrar antes la lista a la persona). Para dejar códigos iguales en los dos lados:
+`actualizar_productos`. Todo lo que sea navegar se hace en el Navegador de NÚCLEO, no en otro.
+
 ## Una vez (lo hace la persona)
 
 1. En WordPress, crear un usuario para NÚCLEO con el perfil **«Gestor de la tienda»** (ve y edita
@@ -35,9 +40,11 @@ con `sincronizar_woocommerce` y `pedidos_woocommerce`; el navegador es el camino
      (descuenta stock). Si está «En espera», queda en borrador hasta que el pago aparezca en el banco.
 5. **Envío**: si el pedido trae despacho, `registrar_envio` y preparar Bluexpress con
    `bluexpress-envio-unitario.md` (origen Punto Blue Express Market Plaza Ñuñoa; talla S hasta 16
-   equipos y M desde 17; «no contiene mercancías peligrosas»; cupón `VAMOSMIPYME`). **Detenerse antes
-   de «Pagar»** y mostrar destinatario, dirección, talla y total: el pago lo aprueba y lo hace el
-   dueño por cada envío. Retiro en tienda: no lleva envío.
+   equipos y M desde 17; «no contiene mercancías peligrosas»; cupón `VAMOSMIPYME`, que se aplica en el
+   paso de pago y descuenta 30 %). **Antes de «Pagar»** mostrar destinatario, dirección, talla y total
+   y esperar el «sí» del dueño para ese envío; con el «sí» se elige el medio de pago (OnePay, con la
+   tarjeta inscrita), se marcan los términos y se paga. `transbank.cl` debe estar entre los sitios
+   permitidos del navegador. Retiro en tienda: no lleva envío.
 6. **Documento**: boleta por e-Boleta (`boleta-electronica-sii.md`) o factura
    (`navegador-sii-y-banco.md` §0.1), y `documentar_venta`.
 7. Informar: pedidos ingresados, ventas creadas, envíos listos para pagar y lo que quedó pendiente.

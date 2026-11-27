@@ -263,7 +263,7 @@ describe("WooCommerce (demostración)", () => {
     expect(JSON.stringify(st)).not.toMatch(/cs_secreta|ck_llave1234/);
     const r = await runTool(b, "completo", "sincronizar_woocommerce", {});
     expect(txt(r)).toMatch(/ventas nuevas 1 · completadas 0 · por revisar 1 · envíos anotados 1/);
-    expect(txt(r)).toMatch(/SKU WEB-SIN-NUCLEO/);
+    expect(txt(r)).toMatch(/sin SKU ni equivalencia/);
     const again = await runTool(b, "completo", "sincronizar_woocommerce", {});
     expect(txt(again)).toMatch(/ventas nuevas 0 .* sin cambios 1/);
     const orders = await b.wooOrders();
@@ -279,6 +279,48 @@ describe("WooCommerce (demostración)", () => {
     // Enviar (lo hace la persona en la pantalla) deja la tienda igual que NÚCLEO.
     expect((await b.wooPush(true, true, true)).applied).toBe(true);
     expect(txt(await runTool(b, "ver", "comparar_woocommerce", { que: "ambos" }))).toMatch(/No hay diferencias/);
+  });
+});
+
+describe("códigos de producto", () => {
+  it("cambia el SKU de varios productos sin tocar lo demás", async () => {
+    const b = new DemoBackend();
+    const goods = (await b.searchProducts("")).filter((p) => p.kind === "producto");
+    const [a, c] = [goods[0]!, goods[1]!];
+    expect((await runTool(b, "borradores", "actualizar_productos", { productos: [{ producto: a.sku, sku: "TLOG-10E" }] })).isError).toBe(true);
+    const r = txt(await runTool(b, "completo", "actualizar_productos", { productos: [{ producto: a.sku, sku: "TLOG-10E" }, { producto: c.sku, sku: "RC-5+", precio_neto: c.price_minor }, { producto: "no-existe-xyz", sku: "X" }] }));
+    expect(r).toMatch(/Productos actualizados: 2 · con error: 1/);
+    expect(r).toMatch(new RegExp(`SKU ${a.sku} → TLOG-10E`));
+    const now = (await b.searchProducts("TLOG-10E")).find((p) => p.uid === a.uid)!;
+    expect([now.sku, now.name, now.price_minor, now.on_hand_milli, now.category_uid]).toEqual(["TLOG-10E", a.name, a.price_minor, a.on_hand_milli, a.category_uid]);
+  });
+});
+
+describe("WooCommerce sin SKU: equivalencias (demostración)", () => {
+  it("enlaza un producto y un combo de la tienda, y el pedido deja de estar por revisar", async () => {
+    const b = new DemoBackend();
+    await b.wooConnect({ url: "", consumer_key: "", consumer_secret: "", code: "nucleo-woo:demo" });
+    const antes = txt(await runTool(b, "ver", "equivalencias_woocommerce", {}));
+    expect(antes).toMatch(/2 sin reconocer/);
+    expect(antes).toMatch(/tienda 902 · Producto solo de la tienda · \$12\.990 → sin reconocer/);
+    expect((await runTool(b, "borradores", "guardar_equivalencias_woocommerce", { equivalencias: [{ producto_tienda: "902", productos: [] }] })).isError).toBe(true);
+    const sync1 = txt(await runTool(b, "completo", "sincronizar_woocommerce", {}));
+    expect(sync1).toMatch(/por revisar 1/);
+    const goods = (await b.searchProducts("")).filter((p) => p.kind === "producto");
+    const g = txt(await runTool(b, "completo", "guardar_equivalencias_woocommerce", { equivalencias: [
+      { producto_tienda: "902", nombre: "Producto solo de la tienda", productos: [{ producto: goods[2]!.sku, cantidad: 5 }] },
+      { producto_tienda: "903", nombre: "Combo", productos: [{ producto: goods[0]!.sku }, { producto: goods[1]!.sku, cantidad: 2 }] },
+      { producto_tienda: "x1", productos: [{ producto: goods[0]!.sku }] },
+    ] }));
+    expect(g).toMatch(/Equivalencias guardadas: 2 · con error: 1/);
+    expect(g).toMatch(new RegExp(`Combo = 1 × ${goods[0]!.sku} \\+ 2 × ${goods[1]!.sku}`));
+    const despues = txt(await runTool(b, "ver", "equivalencias_woocommerce", { ver: "todas" }));
+    expect(despues).toMatch(/2 por equivalencia · 0 sin reconocer/);
+    expect(despues).toMatch(/tienda 902 · .* → equivalencia: 5 × /);
+    const stock = goods[2]!.on_hand_milli;
+    const sync2 = txt(await runTool(b, "completo", "sincronizar_woocommerce", {}));
+    expect(sync2).toMatch(/completadas 1 · por revisar 0/);
+    expect((await b.searchProducts(goods[2]!.sku)).find((p) => p.uid === goods[2]!.uid)!.on_hand_milli).toBe(stock - 5000);
   });
 });
 

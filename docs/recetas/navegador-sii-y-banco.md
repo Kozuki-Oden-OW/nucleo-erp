@@ -4,6 +4,9 @@ Para el agente de NÚCLEO. Todo ocurre en la ventana «Navegador NÚCLEO», no e
 persona. Reglas en `docs/AGENTE_CLAUDE.md` («Gestor de contraseñas y Navegador de NÚCLEO») y
 `docs/DECISIONS.md` (D-NAV-01…04).
 
+**Regla estricta: todo se hace en el Navegador de NÚCLEO.** No se abre Chrome ni otro navegador para
+ninguna parte de estas tareas. Si un paso no se puede hacer aquí, se le avisa a la persona.
+
 ## Antes de empezar (lo hace la persona, una vez al día)
 
 - **SII**: abre el navegador (Configuración → Integraciones → Navegador → «Abrir navegador») y entra

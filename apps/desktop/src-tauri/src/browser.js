@@ -128,6 +128,19 @@
     return "botón";
   }
 
+  // Un botón sin texto (solo un ícono) se nombra por lo que tiene al lado: el título de su fila o,
+  // si no hay, el nombre del ícono. Así se pueden abrir acordeones como los del SII.
+  function contextLabel(el) {
+    var p = el.parentElement;
+    for (var k = 0; k < 3 && p && p !== document.body; k++, p = p.parentElement) {
+      var t = clean(p.innerText);
+      if (t && t.length <= 90) return t;
+      if (t) break;
+    }
+    var m = /(?:^|\s)(?:bi|fa|fas|far|icon|glyphicon|mdi)-([a-z0-9-]+)/i.exec(typeof el.className === "string" ? el.className : "");
+    return m ? m[1].replace(/-/g, " ") : "";
+  }
+
   var DOC_URL = /\.(pdf|xml|csv|xlsx?|zip)(\?|#|$)|pdf|descarg|download/i;
 
   var CONTROLS =
@@ -151,11 +164,35 @@
         if (el.closest(CONTROLS) || el.querySelector(CONTROLS + ", label")) continue;
         if (!visible(el)) continue;
         var t = clean(el.innerText);
+        // Una tarjeta que es solo una imagen (un medio de pago, un ícono) vale por su texto alternativo.
+        if (!t) t = iconLabel(el);
         if (!t || t.length > 80) continue;
         out.push(el);
       } catch (e) {}
     }
     return out;
+  }
+
+  // Nombre de un elemento sin texto: su etiqueta accesible, su título o el de la imagen que contiene.
+  function iconLabel(el) {
+    var t = el.getAttribute("aria-label") || el.getAttribute("title") || "";
+    if (!clean(t) && el.querySelector) {
+      var img = el.querySelector("img[alt], svg[aria-label], [title]");
+      if (img) t = img.getAttribute("alt") || img.getAttribute("aria-label") || img.getAttribute("title") || "";
+    }
+    return clean(t, 90);
+  }
+
+  // Una casilla u opción oculta (dibujada con una tarjeta o una imagen) se maneja por su etiqueta
+  // visible: se pulsa la etiqueta y el estado se lee de la casilla.
+  function proxyOf(el) {
+    var l = null;
+    try {
+      if (el.id) l = document.querySelector('label[for="' + CSS.escape(el.id) + '"]');
+    } catch (e) {}
+    if (!l && el.closest) l = el.closest("label");
+    if (!l && el.parentElement && el.parentElement !== document.body) l = el.parentElement;
+    return l && visible(l) ? l : null;
   }
 
   function snapshot() {
@@ -170,9 +207,15 @@
       var el = list[i];
       var tag = el.tagName.toLowerCase();
       if (tag === "input" && (el.type || "").toLowerCase() === "hidden") continue;
-      if (i < std && !visible(el)) continue;
       var kind = kindOf(el);
+      var target = el;
+      if (i < std && !visible(el)) {
+        if (kind !== "casilla" || tag !== "input") continue;
+        target = proxyOf(el);
+        if (!target) continue;
+      }
       var c = { n: 0, k: kind, l: labelOf(el) };
+      if (target !== el) c.l = clean(target.innerText, 90) || iconLabel(target) || c.l;
       if (kind === "documento") {
         var src = el.src || el.data || "";
         if (!DOC_URL.test(src) && !/pdf/i.test(el.type || "")) continue;
@@ -190,10 +233,13 @@
       } else if (kind === "casilla") {
         c.v = el.checked || el.getAttribute("aria-checked") === "true" ? "marcada" : "sin marcar";
       } else if (!c.l) {
-        continue;
+        c.l = contextLabel(el);
+        if (!c.l) continue;
       }
+      if (kind === "botón" && el.hasAttribute("aria-expanded"))
+        c.v = el.getAttribute("aria-expanded") === "true" ? "abierto" : "cerrado";
       if (el.disabled || el.getAttribute("aria-disabled") === "true") c.d = 1;
-      c.n = refOf(el);
+      c.n = refOf(target);
       out.push(c);
     }
     var said = alerts;

@@ -137,6 +137,12 @@ Decisiones: `docs/DECISIONS.md`, D-NAV-01…06. Del SII solo se guarda el acceso
 Clave Tributaria), que NÚCLEO usa únicamente en `eboleta.sii.cl`: `docs/recetas/boleta-electronica-sii.md`.
 Pedidos de la tienda WordPress: `docs/recetas/woocommerce-pedidos-navegador.md`. Receta de uso: `docs/recetas/navegador-sii-y-banco.md`.
 
+**Regla estricta (dueño, 27-11-2026): solo el Navegador de NÚCLEO.** Todo lo que el agente hace en
+un sitio web para el negocio (SII, banco, Bluexpress, la tienda, Mercado Libre) lo hace en el
+Navegador de NÚCLEO. No se usa Chrome ni otro navegador, tampoco «solo para terminar un paso». Si
+algo no se puede hacer ahí (el sitio no está permitido, un control no aparece, hace falta un pago),
+se le dice a la persona qué falta y se corrige en NÚCLEO.
+
 Lo que hace la persona (en Configuración → Integraciones):
 
 - **Accesos**: guarda un acceso por sitio (nombre, dirección de ingreso, usuario, clave y tipo: solo

@@ -139,6 +139,8 @@ fn with_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builde
         woo::woo_sync,
         woo::woo_orders,
         woo::woo_push,
+        woo::woo_catalog,
+        woo::woo_save_equivalence,
         mail::mail_status,
         mail::mail_presets,
         mail::mail_save,

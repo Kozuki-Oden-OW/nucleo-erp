@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "nucleo-erp",
   "display_name": "NÚCLEO ERP",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Permite que Claude use NÚCLEO ERP en este computador: ve la pantalla, la recorre con su propio cursor y registra ventas, gastos, clientes y cobros.",
   "long_description": "Conecta Claude con NÚCLEO ERP, el sistema de gestión local y gratuito para pymes chilenas. NÚCLEO debe estar abierto con Configuración → Claude activado; ahí eliges si Claude solo mira, crea borradores o tiene acceso completo. La extensión solo se comunica con NÚCLEO dentro del mismo computador (127.0.0.1): los datos del negocio siguen guardados solo en tu equipo.",
   "author": {
@@ -107,6 +107,10 @@
     {
       "name": "crear_producto",
       "description": "Crea un producto o servicio. precio_neto y costo en pesos sin IVA. Si el SKU ya existe, devuelve el existente."
+    },
+    {
+      "name": "actualizar_productos",
+      "description": "Cambia el código (SKU), el nombre o el precio neto de productos existentes, varios a la vez. Sirve para dejar los códigos de NÚCLEO iguales a los de la tienda (o a los modelos del fabricante). Solo ca"
     },
     {
       "name": "crear_venta_borrador",
@@ -235,6 +239,14 @@
     {
       "name": "comparar_woocommerce",
       "description": "Compara, sin cambiar nada, el stock disponible y/o los precios de lista de NÚCLEO con los de la tienda WooCommerce, calzando por SKU: muestra qué productos cambiarían (stock o precio de la tienda → de"
+    },
+    {
+      "name": "equivalencias_woocommerce",
+      "description": "Lista los productos de la tienda WooCommerce (y sus variaciones) con lo que NÚCLEO les reconoce: por SKU, por una equivalencia guardada o nada. Para los que faltan propone el producto de NÚCLEO de nom"
+    },
+    {
+      "name": "guardar_equivalencias_woocommerce",
+      "description": "Guarda a qué productos de NÚCLEO equivale cada producto de la tienda WooCommerce, para tiendas sin SKU, combos y packs. «productos» lleva uno o varios productos de NÚCLEO con la cantidad que se descue"
     },
     {
       "name": "listar_accesos",

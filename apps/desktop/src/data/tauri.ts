@@ -7,7 +7,7 @@ import type {
   AlertItem, AlertSettings, CustomerInsights, ProductInsights, TrendPoint, HistoricalReport, HistoricalSale,
   AccountingMap, JournalEntry, LedgerAccount, LedgerAccountInput, ManualEntryInput, PeriodRow,
   ImportStatementResult, ReconcileAction, ReconciliationView, StatementLineInput,
-  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, BrowserActResult, BrowserPageState, BrowserRead, BrowserSavedFile, BrowserSettings, BrowserView, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, WspBridgeState, WspChat, WspConversation, WspDraft, WspSent, WspSetup, WspStatus, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncView, WooConnectInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
+  CreditDocInput, CustomerCredit, PendingDispatch, Promotion, PromotionInput, MlManualOrder, MlOrderRow, MlStatus, MlSyncReport, AccessInput, AccessRow, BrowserActResult, BrowserPageState, BrowserRead, BrowserSavedFile, BrowserSettings, BrowserView, QuoteDocSettings, QuoteEmitted, QuoteNumbering, QuoteTerms, WspBridgeState, WspChat, WspConversation, WspDraft, WspSent, WspSetup, WspStatus, SyncOutcome, SyncPairedDevice, SyncPairingCode, SyncView, WooCatalogItem, WooConnectInput, WooEquivalenceInput, WooOrderRow, WooPushReport, WooStatus, WooSyncReport, Shipment, ShipmentInput, WarehouseStockRow,
   Report, ReportDef, ReportParams,
   F22Inputs, F22View,
   IndicatorsView, LreExport, PayrollIndicators, PayrollSettings, PayrollView, PayslipMonth, PayslipView, PreviredView,
@@ -196,6 +196,8 @@ export class TauriBackend implements Backend {
   wooSync(from?: string | null) { return call<WooSyncReport>("woo_sync", { from: from ?? null }); }
   wooOrders(limit?: number) { return call<WooOrderRow[]>("woo_orders", { limit: limit ?? null }); }
   wooPush(stock: boolean, prices: boolean, apply: boolean) { return call<WooPushReport>("woo_push", { stock, prices, apply }); }
+  wooCatalog() { return call<WooCatalogItem[]>("woo_catalog"); }
+  wooSaveEquivalence(input: WooEquivalenceInput) { return call<void>("woo_save_equivalence", { input }); }
   wspStatus() { return call<WspStatus>("wsp_status"); }
   wspSave(setup: WspSetup) { return call<WspStatus>("wsp_save", { setup }); }
   wspDisconnect() { return call<WspStatus>("wsp_disconnect"); }

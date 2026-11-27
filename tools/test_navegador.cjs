@@ -31,6 +31,12 @@ const pages = {
     <div class=acc id=acc onmouseup="document.getElementById('act').hidden=false">VER ACTIVIDADES ECONÓMICAS VIGENTES</div>
     <div id=act hidden>Venta al por menor de equipos</div>
     <ul><li class=acc><span>Mis Movimientos</span></li></ul>
+    <div class=row><p><h4>VER DOCUMENTOS AUTORIZADOS</h4></p><div><button class="open-btn bi bi-caret-down-square" aria-expanded="false"
+      onclick="this.setAttribute('aria-expanded','true');document.getElementById('docs').hidden=false"></button></div></div>
+    <div id=docs hidden>Factura electrónica: autorizada</div>
+    <label class=acc style="display:inline-block"><input type=radio name=pago value=webpay style="display:none" onchange="document.getElementById('pagar').disabled=false"><img alt="Webpay Plus" width=40 height=20 src="data:image/gif;base64,R0lGODlhAQABAAAAACw="></label>
+    <div class=acc id=tarjeta onmouseup="this.dataset.ok=1"><img alt="Onepay" width=40 height=20 src="data:image/gif;base64,R0lGODlhAQABAAAAACw="></div>
+    <button id=pagar disabled>Pagar</button>
     <input name=rut placeholder="Rut"> <input name=ciudad placeholder="Ciudad">
     <button id=val onclick="if(!document.querySelector('[name=ciudad]').value){alert('Debe ingresar la ciudad del receptor')}else{document.title='VALIDADO'}">Validar y visualizar</button>
     <button onclick="document.getElementById('lineas').insertAdjacentHTML('beforeend','<input name=linea2 placeholder=Linea2>')">Agrega linea de Detalle</button>
@@ -182,6 +188,26 @@ const pages = {
   await page.waitForTimeout(300);
   s = await run({ op: 'leer' });
   assert.ok(s.frames[0].text.includes('Venta al por menor de equipos'));
+  // 7b. Un botón que es solo un ícono toma el nombre de su fila y dice si está abierto.
+  const ico = find(s, 'VER DOCUMENTOS AUTORIZADOS');
+  assert.equal(ico.v, 'cerrado');
+  r = await run({ op: 'clic', ref: ico.n });
+  await page.waitForTimeout(300);
+  s = await run({ op: 'leer' });
+  assert.equal(find(s, 'VER DOCUMENTOS AUTORIZADOS').v, 'abierto');
+  assert.ok(s.frames[0].text.includes('Factura electrónica: autorizada'));
+  // 7c. Una opción oculta dibujada con una imagen se pulsa por su etiqueta; una tarjeta que es solo
+  // una imagen también aparece, con su texto alternativo.
+  const medio = find(s, 'Webpay Plus');
+  assert.equal(medio.k, 'casilla');
+  assert.equal(medio.v, 'sin marcar');
+  assert.ok(find(s, 'Pagar').d, 'Pagar parte desactivado');
+  r = await run({ op: 'clic', ref: medio.n });
+  await page.waitForTimeout(300);
+  s = await run({ op: 'leer' });
+  assert.equal(find(s, 'Webpay Plus').v, 'marcada');
+  assert.ok(!find(s, 'Pagar').d, 'al elegir el medio de pago se activa Pagar');
+  assert.equal(find(s, 'Onepay').k, 'botón');
   // 8. Un aviso (alert) de la página no la detiene y llega en la lectura siguiente, una sola vez.
   r = await run({ op: 'clic', ref: find(s, 'Validar y visualizar').n });
   await page.waitForTimeout(300);

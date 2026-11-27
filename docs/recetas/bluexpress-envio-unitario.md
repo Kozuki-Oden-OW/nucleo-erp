@@ -35,6 +35,22 @@ NÚCLEO y avisa al celular) y la persona lo paga en segundos. Para reducir pagos
 (hasta 20) o **Carga masiva** (hasta 50) y pagar todos los envíos del día con **un solo QR** (por confirmar en el portal), o pedir
 cuenta corriente empresa (sin paso de pago).
 
+## En el Navegador de NÚCLEO (probado el 27-11-2026, pedido web #1261)
+
+- Entrar: `web_abrir {acceso: "Bluexpress"}` → `web_clic` «ui_login_email» → `web_ingresar`. Luego
+  `web_abrir {direccion: "https://app.bluex.cl/envio-unitario/origen"}`.
+- **Origen**: en este perfil el formulario llega vacío. Teléfono y correo de la empresa; «Ingresar
+  manual» → Región Metropolitana, Ñuñoa, calle «Brown Sur», número «306»; región y comuna de origen se
+  copian solas; elegir «Punto Blue Express Market Plaza Ñuñoa» en la lista → «Siguiente».
+- **Destino**: nombre, apellido, teléfono (9 dígitos) y correo → «Enviar a domicilio» → «Ingresar
+  manual» → región, comuna, calle y número → «Siguiente».
+- **Paquete**: casilla de mercancías peligrosas, descripción, valor del contenido y talla → la página
+  muestra el valor del envío → «Siguiente».
+- **Pago**: escribir `VAMOSMIPYME` en «Ingresa el código de descuento» → «Aplicar» (30 %: de $4.200 a
+  $2.940 en talla S a Peñaflor). Mostrar el resumen al dueño; con su «sí», elegir el medio de pago,
+  marcar los términos y «Pagar». La página de Webpay es de `transbank.cl`: debe estar permitida.
+- Todo en el Navegador de NÚCLEO: no se usa otro navegador para ningún paso.
+
 ## Observaciones
 
 - Reglas de Data Logger (dueño, 22-11-2026): talla **S hasta 16 equipos, M desde 17**; marcar siempre «no contiene mercancías peligrosas»; origen Ñuñoa con el **Punto Blue Express Market Plaza Ñuñoa** (Irarrázaval 3601).

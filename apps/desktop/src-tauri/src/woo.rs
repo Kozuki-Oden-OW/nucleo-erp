@@ -4,7 +4,8 @@
 use crate::commands::{AppState, CommandError};
 use nucleo_app::nucleo_db::integrations::WooOrderRow;
 use nucleo_app::woo_ops::{
-    self, UreqHttp, WooConnectInput, WooPushReport, WooStatus, WooSyncReport,
+    self, UreqHttp, WooCatalogItem, WooConnectInput, WooEquivalenceInput, WooPushReport, WooStatus,
+    WooSyncReport,
 };
 use nucleo_app::{AppError, CompanySession};
 use tauri::State;
@@ -82,6 +83,29 @@ pub async fn woo_sync(
 #[tauri::command]
 pub fn woo_orders(state: State<'_, AppState>, limit: Option<i64>) -> CmdResult<Vec<WooOrderRow>> {
     with(&state, |s| s.woo_orders(limit))
+}
+
+/// Productos de la tienda con lo que NÚCLEO les reconoce (por SKU o por equivalencia) y una
+/// sugerencia por nombre para los que no calzan. Solo lee.
+#[tauri::command]
+pub async fn woo_catalog(state: State<'_, AppState>) -> CmdResult<Vec<WooCatalogItem>> {
+    let cfg = with(&state, |s| s.woo_catalog_plan())?;
+    let store = tauri::async_runtime::spawn_blocking(move || {
+        woo_ops::fetch_catalog(&UreqHttp::default(), &cfg)
+    })
+    .await
+    .map_err(|e| err(e.to_string()))?
+    .map_err(|e| err(e.to_string()))?;
+    with(&state, |s| s.woo_catalog(&store))
+}
+
+/// Guarda (o quita, sin productos) la equivalencia de un producto de la tienda.
+#[tauri::command]
+pub fn woo_save_equivalence(
+    state: State<'_, AppState>,
+    input: WooEquivalenceInput,
+) -> CmdResult<()> {
+    with(&state, |s| s.woo_save_equivalence(&input))
 }
 
 /// Compara stock y precios de NÚCLEO con la tienda. Con `apply` envía los cambios; sin él, solo

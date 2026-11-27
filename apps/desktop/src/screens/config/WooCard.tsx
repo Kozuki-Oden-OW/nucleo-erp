@@ -10,6 +10,7 @@ import { useSession } from "../../lib/session";
 import { Badge, Button, Card, Checkbox, Field, Notice, Spinner } from "../../ui/kit";
 import { DataTable, type Column } from "../../ui/table";
 import { Dialog, useToast } from "../../ui/overlay";
+import { WooEquivalences } from "./WooEquivalences";
 
 const STATUS: Record<WooOrderRow["status"], { label: string; tone: "success" | "warning" | "danger" }> = {
   importada: { label: "Importada", tone: "success" },
@@ -34,6 +35,7 @@ export function WooCard() {
   const [from, setFrom] = useState("");
   const [report, setReport] = useState<WooSyncReport | null>(null);
   const [push, setPush] = useState<{ stock: boolean; prices: boolean; report: WooPushReport } | null>(null);
+  const [equiv, setEquiv] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -182,6 +184,13 @@ export function WooCard() {
               onOpen={(o) => o.sale_uid && navigate(`/ventas/${o.sale_uid}`)}
               empty="Aún no hay pedidos. Presiona «Sincronizar pedidos»."
             />
+            <div className="flex flex-col gap-2 rounded-lg border border-line p-3">
+              <div className="text-sm font-medium text-ink">Equivalencias de productos</div>
+              <p className="text-sm text-muted">
+                Si la tienda no usa códigos (SKU), o vende combos y packs, enlaza cada producto de la tienda con el de NÚCLEO. Sin ese enlace el pedido queda como borrador por revisar y no descuenta stock.
+              </p>
+              <div><Button variant="secondary" icon={PackageCheck} onClick={() => setEquiv(true)} disabled={!!busy}>Revisar equivalencias</Button></div>
+            </div>
             {editable && (
               <div className="flex flex-col gap-2 rounded-lg border border-line p-3">
                 <div className="text-sm font-medium text-ink">De NÚCLEO a la tienda</div>
@@ -198,6 +207,7 @@ export function WooCard() {
         )}
       </div>
 
+      <WooEquivalences open={equiv} onClose={() => setEquiv(false)} editable={editable} />
       <Dialog
         open={!!push}
         onClose={() => setPush(null)}

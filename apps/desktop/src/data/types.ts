@@ -1777,6 +1777,16 @@ export interface WooSyncReport {
   messages: string[];
 }
 
+/** Producto de NÚCLEO dentro de un producto de la tienda, con su cantidad por unidad vendida. */
+export interface WooComponent { product_uid: string; qty_milli: number }
+export interface WooComponentView extends WooComponent { sku: string; name: string }
+/** Un producto (o variación) de la tienda y lo que NÚCLEO le reconoce. */
+export interface WooCatalogItem {
+  product_id: string; variation_id: string; name: string; sku: string | null; price_minor: number | null;
+  matched_by: "" | "sku" | "equivalencia"; components: WooComponentView[]; suggestion: WooComponentView | null;
+}
+/** Sin productos, la equivalencia se quita. */
+export interface WooEquivalenceInput { product_id: string; variation_id?: string; name?: string; items: WooComponent[] }
 export interface WooPushChange {
   sku: string;
   name: string;

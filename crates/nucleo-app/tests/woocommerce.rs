@@ -531,3 +531,120 @@ fn stock_y_precios_hacia_la_tienda() {
     assert_eq!(r.changes[0].price_to, Some(10_000));
     assert_eq!(r.changes[0].stock_to, None);
 }
+
+#[test]
+fn tienda_sin_sku_se_reconoce_por_equivalencias_y_un_combo_descuenta_sus_partes() {
+    use nucleo_app::woo_ops::{WooComponent, WooEquivalenceInput};
+    let (_d, _app, mut s) = session();
+    let fake = Fake::default();
+    connect(&mut s, &fake);
+    let equipo = product(&mut s, "P-00004", 50, 23_445);
+    let soporte = product(&mut s, "P-00027", 50, 2_437);
+    // La tienda no usa SKU: un producto simple, un combo y uno variable.
+    *fake.products.borrow_mut() = vec![
+        json!({"id": 137, "type": "simple", "status": "publish", "sku": "", "name": "Producto P-00004 + Soporte", "price": "27900"}),
+        json!({"id": 30, "type": "variable", "status": "publish", "sku": "", "name": "Arriendo", "price": "149400"}),
+        json!({"id": 99, "type": "simple", "status": "trash", "sku": "", "name": "Borrado", "price": "1"}),
+    ];
+    *fake.variations.borrow_mut() = vec![
+        json!({"id": 31, "sku": "", "price": "149400", "attributes": [{"name": "Plan", "option": "6 meses"}]}),
+    ];
+    let store = woo_ops::fetch_catalog(&fake, &s.woo_catalog_plan().unwrap()).unwrap();
+    assert_eq!(store.len(), 2, "sin el producto en la papelera");
+    let cat = s.woo_catalog(&store).unwrap();
+    assert!(cat.iter().all(|c| c.matched_by.is_empty()));
+    assert_eq!(cat[0].name, "Arriendo — 6 meses");
+    assert_eq!(
+        (cat[0].product_id.as_str(), cat[0].variation_id.as_str()),
+        ("30", "31")
+    );
+    // Por nombre sugiere el producto de NÚCLEO más parecido.
+    let combo = cat.iter().find(|c| c.product_id == "137").unwrap();
+    assert_eq!(combo.suggestion.as_ref().unwrap().sku, "P-00004");
+
+    // Sin equivalencia, el pedido queda por revisar.
+    let mut pedido = order(3001, "processing", "", 2, 55_800, 0);
+    pedido["line_items"][0]["product_id"] = json!(137);
+    pedido["line_items"][0]["name"] = json!("Producto P-00004 + Soporte");
+    fake.orders.borrow_mut().push(pedido);
+    let r = sync(&mut s, &fake);
+    assert_eq!((r.imported, r.to_review), (0, 1));
+    assert!(
+        r.messages[0].contains("sin SKU ni equivalencia"),
+        "{:?}",
+        r.messages
+    );
+
+    // Se guarda el combo (1 equipo + 1 soporte por unidad) y la misma venta se confirma.
+    let combo = WooEquivalenceInput {
+        product_id: "137".into(),
+        variation_id: String::new(),
+        name: "Producto P-00004 + Soporte".into(),
+        items: vec![
+            WooComponent {
+                product_uid: equipo.clone(),
+                qty_milli: 1000,
+            },
+            WooComponent {
+                product_uid: soporte.clone(),
+                qty_milli: 1000,
+            },
+        ],
+    };
+    s.woo_save_equivalence(&combo).unwrap();
+    let cat = s.woo_catalog(&store).unwrap();
+    let c = cat.iter().find(|c| c.product_id == "137").unwrap();
+    assert_eq!(
+        (c.matched_by.as_str(), c.components.len()),
+        ("equivalencia", 2)
+    );
+    let r = sync(&mut s, &fake);
+    assert_eq!((r.completed, r.to_review), (1, 0), "{:?}", r.messages);
+    assert_eq!(
+        (stock(&s, "P-00004"), stock(&s, "P-00027"), sales(&s)),
+        (48, 48, 1)
+    );
+    // Las dos líneas suman lo que cobró la tienda (los montos venían con el impuesto incluido).
+    let venta = s
+        .list_sales(&SaleFilter {
+            query: None,
+            view: Some("todas".into()),
+        })
+        .unwrap()
+        .remove(0);
+    assert!(
+        (venta.total_minor - 55_800).abs() <= 1,
+        "total {} (un peso de redondeo como máximo)",
+        venta.total_minor
+    );
+
+    // Lo que no vale: repetidos, cantidades en cero y productos que no existen.
+    let mut malo = combo.clone();
+    malo.items.push(WooComponent {
+        product_uid: equipo.clone(),
+        qty_milli: 1000,
+    });
+    assert!(s.woo_save_equivalence(&malo).is_err());
+    malo.items = vec![WooComponent {
+        product_uid: equipo,
+        qty_milli: 0,
+    }];
+    assert!(s.woo_save_equivalence(&malo).is_err());
+    malo.items = vec![WooComponent {
+        product_uid: "no-existe".into(),
+        qty_milli: 1000,
+    }];
+    assert!(s.woo_save_equivalence(&malo).is_err());
+    // Sin productos, la equivalencia se quita.
+    s.woo_save_equivalence(&WooEquivalenceInput {
+        product_id: "137".into(),
+        ..Default::default()
+    })
+    .unwrap();
+    assert!(
+        s.woo_catalog(&store)
+            .unwrap()
+            .iter()
+            .all(|c| c.matched_by.is_empty())
+    );
+}
