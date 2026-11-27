@@ -81,6 +81,7 @@ fn line(desc: &str, price: i64) -> LineInput {
         unit_price_minor: price,
         discount_ppm: 0,
         taxable: false,
+        detail: None,
     }
 }
 

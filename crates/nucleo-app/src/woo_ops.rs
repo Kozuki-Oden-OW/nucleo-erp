@@ -1190,6 +1190,7 @@ impl CompanySession {
                 unit_price_minor: net(unit),
                 discount_ppm,
                 taxable: true,
+                detail: None,
             });
         }
         if o.shipping_minor > 0 {
@@ -1203,6 +1204,7 @@ impl CompanySession {
                 unit_price_minor: net(o.shipping_minor),
                 discount_ppm: 0,
                 taxable: true,
+                detail: None,
             });
         }
         for (name, amount) in &o.fees {
@@ -1214,6 +1216,7 @@ impl CompanySession {
                     unit_price_minor: net(*amount),
                     discount_ppm: 0,
                     taxable: true,
+                    detail: None,
                 });
             }
         }

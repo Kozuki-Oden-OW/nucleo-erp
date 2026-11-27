@@ -118,3 +118,58 @@ fn la_clave_solo_con_el_permiso_de_hoy_y_para_el_mismo_sitio() {
     assert_eq!(s.browser_find_access("bci").unwrap().uid, a.uid);
     assert!(s.browser_find_access("otro").is_err());
 }
+
+#[test]
+fn del_sii_solo_se_guarda_e_boleta_y_su_clave_vale_solo_en_ese_servidor() {
+    use nucleo_app::access_ops::AccessInput;
+    let data = tempfile::tempdir().unwrap();
+    let mut app =
+        nucleo_app::AppService::open(data.path(), Box::new(nucleo_app::MemoryKeyStore::default()))
+            .unwrap();
+    let c = app
+        .create_company("Data Logger", nucleo_app::BusinessProfile::Empresa)
+        .unwrap();
+    let mut s = app.open_company(&c.company.uid).unwrap();
+    let acceso = |name: &str, url: &str| AccessInput {
+        name: name.into(),
+        login_url: url.into(),
+        username: "17256184-5".into(),
+        password: "secreta".into(),
+        kind: "operador".into(),
+        notes: None,
+        no_payments: true,
+    };
+    // El resto del SII sigue sin guardarse; un nombre parecido en otro dominio tampoco pasa por e-Boleta.
+    assert!(
+        s.save_access(None, &acceso("SII", "https://zeusr.sii.cl/AUT2000/"))
+            .is_err()
+    );
+    assert!(
+        s.save_access(None, &acceso("Clave Tributaria", "https://misii.sii.cl/"))
+            .is_err()
+    );
+    assert_eq!(
+        nucleo_app::CompanySession::login_scope("https://eboleta.sii.cl.malo.com/x").as_deref(),
+        Some("malo.com")
+    );
+    let a = s
+        .save_access(None, &acceso("SII e-Boleta", "https://eboleta.sii.cl/"))
+        .unwrap();
+    assert_eq!(
+        nucleo_app::CompanySession::login_scope(&a.login_url).as_deref(),
+        Some("eboleta.sii.cl")
+    );
+    assert_eq!(
+        nucleo_app::CompanySession::login_scope("https://www.bci.cl/pyme").as_deref(),
+        Some("bci.cl")
+    );
+    // Con el permiso de hoy, la clave va a e-Boleta y a ningún otro servidor del SII.
+    s.browser_grant(&a.uid, true).unwrap();
+    assert!(s.browser_login_data(&a.uid, Some("eboleta.sii.cl")).is_ok());
+    for otro in ["zeusr.sii.cl", "www.sii.cl", "misii.sii.cl", "sii.cl"] {
+        assert!(
+            s.browser_login_data(&a.uid, Some(otro)).is_err(),
+            "no debe entregar la clave a {otro}"
+        );
+    }
+}

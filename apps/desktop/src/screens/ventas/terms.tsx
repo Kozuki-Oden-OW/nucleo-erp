@@ -2,37 +2,48 @@
 // datos del receptor que se completan desde la ficha del cliente.
 import { useEffect, useState } from "react";
 import { Archive, Check, Plus, Tags, Trash2, X } from "lucide-react";
-import { useBackend, errorMessage, type Receiver, type ReferenceKind, type SalePayment, type SaleReference, type SaleTerms } from "../../data";
-import { BANKS, CREDIT_DAYS, REFERENCE_KINDS, referenceLabel } from "../../data/saleTerms";
+import { useBackend, errorMessage, type Receiver, type ReferenceKind, type SaleDocument, type SalePayment, type SaleReference, type SaleTerms, type Transport } from "../../data";
+import { BANKS, CREDIT_DAYS, PURCHASE_KINDS, REFERENCE_KINDS, cityForCommune, referenceLabel } from "../../data/saleTerms";
 import { Dialog, useToast } from "../../ui/overlay";
 import { addDays, formatDate } from "../../lib/format";
 import { Button, Card, Checkbox, Field, IconButton, Notice, Segmented, Select, cx } from "../../ui/kit";
 import { REGIONS } from "../../data/lre";
 
-const PAYMENTS: { value: Exclude<SalePayment, "">; label: string }[] = [
+const METHODS: { value: Exclude<SalePayment, "" | "credito">; label: string }[] = [
   { value: "efectivo", label: "Efectivo" }, { value: "tarjeta", label: "Tarjeta" }, { value: "transferencia", label: "Transferencia" },
-  { value: "credito", label: "Crédito" }, { value: "cheque", label: "Cheque" },
+  { value: "cheque", label: "Cheque" },
 ];
+const chip = (on: boolean) => cx("h-9 rounded-lg border px-3.5 text-sm font-medium transition-colors",
+  on ? "border-accent bg-accent-soft text-ink" : "border-line text-muted hover:border-line-strong hover:text-ink");
 
-export function PaymentCard({ terms, onChange, issueDate, hasCustomer, creditWarning }: {
-  terms: SaleTerms; onChange: (t: SaleTerms) => void; issueDate: string; hasCustomer: boolean; creditWarning?: string | null;
+export function PaymentCard({ terms, onChange, issueDate, hasCustomer, creditWarning, document }: {
+  terms: SaleTerms; onChange: (t: SaleTerms) => void; issueDate: string; hasCustomer: boolean; creditWarning?: string | null; document?: SaleDocument;
 }) {
   const set = (patch: Partial<SaleTerms>) => onChange({ ...terms, ...patch });
   const days = terms.credit_days ?? 30;
   const due = terms.due_date ?? addDays(issueDate, days);
+  const mode = terms.payment === "credito" ? "credito" : terms.payment ? "contado" : "";
   return (
-    <Card title="Forma de pago" subtitle="Se usa al marcar la venta como efectuada y aparece en el documento.">
+    <Card title="Forma de pago" subtitle={document === "factura" ? "Contado o Crédito, igual que en la factura del SII. Se usa al marcar la venta como efectuada." : "Se usa al marcar la venta como efectuada y aparece en el documento."}>
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Forma de pago">
-          {PAYMENTS.map((p) => (
-            <button key={p.value} type="button" role="radio" aria-checked={terms.payment === p.value}
-              onClick={() => set({ payment: terms.payment === p.value ? "" : p.value, ...(p.value === "credito" && !terms.credit_days ? { credit_days: 30, due_date: null } : {}) })}
-              className={cx("h-9 rounded-lg border px-3.5 text-sm font-medium transition-colors",
-                terms.payment === p.value ? "border-accent bg-accent-soft text-ink" : "border-line text-muted hover:border-line-strong hover:text-ink")}>
-              {p.label}
-            </button>
-          ))}
+          <button type="button" role="radio" aria-checked={mode === "contado"} className={chip(mode === "contado")}
+            onClick={() => set({ payment: mode === "contado" ? "" : document === "boleta" ? "efectivo" : "transferencia" })}>Contado</button>
+          <button type="button" role="radio" aria-checked={mode === "credito"} className={chip(mode === "credito")}
+            onClick={() => set(mode === "credito" ? { payment: "" } : { payment: "credito", ...(!terms.credit_days ? { credit_days: 30, due_date: null } : {}) })}>Crédito</button>
         </div>
+        {mode === "contado" && (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-medium text-ink">Medio de pago</span>
+            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Medio de pago">
+              {METHODS.map((p) => (
+                <button key={p.value} type="button" role="radio" aria-checked={terms.payment === p.value} onClick={() => set({ payment: p.value })} className={chip(terms.payment === p.value)}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {terms.payment === "tarjeta" && (
           <div className="flex flex-wrap items-end gap-4">
             <div className="flex flex-col gap-1.5">
@@ -82,7 +93,7 @@ export function PaymentCard({ terms, onChange, issueDate, hasCustomer, creditWar
   );
 }
 
-export function ReferencesCard({ refs, onChange }: { refs: SaleReference[]; onChange: (r: SaleReference[]) => void }) {
+export function ReferencesCard({ refs, onChange, poExpected }: { refs: SaleReference[]; onChange: (r: SaleReference[]) => void; poExpected?: boolean }) {
   const backend = useBackend();
   const toast = useToast();
   const [kinds, setKinds] = useState<ReferenceKind[]>(REFERENCE_KINDS.map((k) => ({ code: k.value, label: k.label, custom_id: null })));
@@ -113,6 +124,9 @@ export function ReferencesCard({ refs, onChange }: { refs: SaleReference[]; onCh
         <Button size="sm" variant="ghost" icon={Tags} onClick={() => setManaging(true)}>Tipos</Button>
         <Button size="sm" variant="secondary" icon={Plus} onClick={() => onChange([...refs, { kind: refs.length ? "HES" : "801", folio: "", date: null, note: null }])}>Agregar referencia</Button>
       </>}>
+      {poExpected && !refs.some((r) => r.kind === "801" && r.folio.trim()) && (
+        <div className="mb-3"><Notice tone="warning">Este cliente trabaja con orden de compra: anota su número para que salga en la factura.</Notice></div>
+      )}
       {refs.length === 0 ? <p className="text-sm text-muted">Sin referencias. Agrega la orden de compra, la HES o el número del pedido de Mercado Libre o de tu tienda online.</p> : (
         <div className="flex flex-col gap-2">
           {refs.map((r, i) => (
@@ -162,32 +176,58 @@ export function ReferencesCard({ refs, onChange }: { refs: SaleReference[]; onCh
   );
 }
 
-export function ReceiverCard({ receiver, onChange, saveToCustomer, onSaveToCustomer, canSave }: {
-  receiver: Receiver; onChange: (r: Receiver) => void; saveToCustomer: boolean; onSaveToCustomer: (v: boolean) => void; canSave: boolean;
+export function ReceiverCard({ receiver, onChange, saveToCustomer, onSaveToCustomer, canSave, document }: {
+  receiver: Receiver; onChange: (r: Receiver) => void; saveToCustomer: boolean; onSaveToCustomer: (v: boolean) => void; canSave: boolean; document?: SaleDocument;
 }) {
   const set = (patch: Partial<Receiver>) => onChange({ ...receiver, ...patch });
-  const f = (k: keyof Receiver) => receiver[k] ?? "";
+  const f = (k: "rut" | "name" | "activity" | "address" | "commune" | "city" | "region" | "email" | "phone" | "contact" | "requester_rut") => receiver[k] ?? "";
+  const noCity = !f("city").trim();
   return (
-    <Card title="Datos del receptor" subtitle="Se completan solos desde la ficha del cliente. Puedes corregirlos para este documento.">
+    <Card title="Datos receptor" subtitle="Mismos campos y orden que el facturador del SII. Se completan solos desde la ficha del cliente.">
       <div className="flex flex-col gap-3">
-        <div className="grid gap-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
-          <Field label="RUT" value={f("rut")} onChange={(e) => set({ rut: e.target.value })} placeholder="12.345.678-5" />
-          <Field label="Razón social" value={f("name")} onChange={(e) => set({ name: e.target.value })} />
+        <div className="grid gap-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
+          <Field label="Rut" value={f("rut")} onChange={(e) => set({ rut: e.target.value })} placeholder="12.345.678-5" />
+          <Field label="Razón Social" value={f("name")} onChange={(e) => set({ name: e.target.value })} />
+        </div>
+        <div className={cx("grid gap-3", document === "guia" ? "" : "sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]")}>
+          {document !== "guia" && (
+            <Select label="Tipo de Compra" value={String(receiver.purchase_kind ?? 1)} onChange={(e) => set({ purchase_kind: Number(e.target.value) })}
+              options={PURCHASE_KINDS.map((k) => ({ value: String(k.value), label: k.label }))} />
+          )}
+          <Field label="Dirección" value={f("address")} onChange={(e) => set({ address: e.target.value })} />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Comuna" value={f("commune")} onChange={(e) => set({ commune: e.target.value })} />
+          <Field label="Ciudad" value={f("city")} onChange={(e) => set({ city: e.target.value })} placeholder={cityForCommune(f("commune")) ?? "Nombre de la ciudad, localidad o pueblo"}
+            onFocus={() => { if (noCity && f("commune")) set({ city: cityForCommune(f("commune")) }); }}
+            error={noCity ? "Falta la ciudad: el SII no deja emitir sin ella." : undefined} />
         </div>
         <Field label="Giro" value={f("activity")} onChange={(e) => set({ activity: e.target.value })} />
-        <Field label="Dirección" value={f("address")} onChange={(e) => set({ address: e.target.value })} />
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Comuna" value={f("commune")} onChange={(e) => set({ commune: e.target.value })} />
-          <Field label="Ciudad" value={f("city")} onChange={(e) => set({ city: e.target.value })} />
-          <Select label="Región" value={f("region")} onChange={(e) => set({ region: e.target.value || null })}
-            options={regionOptions(f("region"))} />
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem]">
+          <Field label="Contacto" optional value={f("contact")} onChange={(e) => set({ contact: e.target.value })} placeholder="A quién va dirigido el documento" />
+          <Field label="Rut solicita" optional value={f("requester_rut")} onChange={(e) => set({ requester_rut: e.target.value })} placeholder="12.345.678-5" />
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Contacto" optional value={f("contact")} onChange={(e) => set({ contact: e.target.value })} />
+        <div className="grid gap-3 border-t border-line pt-3 sm:grid-cols-3">
+          <Select label="Región" value={f("region")} onChange={(e) => set({ region: e.target.value || null })} options={regionOptions(f("region"))} />
           <Field label="Correo" optional value={f("email")} onChange={(e) => set({ email: e.target.value })} />
           <Field label="Teléfono" optional value={f("phone")} onChange={(e) => set({ phone: e.target.value })} />
         </div>
         {canSave && <Checkbox label="Guardar estos datos en la ficha del cliente" hint="Así se completan solos la próxima vez." checked={saveToCustomer} onChange={onSaveToCustomer} />}
+      </div>
+    </Card>
+  );
+}
+
+/** Bloque «Transporte» del documento (obligado en la práctica solo para la guía de despacho). */
+export function TransportCard({ transport, onChange }: { transport: Transport; onChange: (t: Transport) => void }) {
+  const set = (patch: Partial<Transport>) => onChange({ ...transport, ...patch });
+  return (
+    <Card title="Transporte" subtitle="Opcional. Quién lleva la mercadería, como en el documento del SII.">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Rut transporte" optional value={transport.rut ?? ""} onChange={(e) => set({ rut: e.target.value })} placeholder="12.345.678-5" />
+        <Field label="Patente" optional value={transport.plate ?? ""} onChange={(e) => set({ plate: e.target.value.toUpperCase() })} maxLength={8} />
+        <Field label="Rut chofer" optional value={transport.driver_rut ?? ""} onChange={(e) => set({ driver_rut: e.target.value })} placeholder="12.345.678-5" />
+        <Field label="Nombre chofer" optional value={transport.driver_name ?? ""} onChange={(e) => set({ driver_name: e.target.value })} maxLength={30} />
       </div>
     </Card>
   );

@@ -113,9 +113,29 @@ construyen después de la certificación del SII.
 | 18 | **Series y certificados** | Registra series con su certificado de calibración, las une a la venta y responde a quién se le vendió cada equipo y qué calibraciones vencen | Construido el 26-11-2026: `buscar_series`, `registrar_series` (D-SERIE-01) |
 | 19 | **Conector propio del banco** | Servicio local que entra al portal con el usuario de consulta (solo lectura) y deja los movimientos, con quién transfirió, en la conciliación | Por construir: requiere estudiar el portal de BCI con una sesión abierta por el dueño. Mientras tanto Claude los lee en esa sesión y los carga con `registrar_movimientos_banco` |
 
+### Ventas con los datos del SII
+
+Decisiones: D-VEN-SII-01…03. «Nueva venta» parte por el documento y guarda lo mismo que pide el
+facturador del SII, para que emitir sea copiar.
+
+| Herramienta | Nivel | Qué hace |
+|---|---|---|
+| `crear_venta_borrador {documento, cliente, lineas[detalle], referencias, forma_pago…}` | borradores | Venta con documento (boleta, factura, guia), receptor desde la ficha, descripción extendida por línea, referencias (orden de compra, HES, guía) y forma de pago. Avisa qué le falta al receptor y si el cliente trabaja con orden de compra y no se anotó |
+| `ver_venta {venta}` | ver | La venta en el orden del formulario del SII: receptor, transporte, detalle con «Descrip.», referencias, forma de pago, totales y lo que falta para emitir |
+| `actualizar_cliente {cliente, …}` | completo | Completa o corrige la ficha (razón social, giro, dirección, comuna, ciudad, contacto, correos, teléfono, orden de compra) y responde con lo que había antes |
+| `crear_cliente {…, ciudad, trabaja_con_oc}` | borradores | Si no se indica la ciudad, la propone desde la comuna |
+
+Reglas: una factura o guía necesita cliente; la ciudad es obligatoria en el SII; un cliente marcado
+«trabaja con orden de compra» no se factura sin anotarla en referencias (se le pide a la persona). La
+consulta pública de situación tributaria (`https://www2.sii.cl/stc/noauthz`) entrega razón social,
+inicio de actividades y giro; la dirección y la comuna las da el formulario de factura al escribir el
+RUT. Pasos: `docs/recetas/navegador-sii-y-banco.md` §0.0 a §0.3.
+
 ### Gestor de contraseñas y Navegador de NÚCLEO
 
-Decisiones: `docs/DECISIONS.md`, D-NAV-01…04. Receta de uso: `docs/recetas/navegador-sii-y-banco.md`.
+Decisiones: `docs/DECISIONS.md`, D-NAV-01…06. Del SII solo se guarda el acceso a e-Boleta (RUT y
+Clave Tributaria), que NÚCLEO usa únicamente en `eboleta.sii.cl`: `docs/recetas/boleta-electronica-sii.md`.
+Pedidos de la tienda WordPress: `docs/recetas/woocommerce-pedidos-navegador.md`. Receta de uso: `docs/recetas/navegador-sii-y-banco.md`.
 
 Lo que hace la persona (en Configuración → Integraciones):
 
@@ -134,9 +154,9 @@ Lo que puede hacer el agente:
 |---|---|---|
 | `listar_accesos` | ver | Sitios con acceso guardado, usuario y tipo. Nunca la clave |
 | `web_abrir {direccion \| acceso}` | ver | Abre una página de un sitio permitido y la lee |
-| `web_leer {buscar, desde}` | ver | Texto de la página y de todos sus marcos, y controles numerados (`w12`) |
-| `web_clic {elemento \| volver}` | completo | Clic en un control o volver atrás; devuelve la página después |
-| `web_escribir {elemento, texto, enter}` | completo | Escribe en un campo o elige en una lista. Nunca en un campo de clave |
+| `web_leer {buscar, desde}` | ver | Texto de la página y de todos sus marcos, controles numerados (`w12`, el número se conserva mientras la página sea la misma) y los avisos (`alert`) que mostró la página |
+| `web_clic {elemento \| volver}` | completo | Clic en un control o volver atrás; devuelve solo lo que cambió (la página completa si es otra) |
+| `web_escribir {elemento, texto, enter}` | completo | Escribe en un campo o elige en una lista; devuelve solo lo que cambió. Nunca en un campo de clave |
 | `web_guardar {nombre, elemento, direccion}` | completo | Guarda en la carpeta de descargas el documento incrustado, un enlace o una dirección |
 | `web_ingresar {acceso}` | completo | Pide a NÚCLEO que rellene el ingreso con un acceso autorizado hoy |
 

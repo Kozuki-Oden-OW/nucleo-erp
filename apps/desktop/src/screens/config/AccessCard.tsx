@@ -11,10 +11,14 @@ import { DataTable, type Column } from "../../ui/table";
 import { Dialog, useToast } from "../../ui/overlay";
 
 const EMPTY: AccessInput = { name: "", login_url: "", username: "", password: "", kind: "lectura", notes: "", no_payments: false };
-const PRESETS: { label: string; name: string; url: string }[] = [
+/** El único acceso del SII que se guarda: e-Boleta, que solo admite RUT y Clave Tributaria. */
+const isEboleta = (url: string) => /^https:\/\/eboleta\.sii\.cl(\/|$)/i.test(url.trim());
+const PRESETS: { label: string; name: string; url: string; kind?: AccessInput["kind"] }[] = [
   { label: "Mercado Libre (colaborador)", name: "Mercado Libre", url: "https://www.mercadolibre.cl/" },
   { label: "BCI Pyme (operador de consulta)", name: "BCI Pyme", url: "https://www.bci.cl/corporativo/banco-en-linea/pyme" },
   { label: "Bluexpress", name: "Bluexpress", url: "https://www.blue.cl/" },
+  { label: "SII e-Boleta (RUT y clave)", name: "SII e-Boleta", url: "https://eboleta.sii.cl/", kind: "operador" },
+  { label: "WordPress / WooCommerce", name: "WordPress", url: "https://tu-tienda.cl/wp-login.php", kind: "operador" },
 ];
 
 export function AccessCard() {
@@ -65,7 +69,7 @@ export function AccessCard() {
   const columns: Column<AccessRow>[] = [
     { key: "name", header: "Sitio", width: "minmax(8rem,1fr)", render: (a) => <span className="flex min-w-0 flex-col"><strong className="truncate">{a.name}</strong><span className="truncate text-xs text-muted">{a.login_url}</span></span> },
     { key: "user", header: "Usuario", width: "minmax(8rem,1fr)", render: (a) => <span className="truncate">{a.username}</span> },
-    { key: "kind", header: "Tipo", width: "9rem", render: (a) => <Badge tone="success" icon={ShieldCheck}>{a.kind === "lectura" ? "Solo lectura" : "Operador sin pagos"}</Badge> },
+    { key: "kind", header: "Tipo", width: "9rem", render: (a) => isEboleta(a.login_url) ? <Badge tone="warning" icon={KeyRound}>Clave Tributaria</Badge> : <Badge tone="success" icon={ShieldCheck}>{a.kind === "lectura" ? "Solo lectura" : "Operador sin pagos"}</Badge> },
     { key: "pass", header: "Clave", width: "6.5rem", render: (a) => a.has_password ? "Guardada" : "—" },
     ...(editable ? [{ key: "actions", header: "", width: "5rem", align: "right" as const, render: (a: AccessRow) => (
       <span className="flex justify-end gap-1">
@@ -86,7 +90,7 @@ export function AccessCard() {
         <Notice tone="info" title="Cómo se usan">
           La clave queda cifrada en tu computador y no se vuelve a mostrar: ni en esta pantalla ni a Claude. Quien la usa es el <strong>Navegador de NÚCLEO</strong>{" "}
           (más abajo), y solo los días en que tú pulsas «Autorizar por hoy» para ese acceso.
-          Guarda solo cuentas que <strong>no puedan pagar ni transferir</strong>.
+          Guarda solo cuentas que <strong>no puedan pagar ni transferir</strong>. Única excepción: el acceso a e-Boleta del SII, que se usa solo en ese sitio.
         </Notice>
         <DataTable label="Accesos guardados" columns={columns} rows={rows} rowKey={(a) => a.uid} empty="Aún no hay accesos guardados." />
       </div>
@@ -104,11 +108,17 @@ export function AccessCard() {
           <div className="flex flex-col gap-3">
             {!editing?.uid && (
               <div className="flex flex-wrap gap-2">
-                {PRESETS.map((p) => <Button key={p.name} size="sm" variant="secondary" onClick={() => set({ name: p.name, login_url: p.url })}>{p.label}</Button>)}
+                {PRESETS.map((p) => <Button key={p.name} size="sm" variant="secondary" onClick={() => set({ name: p.name, login_url: p.url, ...(p.kind ? { kind: p.kind } : {}) })}>{p.label}</Button>)}
               </div>
             )}
             <Field label="Sitio" value={f.name} onChange={(e) => set({ name: e.target.value })} placeholder="Mercado Libre" />
-            <Field label="Dirección de ingreso" value={f.login_url} onChange={(e) => set({ login_url: e.target.value })} placeholder="https://…" hint="La página donde se inicia sesión. NÚCLEO solo usará la clave en esa dirección." />
+            <Field label="Dirección de ingreso" value={f.login_url} onChange={(e) => set({ login_url: e.target.value })} placeholder="https://…" hint={/tu-tienda\.cl/.test(f.login_url) ? "Cambia «tu-tienda.cl» por la dirección de tu sitio. Conviene un usuario con el perfil «Gestor de la tienda», no el administrador." : "La página donde se inicia sesión. NÚCLEO solo usará la clave en esa dirección."} />
+            {isEboleta(f.login_url) && (
+              <Notice tone="warning" title="Es tu Clave Tributaria">
+                e-Boleta solo deja entrar con RUT y Clave Tributaria. NÚCLEO la guarda cifrada y la escribe <strong>únicamente en eboleta.sii.cl</strong>, los días que
+                tú pulses «Autorizar por hoy»; nunca en el resto del SII, donde se entra con el certificado digital. Cada boleta se emite con tu confirmación.
+              </Notice>
+            )}
             <Field label="Usuario o correo" value={f.username} onChange={(e) => set({ username: e.target.value })} autoComplete="off" />
             <Field label="Clave" type="password" value={f.password} onChange={(e) => set({ password: e.target.value })} autoComplete="new-password"
               placeholder={editing?.uid ? "Guardada (escribe para cambiarla)" : ""} hint="Escríbela tú aquí; no la envíes por chat. Queda cifrada y no se vuelve a mostrar." />
@@ -117,8 +127,9 @@ export function AccessCard() {
             <TextArea label="Notas" optional rows={2} value={f.notes ?? ""} onChange={(e) => set({ notes: e.target.value })} />
             {/* La declaración es de la persona: Claude no puede marcarla. */}
             <div data-agent-human>
-              <Checkbox label="Confirmo que esta cuenta no puede pagar, transferir ni firmar." checked={f.no_payments} onChange={(v) => set({ no_payments: v })}
-                hint="No guardes la clave de un apoderado del banco, de Google ni la Clave Tributaria." />
+              <Checkbox label={isEboleta(f.login_url) ? "Entiendo que es mi Clave Tributaria y autorizo a NÚCLEO a usarla solo para e-Boleta." : "Confirmo que esta cuenta no puede pagar, transferir ni firmar."}
+                checked={f.no_payments} onChange={(v) => set({ no_payments: v })}
+                hint={isEboleta(f.login_url) ? "Puedes quitar el acceso cuando quieras: la clave se borra de NÚCLEO." : "No guardes la clave de un apoderado del banco ni de Google. Del SII solo se guarda el acceso a e-Boleta."} />
             </div>
           </div>
         )}

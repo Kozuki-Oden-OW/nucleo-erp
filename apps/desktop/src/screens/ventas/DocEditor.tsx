@@ -1,17 +1,17 @@
 // Editor de cotización, venta o factura interna. Pensado para digitar rápido con el teclado:
 // buscar producto → Enter → ajustar cantidad → siguiente producto.
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, BadgePercent, CheckCircle2, FileDown, Info, Save, Trash2 } from "lucide-react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { AlignLeft, ArrowLeft, BadgePercent, CheckCircle2, FileDown, Info, Save, Trash2, Truck } from "lucide-react";
 import { applyPromotions } from "../../data/promos";
-import { useBackend, errorMessage, type BusinessSettings, type Customer, type LineInput, type Product, type Promotion, type QuoteDetail, type Receiver, type SaleDetail, type SaleTerms } from "../../data";
-import { EMPTY_TERMS, receiverFromCustomer } from "../../data/saleTerms";
-import { PaymentCard, ReceiverCard, ReferencesCard } from "./terms";
+import { useBackend, errorMessage, type BusinessSettings, type Customer, type LineInput, type Product, type Promotion, type QuoteDetail, type Receiver, type SaleDetail, type SaleDocument, type SaleTerms } from "../../data";
+import { DOCUMENTS, EMPTY_TERMS, EMPTY_TRANSPORT, TRANSFER_KINDS, cityForCommune, documentLabel, receiverFromCustomer } from "../../data/saleTerms";
+import { PaymentCard, ReceiverCard, ReferencesCard, TransportCard } from "./terms";
 import { computeTotals, lineAmounts } from "../../data/calc";
 import { addDays, formatMoney, formatPpm, parsePercent, parseQty, todayIso } from "../../lib/format";
 import { useTerm } from "../../lib/glosario";
 import { goBack, navigate } from "../../lib/router";
 import { MoneyField } from "../../ui/doc";
-import { Button, Card, Field, IconButton, Label, Notice, PageHeader, TextArea } from "../../ui/kit";
+import { Button, Card, Field, IconButton, Label, Notice, PageHeader, Segmented, Select, TextArea } from "../../ui/kit";
 import { useToast } from "../../ui/overlay";
 import { NewCustomerDrawer } from "../clientes/Customers";
 import { useCreditWarning } from "../clientes/credit";
@@ -21,14 +21,18 @@ import { CustomerPicker, ProductPicker, type ProductPickerHandle } from "./picke
 type Kind = "COT" | "VEN" | "FV";
 const TITLE: Record<Kind, string> = { COT: "Nueva cotización", VEN: "Nueva venta", FV: "Nueva factura interna" };
 
-interface Row extends LineInput { key: number; qtyText: string; discText: string }
+const DOC_TITLE: Record<Exclude<SaleDocument, "">, string> = { boleta: "Nueva boleta", factura: "Nueva factura", guia: "Nueva guía de despacho" };
+
+interface Row extends LineInput { key: number; qtyText: string; discText: string; showDetail: boolean }
 let rowSeq = 0;
 
 function toRow(l: LineInput): Row {
-  return { ...l, key: ++rowSeq, qtyText: String(l.qty_milli / 1000).replace(".", ","), discText: l.discount_ppm ? String(l.discount_ppm / 10_000).replace(".", ",") : "" };
+  return { ...l, key: ++rowSeq, qtyText: String(l.qty_milli / 1000).replace(".", ","), discText: l.discount_ppm ? String(l.discount_ppm / 10_000).replace(".", ",") : "", showDetail: !!l.detail };
 }
 
-export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; existing?: QuoteDetail | SaleDetail; initialCustomerUid?: string | null }) {
+const isPo = (r: { kind: string }) => r.kind === "801";
+
+export function DocEditor({ kind, existing, initialCustomerUid, doc }: { kind: Kind; existing?: QuoteDetail | SaleDetail; initialCustomerUid?: string | null; doc?: SaleDocument }) {
   const backend = useBackend();
   const toast = useToast();
   const t = useTerm();
@@ -39,9 +43,18 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
   const [validUntil, setValidUntil] = useState<string>((existing as QuoteDetail | undefined)?.valid_until ?? addDays(todayIso(), 15));
   const [rows, setRows] = useState<Row[]>(() => (existing?.lines ?? []).map(toRow));
   const [notes, setNotes] = useState(existing?.notes ?? "");
-  const [terms, setTerms] = useState<SaleTerms>(() => ({ ...EMPTY_TERMS, ...((existing as SaleDetail | undefined)?.terms ?? {}) }));
+  const [terms, setTerms] = useState<SaleTerms>(() => {
+    const saved = (existing as SaleDetail | undefined)?.terms;
+    return { ...EMPTY_TERMS, ...(saved ?? {}), document: saved?.document ?? (existing ? "" : doc ?? "") };
+  });
   const [saveToCustomer, setSaveToCustomer] = useState(false);
+  const [cityProposed, setCityProposed] = useState<string | null>(null);
   const isSale = kind !== "COT";
+  // El documento tributario que se va a emitir: define qué bloques muestra el formulario (como en el SII).
+  const document: SaleDocument = kind === "VEN" ? terms.document ?? "" : "";
+  const showReceiver = kind === "FV" || document === "factura" || document === "guia";
+  const [withTransport, setWithTransport] = useState(() => !!(existing as SaleDetail | undefined)?.terms?.transport);
+  const showTransport = document === "guia" || (document === "factura" && withTransport);
   const [newCust, setNewCust] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -72,13 +85,20 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
     // Al abrir un documento guardado se respetan sus condiciones; solo se completa el receptor si falta.
     const restoring = !!existing && prev === undefined && u === (existing.customer_uid ?? null);
     const rec = customer ? { ...receiverFromCustomer(customer), rut: customer.rut ? formatRut(customer.rut) : null } : null;
-    if (!restoring) setSaveToCustomer(false);
+    // El SII exige la ciudad y no la completa: si la ficha no la tiene, se propone desde la comuna y se guarda.
+    const city = rec && !rec.city ? cityForCommune(rec.commune) : null;
+    if (rec && city) rec.city = city;
+    if (!restoring) { setSaveToCustomer(!!city); setCityProposed(city); }
     setTerms((t) => {
       if (restoring) return t.receiver || !rec ? t : { ...t, receiver: rec };
+      // El cliente que trabaja con orden de compra trae lista la referencia para anotar su número.
+      const refs = t.references.filter((r) => !(isPo(r) && !r.folio.trim() && !r.date));
       return {
         ...t,
+        references: customer?.requires_po && !refs.some(isPo) ? [{ kind: "801", folio: "", date: null, note: null }, ...refs] : refs,
         receiver: rec,
         ...(customer && customer.credit_enabled && customer.payment_terms_days > 0 && !t.payment ? { payment: "credito" as const, credit_days: customer.payment_terms_days, due_date: null } : {}),
+        ...(customer && !t.payment && !(customer.credit_enabled && customer.payment_terms_days > 0) && t.document === "factura" ? { payment: "transferencia" as const } : {}),
         ...(!customer && t.payment === "credito" ? { payment: "" as const } : {}),
       };
     });
@@ -126,7 +146,13 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
 
   async function save(emit = false) {
     setErr(null);
-    const lines: LineInput[] = rows.map(({ product_uid, description, qty_milli, unit_price_minor, discount_ppm, taxable }) => ({ product_uid, description, qty_milli, unit_price_minor, discount_ppm, taxable }));
+    const lines: LineInput[] = rows.map(({ product_uid, description, qty_milli, unit_price_minor, discount_ppm, taxable, detail, showDetail }) => ({
+      product_uid, description, qty_milli, unit_price_minor, discount_ppm, taxable, detail: showDetail && detail?.trim() ? detail.trim() : null,
+    }));
+    if ((document === "factura" || document === "guia") && !customer) {
+      setErr(`La ${documentLabel(document)!.toLowerCase()} necesita un cliente con sus datos de receptor: elígelo o créalo arriba.`);
+      return;
+    }
     setBusy(true);
     try {
       if (kind === "COT") {
@@ -134,7 +160,7 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
         toast("success", `${q.number} guardada.`);
         navigate(`/cotizaciones/${q.uid}${emit ? "?emitir=1" : ""}`, { replace: true });
       } else {
-        if (saveToCustomer && customer && terms.receiver) {
+        if (showReceiver && saveToCustomer && customer && terms.receiver) {
           const r = terms.receiver;
           await backend.updateCustomer(customer.uid, {
             ...customer, name: r.name || customer.name, rut: r.rut || undefined, email: customer.email ?? undefined, phone: r.phone || customer.phone || undefined,
@@ -142,7 +168,7 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
             invoice_email: r.email && r.email !== customer.email ? r.email : customer.invoice_email, trade_name: customer.trade_name,
           });
         }
-        const s = await backend.saveSale({ doc_type: kind, customer_uid: customer?.uid ?? null, issue_date: date, lines, notes: notes || undefined, terms: kind === "FV" ? terms : { ...terms, receiver: null } }, existing?.uid);
+        const s = await backend.saveSale({ doc_type: kind, customer_uid: customer?.uid ?? null, issue_date: date, lines, notes: notes || undefined, terms: { ...terms, document, receiver: showReceiver ? terms.receiver : null, transport: showTransport ? terms.transport ?? null : null } }, existing?.uid);
         toast("success", `${s.number} guardada como borrador. Ahora puedes marcarla como efectuada.`);
         navigate(`/ventas/${s.uid}`, { replace: true });
       }
@@ -159,14 +185,17 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
     return () => window.removeEventListener("keydown", h);
   });
 
-  const title = existing ? `Editar ${existing.number}` : TITLE[kind];
+  const docLabel = documentLabel(document);
+  const title = existing ? `Editar ${existing.number}${docLabel ? ` · ${docLabel}` : ""}` : document ? DOC_TITLE[document] : TITLE[kind];
 
   return (
     <div className="anim-in">
       <PageHeader
         back={<button onClick={() => goBack("/ventas")} className="mb-2 inline-flex items-center gap-1 text-sm text-muted hover:text-ink"><ArrowLeft size={15} /> Volver</button>}
         title={title}
-        subtitle={kind === "FV" ? "Se imprime con el título FACTURA INTERNA y la leyenda “Documento interno — no tributario”." : kind === "COT" ? "No mueve stock ni dinero. Cuando el cliente acepte, conviértela en venta sin volver a digitar." : "Queda como borrador hasta que la marques como efectuada."}
+        subtitle={kind === "FV" ? "Se imprime con el título FACTURA INTERNA y la leyenda “Documento interno — no tributario”." : kind === "COT" ? "No mueve stock ni dinero. Cuando el cliente acepte, conviértela en venta sin volver a digitar."
+          : docLabel ? `Mismos datos y orden que la ${docLabel.toLowerCase()} del SII: al emitirla no falta nada. Queda como borrador hasta que la marques como efectuada.`
+          : "Queda como borrador hasta que la marques como efectuada."}
         actions={<>
           {kind === "COT" && <Button variant="secondary" icon={FileDown} onClick={() => save(true)} disabled={busy || rows.length === 0}>Emitir documento</Button>}
           <Button icon={Save} onClick={() => save()} disabled={busy || rows.length === 0} kbd="Ctrl Enter">{kind === "COT" ? "Guardar cotización" : "Guardar y continuar"}</Button>
@@ -175,6 +204,13 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex min-w-0 flex-col gap-6">
           <Card>
+            {kind === "VEN" && (
+              <div className="mb-4 flex flex-wrap items-center gap-3">
+                <span className="text-[13px] font-medium text-ink">Documento</span>
+                <Segmented label="Tipo de documento" value={document} onChange={(v) => setTerms({ ...terms, document: v })}
+                  options={[...DOCUMENTS.map((d) => ({ value: d.value as SaleDocument, label: d.label })), { value: "" as SaleDocument, label: "Sin documento" }]} />
+              </div>
+            )}
             <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem_10rem]">
               <div className="flex flex-col gap-1.5">
                 <Label>Cliente</Label>
@@ -193,18 +229,42 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
                 <Field label="Válida hasta" type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
               ) : <div />}
             </div>
+            {document === "guia" && (
+              <div className="mt-4 max-w-sm">
+                <Select label="Tipo Traslado" value={String(terms.transfer_kind ?? 1)} onChange={(e) => setTerms({ ...terms, transfer_kind: Number(e.target.value) })}
+                  options={TRANSFER_KINDS.map((k) => ({ value: String(k.value), label: k.label }))} />
+              </div>
+            )}
+            {(document === "factura" || document === "guia") && !customer && (
+              <div className="mt-3"><Notice tone="info">Elige el cliente: sus datos de receptor (RUT, razón social, dirección, comuna, ciudad y giro) se completan solos.</Notice></div>
+            )}
           </Card>
+
+          {isSale && showReceiver && customer && terms.receiver && (
+            <>
+              {cityProposed && terms.receiver.city === cityProposed && (
+                <Notice tone="info">La ficha de {customer.name} no tenía ciudad: propusimos «{cityProposed}» a partir de la comuna. Revísala; al guardar queda en su ficha.</Notice>
+              )}
+              <ReceiverCard receiver={terms.receiver} onChange={(r) => setTerms({ ...terms, receiver: r })} saveToCustomer={saveToCustomer}
+                onSaveToCustomer={setSaveToCustomer} canSave={receiverChanged} document={document} />
+            </>
+          )}
+          {isSale && showTransport && <TransportCard transport={terms.transport ?? EMPTY_TRANSPORT} onChange={(transport) => setTerms({ ...terms, transport })} />}
+          {isSale && document === "factura" && !withTransport && (
+            <div><Button size="sm" variant="ghost" icon={Truck} onClick={() => setWithTransport(true)}>Agregar transporte</Button></div>
+          )}
 
           <Card title="Productos y servicios" padded={false}>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[680px] text-sm">
+              <table className="w-full min-w-[640px] text-sm">
                 <thead>
                   <tr className="border-b border-line text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                    <th className="px-4 py-2.5">Descripción</th>
-                    <th className="w-24 px-2 py-2.5 text-right">Cantidad</th>
-                    <th className="w-36 px-2 py-2.5 text-right">Precio unitario</th>
-                    <th className="w-20 px-2 py-2.5 text-right">Desc. %</th>
-                    <th className="w-32 px-2 py-2.5 text-right">Total</th>
+                    <th className="px-4 py-2.5">{isSale ? "Nombre producto" : "Descripción"}</th>
+                    <th className="w-14 px-1 py-2.5 text-center" title="Descripción extendida de la línea, como la casilla «Descrip.» del SII">Descrip.</th>
+                    <th className="w-20 px-2 py-2.5 text-right">Cantidad</th>
+                    <th className="w-32 px-2 py-2.5 text-right">Precio</th>
+                    <th className="w-[4.5rem] whitespace-nowrap px-2 py-2.5 text-right">% Desc.</th>
+                    <th className="w-28 px-2 py-2.5 text-right">SubTotal</th>
                     <th className="w-10" />
                   </tr>
                 </thead>
@@ -212,7 +272,8 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
                   {rows.map((r) => {
                     const a = lineAmounts(r);
                     return (
-                      <tr key={r.key} className="border-b border-line">
+                      <Fragment key={r.key}>
+                      <tr className={r.showDetail ? "" : "border-b border-line"}>
                         <td className="px-4 py-1.5">
                           <input
                             aria-label="Descripción"
@@ -220,6 +281,14 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
                             onChange={(e) => update(r.key, { description: e.target.value })}
                             className="h-8 w-full rounded-md border border-transparent bg-transparent px-2 text-ink hover:border-line focus:border-accent focus:outline-none"
                           />
+                        </td>
+                        <td className="px-1 py-1.5 text-center">
+                          <button type="button" aria-pressed={r.showDetail} aria-label={`Descripción extendida de ${r.description || "la línea"}`}
+                            title={r.showDetail ? "Quitar la descripción extendida" : "Agregar una descripción extendida (Descrip.)"}
+                            onClick={() => update(r.key, { showDetail: !r.showDetail })}
+                            className={`inline-flex h-8 w-8 items-center justify-center rounded-md border ${r.showDetail ? "border-accent bg-accent-soft text-ink" : "border-line text-muted hover:text-ink"}`}>
+                            <AlignLeft size={15} aria-hidden />
+                          </button>
                         </td>
                         <td className="px-2 py-1.5">
                           <input
@@ -250,6 +319,17 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
                           <IconButton icon={Trash2} label="Quitar línea" size={15} onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))} />
                         </td>
                       </tr>
+                      {r.showDetail && (
+                        <tr className="border-b border-line">
+                          <td colSpan={7} className="px-4 pb-2.5">
+                            <textarea aria-label="Descripción extendida" rows={2} maxLength={1000} value={r.detail ?? ""}
+                              onChange={(e) => update(r.key, { detail: e.target.value })}
+                              placeholder="Ingresa solo si necesitas una descripción extendida del producto o servicio (modelo, serie, alcance del servicio…)"
+                              className="w-full resize-y rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none" />
+                          </td>
+                        </tr>
+                      )}
+                      </Fragment>
                     );
                   })}
                 </tbody>
@@ -261,12 +341,8 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
             </div>
           </Card>
 
-          {isSale && <PaymentCard terms={terms} onChange={setTerms} issueDate={date} hasCustomer={!!customer} creditWarning={creditWarn} />}
-          {isSale && kind === "FV" && customer && terms.receiver && (
-            <ReceiverCard receiver={terms.receiver} onChange={(r) => setTerms({ ...terms, receiver: r })} saveToCustomer={saveToCustomer}
-              onSaveToCustomer={setSaveToCustomer} canSave={receiverChanged} />
-          )}
-          {isSale && <ReferencesCard refs={terms.references} onChange={(references) => setTerms({ ...terms, references })} />}
+          {isSale && <ReferencesCard refs={terms.references} onChange={(references) => setTerms({ ...terms, references })} poExpected={!!customer?.requires_po} />}
+          {isSale && document !== "guia" && <PaymentCard terms={terms} onChange={setTerms} issueDate={date} hasCustomer={!!customer} creditWarning={creditWarn} document={document} />}
 
           <Card>
             <TextArea label="Observaciones" optional value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Condiciones, plazo de entrega, notas para el cliente…" />
@@ -294,7 +370,9 @@ export function DocEditor({ kind, existing, initialCustomerUid }: { kind: Kind; 
                 <dd className="num text-[22px] font-semibold text-ink">{formatMoney(totals.total_minor)}</dd>
               </div>
             </dl>
-            <p className="mt-4 rounded-md bg-surface-2 px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-muted">DOCUMENTO INTERNO — NO TRIBUTARIO</p>
+            <p className="mt-4 rounded-md bg-surface-2 px-3 py-2 text-center text-[11px] font-semibold tracking-wide text-muted">
+              {docLabel ? `BORRADOR DE ${docLabel.toUpperCase()} — EL DOCUMENTO TRIBUTARIO SE EMITE EN EL SII` : "DOCUMENTO INTERNO — NO TRIBUTARIO"}
+            </p>
           </Card>
           {promo.applied.length > 0 && (
             <Card title="Promociones" subtitle={promoApplied ? "Aplicadas como descuento en cada línea." : "Calzan con esta venta."}>

@@ -670,7 +670,10 @@ pub async fn browser_login<R: Runtime>(
     let found = with(&state, |s| s.browser_find_access(&access))?;
     let login_host =
         host_of(&found.login_url).ok_or_else(|| err("la dirección del acceso no es https"))?;
-    let site = site_of(&login_host);
+    // El sitio donde vale la clave: el del acceso o, para e-Boleta, solo ese servidor.
+    let site = nucleo_app::CompanySession::login_scope(&found.login_url)
+        .unwrap_or_else(|| site_of(&login_host));
+    let in_scope = |h: &str| h == site || h.ends_with(&format!(".{site}"));
     // Sin el permiso de hoy no se abre nada: el error explica dónde darlo.
     if !found.granted_today {
         with(&state, |s| {
@@ -682,7 +685,7 @@ pub async fn browser_login<R: Runtime>(
         .get_webview_window(LABEL)
         .and_then(|w| w.url().ok())
         .and_then(|u| host_of(u.as_str()));
-    if current.as_deref().map(site_of).as_deref() != Some(site.as_str()) {
+    if !current.as_deref().is_some_and(in_scope) {
         let parsed = Url::parse(&found.login_url)
             .map_err(|_| err("la dirección del acceso no es válida"))?;
         let (a, sh) = (app.clone(), shared.inner().clone());

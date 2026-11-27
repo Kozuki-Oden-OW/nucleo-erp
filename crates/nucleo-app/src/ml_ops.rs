@@ -974,6 +974,7 @@ impl CompanySession {
                     unit_price_minor: net_of(it.unit_price_minor, tax),
                     discount_ppm: 0,
                     taxable: true,
+                    detail: None,
                 });
             }
         }
@@ -986,6 +987,7 @@ impl CompanySession {
                 unit_price_minor: net_of(shipping_paid, tax),
                 discount_ppm: 0,
                 taxable: true,
+                detail: None,
             });
         }
         let billing = group.iter().find_map(|o| o.billing.clone());

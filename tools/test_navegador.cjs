@@ -27,6 +27,14 @@ const pages = {
   'https://www.banco.test/login2': `<title>Ingreso en marco</title><iframe src="https://login.banco.test/f" width=400 height=200></iframe><iframe src="https://anuncios.test/x"></iframe>`,
   'https://login.banco.test/f': `<form onsubmit="event.preventDefault();document.title='ENVIADO '+this.u.value+' '+this.p.value.length"><input name=u><input type=password name=p><input type=submit value="Entrar"></form>`,
   'https://malo.test/': `<title>Falso</title><form><input name=rut><input type=password name=clave><button>Ingresar</button></form>`,
+  'https://www.sii.test/form': `<title>Formulario</title><style>.acc{cursor:pointer}</style>
+    <div class=acc id=acc onmouseup="document.getElementById('act').hidden=false">VER ACTIVIDADES ECONÓMICAS VIGENTES</div>
+    <div id=act hidden>Venta al por menor de equipos</div>
+    <ul><li class=acc><span>Mis Movimientos</span></li></ul>
+    <input name=rut placeholder="Rut"> <input name=ciudad placeholder="Ciudad">
+    <button id=val onclick="if(!document.querySelector('[name=ciudad]').value){alert('Debe ingresar la ciudad del receptor')}else{document.title='VALIDADO'}">Validar y visualizar</button>
+    <button onclick="document.getElementById('lineas').insertAdjacentHTML('beforeend','<input name=linea2 placeholder=Linea2>')">Agrega linea de Detalle</button>
+    <div id=lineas><input name=linea1 placeholder="Linea1"></div> <button id=fin>Guardar Borrador</button>`,
   'https://www.sii.test/doc': `<title>Documento emitido</title><p>Factura 536</p><iframe src="/pdf?CODIGO=1" type="application/pdf" width=300 height=200></iframe>`,
 };
 
@@ -153,6 +161,40 @@ const pages = {
   r = await run({ op: 'escribir', ref: s.frames[0].controls.find(c => c.k === 'clave').n, texto: 'x' });
   assert.ok(r.error && r.error.includes('NÚCLEO'));
   console.log('5 ingreso ok');
+
+  // 6. Los números de los controles se conservan entre lecturas; un control nuevo recibe uno nuevo.
+  await page.goto('https://www.sii.test/form');
+  s = await run({ op: 'leer' });
+  const before = Object.fromEntries(s.frames[0].controls.map(c => [c.l, c.n]));
+  r = await run({ op: 'clic', ref: find(s, 'Agrega linea').n });
+  await page.waitForTimeout(300);
+  s = await run({ op: 'leer' });
+  for (const c of s.frames[0].controls) if (before[c.l]) assert.equal(c.n, before[c.l], 'cambió el número de ' + c.l);
+  assert.ok(find(s, 'Linea2').n > Math.max(...Object.values(before)), 'el control nuevo lleva un número nuevo');
+  r = await run({ op: 'escribir', ref: before['Linea1'], texto: 'Servicio' });
+  assert.ok(r.ok, 'un número de una lectura anterior sigue sirviendo');
+  // 7. Elementos que se pulsan sin ser botones (acordeones y menús con cursor de mano).
+  const acc = find(s, 'VER ACTIVIDADES');
+  assert.equal(acc.k, 'botón');
+  assert.ok(find(s, 'Mis Movimientos'));
+  assert.ok(!s.frames[0].text.includes('Venta al por menor'));
+  r = await run({ op: 'clic', ref: acc.n });
+  await page.waitForTimeout(300);
+  s = await run({ op: 'leer' });
+  assert.ok(s.frames[0].text.includes('Venta al por menor de equipos'));
+  // 8. Un aviso (alert) de la página no la detiene y llega en la lectura siguiente, una sola vez.
+  r = await run({ op: 'clic', ref: find(s, 'Validar y visualizar').n });
+  await page.waitForTimeout(300);
+  s = await run({ op: 'leer' });
+  assert.deepEqual(s.alerts, ['Debe ingresar la ciudad del receptor']);
+  assert.equal(await page.title(), 'Formulario');
+  s = await run({ op: 'leer' });
+  assert.deepEqual(s.alerts, []);
+  r = await run({ op: 'escribir', ref: find(s, 'Ciudad').n, texto: 'SANTIAGO' });
+  r = await run({ op: 'clic', ref: find(s, 'Validar y visualizar').n });
+  await page.waitForTimeout(300);
+  assert.equal(await page.title(), 'VALIDADO');
+  console.log('6-8 números estables, elementos con cursor de mano y avisos ok');
 
   await browser.close();
   console.log('TODO OK');

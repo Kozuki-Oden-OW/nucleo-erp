@@ -185,6 +185,7 @@ fn envia_con_cotizacion_solo_con_permiso() {
                     unit_price_minor: 23_445,
                     discount_ppm: 0,
                     taxable: true,
+                    detail: None,
                 }],
                 notes: None,
             },

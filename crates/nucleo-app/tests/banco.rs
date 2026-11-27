@@ -50,6 +50,7 @@ fn sale(
                     unit_price_minor: price,
                     discount_ppm: 0,
                     taxable: false,
+                    detail: None,
                 }],
                 notes: None,
                 terms: None,

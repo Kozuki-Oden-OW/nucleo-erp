@@ -23,7 +23,55 @@
   var MAX_TEXT = 200000;
   var MAX_CONTROLS = 400;
   var MAX_FILE = 25 * 1024 * 1024;
-  var els = [];
+  // Los controles conservan su número mientras dure el documento: así, después de una acción,
+  // NÚCLEO puede informar solo lo que cambió. `DOC` distingue este documento del que lo reemplace
+  // en el mismo marco.
+  var DOC = Math.random().toString(36).slice(2, 10);
+  var els = []; // número local → WeakRef del elemento
+  var known = typeof WeakMap === "function" ? new WeakMap() : null;
+  var alerts = []; // avisos (alert) que mostró la página desde la última lectura
+
+  function refOf(el) {
+    var n = known ? known.get(el) : undefined;
+    if (n === undefined) {
+      n = els.length;
+      els.push(typeof WeakRef === "function" ? new WeakRef(el) : { deref: function () { return el; } });
+      if (known) known.set(el, n);
+    }
+    return n;
+  }
+  function elAt(n) {
+    var r = els[n];
+    return r ? r.deref() : null;
+  }
+
+  // Un `alert` nativo detiene la página hasta que alguien lo cierra y el agente no lo ve. Es solo un
+  // aviso: se muestra en una franja dentro de la página y queda anotado para la próxima lectura.
+  // `confirm` y `prompt` no se tocan: son decisiones de la persona.
+  try {
+    window.alert = function (m) {
+      var t = clean(m, 400);
+      if (!t) return;
+      alerts.push(t);
+      if (alerts.length > 5) alerts.shift();
+      try {
+        var b = document.createElement("div");
+        b.textContent = "Aviso de la página: " + t + "  ✕";
+        b.setAttribute("role", "alert");
+        b.style.cssText =
+          "position:fixed;z-index:2147483647;top:8px;left:50%;transform:translateX(-50%);max-width:min(720px,92vw);" +
+          "background:#1f2937;color:#fff;font:14px/1.4 system-ui,sans-serif;padding:10px 14px;border-radius:8px;" +
+          "box-shadow:0 6px 24px rgba(0,0,0,.35);cursor:pointer;white-space:pre-wrap";
+        b.addEventListener("click", function () {
+          b.remove();
+        });
+        (document.body || document.documentElement).appendChild(b);
+        setTimeout(function () {
+          b.remove();
+        }, 15000);
+      } catch (e) {}
+    };
+  } catch (e) {}
 
   function clean(s, n) {
     s = String(s == null ? "" : s).replace(/\s+/g, " ").trim();
@@ -82,23 +130,49 @@
 
   var DOC_URL = /\.(pdf|xml|csv|xlsx?|zip)(\?|#|$)|pdf|descarg|download/i;
 
+  var CONTROLS =
+    "a[href], button, input, select, textarea, [role=button], [role=link], [role=tab], " +
+    "[role=menuitem], [role=checkbox], [role=switch], [onclick], iframe[src], embed[src], object[data]";
+
+  // Elementos que se pulsan sin ser botones ni enlaces (menús y acordeones hechos con <div>, <li> o
+  // <a> sin dirección): se reconocen por el cursor de mano. Solo el más externo y con texto corto.
+  function pointerExtras(limit) {
+    var out = [];
+    var all = [];
+    try {
+      all = document.querySelectorAll("a:not([href]), summary, li, div, span, td, h2, h3, h4, h5, p, [tabindex], [data-toggle], [data-bs-toggle]");
+    } catch (e) {}
+    for (var i = 0; i < all.length && i < 6000 && out.length < limit; i++) {
+      var el = all[i];
+      try {
+        if (window.getComputedStyle(el).cursor !== "pointer") continue;
+        var p = el.parentElement;
+        if (p && p !== document.body && window.getComputedStyle(p).cursor === "pointer") continue;
+        if (el.closest(CONTROLS) || el.querySelector(CONTROLS + ", label")) continue;
+        if (!visible(el)) continue;
+        var t = clean(el.innerText);
+        if (!t || t.length > 80) continue;
+        out.push(el);
+      } catch (e) {}
+    }
+    return out;
+  }
+
   function snapshot() {
-    els = [];
     var out = [];
     var list = [];
     try {
-      list = document.querySelectorAll(
-        "a[href], button, input, select, textarea, [role=button], [role=link], [role=tab], " +
-          "[role=menuitem], [role=checkbox], [role=switch], [onclick], iframe[src], embed[src], object[data]"
-      );
+      list = Array.prototype.slice.call(document.querySelectorAll(CONTROLS));
     } catch (e) {}
+    var std = list.length;
+    list = list.concat(pointerExtras(120));
     for (var i = 0; i < list.length && out.length < MAX_CONTROLS; i++) {
       var el = list[i];
       var tag = el.tagName.toLowerCase();
       if (tag === "input" && (el.type || "").toLowerCase() === "hidden") continue;
-      if (!visible(el)) continue;
+      if (i < std && !visible(el)) continue;
       var kind = kindOf(el);
-      var c = { n: els.length, k: kind, l: labelOf(el) };
+      var c = { n: 0, k: kind, l: labelOf(el) };
       if (kind === "documento") {
         var src = el.src || el.data || "";
         if (!DOC_URL.test(src) && !/pdf/i.test(el.type || "")) continue;
@@ -119,9 +193,11 @@
         continue;
       }
       if (el.disabled || el.getAttribute("aria-disabled") === "true") c.d = 1;
-      els.push(el);
+      c.n = refOf(el);
       out.push(c);
     }
+    var said = alerts;
+    alerts = [];
     var text = "";
     try {
       text = (document.body && document.body.innerText) || "";
@@ -133,6 +209,8 @@
       type: document.contentType || "",
       text: text.length > MAX_TEXT ? text.slice(0, MAX_TEXT) + "\n[…texto recortado…]" : text,
       controls: out,
+      doc: DOC,
+      alerts: said,
     };
   }
 
@@ -163,7 +241,7 @@
 
   // Acciones sobre un control de la última lectura de ESTE marco.
   function act(a) {
-    var el = els[a.n];
+    var el = a.doc && a.doc !== DOC ? null : elAt(a.n);
     if (!el || !el.isConnected) return { error: "ese control ya no está: vuelve a leer la página" };
     var kind = kindOf(el);
     if (a.op === "clic") {
@@ -293,7 +371,7 @@
   function grab(a) {
     var url = a.url || "";
     if (a.n != null) {
-      var r = act({ op: "direccion", n: a.n });
+      var r = act({ op: "direccion", n: a.n, doc: a.doc });
       if (r.error) return Promise.resolve(r);
       url = r.url;
     }
@@ -485,7 +563,8 @@
   /* ───────────── Solo el marco principal ───────────── */
 
   var waiting = {}; // id → { left, got, done }
-  var refs = []; // número global → { path, n }
+  var refs = []; // número global − 1 → { path, n, doc }
+  var refKeys = {}; // "marco|documento|número local" → número global (se conserva entre lecturas)
 
   window.addEventListener(
     "message",
@@ -570,22 +649,29 @@
       got.sort(function (x, y) {
         return x.path < y.path ? -1 : 1;
       });
-      refs = [];
       var frames = [{ path: "", data: own }].concat(got);
       var out = [];
+      var said = [];
       for (var i = 0; i < frames.length; i++) {
         var d = frames[i].data;
         if (!d || !d.controls) continue;
         for (var j = 0; j < d.controls.length; j++) {
-          refs.push({ path: frames[i].path, n: d.controls[j].n });
-          d.controls[j].n = refs.length;
+          var key = frames[i].path + "|" + d.doc + "|" + d.controls[j].n;
+          if (!refKeys[key]) {
+            refs.push({ path: frames[i].path, n: d.controls[j].n, doc: d.doc });
+            refKeys[key] = refs.length;
+          }
+          d.controls[j].n = refKeys[key];
         }
+        if (d.alerts && d.alerts.length) said = said.concat(d.alerts);
+        delete d.alerts;
+        delete d.doc;
         if (frames[i].path === "" || d.text || d.controls.length) {
           d.path = frames[i].path;
           out.push(d);
         }
       }
-      return { url: location.href, title: clean(document.title, 200), frames: out };
+      return { url: location.href, title: clean(document.title, 200), frames: out, alerts: said };
     });
   }
 
@@ -594,6 +680,7 @@
     if (!r) return Promise.resolve({ error: "no conozco «w" + num + "»: vuelve a leer la página" });
     a = a || {};
     a.n = r.n;
+    a.doc = r.doc;
     if (r.path === "") return handle(op, a);
     var win = winAt(r.path);
     if (!win) return Promise.resolve({ error: "ese marco ya no está: vuelve a leer la página" });

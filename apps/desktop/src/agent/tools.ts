@@ -3,14 +3,14 @@
 // valen las mismas reglas, permisos y auditoría.
 import type { Backend } from "../data";
 import { errorMessage } from "../data";
-import type { BankRule, BankRuleAction, BankRuleDirection, BankRuleInput, Serial, SerialStatus, WspChat, QuoteDetail, QuoteSummary, QuoteTemplate, Customer, HistoricalSale, MoneyAccount, ReconcileKind, SiiDocument, SiiIntercambioResumen, SiiLibro, SiiLineaLibro, LineInput, Product, SaleSummary, SaleTerms, ShipmentInput, ShipmentSize, Supplier } from "../data/types";
-import { EMPTY_TERMS } from "../data/saleTerms";
+import type { BrowserPage, Receiver, SaleDocument, BankRule, BankRuleAction, BankRuleDirection, BankRuleInput, Serial, SerialStatus, WspChat, QuoteDetail, QuoteSummary, QuoteTemplate, Customer, HistoricalSale, MoneyAccount, ReconcileKind, SiiDocument, SiiIntercambioResumen, SiiLibro, SiiLineaLibro, LineInput, Product, SaleSummary, SaleTerms, ShipmentInput, ShipmentSize, Supplier } from "../data/types";
+import { EMPTY_TERMS, PURCHASE_KINDS, TRANSFER_KINDS, cityForCommune, documentLabel, eboletaDetail, paymentText, receiverFromCustomer, siiPayment } from "../data/saleTerms";
 import { formatMoney, formatQty, todayIso } from "../lib/format";
 import { buildQuotePdf, QUOTE_TEMPLATES, quoteFileName } from "../lib/quotePdf";
 import { navigate } from "../lib/router";
 import { hitHref } from "../shell/CommandPalette";
 import { choose, click, key, resolveRoute, scroll, settle, snapshot, type } from "./dom";
-import { formatPage, refNumber, stateLines } from "./web";
+import { formatChange, formatPage, refNumber, stateLines } from "./web";
 import TOOLS from "./tools.json";
 
 export type AgentLevel = "ver" | "borradores" | "completo";
@@ -147,7 +147,36 @@ function productLine(p: Product): string {
   const stock = p.kind === "servicio" ? "servicio" : `stock ${p.on_hand_milli / 1000} ${p.unit}`;
   return `- ${p.name} · SKU ${p.sku || "—"} · neto ${pesos(p.price_minor)} · costo ${pesos(p.cost_e4 / 10_000)} · ${stock} · ${p.taxable ? "afecto a IVA" : "exento"}`;
 }
-const customerLine = (c: Customer) => `- ${c.name} · RUT ${c.rut ?? "—"} · ${c.email ?? "sin correo"} · ${c.phone ?? "sin teléfono"}`;
+const customerLine = (c: Customer) =>
+  `- ${c.name} · RUT ${c.rut ?? "—"} · ${c.email ?? "sin correo"} · ${c.phone ?? "sin teléfono"} · ${[c.commune, c.city].filter(Boolean).join(", ") || "sin comuna ni ciudad"}${c.commune && !c.city ? " (falta la ciudad)" : ""} · ${c.credit_enabled ? `crédito ${c.payment_terms_days} días` : "contado"}${c.requires_po ? " · trabaja con orden de compra" : ""}`;
+
+/** Tipo de referencia de NÚCLEO a partir de cómo lo nombra el agente («orden de compra», «hes», «801»…). */
+function refKind(t: string): string {
+  const k = norm(t);
+  if (/^(801|oc)$|orden de compra/.test(k)) return "801";
+  if (/^hes$|entrada de servicio/.test(k)) return "HES";
+  if (/^hem$|entrada de material/.test(k)) return "HEM";
+  if (/^802$|nota de pedido/.test(k)) return "802";
+  if (/^nv$|nota de venta/.test(k)) return "NV";
+  if (/^52$|guia/.test(k)) return "52";
+  if (/^803$|contrato/.test(k)) return "803";
+  if (/^805$|chilecompra|mercado publico/.test(k)) return "805";
+  if (/^ml$|mercado libre/.test(k)) return "ML";
+  if (/^web$|internet|tienda/.test(k)) return "WEB";
+  if (/^wsp$|whatsapp/.test(k)) return "WSP";
+  return "OTRO";
+}
+/** Nombre del tipo de referencia en la lista «Tipo de documento» del facturador del SII. */
+const SII_REF: Record<string, string> = {
+  "801": "Orden de Compra", "802": "Nota de pedido", "803": "Contrato", "805": "Proceso ChileCompra", HES: "Hoja Entrada Servicio", "52": "Guia despacho elec.",
+};
+const rutDv = (r: string | null | undefined) => { const k = rutKey(r); return k ? `${k.slice(0, -1)}-${k.slice(-1)}` : "—"; };
+
+/** Datos del receptor que el SII exige y faltan (la validación del formulario no avanza sin ellos). */
+function receiverMissing(r: { rut?: string | null; name?: string | null; address?: string | null; commune?: string | null; city?: string | null; activity?: string | null } | null): string[] {
+  if (!r) return ["el cliente (receptor)"];
+  return [!r.rut && "RUT", !r.name && "razón social", !r.address && "dirección", !r.commune && "comuna", !r.city && "ciudad", !r.activity && "giro"].filter(Boolean) as string[];
+}
 const supplierLine = (s: Supplier) => `- ${s.name} · RUT ${s.rut ?? "—"} · ${s.email ?? "sin correo"} · plazo ${s.payment_terms_days} días`;
 const saleLine = (s: SaleSummary) =>
   `- ${s.number || "(borrador)"} · ${s.issue_date} · ${s.customer_name || "sin cliente"} · total ${pesos(s.total_minor)} · pagado ${pesos(s.paid_minor)} · ${s.commercial_state}/${s.payment_state}/${s.documentation_state}`;
@@ -230,6 +259,8 @@ export async function runTool(backend: Backend, level: AgentLevel, name: string,
 
 /** Tipo de cada control de la última lectura del navegador (para saber si es una lista). */
 let webControls = new Map<number, string>();
+/** Última lectura del navegador: después de una acción se informa solo lo que cambió. */
+let webPage: BrowserPage | null = null;
 
 async function exec(backend: Backend, level: AgentLevel, name: string, a: Args): Promise<ToolResult> {
   switch (name) {
@@ -289,6 +320,49 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
     case "buscar_proveedores": {
       const r = await backend.searchSuppliers(str(a, "texto"));
       return text(r.length ? `${r.length} proveedores:\n${r.slice(0, 40).map(supplierLine).join("\n")}` : "Sin proveedores que coincidan.");
+    }
+    case "ver_venta": {
+      const ref = str(a, "venta");
+      const list = await backend.listSales({ view: "todas", query: ref });
+      const hit = list.find((x) => x.uid === ref || norm(x.number) === norm(ref)) ?? (list.length === 1 ? list[0] : undefined)
+        ?? (await backend.listSales({ view: "todas" })).find((x) => x.uid === ref)
+        ?? (await backend.listSales({ view: "borradores", query: ref })).find((x) => x.uid === ref || norm(x.number) === norm(ref));
+      if (!hit) throw new Error(`No encontré la venta «${ref}».`);
+      const s = await backend.sale(hit.uid);
+      const t = s.terms;
+      const cust = s.customer_uid ? await backend.customer(s.customer_uid) : null;
+      // Receptor: lo que quedó en el documento; lo que falte, de la ficha del cliente.
+      const base = cust ? receiverFromCustomer(cust) : null;
+      const r = base || t?.receiver ? { ...(base ?? {}), ...Object.fromEntries(Object.entries(t?.receiver ?? {}).filter(([, v]) => v !== null && v !== "")) } as Receiver : null;
+      const doc = t?.document ?? "";
+      const out = [
+        `${s.number || "(borrador)"} · ${documentLabel(doc) ?? (s.doc_type === "FV" ? "Factura interna" : "Sin documento definido")} · fecha ${s.issue_date} · ${s.commercial_state}/${s.payment_state}/${s.documentation_state}${s.external_ref?.external_number ? ` · ${s.external_ref.doc_kind ?? "documento"} N° ${s.external_ref.external_number}` : ""}`,
+      ];
+      if (doc === "guia") out.push(`Tipo Traslado: ${TRANSFER_KINDS.find((k) => k.value === (t?.transfer_kind ?? 1))?.label}`);
+      if (r) {
+        out.push("DATOS RECEPTOR", `- Rut: ${rutDv(r.rut)}`, `- Razón Social: ${r.name ?? "—"}`);
+        if (doc !== "guia") out.push(`- Tipo de Compra: ${PURCHASE_KINDS.find((k) => k.value === (r.purchase_kind ?? 1))?.label}`);
+        out.push(`- Dirección: ${r.address ?? "FALTA"}`, `- Comuna: ${r.commune ?? "FALTA"}`, `- Ciudad: ${r.city ?? "FALTA"}`, `- Giro: ${r.activity ?? "FALTA"}`,
+          `- Contacto: ${r.contact ?? r.email ?? "—"}`, `- Rut solicita: ${r.requester_rut ? rutDv(r.requester_rut) : "—"}`);
+      } else out.push("Sin cliente (venta a público).");
+      if (t?.transport) out.push("TRANSPORTE", `- Rut transporte: ${t.transport.rut ? rutDv(t.transport.rut) : "—"} · Patente: ${t.transport.plate ?? "—"} · Rut chofer: ${t.transport.driver_rut ? rutDv(t.transport.driver_rut) : "—"} · Nombre chofer: ${t.transport.driver_name ?? "—"}`);
+      out.push("DETALLE (nombre · cantidad · precio neto · % desc. · subtotal)");
+      for (const l of s.lines) {
+        out.push(`${l.line_no}. ${l.description} · ${formatQty(l.qty_milli)} · ${pesos(l.unit_price_minor)} · ${l.discount_ppm ? `${l.discount_ppm / 10_000} %` : "—"} · ${pesos(l.net_minor)}${l.taxable ? "" : " (exento)"}`);
+        if (l.detail) out.push(`   Descrip.: ${l.detail.replace(/\n/g, " / ")}`);
+      }
+      out.push(t?.references.length ? "REFERENCIAS (tipo de documento · folio · fecha · razón)" : "REFERENCIAS: ninguna");
+      for (const x of t?.references ?? []) out.push(`- ${SII_REF[x.kind] ?? x.kind} · ${x.folio} · ${x.date ?? s.issue_date} · ${x.note ?? "—"}`);
+      if (doc !== "guia") out.push(`FORMA DE PAGO: ${siiPayment(t) ?? "sin definir"}${t?.payment ? ` (${paymentText(t, (d) => d)})` : ""}`);
+      if (doc === "boleta") out.push("PARA LA e-BOLETA DEL SII (eboleta.sii.cl)", `- Monto: ${pesos(s.totals.total_minor)} (total con IVA)`, `- Tipo: ${s.totals.tax_minor > 0 ? "Boleta afecta" : "Boleta exenta"}`,
+        `- Método de pago: ${t?.payment ? paymentText(t, (d) => d) : "sin definir"}`, `- Detalle (máx. 80): ${eboletaDetail(s.lines)}`,
+        r ? `- Receptor (opcional): ${rutDv(r.rut)} · ${r.name ?? "—"} · ${[r.address, r.commune].filter(Boolean).join(", ") || "sin dirección"} · ${r.email ?? "sin correo"} · ${r.phone ?? "sin teléfono"}` : "- Receptor: sin cliente (se deja apagado)");
+      out.push(`Neto ${pesos(s.totals.net_minor)} · exento ${pesos(s.totals.exempt_minor)} · IVA ${pesos(s.totals.tax_minor)} · total ${pesos(s.totals.total_minor)}`);
+      if (s.notes) out.push(`Observaciones: ${s.notes}`);
+      const miss = doc === "factura" || doc === "guia" || s.doc_type === "FV" ? receiverMissing(r) : [];
+      if (miss.length) out.push(`⚠ Falta para emitir en el SII: ${miss.join(", ")} (actualizar_cliente).`);
+      if (cust?.requires_po && !t?.references.some((x) => x.kind === "801")) out.push("⚠ El cliente trabaja con orden de compra y la venta no tiene ninguna anotada.");
+      return text(out.join("\n"));
     }
     case "listar_ventas": {
       const view = (str(a, "vista") || "todas") as "todas";
@@ -396,12 +470,14 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
       if (!st.open) return text("No se pudo abrir el navegador de NÚCLEO.", true);
       const r = await backend.browserRead();
       webControls = new Map((r.page.frames ?? []).flatMap((f) => f.controls).map((c) => [c.n, c.k]));
+      webPage = r.page;
       return text(formatPage(r.page, r.state));
     }
     case "web_leer": {
       const r = await backend.browserRead();
       if (r.page.navego) return text("La página estaba cambiando: vuelve a leerla.", true);
       webControls = new Map((r.page.frames ?? []).flatMap((f) => f.controls).map((c) => [c.n, c.k]));
+      webPage = r.page;
       return text(formatPage(r.page, r.state, str(a, "buscar"), num(a, "desde") ?? 0));
     }
     case "web_clic":
@@ -417,7 +493,10 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
       const after = await backend.browserRead();
       webControls = new Map((after.page.frames ?? []).flatMap((f) => f.controls).map((c) => [c.n, c.k]));
       const done = r.result.navego ? "Hecho: la página cambió." : `Hecho: ${r.result.ok ?? "listo"}.`;
-      return text(`${done}\n\n${formatPage(after.page, after.state)}`);
+      // Si la página es la misma, basta con lo que cambió: los controles conservan su número.
+      const change = r.result.navego || after.page.navego ? null : formatChange(webPage, after.page, after.state);
+      webPage = after.page;
+      return text(`${done}\n\n${change ?? formatPage(after.page, after.state)}`);
     }
     case "web_guardar": {
       const el = str(a, "elemento");
@@ -442,6 +521,7 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
             : "No hay un formulario de ingreso en la página: puede que la sesión ya esté abierta.";
       const after = await backend.browserRead();
       webControls = new Map((after.page.frames ?? []).flatMap((f) => f.controls).map((c) => [c.n, c.k]));
+      webPage = after.page;
       return text([`${r.access ?? "Acceso"}: ${what}`, ...stateLines(r.state).filter((l) => l.startsWith("Bloqueado")), "", formatPage(after.page, after.state)].join("\n"));
     }
     case "sincronizar_woocommerce": {
@@ -510,10 +590,44 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
       }
       const c = await backend.addCustomer({
         name: str(a, "nombre"), rut: rut || undefined, email: str(a, "correo") || undefined, phone: str(a, "telefono") || undefined,
+        kind: rut && Number(rutKey(rut).slice(0, -1)) >= 50_000_000 ? "empresa" : "persona",
         address: str(a, "direccion") || null, commune: str(a, "comuna") || null, business_activity: str(a, "giro") || null,
+        city: str(a, "ciudad") || cityForCommune(str(a, "comuna")), region: str(a, "region") || null, contact_name: str(a, "contacto") || null,
+        invoice_email: str(a, "correo_facturas") || null, requires_po: a.trabaja_con_oc === true,
       });
       dataChanged();
       return text(`Cliente creado: ${customerLine(c).slice(2)}`);
+    }
+    case "actualizar_cliente": {
+      const q = str(a, "cliente");
+      const d = await backend.customer(pickOne(await searchBoth((x) => backend.searchCustomers(x), q), q, (x) => x.rut ?? "", "cliente").uid);
+      const fields: [string, "name" | "business_activity" | "address" | "commune" | "city" | "region" | "contact_name" | "email" | "invoice_email" | "phone", string][] = [
+        ["nombre", "name", "razón social"], ["giro", "business_activity", "giro"], ["direccion", "address", "dirección"], ["comuna", "commune", "comuna"],
+        ["ciudad", "city", "ciudad"], ["region", "region", "región"], ["contacto", "contact_name", "contacto"], ["correo", "email", "correo"],
+        ["correo_facturas", "invoice_email", "correo para facturas"], ["telefono", "phone", "teléfono"],
+      ];
+      const next = { ...d } as Customer;
+      const changes: string[] = [];
+      for (const [arg, field, label] of fields) {
+        const v = str(a, arg);
+        if (!v || v === (d[field] ?? "")) continue;
+        changes.push(`${label}: «${d[field] ?? "vacío"}» → «${v}»`);
+        (next as unknown as Record<string, unknown>)[field] = v;
+      }
+      if (typeof a.trabaja_con_oc === "boolean" && a.trabaja_con_oc !== !!d.requires_po) {
+        changes.push(`orden de compra: ${d.requires_po ? "la pedía" : "no la pedía"} → ${a.trabaja_con_oc ? "trabaja con orden de compra" : "no la pide"}`);
+        next.requires_po = a.trabaja_con_oc;
+      }
+      if (!changes.length) return text(`Sin cambios: ${customerLine(d).slice(2)}`);
+      const c = await backend.updateCustomer(d.uid, {
+        name: next.name, rut: d.rut ?? undefined, email: next.email ?? undefined, phone: next.phone ?? undefined, kind: d.kind, trade_name: d.trade_name,
+        business_activity: next.business_activity, address: next.address, commune: next.commune, city: next.city, region: next.region,
+        contact_name: next.contact_name, invoice_email: next.invoice_email, payment_terms_days: d.payment_terms_days, credit_limit_minor: d.credit_limit_minor,
+        notes: d.notes, credit_enabled: d.credit_enabled, credit_conditions: d.credit_conditions, preferred: d.preferred, requires_po: next.requires_po,
+      });
+      dataChanged();
+      const miss = receiverMissing({ rut: c.rut, name: c.name, address: c.address, commune: c.commune, city: c.city, activity: c.business_activity });
+      return text([`Ficha de ${c.name} actualizada:`, ...changes.map((x) => `- ${x}`), miss.length ? `Para facturarle todavía falta: ${miss.join(", ")}.` : "La ficha tiene todo lo que pide la factura del SII."].join("\n"));
     }
     case "importar_clientes": {
       const list = Array.isArray(a.clientes) ? (a.clientes as Args[]) : [];
@@ -550,7 +664,7 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
             kind: d.kind, trade_name: d.trade_name, business_activity: patch.business_activity, address: patch.address, commune: patch.commune,
             city: d.city, region: d.region, contact_name: patch.contact_name, invoice_email: d.invoice_email, payment_terms_days: d.payment_terms_days,
             credit_limit_minor: d.credit_limit_minor, notes: patch.notes ?? null, credit_enabled: d.credit_enabled, credit_conditions: d.credit_conditions,
-            preferred: d.preferred,
+            preferred: d.preferred, requires_po: d.requires_po,
           });
           updated++;
         } catch (e) {
@@ -611,22 +725,50 @@ async function exec(backend: Backend, level: AgentLevel, name: string, a: Args):
           lines.push({
             product_uid: p.uid, description: str(l, "descripcion") || p.name, qty_milli: Math.round(qty * 1000),
             unit_price_minor: Math.round(num(l, "precio_neto") ?? p.price_minor), discount_ppm: disc,
-            taxable: typeof l.afecto_iva === "boolean" ? l.afecto_iva : p.taxable,
+            taxable: typeof l.afecto_iva === "boolean" ? l.afecto_iva : p.taxable, detail: str(l, "detalle") || null,
           });
         } else {
           const desc = str(l, "descripcion");
           const price = num(l, "precio_neto");
           if (!desc || price === null) throw new Error(`La línea ${i + 1} necesita un producto, o una descripción con precio_neto.`);
-          lines.push({ product_uid: null, description: desc, qty_milli: Math.round(qty * 1000), unit_price_minor: Math.round(price), discount_ppm: disc, taxable: l.afecto_iva !== false });
+          lines.push({ product_uid: null, description: desc, qty_milli: Math.round(qty * 1000), unit_price_minor: Math.round(price), discount_ppm: disc, taxable: l.afecto_iva !== false, detail: str(l, "detalle") || null });
         }
       }
+      // Condiciones del documento, como en el formulario del SII: documento, receptor, referencias y forma de pago.
+      const fv = str(a, "tipo") === "FV";
+      const dq = str(a, "documento");
+      const document: SaleDocument = !fv && (dq === "boleta" || dq === "factura" || dq === "guia") ? dq : "";
+      const cust = customer_uid ? await backend.customer(customer_uid) : null;
+      const withReceiver = fv || document === "factura" || document === "guia";
+      if ((document === "factura" || document === "guia") && !cust) throw new Error(`La ${documentLabel(document)!.toLowerCase()} necesita un cliente: indícalo en «cliente» (créalo antes con crear_cliente).`);
+      const receiver = withReceiver && cust ? receiverFromCustomer(cust) : null;
+      const notes: string[] = [];
+      if (receiver && !receiver.city && receiver.commune) {
+        receiver.city = cityForCommune(receiver.commune);
+        notes.push(`La ficha no tiene ciudad: en el documento va «${receiver.city}» (propuesta desde la comuna). Guárdala con actualizar_cliente.`);
+      }
+      const refs = (Array.isArray(a.referencias) ? (a.referencias as Args[]) : []).map((r) => ({ kind: refKind(str(r, "tipo")), folio: str(r, "folio"), date: str(r, "fecha") || null, note: str(r, "detalle") || null }));
+      if (cust?.requires_po && !refs.some((r) => r.kind === "801" && r.folio)) notes.push("Este cliente trabaja con orden de compra y no se anotó ninguna: pídela y agrégala en «referencias» antes de facturar.");
+      const fp = str(a, "forma_pago");
+      const credit = fp === "credito" || (!fp && !!cust?.credit_enabled && cust.payment_terms_days > 0);
+      const method = str(a, "medio_pago") as SaleTerms["payment"];
+      const payment: SaleTerms["payment"] = document === "guia" ? "" : credit ? "credito" : fp === "contado" || document === "factura" ? method || "transferencia" : method;
+      if (credit && !cust) throw new Error("Para vender a crédito indica el cliente.");
+      const terms: SaleTerms = {
+        ...EMPTY_TERMS, document, payment, credit_days: payment === "credito" ? num(a, "dias_credito") ?? (cust?.payment_terms_days || 30) : null,
+        references: refs, receiver, transfer_kind: document === "guia" ? num(a, "tipo_traslado") ?? 1 : null,
+      };
+      const miss = document === "factura" || document === "guia" ? receiverMissing(receiver) : [];
+      if (miss.length) notes.push(`Al receptor le falta ${miss.join(", ")}: el SII no deja emitir sin eso. Complétalo con actualizar_cliente.`);
       const sale = await backend.saveSale({
-        doc_type: str(a, "tipo") === "FV" ? "FV" : "VEN", customer_uid, issue_date: str(a, "fecha") || todayIso(), lines,
-        notes: str(a, "notas") || undefined, terms: EMPTY_TERMS,
+        doc_type: fv ? "FV" : "VEN", customer_uid, issue_date: str(a, "fecha") || todayIso(), lines,
+        notes: str(a, "notas") || undefined, terms,
       });
       dataChanged();
       return text([
         `Venta en borrador creada (${sale.number || "sin número hasta confirmarla"}) para ${customerName}.`,
+        ...(document ? [`Documento: ${documentLabel(document)}${payment ? ` · forma de pago ${siiPayment(terms)}${payment === "credito" ? ` ${terms.credit_days} días` : ""}` : ""}${refs.length ? ` · referencias: ${refs.map((r) => `${SII_REF[r.kind] ?? r.kind} ${r.folio}`).join(", ")}` : ""}`] : []),
+        ...notes.map((n) => `⚠ ${n}`),
         ...sale.lines.map((l) => `- ${l.description}: ${l.qty_milli / 1000} × ${pesos(l.unit_price_minor)}${l.discount_ppm ? ` (−${l.discount_ppm / 10_000} %)` : ""} = ${pesos(l.net_minor)} neto`),
         `Neto ${pesos(sale.totals.net_minor)} · exento ${pesos(sale.totals.exempt_minor)} · IVA ${pesos(sale.totals.tax_minor)} · total ${pesos(sale.totals.total_minor)}`,
         `Identificador: ${sale.uid} · se ve en ir_a /ventas/${sale.uid}`,

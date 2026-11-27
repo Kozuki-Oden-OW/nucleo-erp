@@ -44,6 +44,8 @@ pub struct CustomerProfile {
     pub credit_conditions: Option<String>,
     /// Cliente preferencial (recibe las promociones para preferenciales).
     pub preferred: bool,
+    /// Trabaja con orden de compra: al venderle se pide su número para las referencias.
+    pub requires_po: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -58,7 +60,7 @@ pub struct NewCustomerRow<'a> {
 
 const COLS: &str = "id, uid, rut, name, email, phone, created_at, kind, trade_name, business_activity, \
     address, commune, city, region, contact_name, invoice_email, payment_terms_days, credit_limit_minor, notes, \
-    credit_enabled, credit_conditions, preferred";
+    credit_enabled, credit_conditions, preferred, requires_po";
 
 fn map(r: &Row<'_>) -> rusqlite::Result<CustomerRow> {
     Ok(CustomerRow {
@@ -85,6 +87,7 @@ fn map(r: &Row<'_>) -> rusqlite::Result<CustomerRow> {
             credit_enabled: r.get::<_, i64>(19)? == 1,
             credit_conditions: r.get(20)?,
             preferred: r.get::<_, i64>(21)? == 1,
+            requires_po: r.get::<_, i64>(22)? == 1,
         },
     })
 }
@@ -95,7 +98,7 @@ pub fn set_profile(conn: &Connection, id: i64, p: &CustomerProfile) -> DbResult<
         "UPDATE customers SET kind = ?2, trade_name = ?3, business_activity = ?4, address = ?5, commune = ?6,
             city = ?7, region = ?8, contact_name = ?9, invoice_email = ?10, payment_terms_days = ?11,
             credit_limit_minor = ?12, notes = ?13, credit_enabled = ?14, credit_conditions = ?15,
-            preferred = ?16 WHERE id = ?1",
+            preferred = ?16, requires_po = ?17 WHERE id = ?1",
         rusqlite::params![
             id,
             if p.kind == "empresa" { "empresa" } else { "persona" },
@@ -112,7 +115,8 @@ pub fn set_profile(conn: &Connection, id: i64, p: &CustomerProfile) -> DbResult<
             p.notes,
             p.credit_enabled as i64,
             p.credit_conditions,
-            p.preferred as i64
+            p.preferred as i64,
+            p.requires_po as i64
         ],
     )?;
     Ok(())

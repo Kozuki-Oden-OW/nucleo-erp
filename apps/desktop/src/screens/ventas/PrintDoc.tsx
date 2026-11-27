@@ -106,7 +106,7 @@ export function PrintDoc({ kind, doc, biz, preview = false }: Props & { preview?
         <tbody>
           {doc.lines.map((l) => (
             <tr key={l.line_no} className="border-b border-neutral-300">
-              <td className="py-1">{l.description}</td>
+              <td className="py-1">{l.description}{l.detail && <div className="whitespace-pre-line text-[0.85em] text-neutral-600">{l.detail}</div>}</td>
               <td className="py-1 text-right">{formatQty(l.qty_milli)}</td>
               <td className="py-1 text-right">{formatMoney(l.unit_price_minor)}</td>
               <td className="py-1 text-right">{l.discount_ppm ? formatPpm(l.discount_ppm, 0) : ""}</td>

@@ -587,6 +587,7 @@ fn factura_desde_una_venta() {
                         unit_price_minor: 25_000,
                         discount_ppm: 100_000,
                         taxable: true,
+                        detail: None,
                     },
                     LineInput {
                         product_uid: None,
@@ -595,6 +596,7 @@ fn factura_desde_una_venta() {
                         unit_price_minor: 5_000,
                         discount_ppm: 0,
                         taxable: true,
+                        detail: None,
                     },
                 ],
                 notes: None,

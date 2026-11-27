@@ -37,6 +37,7 @@ fn sale(s: &mut CompanySession, amount: i64, document: Option<&str>) {
                     unit_price_minor: amount,
                     discount_ppm: 0,
                     taxable: true,
+                    detail: None,
                 }],
                 notes: None,
                 terms: None,

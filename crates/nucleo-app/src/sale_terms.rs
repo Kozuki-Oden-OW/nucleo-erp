@@ -50,6 +50,41 @@ pub fn check_kind(kind: &str) -> AppResult<String> {
     }
 }
 
+/// Documento tributario con que sale la venta (lo primero que se elige en «Nueva venta»).
+pub const DOCUMENTS: &[(&str, &str)] = &[
+    ("boleta", "Boleta"),
+    ("factura", "Factura"),
+    ("guia", "Guía de despacho"),
+];
+
+/// «Tipo de compra» del receptor, como en la factura del SII (código del campo TpoTranCompra).
+pub const PURCHASE_KINDS: &[(u8, &str)] = &[
+    (1, "Del Giro"),
+    (2, "Supermercados"),
+    (3, "Venta de Bienes inmuebles, 'BBRR'"),
+    (4, "Activo Fijo"),
+    (5, "IVA Uso Común"),
+    (6, "IVA no Recuperable"),
+    (7, "No Corresponde incluir"),
+];
+
+/// «Tipo Traslado» de la guía de despacho del SII (código del campo IndTraslado).
+pub const TRANSFER_KINDS: &[(u8, &str)] = &[
+    (1, "Operación constituye venta"),
+    (2, "Ventas por efectuar"),
+    (3, "Consignaciones"),
+    (4, "Entrega Gratuita"),
+    (5, "Traslados internos"),
+    (6, "Otros traslados no venta"),
+    (7, "Guía de devolución"),
+    (8, "Traslado para exportación (no venta)"),
+    (9, "Venta para exportación"),
+];
+
+pub fn document_label(code: &str) -> Option<&'static str> {
+    DOCUMENTS.iter().find(|(c, _)| *c == code).map(|(_, l)| *l)
+}
+
 pub const PAYMENTS: &[&str] = &[
     "efectivo",
     "tarjeta",
@@ -83,6 +118,20 @@ pub struct Receiver {
     pub email: Option<String>,
     pub phone: Option<String>,
     pub contact: Option<String>,
+    /// «Tipo de compra» del SII (1 = Del Giro … 7 = No corresponde incluir).
+    pub purchase_kind: Option<u8>,
+    /// «Rut solicita»: persona que pide la factura.
+    pub requester_rut: Option<String>,
+}
+
+/// Bloque «Transporte» del documento, como en el SII.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Transport {
+    pub rut: Option<String>,
+    pub plate: Option<String>,
+    pub driver_rut: Option<String>,
+    pub driver_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -104,6 +153,22 @@ pub struct SaleTerms {
     pub operation: Option<String>,
     pub references: Vec<SaleReference>,
     pub receiver: Option<Receiver>,
+    /// Documento tributario: "", "boleta", "factura" o "guia".
+    pub document: String,
+    /// Guía de despacho: tipo de traslado del SII (1 a 9).
+    pub transfer_kind: Option<u8>,
+    pub transport: Option<Transport>,
+}
+
+fn rut_opt(v: &Option<String>, label: &str) -> AppResult<Option<String>> {
+    match v.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        Some(r) => Ok(Some(
+            nucleo_domain::Rut::parse(r)
+                .map_err(|e| AppError::Validation(format!("{label}: {e}")))?
+                .compact(),
+        )),
+        None => Ok(None),
+    }
 }
 
 fn text(v: &Option<String>, max: usize, label: &str) -> AppResult<Option<String>> {
@@ -202,14 +267,7 @@ impl SaleTerms {
         let receiver = match &self.receiver {
             None => None,
             Some(v) => {
-                let rut = match v.rut.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-                    Some(r) => Some(
-                        nucleo_domain::Rut::parse(r)
-                            .map_err(|e| AppError::Validation(format!("RUT del receptor: {e}")))?
-                            .compact(),
-                    ),
-                    None => None,
-                };
+                let rut = rut_opt(&v.rut, "RUT del receptor")?;
                 let r = Receiver {
                     rut,
                     name: text(&v.name, 200, "la razón social")?,
@@ -222,11 +280,48 @@ impl SaleTerms {
                     email: text(&v.email, 254, "el correo")?,
                     phone: text(&v.phone, 40, "el teléfono")?,
                     contact: text(&v.contact, 120, "el contacto")?,
+                    purchase_kind: match v.purchase_kind {
+                        None => None,
+                        Some(k) if PURCHASE_KINDS.iter().any(|(c, _)| *c == k) => Some(k),
+                        Some(_) => {
+                            return Err(AppError::Validation("tipo de compra no válido".into()));
+                        }
+                    },
+                    requester_rut: rut_opt(&v.requester_rut, "RUT de quien solicita")?,
                 };
                 (r != Receiver::default()).then_some(r)
             }
         };
+        let document = self.document.trim().to_lowercase();
+        if !document.is_empty() && document_label(&document).is_none() {
+            return Err(AppError::Validation(
+                "tipo de documento no válido (boleta, factura o guía de despacho)".into(),
+            ));
+        }
+        let transfer_kind = match (document.as_str(), self.transfer_kind) {
+            ("guia", None) => Some(1),
+            ("guia", Some(k)) if TRANSFER_KINDS.iter().any(|(c, _)| *c == k) => Some(k),
+            ("guia", Some(_)) => {
+                return Err(AppError::Validation("tipo de traslado no válido".into()));
+            }
+            _ => None,
+        };
+        let transport = match &self.transport {
+            None => None,
+            Some(t) => {
+                let t = Transport {
+                    rut: rut_opt(&t.rut, "RUT del transporte")?,
+                    plate: text(&t.plate, 8, "la patente")?.map(|p| p.to_uppercase()),
+                    driver_rut: rut_opt(&t.driver_rut, "RUT del chofer")?,
+                    driver_name: text(&t.driver_name, 30, "el nombre del chofer")?,
+                };
+                (t != Transport::default()).then_some(t)
+            }
+        };
         Ok(SaleTerms {
+            document,
+            transfer_kind,
+            transport,
             payment,
             card,
             credit_days,

@@ -316,7 +316,8 @@ export function scroll(dir: "arriba" | "abajo" | "inicio" | "final"): void {
 
 /** Rutas por nombre de sección (con o sin tildes). */
 const ROUTES: Record<string, string> = {
-  inicio: "/inicio", ventas: "/ventas", vender: "/ventas", "nueva venta": "/ventas/nueva", "nueva factura": "/ventas/nueva?tipo=FV",
+  inicio: "/inicio", ventas: "/ventas", vender: "/ventas", "nueva venta": "/ventas/nueva", "nueva factura": "/ventas/nueva?doc=factura", "nueva boleta": "/ventas/nueva?doc=boleta",
+  "nueva guia": "/ventas/nueva?doc=guia", "nueva guia de despacho": "/ventas/nueva?doc=guia", "factura interna": "/ventas/nueva?tipo=FV",
   cotizaciones: "/ventas?tab=cotizaciones", "nueva cotizacion": "/cotizaciones/nueva", clientes: "/clientes", productos: "/productos",
   "productos y servicios": "/productos", promociones: "/promociones", descuentos: "/promociones", compras: "/compras", comprar: "/compras",
   proveedores: "/compras?tab=proveedores", "nueva orden de compra": "/compras/oc/nueva", "nueva compra": "/compras/doc/nueva",

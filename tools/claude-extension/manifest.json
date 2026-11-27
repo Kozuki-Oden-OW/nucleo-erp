@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "nucleo-erp",
   "display_name": "NÚCLEO ERP",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Permite que Claude use NÚCLEO ERP en este computador: ve la pantalla, la recorre con su propio cursor y registra ventas, gastos, clientes y cobros.",
   "long_description": "Conecta Claude con NÚCLEO ERP, el sistema de gestión local y gratuito para pymes chilenas. NÚCLEO debe estar abierto con Configuración → Claude activado; ahí eliges si Claude solo mira, crea borradores o tiene acceso completo. La extensión solo se comunica con NÚCLEO dentro del mismo computador (127.0.0.1): los datos del negocio siguen guardados solo en tu equipo.",
   "author": {
@@ -77,6 +77,10 @@
       "description": "Lista ventas. vista: todas, por_cobrar, borradores, pendientes_doc (sin documento tributario) o anuladas."
     },
     {
+      "name": "ver_venta",
+      "description": "Muestra una venta completa en el orden del formulario del SII: documento, receptor (RUT, razón social, tipo de compra, dirección, comuna, ciudad, giro, contacto), transporte, líneas con su descripción"
+    },
+    {
       "name": "listar_gastos",
       "description": "Lista gastos entre dos fechas (AAAA-MM-DD), opcionalmente filtrando por texto."
     },
@@ -86,7 +90,11 @@
     },
     {
       "name": "crear_cliente",
-      "description": "Crea un cliente. Si el RUT ya existe, devuelve el cliente existente sin duplicarlo."
+      "description": "Crea un cliente con los datos que pide una factura (RUT, razón social, giro, dirección, comuna y ciudad). Si el RUT ya existe, devuelve el cliente existente sin duplicarlo (para cambiarle datos usa ac"
+    },
+    {
+      "name": "actualizar_cliente",
+      "description": "Completa o corrige la ficha de un cliente: razón social, giro, dirección, comuna, ciudad, contacto, correos, teléfono y si trabaja con orden de compra. Solo cambia los campos que se envían y responde "
     },
     {
       "name": "importar_clientes",
@@ -102,7 +110,7 @@
     },
     {
       "name": "crear_venta_borrador",
-      "description": "Crea una venta en borrador (no mueve stock ni dinero hasta confirmarla). Cada línea indica un producto por SKU o nombre, o una descripción libre con precio. precio_neto es por unidad, sin IVA; si se o"
+      "description": "Crea una venta en borrador (no mueve stock ni dinero hasta confirmarla), con los mismos datos que pide el SII. «documento» es lo primero: boleta, factura o guia (guía de despacho); con factura o guía "
     },
     {
       "name": "registrar_gasto",
@@ -238,11 +246,11 @@
     },
     {
       "name": "web_leer",
-      "description": "Lee la página abierta en el Navegador de NÚCLEO: texto de la página y de cada marco, y los controles con su número ([w12] enlace, botón, campo, lista…). Los números cambian después de cada lectura. Co"
+      "description": "Lee la página abierta en el Navegador de NÚCLEO: texto de la página y de cada marco, y los controles con su número ([w12] enlace, botón, campo, lista…). Cada control conserva su número mientras la pág"
     },
     {
       "name": "web_clic",
-      "description": "Hace clic en un control de la última lectura del Navegador de NÚCLEO (por ejemplo «w12») y devuelve la página después. Con «volver» en true vuelve a la página anterior. Solo para navegar y consultar: "
+      "description": "Hace clic en un control de la última lectura del Navegador de NÚCLEO (por ejemplo «w12») y devuelve lo que cambió: texto nuevo y controles nuevos o cambiados (los demás conservan su número); si la pág"
     },
     {
       "name": "web_escribir",

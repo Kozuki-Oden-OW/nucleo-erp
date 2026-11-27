@@ -60,6 +60,7 @@ fn sale(s: &mut CompanySession, customer: &str, product: &str, qty: i64) -> Stri
                     unit_price_minor: 50_000,
                     discount_ppm: 0,
                     taxable: false,
+                    detail: None,
                 }],
                 notes: None,
                 terms: None,

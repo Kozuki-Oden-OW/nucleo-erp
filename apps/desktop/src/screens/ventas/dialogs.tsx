@@ -107,7 +107,8 @@ export function PaymentDialog({ sale, open, onClose, onDone }: { sale: SaleDetai
 export function DocumentDialog({ sale, open, onClose, onDone }: { sale: SaleDetail; open: boolean; onClose: () => void; onDone: Done }) {
   const backend = useBackend();
   const toast = useToast();
-  const [kind, setKind] = useState(EXTERNAL_DOC_KINDS[0]!);
+  // Se propone el documento que se eligió al crear la venta.
+  const [kind, setKind] = useState(() => ({ factura: "Factura", boleta: "Boleta", guia: "Guía de despacho" } as Record<string, string>)[sale.terms?.document ?? ""] ?? EXTERNAL_DOC_KINDS[0]!);
   const [number, setNumber] = useState("");
   const [date, setDate] = useState(todayIso());
   const [obs, setObs] = useState("");
@@ -140,29 +141,40 @@ export function DocumentDialog({ sale, open, onClose, onDone }: { sale: SaleDeta
   );
 }
 
-export function VoidDialog({ sale, open, onClose, onDone }: { sale: SaleDetail; open: boolean; onClose: () => void; onDone: Done }) {
+export function VoidDialog({ sale, open, onClose, onDone, creditNote = false }: { sale: SaleDetail; open: boolean; onClose: () => void; onDone: Done; creditNote?: boolean }) {
   const backend = useBackend();
   const toast = useToast();
   const [reason, setReason] = useState("");
+  // Nota de crédito que anula el documento en el SII: su folio y fecha quedan en el motivo.
+  const [ncFolio, setNcFolio] = useState("");
+  const [ncDate, setNcDate] = useState(todayIso());
+  const withNote = creditNote || sale.documentation_state === "documentada";
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const effected = sale.commercial_state === "efectuada" || sale.commercial_state === "cerrada";
   async function go() {
     setBusy(true); setErr(null);
     try {
-      const s = await backend.voidSale(sale.uid, reason);
+      const note = withNote && ncFolio.trim() ? `Nota de crédito N° ${ncFolio.trim()}${ncDate ? ` del ${formatDate(ncDate)}` : ""}: ` : "";
+      const s = await backend.voidSale(sale.uid, `${note}${reason.trim()}`);
       toast("info", `${s.number} anulada.`);
       onDone(s); onClose();
     } catch (e) { setErr(errorMessage(e)); } finally { setBusy(false); }
   }
   return (
-    <Dialog open={open} onClose={onClose} title={`Anular ${sale.number}`} size="sm" footer={<><Button variant="ghost" onClick={onClose}>Cancelar</Button><Button variant="danger" icon={Ban} onClick={go} disabled={busy || !reason.trim()}>Anular venta</Button></>}>
+    <Dialog open={open} onClose={onClose} title={creditNote ? `Nota de crédito para ${sale.number}` : `Anular ${sale.number}`} size="sm" footer={<><Button variant="ghost" onClick={onClose}>Cancelar</Button><Button variant="danger" icon={Ban} onClick={go} disabled={busy || !reason.trim()}>Anular venta</Button></>}>
       <div className="flex flex-col gap-4">
         <p className="text-sm text-muted">
           {effected ? "Se devolverá el stock y la venta dejará de contar en tus números. " : ""}
           La venta no se borra: queda anulada, con su motivo, en la auditoría.
           {sale.documentation_state === "documentada" ? " Recuerda anular también el documento tributario en el sistema oficial, si corresponde." : ""}
         </p>
+        {withNote && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="N.º de la nota de crédito" optional inputMode="numeric" value={ncFolio} onChange={(e) => setNcFolio(e.target.value)} placeholder="Ej. 24" hint="El folio con que se anuló en el SII." />
+            <Field label="Fecha" type="date" value={ncDate} onChange={(e) => setNcDate(e.target.value)} />
+          </div>
+        )}
         <TextArea label="Motivo" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ej. el cliente desistió de la compra" data-autofocus />
         {err && <Notice tone="danger">{err}</Notice>}
       </div>

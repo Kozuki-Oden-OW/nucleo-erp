@@ -132,6 +132,7 @@ fn reportes_con_cifras_conocidas() {
                     unit_price_minor: 10_000,
                     discount_ppm: 0,
                     taxable: false,
+                    detail: None,
                 }],
                 notes: None,
                 terms: None,

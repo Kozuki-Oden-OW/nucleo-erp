@@ -15,17 +15,21 @@ import { useToast } from "../../ui/overlay";
 import { DocumentDialog, EffectDialog, PaymentDialog, VoidDialog } from "./dialogs";
 import { PrintButton, PrintDoc } from "./PrintDoc";
 import { SaleSiiButton } from "./SaleSii";
-import { paymentText, referenceLabel } from "../../data/saleTerms";
+import { PURCHASE_KINDS, TRANSFER_KINDS, documentLabel, eboletaDetail, paymentText, referenceLabel, siiPayment } from "../../data/saleTerms";
 import type { SaleTerms } from "../../data";
 import { formatRut } from "../../lib/format";
 
-function TermsCard({ terms }: { terms: SaleTerms }) {
+function TermsCard({ terms, lines }: { terms: SaleTerms; lines: { description: string; qty_milli: number }[] }) {
   const r = terms.receiver;
   return (
     <Card title="Condiciones del documento">
       <div className="flex flex-col gap-4">
         <DefinitionList items={[
-          ...(terms.payment ? [{ label: "Forma de pago", value: paymentText(terms, formatDate) }] : []),
+          ...(terms.document ? [{ label: "Documento", value: documentLabel(terms.document) }] : []),
+          ...(terms.document === "boleta" ? [{ label: "Detalle para la e-Boleta", value: eboletaDetail(lines) }] : []),
+          ...(terms.document === "guia" ? [{ label: "Tipo de traslado", value: TRANSFER_KINDS.find((k) => k.value === (terms.transfer_kind ?? 1))?.label ?? "—" }] : []),
+          ...(terms.payment ? [{ label: "Forma de pago", value: `${terms.document === "factura" ? `${siiPayment(terms)} · ` : ""}${paymentText(terms, formatDate)}`.replace("Crédito · Crédito", "Crédito") }] : []),
+          ...(terms.transport ? [{ label: "Transporte", value: [terms.transport.rut && `RUT ${formatRut(terms.transport.rut)}`, terms.transport.plate && `patente ${terms.transport.plate}`, terms.transport.driver_name, terms.transport.driver_rut && `RUT chofer ${formatRut(terms.transport.driver_rut)}`].filter(Boolean).join(" · ") }] : []),
           ...terms.references.map((x) => ({ label: referenceLabel(x.kind), value: `N.º ${x.folio}${x.date ? ` del ${formatDate(x.date)}` : ""}${x.note ? ` · ${x.note}` : ""}` })),
         ]} />
         {r && (
@@ -33,6 +37,7 @@ function TermsCard({ terms }: { terms: SaleTerms }) {
             <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Receptor</div>
             <div className="font-medium text-ink">{r.name}{r.rut ? ` · RUT ${formatRut(r.rut)}` : ""}</div>
             {r.activity && <div className="text-muted">Giro: {r.activity}</div>}
+            {(r.purchase_kind || r.requester_rut) && <div className="text-muted">{[r.purchase_kind && `Tipo de compra: ${PURCHASE_KINDS.find((k) => k.value === r.purchase_kind)?.label}`, r.requester_rut && `Solicita: RUT ${formatRut(r.requester_rut)}`].filter(Boolean).join(" · ")}</div>}
             {(r.address || r.commune) && <div className="text-muted">{[r.address, r.commune, r.city, r.region].filter(Boolean).join(", ")}</div>}
             {(r.contact || r.email || r.phone) && <div className="text-muted">{[r.contact, r.email, r.phone].filter(Boolean).join(" · ")}</div>}
           </div>
@@ -44,7 +49,7 @@ function TermsCard({ terms }: { terms: SaleTerms }) {
 
 type Open = null | "effect" | "pay" | "doc" | "void";
 
-export function SaleView({ uid }: { uid: string }) {
+export function SaleView({ uid, creditNote = false }: { uid: string; creditNote?: boolean }) {
   const backend = useBackend();
   const toast = useToast();
   const t = useTerm();
@@ -52,7 +57,7 @@ export function SaleView({ uid }: { uid: string }) {
   const [s, setS] = useState<SaleDetail | null>(null);
   const [biz, setBiz] = useState<BusinessSettings | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [open, setOpen] = useState<Open>(null);
+  const [open, setOpen] = useState<Open>(creditNote ? "void" : null);
   const [snoozed, setSnoozed] = useState(false);
   const [dispatching, setDispatching] = useState<PendingDispatch | null>(null);
   const [ships, setShips] = useState<Shipment[]>([]);
@@ -147,7 +152,7 @@ export function SaleView({ uid }: { uid: string }) {
                 <tbody>
                   {s.lines.map((l) => (
                     <tr key={l.line_no} className="border-b border-line last:border-0">
-                      <td className="px-5 py-2.5 text-ink">{l.description}</td>
+                      <td className="px-5 py-2.5 text-ink">{l.description}{l.detail && <div className="mt-0.5 whitespace-pre-line text-xs text-muted">{l.detail}</div>}</td>
                       <td className="num px-3 py-2.5 text-right">{formatQty(l.qty_milli)}</td>
                       <td className="num px-3 py-2.5 text-right">{formatMoney(l.unit_price_minor)}</td>
                       <td className="num px-3 py-2.5 text-right text-muted">{l.discount_ppm ? formatPpm(l.discount_ppm, 0) : "—"}</td>
@@ -159,7 +164,7 @@ export function SaleView({ uid }: { uid: string }) {
             </div>
           </Card>
 
-          {s.terms && <TermsCard terms={s.terms} />}
+          {s.terms && <TermsCard terms={s.terms} lines={s.lines} />}
 
           {s.dispatch.length > 0 && (
             <Card title="Por despachar" subtitle="Productos que toman reservas: se descuentan del stock al despachar." padded={false}>
@@ -289,7 +294,7 @@ export function SaleView({ uid }: { uid: string }) {
       <EffectDialog sale={s} open={open === "effect"} onClose={() => setOpen(null)} onDone={setS} />
       {open === "pay" && <PaymentDialog sale={s} open onClose={() => setOpen(null)} onDone={setS} />}
       <DocumentDialog sale={s} open={open === "doc"} onClose={() => setOpen(null)} onDone={setS} />
-      <VoidDialog sale={s} open={open === "void"} onClose={() => setOpen(null)} onDone={setS} />
+      <VoidDialog sale={s} open={open === "void" && s.commercial_state !== "anulada"} onClose={() => setOpen(null)} onDone={setS} creditNote={creditNote} />
     </div>
     </>
   );

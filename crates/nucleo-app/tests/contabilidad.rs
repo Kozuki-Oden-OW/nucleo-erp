@@ -43,6 +43,7 @@ fn sell(s: &mut CompanySession, product: &str, units: i64, price: i64, date: &st
                     unit_price_minor: price,
                     discount_ppm: 0,
                     taxable: true,
+                    detail: None,
                 }],
                 notes: None,
                 terms: None,

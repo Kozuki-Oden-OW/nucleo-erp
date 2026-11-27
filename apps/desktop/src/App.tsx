@@ -42,6 +42,7 @@ import { ExpenseView } from "./screens/dinero/Expenses";
 import { Gastos } from "./screens/gastos/Gastos";
 import { Products } from "./screens/productos/Products";
 import { DocEditor } from "./screens/ventas/DocEditor";
+import { DocChooser } from "./screens/ventas/DocChooser";
 import { QuoteView } from "./screens/ventas/QuoteView";
 import { SaleView } from "./screens/ventas/SaleView";
 import { SalesList } from "./screens/ventas/SalesList";
@@ -146,9 +147,15 @@ function Screen({ route, info, session, reload }: { route: Route; info: AppInfo;
       return has.has("dashboard") ? <Dashboard session={session} /> : <DesktopHome session={session} />;
     case "ventas":
       if (!has.has("ventas")) return <Proximamente id="vender" />;
-      if (a === "nueva") return <DocEditor key={route.raw} kind={route.query.get("tipo") === "FV" ? "FV" : "VEN"} initialCustomerUid={route.query.get("cliente")} />;
+      if (a === "nueva") {
+        // Lo primero es el documento (boleta, factura, guía o nota de crédito); después, su formulario.
+        const doc = route.query.get("doc");
+        if (route.query.get("tipo") === "FV") return <DocEditor key={route.raw} kind="FV" initialCustomerUid={route.query.get("cliente")} />;
+        if (!doc) return <DocChooser customerUid={route.query.get("cliente")} />;
+        return <DocEditor key={route.raw} kind="VEN" doc={doc === "boleta" || doc === "factura" || doc === "guia" ? doc : ""} initialCustomerUid={route.query.get("cliente")} />;
+      }
       if (a && b === "editar") return <EditLoader kind="sale" uid={a} />;
-      if (a) return <SaleView key={a} uid={a} />;
+      if (a) return <SaleView key={a} uid={a} creditNote={route.query.get("nc") === "1"} />;
       return <SalesList route={route} />;
     case "cotizaciones":
       if (!has.has("ventas")) return <Proximamente id="vender" />;

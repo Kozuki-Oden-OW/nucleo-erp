@@ -1220,6 +1220,7 @@ export class DemoBackend implements Backend {
       address: t(input.address), commune: t(input.commune), city: t(input.city), region: t(input.region), contact_name: t(input.contact_name),
       invoice_email: t(input.invoice_email), payment_terms_days: days, credit_limit_minor: input.credit_limit_minor ?? null, notes: t(input.notes),
       credit_enabled: !!input.credit_enabled, credit_conditions: t(input.credit_conditions), preferred: !!input.preferred,
+      requires_po: !!input.requires_po,
     };
   }
   async addCustomer(input: NewCustomer): Promise<Customer> {
@@ -1493,6 +1494,8 @@ export class DemoBackend implements Backend {
       return wait(this.detail(s));
     }
     const terms = normalizeTerms(input.terms, input.issue_date);
+    // El cliente que compra con orden de compra queda recordado.
+    if (terms?.references.some((r) => r.kind === "801")) { const c = this.customers.find((x) => x.uid === input.customer_uid); if (c) c.requires_po = true; }
     const s = this.makeSale(input.doc_type, input.customer_uid, input.issue_date, input.lines, null);
     s.notes = input.notes ?? null;
     s.terms = terms;
@@ -2566,7 +2569,8 @@ export class DemoBackend implements Backend {
     if (!url.startsWith("https://")) throw new AppError("validacion", "La dirección de ingreso debe empezar con https:// (cópiala de la página donde inicias sesión).");
     const both = `${name} ${url}`.toLowerCase();
     if (both.includes("google.com")) throw new AppError("validacion", "La cuenta de Google no se guarda: inicia sesión tú en el navegador.");
-    if (both.includes("sii.cl") || both.includes("clave tributaria")) throw new AppError("validacion", "La Clave Tributaria del SII no se guarda: entra tú con tu certificado o tu clave.");
+    const eboleta = /^https:\/\/eboleta\.sii\.cl(\/|$)/i.test(url);
+    if (!eboleta && (both.includes("sii.cl") || both.includes("clave tributaria"))) throw new AppError("validacion", "Del SII solo se guarda el acceso a e-Boleta (https://eboleta.sii.cl/): al resto se entra con el certificado digital.");
     if (!username) throw new AppError("validacion", "Escribe el usuario o correo con que se inicia sesión.");
     if (!input.no_payments) throw new AppError("validacion", "Confirma que esta cuenta no puede pagar ni transferir: NÚCLEO solo guarda accesos de consulta.");
     const cur = u ? this.accessList.find((a) => a.uid === u) : undefined;

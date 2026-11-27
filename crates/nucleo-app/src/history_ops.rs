@@ -276,6 +276,7 @@ impl CompanySession {
             lines.push(NewLine {
                 product_id: product.map(|p| p.0),
                 description: l.description.trim().chars().take(500).collect(),
+                detail: None,
                 qty_milli: l.qty_milli,
                 list_price_minor: l.unit_price_minor,
                 unit_price_minor: l.unit_price_minor,

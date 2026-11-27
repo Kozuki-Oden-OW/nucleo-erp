@@ -154,6 +154,8 @@ export interface CustomerProfile {
   credit_conditions: string | null;
   /** Cliente preferencial (recibe las promociones para preferenciales). */
   preferred: boolean;
+  /** Trabaja con orden de compra: al venderle se pide su número para las referencias. */
+  requires_po?: boolean;
 }
 export interface Customer extends CustomerProfile {
   id: number;
@@ -180,7 +182,15 @@ export interface ReferenceKind { code: string; label: string; custom_id: number 
 export interface Receiver {
   rut: string | null; name: string | null; trade_name: string | null; activity: string | null; address: string | null;
   commune: string | null; city: string | null; region: string | null; email: string | null; phone: string | null; contact: string | null;
+  /** «Tipo de compra» del SII (1 = Del Giro … 7 = No corresponde incluir). */
+  purchase_kind?: number | null;
+  /** «Rut solicita»: persona que pide la factura. */
+  requester_rut?: string | null;
 }
+/** Documento tributario con que sale la venta ("" = sin definir). */
+export type SaleDocument = "" | "boleta" | "factura" | "guia";
+/** Bloque «Transporte» del documento, como en el SII. */
+export interface Transport { rut: string | null; plate: string | null; driver_rut: string | null; driver_name: string | null }
 export interface SaleTerms {
   payment: SalePayment;
   card: "debito" | "credito" | null;
@@ -192,6 +202,10 @@ export interface SaleTerms {
   operation: string | null;
   references: SaleReference[];
   receiver: Receiver | null;
+  document?: SaleDocument;
+  /** Guía de despacho: tipo de traslado del SII (1 a 9). */
+  transfer_kind?: number | null;
+  transport?: Transport | null;
 }
 export interface CustomerDetail extends Customer {
   sales_count: number;
@@ -302,6 +316,8 @@ export interface LineInput {
   unit_price_minor: number;
   discount_ppm: number;
   taxable: boolean;
+  /** Descripción extendida de la línea (la casilla «Descrip.» del facturador del SII). */
+  detail?: string | null;
 }
 export interface Line extends LineInput {
   line_no: number;
@@ -2246,7 +2262,11 @@ export interface BrowserPageState {
 /** Un control de la página: `n` es su número (w12), `k` el tipo, `l` la etiqueta, `v` el valor. */
 export interface BrowserControl { n: number; k: string; l: string; v?: string; o?: string[]; d?: number }
 export interface BrowserFrame { path: string; href: string; title: string; type: string; text: string; controls: BrowserControl[] }
-export interface BrowserPage { url?: string; title?: string; frames?: BrowserFrame[]; navego?: boolean; error?: string }
+export interface BrowserPage {
+  url?: string; title?: string; frames?: BrowserFrame[]; navego?: boolean; error?: string;
+  /** Avisos (alert) que mostró la página desde la lectura anterior. */
+  alerts?: string[];
+}
 export interface BrowserRead { state: BrowserPageState; page: BrowserPage }
 export interface BrowserActResult {
   state: BrowserPageState;

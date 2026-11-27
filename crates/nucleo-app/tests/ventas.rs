@@ -50,6 +50,7 @@ fn line(
         unit_price_minor: price,
         discount_ppm: discount_pct * 10_000,
         taxable: true,
+        detail: None,
     }
 }
 
@@ -576,5 +577,124 @@ fn ficha_completa_del_cliente_y_condiciones_de_la_factura_interna() {
     assert_eq!(
         v.terms.unwrap().payment_reference().as_deref(),
         Some("Banco Estado · 998877")
+    );
+}
+
+#[test]
+fn venta_con_los_datos_del_sii_documento_receptor_descripcion_y_orden_de_compra() {
+    use nucleo_app::nucleo_db::customers::CustomerProfile;
+    use nucleo_app::sale_terms::{Receiver, SaleReference, SaleTerms, Transport};
+    let (_d, _app, mut s) = session(BusinessProfile::Empresa);
+    let c = s
+        .add_customer(&NewCustomer {
+            name: "Asurity SpA".into(),
+            rut: Some("76.086.428-5".into()),
+            profile: CustomerProfile {
+                kind: "empresa".into(),
+                commune: Some("Providencia".into()),
+                city: Some("Santiago".into()),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .unwrap();
+    assert!(!c.profile.requires_po);
+    let terms = |document: &str| SaleTerms {
+        document: document.into(),
+        payment: "transferencia".into(),
+        references: vec![SaleReference {
+            kind: "801".into(),
+            folio: "4500012345".into(),
+            ..Default::default()
+        }],
+        receiver: Some(Receiver {
+            rut: Some("76.086.428-5".into()),
+            name: Some("Asurity SpA".into()),
+            city: Some("Santiago".into()),
+            purchase_kind: Some(4),
+            requester_rut: Some("11.111.111-1".into()),
+            ..Default::default()
+        }),
+        transport: Some(Transport {
+            plate: Some("abcd12".into()),
+            driver_name: Some("Juan Pérez".into()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let mut l = line(None, "Verificación de puntos", 2, 15_000, 0);
+    l.detail = Some("  Puntos 2 °C y 8 °C · serie EF123  ".into());
+    let input = |t: SaleTerms, lines: Vec<LineInput>| SaleInput {
+        doc_type: "VEN".into(),
+        customer_uid: Some(c.uid.clone()),
+        issue_date: HOY.into(),
+        lines,
+        notes: None,
+        terms: Some(t),
+    };
+    let v = s
+        .save_sale(&input(terms("Factura"), vec![l.clone()]), None)
+        .unwrap();
+    // La descripción extendida queda en la línea; el documento y el receptor, en las condiciones.
+    assert_eq!(
+        v.lines[0].detail.as_deref(),
+        Some("Puntos 2 °C y 8 °C · serie EF123")
+    );
+    let t = v.terms.unwrap();
+    assert_eq!(t.document, "factura");
+    assert_eq!(t.transfer_kind, None);
+    let r = t.receiver.unwrap();
+    assert_eq!(r.purchase_kind, Some(4));
+    assert_eq!(r.requester_rut.as_deref(), Some("11111111-1"));
+    assert_eq!(t.transport.unwrap().plate.as_deref(), Some("ABCD12"));
+    // La orden de compra deja recordado al cliente: la próxima venta la pide.
+    assert!(
+        s.customer_detail(&c.uid)
+            .unwrap()
+            .customer
+            .profile
+            .requires_po
+    );
+
+    // Guía: el tipo de traslado por omisión es «operación constituye venta».
+    let g = s
+        .save_sale(&input(terms("guia"), vec![l.clone()]), None)
+        .unwrap();
+    assert_eq!(g.terms.unwrap().transfer_kind, Some(1));
+
+    // Lo que no existe en el SII se rechaza.
+    assert!(matches!(
+        s.save_sale(&input(terms("recibo"), vec![l.clone()]), None),
+        Err(AppError::Validation(_))
+    ));
+    let mut malo = terms("factura");
+    malo.receiver.as_mut().unwrap().purchase_kind = Some(9);
+    assert!(s.save_sale(&input(malo, vec![l.clone()]), None).is_err());
+    let mut largo = l.clone();
+    largo.detail = Some("x".repeat(1001));
+    assert!(
+        s.save_sale(&input(terms("factura"), vec![largo]), None)
+            .is_err()
+    );
+
+    // La descripción extendida sigue en la venta que nace de una cotización.
+    let q = s
+        .save_quote(
+            &QuoteInput {
+                customer_uid: Some(c.uid.clone()),
+                prospect_name: None,
+                issue_date: HOY.into(),
+                valid_until: Some(in_30_days()),
+                lines: vec![l],
+                notes: None,
+            },
+            None,
+        )
+        .unwrap();
+    assert!(q.lines[0].detail.is_some());
+    let conv = s.convert_quote(&q.summary.uid).unwrap();
+    assert_eq!(
+        conv.lines[0].detail.as_deref(),
+        Some("Puntos 2 °C y 8 °C · serie EF123")
     );
 }

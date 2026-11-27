@@ -59,6 +59,7 @@ fn sell(
                 unit_price_minor: 10_000,
                 discount_ppm: 0,
                 taxable: true,
+                detail: None,
             }],
             notes: None,
             terms: None,

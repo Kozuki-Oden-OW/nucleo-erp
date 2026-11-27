@@ -3,6 +3,7 @@ import { Crown, FilePlus2, Mail, Pencil, Plus, Search, ShoppingBag, UserPlus, Us
 import { MailComposer } from "../../ui/MailComposer";
 import { useBackend, errorMessage, type Customer, type CustomerDetail, type NewCustomer } from "../../data";
 import { REGIONS } from "../../data/lre";
+import { cityForCommune } from "../../data/saleTerms";
 import { formatDate, formatMoney, formatRut } from "../../lib/format";
 import { useTerm } from "../../lib/glosario";
 import { navigate, type Route } from "../../lib/router";
@@ -66,7 +67,7 @@ export function Customers({ route }: { route: Route }) {
 type Form = {
   kind: "persona" | "empresa"; name: string; rut: string; trade_name: string; business_activity: string; email: string; phone: string;
   invoice_email: string; contact_name: string; address: string; commune: string; city: string; region: string; days: string;
-  credit_limit: number | null; notes: string; credit_enabled: boolean; credit_conditions: string; preferred: boolean;
+  credit_limit: number | null; notes: string; credit_enabled: boolean; credit_conditions: string; preferred: boolean; requires_po: boolean;
 };
 
 function toForm(c: Customer | undefined, initialName: string): Form {
@@ -76,6 +77,7 @@ function toForm(c: Customer | undefined, initialName: string): Form {
     contact_name: c?.contact_name ?? "", address: c?.address ?? "", commune: c?.commune ?? "", city: c?.city ?? "", region: c?.region ?? "",
     days: c?.payment_terms_days ? String(c.payment_terms_days) : "", credit_limit: c?.credit_limit_minor ?? null, notes: c?.notes ?? "",
     credit_enabled: c?.credit_enabled ?? false, credit_conditions: c?.credit_conditions ?? "", preferred: c?.preferred ?? false,
+    requires_po: c?.requires_po ?? false,
   };
 }
 
@@ -87,7 +89,7 @@ export function customerInput(f: Form): NewCustomer {
     trade_name: t(f.trade_name), business_activity: t(f.business_activity), invoice_email: t(f.invoice_email), contact_name: t(f.contact_name),
     address: t(f.address), commune: t(f.commune), city: t(f.city), region: t(f.region),
     payment_terms_days: f.credit_enabled ? Number(f.days) || 0 : 0, credit_limit_minor: f.credit_enabled ? f.credit_limit : null, notes: t(f.notes),
-    credit_enabled: f.credit_enabled, credit_conditions: f.credit_enabled ? t(f.credit_conditions) : null, preferred: f.preferred,
+    credit_enabled: f.credit_enabled, credit_conditions: f.credit_enabled ? t(f.credit_conditions) : null, preferred: f.preferred, requires_po: f.requires_po,
   };
 }
 
@@ -140,7 +142,7 @@ export function NewCustomerDrawer({ open, onClose, onCreated, initialName = "", 
             <Field label="RUT" optional value={form.rut} onChange={(e) => set({ rut: e.target.value })} placeholder="12.345.678-5" hint="Se valida el dígito verificador." />
             {company && <Field label="Nombre de fantasía" optional value={form.trade_name} onChange={(e) => set({ trade_name: e.target.value })} />}
           </div>
-          <Field label="Giro" optional value={form.business_activity} onChange={(e) => set({ business_activity: e.target.value })} placeholder="Ej. Venta al por menor de equipos" hint="Aparece en la factura interna." />
+          <Field label="Giro" optional value={form.business_activity} onChange={(e) => set({ business_activity: e.target.value })} placeholder="Ej. Venta al por menor de equipos" hint="Va en la factura, igual que en el SII." />
         </Section>
         <Section title="Contacto">
           <div className="grid gap-3 sm:grid-cols-2">
@@ -154,7 +156,8 @@ export function NewCustomerDrawer({ open, onClose, onCreated, initialName = "", 
           <Field label="Dirección" optional value={form.address} onChange={(e) => set({ address: e.target.value })} placeholder="Calle, número, oficina" />
           <div className="grid gap-3 sm:grid-cols-3">
             <Field label="Comuna" optional value={form.commune} onChange={(e) => set({ commune: e.target.value })} />
-            <Field label="Ciudad" optional value={form.city} onChange={(e) => set({ city: e.target.value })} />
+            <Field label="Ciudad" optional value={form.city} onChange={(e) => set({ city: e.target.value })} placeholder={cityForCommune(form.commune) ?? undefined}
+              onFocus={() => { if (!form.city && form.commune) set({ city: cityForCommune(form.commune) ?? "" }); }} hint="El SII la exige en la factura." />
             <Select label="Región" optional value={form.region} onChange={(e) => set({ region: e.target.value })}
               options={regionOptions(form.region)} />
           </div>
@@ -174,6 +177,8 @@ export function NewCustomerDrawer({ open, onClose, onCreated, initialName = "", 
                 placeholder="Ej. paga con transferencia los días 5; firma pagaré; cheque en garantía; tope por compra…" />
             </div>
           )}
+          <Checkbox label="Trabaja con orden de compra" checked={form.requires_po} onChange={(v) => set({ requires_po: v })}
+            hint="Al venderle, NÚCLEO pide el número de la orden de compra y lo anota en Referencias de la factura." />
           <Checkbox label="Cliente preferencial" checked={form.preferred} onChange={(v) => set({ preferred: v })}
             hint="Recibe las promociones para clientes preferenciales (Descuentos y promociones)." />
           <TextArea label="Notas" optional value={form.notes} onChange={(e) => set({ notes: e.target.value })} placeholder="Horario de recepción, condiciones especiales…" />
@@ -236,6 +241,7 @@ function CustomerDrawer({ uid, onClose, onChanged }: { uid: string; onClose: () 
             ...(c.invoice_email ? [{ label: "Correo para facturas", value: c.invoice_email }] : []),
             ...(c.contact_name ? [{ label: "Contacto", value: c.contact_name }] : []),
             { label: "Condición de pago", value: c.credit_enabled ? `Crédito${c.payment_terms_days ? ` ${c.payment_terms_days} días` : ""}` : "Contado" },
+            { label: "Orden de compra", value: c.requires_po ? "Trabaja con orden de compra" : "No la pide" },
             ...(c.notes ? [{ label: "Notas", value: c.notes }] : []),
           ]} />
           <CreditPanel key={`cr${version}`} uid={c.uid} company={c.kind === "empresa"} onFilesChanged={() => setFiles((v) => v + 1)} />

@@ -24,6 +24,8 @@ use rust_decimal::prelude::ToPrimitive;
 use serde::{Deserialize, Serialize};
 
 pub(crate) const MAX_LINES: usize = 500;
+/// Largo de la descripción extendida de una línea (el del detalle de un DTE).
+pub(crate) const MAX_DETAIL: usize = 1000;
 pub(crate) const MAX_QTY_MILLI: i64 = 1_000_000_000_000;
 pub(crate) const MAX_PRICE_MINOR: i64 = 10_000_000_000_000;
 
@@ -90,6 +92,9 @@ pub struct LineInput {
     pub unit_price_minor: i64,
     pub discount_ppm: i64,
     pub taxable: bool,
+    /// Descripción extendida de la línea (la casilla «Descrip.» del facturador del SII).
+    #[serde(default)]
+    pub detail: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -104,6 +109,7 @@ pub struct Line {
     pub net_minor: i64,
     pub discount_minor: i64,
     pub unit_cost_e4: Option<i64>,
+    pub detail: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -451,6 +457,12 @@ impl CompanySession {
                     "revisa la línea {n}: la descripción es obligatoria (hasta 300 caracteres)"
                 )));
             }
+            let detail = l.detail.as_deref().map(str::trim).filter(|d| !d.is_empty());
+            if detail.is_some_and(|d| d.chars().count() > MAX_DETAIL) {
+                return Err(AppError::Validation(format!(
+                    "revisa la línea {n}: la descripción extendida admite hasta {MAX_DETAIL} caracteres"
+                )));
+            }
             if l.qty_milli <= 0 || l.qty_milli > MAX_QTY_MILLI {
                 return Err(AppError::Validation(format!(
                     "revisa la línea {n}: la cantidad debe ser mayor que cero"
@@ -477,6 +489,7 @@ impl CompanySession {
             lines.push(NewLine {
                 product_id: product.as_ref().map(|p| p.id),
                 description: desc.to_string(),
+                detail: detail.map(String::from),
                 qty_milli: l.qty_milli,
                 list_price_minor: product
                     .as_ref()
@@ -511,6 +524,7 @@ impl CompanySession {
                 net_minor: r.net_minor,
                 discount_minor: r.discount_minor,
                 unit_cost_e4: if costs { r.unit_cost_e4 } else { None },
+                detail: r.detail,
             })
             .collect()
     }
@@ -1023,6 +1037,7 @@ impl CompanySession {
                 unit_price_minor: l.unit_price_minor,
                 discount_ppm: l.discount_ppm,
                 taxable: l.taxable,
+                detail: l.detail,
             })
             .collect();
         let p = self.prepare_lines(&input)?;
@@ -1266,6 +1281,15 @@ impl CompanySession {
         };
         db::replace_sale_items(&tx, id, &p.lines)?;
         db::set_sale_terms(&tx, id, terms_json.as_deref())?;
+        // El cliente que compra con orden de compra queda recordado: la próxima vez se le pide.
+        if let (Some(cid), Some(t)) = (customer_id, &terms)
+            && t.references.iter().any(|r| r.kind == "801")
+        {
+            tx.execute(
+                "UPDATE customers SET requires_po = 1 WHERE id = ?1 AND requires_po = 0",
+                [cid],
+            )?;
+        }
         let (action, text) = match existing {
             Some(_) => ("venta.editar", "Borrador modificado"),
             None => ("venta.crear", "Creada como borrador"),

@@ -31,13 +31,17 @@ export function BrowserCard() {
     try { apply(await backend.browserInfo()); } catch (e) { setErr(errorMessage(e)); }
   }, [backend, apply]);
   useEffect(() => { void load(); }, [load]);
-  // Los accesos se agregan en la tarjeta de al lado: se vuelve a leer cuando cambian los datos.
+  // Los accesos se agregan en la tarjeta de al lado: al cambiar los datos o volver a la ventana se
+  // actualizan los permisos y el estado, sin tocar lo que la persona tenga escrito y sin guardar.
+  const refresh = useCallback(async () => {
+    try { setView(await backend.browserInfo()); } catch { /* se verá en la próxima lectura */ }
+  }, [backend]);
   useEffect(() => {
-    const again = () => void load();
+    const again = () => void refresh();
     window.addEventListener("nucleo:datos", again);
     window.addEventListener("focus", again);
     return () => { window.removeEventListener("nucleo:datos", again); window.removeEventListener("focus", again); };
-  }, [load]);
+  }, [refresh]);
 
   if (err) return <Notice tone="danger">{err}</Notice>;
   if (!view) return <Spinner />;
@@ -56,7 +60,7 @@ export function BrowserCard() {
   );
   const open = async () => {
     setBusy(true);
-    try { await backend.browserOpen(url.trim(), null); await load(); } catch (e) { toast("danger", errorMessage(e)); } finally { setBusy(false); }
+    try { await backend.browserOpen(url.trim(), null); await refresh(); } catch (e) { toast("danger", errorMessage(e)); } finally { setBusy(false); }
   };
   const dirty = dir !== view.settings.download_dir || sites.split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean).join("\n") !== view.settings.sites.join("\n");
 

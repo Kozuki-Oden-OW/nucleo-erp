@@ -56,7 +56,7 @@ fn guarda_lista_sin_la_clave_y_borra() {
         s.save_access(None, &x)
             .unwrap_err()
             .to_string()
-            .contains("Clave Tributaria")
+            .contains("e-Boleta")
     );
     let mut x = ml();
     x.login_url = "https://accounts.google.com/".into();

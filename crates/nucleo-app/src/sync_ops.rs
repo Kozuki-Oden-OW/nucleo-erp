@@ -305,6 +305,7 @@ impl CompanySession {
                                 unit_price_minor: l.unit_price_minor,
                                 discount_ppm: l.discount_ppm,
                                 taxable: l.taxable,
+                                detail: None,
                             })
                             .collect(),
                         notes: Some(

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DemoBackend } from "../data/demo/store";
 import { historicalTerms, runTool, TOOL_DEFS } from "./tools";
+import { formatChange } from "./web";
 
 const txt = (r: { content: { text: string }[] }) => r.content.map((c) => c.text).join("\n");
 
@@ -92,6 +93,97 @@ describe("herramientas de Claude", () => {
   });
 });
 
+describe("venta con los datos del SII", () => {
+  it("factura: receptor con ciudad, descripción extendida, orden de compra recordada y forma de pago", async () => {
+    const b = new DemoBackend();
+    await runTool(b, "borradores", "crear_cliente", { nombre: "Asurity SpA", rut: "78.169.652-8", giro: "Servicios de seguridad", direccion: "Av. Providencia 1234", comuna: "Providencia" });
+    // La ciudad se propone desde la comuna: el SII la exige y no la completa.
+    expect(txt(await runTool(b, "ver", "buscar_clientes", { texto: "Asurity" }))).toMatch(/Providencia, Santiago · contado$/);
+    const sin = await runTool(b, "borradores", "crear_venta_borrador", { documento: "factura", lineas: [{ descripcion: "Servicio", precio_neto: 1000 }] });
+    expect(sin.isError).toBe(true);
+    expect(txt(sin)).toMatch(/La factura necesita un cliente/);
+    const v = txt(await runTool(b, "borradores", "crear_venta_borrador", {
+      cliente: "78.169.652-8", documento: "factura",
+      lineas: [{ descripcion: "Verificación de puntos", detalle: "Puntos 2 °C y 8 °C · serie EF123", precio_neto: 15000, cantidad: 2 }],
+      referencias: [{ tipo: "orden de compra", folio: "4500012345", fecha: "2026-11-20" }],
+    }));
+    expect(v).toMatch(/Documento: Factura · forma de pago Contado · referencias: Orden de Compra 4500012345/);
+    expect(v).toMatch(/total \$35\.700/);
+    const uid = v.match(/Identificador: (\S+)/)![1]!;
+    const ver = txt(await runTool(b, "ver", "ver_venta", { venta: uid }));
+    expect(ver).toMatch(/· Factura · fecha/);
+    expect(ver).toMatch(/- Rut: 78169652-8\n- Razón Social: Asurity SpA\n- Tipo de Compra: Del Giro\n- Dirección: Av\. Providencia 1234\n- Comuna: Providencia\n- Ciudad: Santiago\n- Giro: Servicios de seguridad/);
+    expect(ver).toMatch(/1\. Verificación de puntos · 2 · \$15\.000 · — · \$30\.000\n {3}Descrip\.: Puntos 2 °C y 8 °C · serie EF123/);
+    expect(ver).toMatch(/- Orden de Compra · 4500012345 · 2026-11-20 · —/);
+    expect(ver).toMatch(/FORMA DE PAGO: Contado \(Transferencia\)/);
+    expect(ver).not.toMatch(/Falta para emitir/);
+    // El cliente queda recordado: la próxima venta sin orden de compra lo avisa.
+    expect(txt(await runTool(b, "ver", "buscar_clientes", { texto: "Asurity" }))).toMatch(/trabaja con orden de compra/);
+    const v2 = txt(await runTool(b, "borradores", "crear_venta_borrador", { cliente: "Asurity", documento: "factura", forma_pago: "credito", dias_credito: 45, lineas: [{ descripcion: "Calibración", precio_neto: 50000 }] }));
+    expect(v2).toMatch(/forma de pago Crédito 45 días/);
+    expect(v2).toMatch(/trabaja con orden de compra y no se anotó ninguna/);
+  });
+
+  it("actualiza la ficha del cliente y dice qué falta para facturarle", async () => {
+    const b = new DemoBackend();
+    await runTool(b, "borradores", "crear_cliente", { nombre: "Insumos Pardo Ltda", rut: "77.778.342-4" });
+    expect((await runTool(b, "borradores", "actualizar_cliente", { cliente: "77.778.342-4", ciudad: "Santiago" })).isError).toBe(true);
+    const up = txt(await runTool(b, "completo", "actualizar_cliente", { cliente: "77.778.342-4", giro: "Venta de insumos", comuna: "Ñuñoa", ciudad: "Santiago", trabaja_con_oc: true }));
+    expect(up).toMatch(/giro: «vacío» → «Venta de insumos»/);
+    expect(up).toMatch(/orden de compra: no la pedía → trabaja con orden de compra/);
+    expect(up).toMatch(/todavía falta: dirección/);
+    expect(txt(await runTool(b, "completo", "actualizar_cliente", { cliente: "77.778.342-4", ciudad: "Santiago" }))).toMatch(/^Sin cambios/);
+    const guia = txt(await runTool(b, "borradores", "crear_venta_borrador", { cliente: "77.778.342-4", documento: "guia", tipo_traslado: 5, lineas: [{ descripcion: "Data logger", precio_neto: 20000 }] }));
+    expect(guia).toMatch(/Documento: Guía de despacho/);
+    expect(guia).toMatch(/Al receptor le falta dirección/);
+    const uid = guia.match(/Identificador: (\S+)/)![1]!;
+    expect(txt(await runTool(b, "ver", "ver_venta", { venta: uid }))).toMatch(/Tipo Traslado: Traslados internos/);
+  });
+});
+
+describe("boleta electrónica y accesos del SII", () => {
+  it("arma el detalle de la e-Boleta en 80 caracteres", async () => {
+    const { eboletaDetail } = await import("../data/saleTerms");
+    expect(eboletaDetail([{ description: "RC-5+", qty_milli: 7000 }, { description: "RC-51H", qty_milli: 8000 }])).toBe("7 X RC-5+, 8 X RC-51H");
+    const largo = eboletaDetail(Array.from({ length: 6 }, (_, i) => ({ description: `Registrador de temperatura modelo ${i}`, qty_milli: 1500 })));
+    expect(largo.length).toBeLessThanOrEqual(80);
+    expect(largo).toMatch(/^1,5 X Registr/);
+    expect(eboletaDetail(Array.from({ length: 30 }, (_, i) => ({ description: `Producto ${i}`, qty_milli: 1000 }))).length).toBeLessThanOrEqual(80);
+    const b = new DemoBackend();
+    const v = txt(await runTool(b, "borradores", "crear_venta_borrador", { documento: "boleta", medio_pago: "efectivo", lineas: [{ descripcion: "RC-5+", precio_neto: 10000, cantidad: 7 }, { descripcion: "RC-51H", precio_neto: 12000, cantidad: 8 }] }));
+    const ver = txt(await runTool(b, "ver", "ver_venta", { venta: v.match(/Identificador: (\S+)/)![1]! }));
+    expect(ver).toMatch(/PARA LA e-BOLETA DEL SII/);
+    expect(ver).toMatch(/- Monto: \$197\.540 \(total con IVA\)\n- Tipo: Boleta afecta\n- Método de pago: Efectivo\n- Detalle \(máx\. 80\): 7 X RC-5\+, 8 X RC-51H/);
+  });
+  it("del SII solo se guarda el acceso a e-Boleta", async () => {
+    const b = new DemoBackend();
+    const base = { username: "17256184-5", password: "x", kind: "operador" as const, notes: "", no_payments: true };
+    await expect(b.saveAccess(null, { ...base, name: "SII", login_url: "https://zeusr.sii.cl/AUT2000/" })).rejects.toThrow(/solo se guarda el acceso a e-Boleta/);
+    await expect(b.saveAccess(null, { ...base, name: "Otro", login_url: "https://eboleta.sii.cl.malo.com/" })).rejects.toThrow(/e-Boleta/);
+    expect((await b.saveAccess(null, { ...base, name: "SII e-Boleta", login_url: "https://eboleta.sii.cl/" })).name).toBe("SII e-Boleta");
+  });
+});
+
+describe("navegador: solo lo que cambió", () => {
+  const st = { open: true, url: "https://www1.sii.cl/f", loading: false, blocked: null, downloads: [], folder: "D:\\Facturas" };
+  const frame = (text: string, controls: { n: number; k: string; l: string; v?: string }[]) => ({ path: "", href: "https://www1.sii.cl/f?x=1", title: "F", type: "text/html", text, controls });
+  it("informa texto y controles nuevos, y el aviso de la página", () => {
+    const before = { url: "https://www1.sii.cl/f?x=1", title: "Factura", frames: [frame("DATOS RECEPTOR\nRut", [{ n: 1, k: "campo", l: "Rut", v: "" }, { n: 2, k: "botón", l: "Validar" }])] };
+    const after = { url: "https://www1.sii.cl/f?x=1", title: "Factura", alerts: ["Debe ingresar la ciudad"], frames: [frame("DATOS RECEPTOR\nRut\nASURITY SPA", [{ n: 1, k: "campo", l: "Rut", v: "78169652" }, { n: 2, k: "botón", l: "Validar" }, { n: 9, k: "campo", l: "Linea2", v: "" }])] };
+    const out = formatChange(before, after, st)!;
+    expect(out).toMatch(/Aviso de la página: «Debe ingresar la ciudad»/);
+    expect(out).toMatch(/Texto nuevo:\nASURITY SPA/);
+    expect(out).toMatch(/\[w1\] campo «Rut» = «78169652»\n\[w9\] campo «Linea2»/);
+    expect(out).not.toMatch(/Validar|DATOS RECEPTOR/);
+    expect(formatChange(before, before, st)).toMatch(/Sin cambios visibles/);
+  });
+  it("si la página es otra, no hay resumen", () => {
+    const before = { url: "https://www1.sii.cl/f", title: "A", frames: [frame("a", [])] };
+    expect(formatChange(before, { url: "https://www1.sii.cl/otra", title: "B", frames: [frame("b", [])] }, st)).toBeNull();
+    expect(formatChange(null, before, st)).toBeNull();
+  });
+});
+
 describe("historial a crédito", () => {
   it("lee la orden de compra y la fecha de pago de la factura", () => {
     const t = historicalTerms("Crédito", "- Guia Despacho Electrónica N° 22 del 2026-09-01 - Orden Compra N° 22.112 del 2026-11-18 - TipoDoc.HES N° 6005 del 2026-11-18 Pagos: 2026-12-18      $ 1.140.020 OC N° 22.112 Forma de Pago:Crédito");
@@ -148,7 +240,7 @@ describe("Accesos (gestor de contraseñas)", () => {
     expect(txt(await runTool(b, "ver", "listar_accesos", {}))).toMatch(/No hay accesos guardados/);
     const base = { name: "Mercado Libre", login_url: "https://www.mercadolibre.cl/", username: "colaborador@ejemplo.cl", password: "clave-de-ejemplo", kind: "lectura" as const, no_payments: true };
     await expect(b.saveAccess(null, { ...base, no_payments: false })).rejects.toThrow(/no puede pagar ni transferir/);
-    await expect(b.saveAccess(null, { ...base, login_url: "https://zeusr.sii.cl/" })).rejects.toThrow(/Clave Tributaria/);
+    await expect(b.saveAccess(null, { ...base, login_url: "https://zeusr.sii.cl/" })).rejects.toThrow(/solo se guarda el acceso a e-Boleta/);
     await expect(b.saveAccess(null, { ...base, password: "" })).rejects.toThrow(/clave/);
     const a = await b.saveAccess(null, base);
     expect(JSON.stringify(await b.accesses())).not.toMatch(/clave-de-ejemplo/);

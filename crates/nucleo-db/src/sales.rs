@@ -19,6 +19,8 @@ pub struct Totals {
 pub struct NewLine {
     pub product_id: Option<i64>,
     pub description: String,
+    /// Descripción extendida de la línea (la casilla «Descrip.» del SII).
+    pub detail: Option<String>,
     pub qty_milli: i64,
     pub list_price_minor: i64,
     pub unit_price_minor: i64,
@@ -42,6 +44,7 @@ pub struct LineRow {
     pub taxable: bool,
     pub net_minor: i64,
     pub unit_cost_e4: Option<i64>,
+    pub detail: Option<String>,
 }
 
 fn totals_at(r: &Row<'_>, i: usize) -> rusqlite::Result<Totals> {
@@ -162,7 +165,7 @@ pub fn replace_quote_items(conn: &Connection, quote_id: i64, lines: &[NewLine]) 
     conn.execute("DELETE FROM quote_items WHERE quote_id = ?1", [quote_id])?;
     let mut stmt = conn.prepare(
         "INSERT INTO quote_items (quote_id, line_no, product_id, description, qty_milli, unit_price_minor, discount_ppm,
-            discount_minor, taxable, net_minor) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            discount_minor, taxable, net_minor, detail) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
     )?;
     for (i, l) in lines.iter().enumerate() {
         stmt.execute(rusqlite::params![
@@ -175,7 +178,8 @@ pub fn replace_quote_items(conn: &Connection, quote_id: i64, lines: &[NewLine]) 
             l.discount_ppm,
             l.discount_minor,
             l.taxable as i64,
-            l.net_minor
+            l.net_minor,
+            l.detail
         ])?;
     }
     Ok(())
@@ -200,7 +204,7 @@ pub fn quote_by_id(conn: &Connection, id: i64) -> DbResult<Option<QuoteRow>> {
 pub fn quote_lines(conn: &Connection, quote_id: i64) -> DbResult<Vec<LineRow>> {
     let mut stmt = conn.prepare(
         "SELECT i.id, i.line_no, i.product_id, p.uid, i.description, i.qty_milli, i.unit_price_minor, i.discount_ppm,
-            i.discount_minor, i.taxable, i.net_minor
+            i.discount_minor, i.taxable, i.net_minor, i.detail
          FROM quote_items i LEFT JOIN products p ON p.id = i.product_id
          WHERE i.quote_id = ?1 ORDER BY i.line_no",
     )?;
@@ -218,6 +222,7 @@ pub fn quote_lines(conn: &Connection, quote_id: i64) -> DbResult<Vec<LineRow>> {
             taxable: r.get::<_, i64>(9)? == 1,
             net_minor: r.get(10)?,
             unit_cost_e4: None,
+            detail: r.get(11)?,
         })
     })?;
     Ok(rows.collect::<Result<_, _>>()?)
@@ -476,7 +481,7 @@ pub fn replace_sale_items(conn: &Connection, sale_id: i64, lines: &[NewLine]) ->
     conn.execute("DELETE FROM sale_items WHERE sale_id = ?1", [sale_id])?;
     let mut stmt = conn.prepare(
         "INSERT INTO sale_items (sale_id, line_no, product_id, description, qty_milli, list_price_minor, unit_price_minor,
-            discount_ppm, discount_minor, taxable, net_minor) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            discount_ppm, discount_minor, taxable, net_minor, detail) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
     )?;
     for (i, l) in lines.iter().enumerate() {
         stmt.execute(rusqlite::params![
@@ -490,7 +495,8 @@ pub fn replace_sale_items(conn: &Connection, sale_id: i64, lines: &[NewLine]) ->
             l.discount_ppm,
             l.discount_minor,
             l.taxable as i64,
-            l.net_minor
+            l.net_minor,
+            l.detail
         ])?;
     }
     Ok(())
@@ -511,7 +517,7 @@ pub fn sale_by_id(conn: &Connection, id: i64) -> DbResult<Option<SaleRow>> {
 pub fn sale_lines(conn: &Connection, sale_id: i64) -> DbResult<Vec<LineRow>> {
     let mut stmt = conn.prepare(
         "SELECT i.id, i.line_no, i.product_id, p.uid, i.description, i.qty_milli, i.unit_price_minor, i.discount_ppm,
-            i.discount_minor, i.taxable, i.net_minor, i.unit_cost_e4
+            i.discount_minor, i.taxable, i.net_minor, i.unit_cost_e4, i.detail
          FROM sale_items i LEFT JOIN products p ON p.id = i.product_id
          WHERE i.sale_id = ?1 ORDER BY i.line_no",
     )?;
@@ -529,6 +535,7 @@ pub fn sale_lines(conn: &Connection, sale_id: i64) -> DbResult<Vec<LineRow>> {
             taxable: r.get::<_, i64>(9)? == 1,
             net_minor: r.get(10)?,
             unit_cost_e4: r.get(11)?,
+            detail: r.get(12)?,
         })
     })?;
     Ok(rows.collect::<Result<_, _>>()?)

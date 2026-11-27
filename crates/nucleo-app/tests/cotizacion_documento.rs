@@ -30,6 +30,7 @@ fn quote(s: &mut CompanySession, prospect: &str) -> String {
                 unit_price_minor: 27_900,
                 discount_ppm: 0,
                 taxable: true,
+                detail: None,
             }],
             notes: None,
         },

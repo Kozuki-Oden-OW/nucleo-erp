@@ -63,7 +63,10 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const actions: Item[] = useMemo(() => {
     const go = (href: string) => () => { navigate(href); onClose(); };
     const base: Item[] = [
-      { id: "a-venta", group: "Acciones", title: "Nueva venta", icon: Plus, keywords: "nueva venta vender boleta", run: go("/ventas/nueva") },
+      { id: "a-venta", group: "Acciones", title: "Nueva venta", icon: Plus, keywords: "nueva venta vender documento", run: go("/ventas/nueva") },
+      { id: "a-factura", group: "Acciones", title: "Nueva factura", icon: Plus, keywords: "factura electronica sii receptor", run: go("/ventas/nueva?doc=factura") },
+      { id: "a-boleta", group: "Acciones", title: "Nueva boleta", icon: Plus, keywords: "boleta venta publico", run: go("/ventas/nueva?doc=boleta") },
+      { id: "a-guia", group: "Acciones", title: "Nueva guía de despacho", icon: Plus, keywords: "guia despacho traslado", run: go("/ventas/nueva?doc=guia") },
       { id: "a-fv", group: "Acciones", title: "Nueva factura interna", icon: Plus, keywords: "factura interna fv", run: go("/ventas/nueva?tipo=FV") },
       { id: "a-cot", group: "Acciones", title: "Nueva cotización", icon: Plus, keywords: "nueva cotizacion presupuesto cot", run: go("/cotizaciones/nueva") },
       { id: "a-cli", group: "Acciones", title: "Nuevo cliente", icon: Users, keywords: "nuevo cliente agregar", run: go("/clientes?nuevo=1") },

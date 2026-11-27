@@ -392,6 +392,17 @@ impl CompanySession {
         }
     }
 
+    /// Dónde se puede escribir la clave de un acceso: en su sitio (`banco.cl` y subdominios) o, para
+    /// e-Boleta, solo en ese servidor exacto (la Clave Tributaria no se entrega al resto del SII).
+    pub fn login_scope(login_url: &str) -> Option<String> {
+        let host = host_of(login_url)?;
+        Some(if crate::access_ops::is_eboleta(login_url) {
+            host
+        } else {
+            site_of(&host)
+        })
+    }
+
     /// Usuario y clave para que NÚCLEO rellene el ingreso. Exige el permiso de hoy y, si se indica
     /// la página que está abierta, que sea del mismo sitio que la dirección guardada. Deja registro.
     pub fn browser_login_data(
@@ -420,8 +431,10 @@ impl CompanySession {
         }
         let host = host_of(&access.login_url)
             .ok_or_else(|| AppError::Validation("la dirección del acceso no es https".into()))?;
+        let scope = Self::login_scope(&access.login_url).unwrap_or_else(|| host.clone());
         if let Some(page) = page_host
-            && site_of(page) != site_of(&host)
+            && page != scope
+            && !page.ends_with(&format!(".{scope}"))
         {
             return Err(AppError::Validation(format!(
                 "La página abierta es de {page} y el acceso guardado es de {host}: NÚCLEO no \

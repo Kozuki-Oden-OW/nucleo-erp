@@ -85,7 +85,11 @@ impl CompanySession {
                 Detalle {
                     codigo: None,
                     nombre,
-                    descripcion: Some(resto).filter(|x| !x.trim().is_empty()),
+                    descripcion: l
+                        .detail
+                        .clone()
+                        .or(Some(resto))
+                        .filter(|x| !x.trim().is_empty()),
                     cantidad_milli: Some(l.qty_milli),
                     unidad: None,
                     precio: Some(l.unit_price_minor),

@@ -6,6 +6,9 @@
 //! - La clave la escribe la persona en NÚCLEO y nunca vuelve a la interfaz ni al asistente: lo que se
 //!   lista es el sitio, el usuario y si hay clave guardada.
 //! - Solo se guardan cuentas que no pueden pagar ni transferir, y la persona lo confirma al guardar.
+//! - Una excepción, pedida por el dueño: la Clave Tributaria para **e-Boleta** ([`EBOLETA_HOST`]).
+//!   Se guarda solo con esa dirección y NÚCLEO la escribe únicamente en ese sitio exacto, nunca en el
+//!   resto del SII (al que se entra con el certificado digital).
 //! - Quien usa la clave es NÚCLEO (su robot o su extensión de navegador), con la autorización de la
 //!   persona para cada ingreso. [`CompanySession::access_credentials`] es para ese uso interno y no
 //!   se expone como comando de la interfaz.
@@ -47,13 +50,25 @@ pub struct AccessInput {
     pub no_payments: bool,
 }
 
+/// El único sitio del SII cuya clave se guarda: el emisor de boletas electrónicas.
+pub const EBOLETA_HOST: &str = "eboleta.sii.cl";
+
+/// El acceso es el de e-Boleta (Clave Tributaria): su clave solo se usa en ese sitio exacto.
+pub fn is_eboleta(url: &str) -> bool {
+    crate::browser_ops::host_of(url).as_deref() == Some(EBOLETA_HOST)
+}
+
 /// Nombres de sitios cuya clave no se guarda: con ellas se puede mover dinero o firmar ante el SII.
 fn forbidden(name: &str, url: &str) -> Option<&'static str> {
     let t = format!("{} {}", name.to_lowercase(), url.to_lowercase());
     if t.contains("accounts.google") || t.contains("google.com") {
         Some("la cuenta de Google no se guarda: inicia sesión tú en el navegador")
+    } else if is_eboleta(url) {
+        None
     } else if t.contains("sii.cl") || t.contains("clave tributaria") {
-        Some("la Clave Tributaria del SII no se guarda: entra tú con tu certificado o tu clave")
+        Some(
+            "del SII solo se guarda el acceso a e-Boleta (https://eboleta.sii.cl/): al resto se entra con el certificado digital",
+        )
     } else {
         None
     }
@@ -111,9 +126,11 @@ impl CompanySession {
             return v("el tipo de acceso es «lectura» u «operador»");
         }
         if !input.no_payments {
-            return v(
-                "confirma que esta cuenta no puede pagar ni transferir: NÚCLEO solo guarda accesos de consulta",
-            );
+            return v(if is_eboleta(&url) {
+                "confirma que entiendes que es tu Clave Tributaria y que NÚCLEO la usará solo en e-Boleta"
+            } else {
+                "confirma que esta cuenta no puede pagar ni transferir: NÚCLEO solo guarda accesos de consulta"
+            });
         }
         if input.password.chars().count() > 200 {
             return v("la clave admite hasta 200 caracteres");

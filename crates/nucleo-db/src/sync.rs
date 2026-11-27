@@ -81,6 +81,7 @@ const ENTITIES: &[(&str, &[Col])] = &[
             c("credit_enabled"),
             c("credit_conditions"),
             c("preferred"),
+            c("requires_po"),
         ],
     ),
     (

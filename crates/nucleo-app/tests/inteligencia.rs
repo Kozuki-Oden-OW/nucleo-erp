@@ -70,6 +70,7 @@ fn sell(s: &mut CompanySession, customer: Option<&str>, lines: &[(&str, i64, i64
                         unit_price_minor: *price,
                         discount_ppm: 0,
                         taxable: true,
+                        detail: None,
                     })
                     .collect(),
                 notes: None,

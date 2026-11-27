@@ -61,6 +61,7 @@ fn sale(
                     unit_price_minor: amount,
                     discount_ppm: 0,
                     taxable: false,
+                    detail: None,
                 }],
                 notes: None,
                 terms: None,
